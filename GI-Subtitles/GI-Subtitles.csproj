@@ -234,7 +234,7 @@
          is in-TFM on net10. Native OpenCvSharpExtern.dll upgraded; dropped x86
          support (we're x64 only). No API changes required in our Mat/Cv2
          usage. -->
-    <PackageReference Include="OpenCvSharp4" Version="4.13.0.20260330" />
+    <PackageReference Include="OpenCvSharp4" Version="4.13.0.20260427" />
     <PackageReference Include="OpenCvSharp4.Extensions" Version="4.13.0.20260330" />
     <PackageReference Include="OpenCvSharp4.Windows" Version="4.13.0.20260302" />
 
