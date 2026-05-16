@@ -1,0 +1,42 @@
+# Public-mirror .gitignore. Internal-only entries from the private repo
+# (.plan/, .claude/, memory/, tools/, scripts/, backend/, landing/) are
+# intentionally absent — the publish-source.sh allowlist filters them
+# out at copy time.
+
+# Build outputs
+bin/
+obj/
+publish/
+*.dll
+*.pdb
+*.user
+*.suo
+*.DotSettings
+TestResults/
+.vs/
+.idea/
+
+# NuGet
+packages/
+
+# OS detritus
+Thumbs.db
+
+# Per-user runtime config (could leak machine fingerprint if committed).
+Config.json
+
+# Generated translation artefacts
+*.gisub
+*.gisub-dist
+
+# OCR models (not bundled in source)
+*.onnx
+
+# Game text dumps (large; redistributable from Hoyoverse, not us)
+TextMap*.json
+
+# Belt-and-braces against future internal directories sneaking in
+Kaption.AdminTools/
+.plan/
+.claude/
+memory/

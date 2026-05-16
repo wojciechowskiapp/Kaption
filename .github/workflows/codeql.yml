@@ -1,0 +1,27 @@
+# Static-analysis pass on push and weekly. Free for public repos.
+name: CodeQL
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '0 4 * * 1'
+
+jobs:
+  analyze:
+    runs-on: windows-latest
+    permissions:
+      security-events: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: csharp
+      - run: dotnet build GI-Subtitles.sln -c Release --nologo
+      - uses: github/codeql-action/analyze@v3

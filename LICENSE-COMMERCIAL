@@ -1,0 +1,109 @@
+Kaption — Commercial Licence
+Copyright (c) 2026 Wojciechowski
+
+This file describes the commercial-licence option for Kaption. It is a
+summary of the kind of terms typically offered. The actual licence
+agreement is signed separately, as a written contract between you (or
+your organisation) and the Kaption project author.
+
+If you only want to use Kaption under AGPL-3.0, you do NOT need this
+file — see LICENSE-AGPL instead.
+
+================================================================================
+WHEN A COMMERCIAL LICENCE IS NEEDED
+================================================================================
+
+Most users of Kaption do not need a commercial licence. AGPL-3.0 already
+covers personal use, security research, AGPL-licensed forks, and
+contributions back to the project.
+
+You typically need a commercial licence only if one or more of the
+following applies:
+
+  1. You want to ship a closed-source product, application, or service
+     that includes Kaption source code or substantial portions of it.
+
+  2. You want to distribute a modified version of Kaption without
+     releasing the modifications under AGPL-3.0.
+
+  3. Your organisation has a policy that prohibits AGPL software in its
+     products, even for internal tooling.
+
+  4. You need a contractual warranty, indemnity, service-level
+     agreement, or formal support that AGPL-3.0 does not provide.
+
+  5. You want a written trademark licence to use the "Kaption" name or
+     logo in a specific context (this is granted case-by-case and is
+     not bundled by default).
+
+================================================================================
+WHAT A COMMERCIAL LICENCE TYPICALLY GRANTS
+================================================================================
+
+Subject to the negotiated terms, a commercial licence usually grants:
+
+  * The right to use, modify, and distribute Kaption source and binaries
+    in proprietary / closed-source products and services.
+
+  * Exemption from the AGPL-3.0 obligation to release derivative-work
+    source code.
+
+  * Optional: contractual warranty, indemnity, and support terms.
+
+  * Optional: a limited trademark licence to use the "Kaption" name
+    and logo in specific contexts (granted case-by-case).
+
+================================================================================
+WHAT A COMMERCIAL LICENCE DOES NOT GRANT
+================================================================================
+
+  * The right to register "Kaption" or the Kaption logo as your own
+    trademark in any jurisdiction.
+
+  * Access to private translation-pipeline tooling, internal release
+    scripts, or paid translation packs. Those are operated by the
+    Kaption project; paid translation packs are sold separately to end
+    users via https://kaption.one.
+
+  * Any obligation by us to keep Kaption open source forever, or to
+    accept your contributions, or to maintain backwards compatibility.
+
+  * Transfer to spin-offs, acquirers, or successor entities without a
+    written amendment.
+
+================================================================================
+HOW TO REQUEST A COMMERCIAL LICENCE
+================================================================================
+
+Email:   hello@kaption.one
+Website: https://kaption.one
+
+When you write, please include:
+
+  * Your name, organisation, and country of operation.
+  * A short description of how you intend to use Kaption — many uses
+    fit AGPL-3.0, and we will tell you if a commercial licence is
+    actually unnecessary.
+  * Estimated number of seats, installations, or end users covered.
+  * Whether you need a warranty, indemnity, support, or trademark
+    licence in addition to the source-licence exemption.
+
+We aim to reply within a few business days and finalise most
+agreements within two weeks.
+
+================================================================================
+INBOUND CONTRIBUTIONS
+================================================================================
+
+If you submit a pull request to the public Kaption repository, your
+contribution is licensed under both AGPL-3.0 and the commercial-licence
+option (inbound = outbound). See CONTRIBUTING.md for details.
+
+================================================================================
+NO WARRANTY UNTIL SIGNED
+================================================================================
+
+This file is descriptive, not binding. A commercial licence exists only
+once a written agreement has been signed between you and the Kaption
+project author. Until then, your use of Kaption is governed by AGPL-3.0
+(see LICENSE and LICENSE-AGPL).

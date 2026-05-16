@@ -1,0 +1,43 @@
+<Project Sdk="Microsoft.NET.Sdk.WindowsDesktop">
+
+  <PropertyGroup>
+    <!-- net48 → net8.0-windows on 2026-04-23 → net10.0-windows on 2026-04-24. -->
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <OutputType>Library</OutputType>
+    <RootNamespace>GI.Screenshot</RootNamespace>
+    <AssemblyName>Screenshot</AssemblyName>
+    <LangVersion>12</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Deterministic>true</Deterministic>
+
+    <!-- Windows-only (DXGI + WinForms Screen). Suppress CA1416. -->
+    <NoWarn>$(NoWarn);CA1416</NoWarn>
+
+    <!-- Preserve the sln ProjectGuid so .sln project-config entries still
+         resolve to this project under SDK-style. -->
+    <ProjectGuid>{38B15FC5-1EA1-45E6-A219-9D5DFE95AFF0}</ProjectGuid>
+
+    <!-- Keep the hand-written Properties\AssemblyInfo.cs from colliding with
+         the SDK's auto-generated one. -->
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+
+    <!-- Keep the legacy flat output layout (bin\Release\ instead of
+         bin\Release\net8.0-windows\). Downstream build-release.bat and
+         vpk pack use packDir pointed at bin\Release directly. -->
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
+  </PropertyGroup>
+
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+  </PropertyGroup>
+
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>pdbonly</DebugType>
+  </PropertyGroup>
+
+</Project>

@@ -1,0 +1,78 @@
+<Project Sdk="Microsoft.NET.Sdk.WindowsDesktop">
+
+  <PropertyGroup>
+    <!-- net48 → net8.0-windows on 2026-04-23 → net10.0-windows on 2026-04-24. -->
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <OutputType>Library</OutputType>
+    <RootNamespace>GI_Test</RootNamespace>
+    <AssemblyName>GI-Test</AssemblyName>
+    <LangVersion>12</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+
+    <!-- Release config targeted x64 in the legacy csproj; preserve so tests
+         run against the same codegen as the main exe. -->
+    <PlatformTarget Condition=" '$(Configuration)' == 'Release' ">x64</PlatformTarget>
+
+    <!-- Preserve the sln ProjectGuid so .sln project-config entries still
+         resolve to this project under SDK-style. -->
+    <ProjectGuid>{2B1B3932-4371-41F0-BC3F-0734E69940D9}</ProjectGuid>
+
+    <!-- Hand-written Properties\AssemblyInfo.cs — block the SDK from
+         auto-generating a duplicate set of [assembly: ...] attributes. -->
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+
+    <!-- Keep flat bin\Release\ layout (no net8.0-windows\ subfolder). -->
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
+
+    <AutoGenerateBindingRedirects>false</AutoGenerateBindingRedirects>
+
+    <!-- Windows-only test project (touches WPF + System.Drawing.Bitmap + WinForms).
+         Suppress CA1416 to match the main project. -->
+    <NoWarn>$(NoWarn);CA1416</NoWarn>
+
+    <!-- MSTest discovery: the SDK sets IsTestProject based on
+         Microsoft.NET.Test.Sdk PackageReference. We don't use that here
+         (vstest.console.exe is invoked directly per CLAUDE.md), so leave
+         it off. -->
+  </PropertyGroup>
+
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+  </PropertyGroup>
+
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>pdbonly</DebugType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="log4net" Version="3.3.1" />
+    <!-- Microsoft.NET.Test.Sdk is required for `dotnet test` discovery on
+         net8+ (MSTest alone doesn't surface the VSTest console host).
+         Adds IsTestProject=true implicitly. -->
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+    <PackageReference Include="MSTest.TestAdapter" Version="3.6.1" />
+    <PackageReference Include="MSTest.TestFramework" Version="3.6.1" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
+    <PackageReference Include="OpenCvSharp4" Version="4.13.0.20260330" />
+    <PackageReference Include="OpenCvSharp4.Extensions" Version="4.13.0.20260330" />
+    <PackageReference Include="OpenCvSharp4.runtime.win" Version="4.13.0.20260302" />
+    <!-- System.Drawing.Common dropped: in-box on net10. -->
+
+    <!-- DROPPED (in-box on net8): System.Buffers, System.Memory,
+         System.Numerics.Vectors, System.Runtime.CompilerServices.Unsafe,
+         System.ValueTuple. Framework refs (System.Configuration,
+         System.Web, System.Xaml, PresentationCore/Framework, WindowsBase)
+         are pulled in by UseWPF=true + WindowsDesktop implicit refs. -->
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\GI-Subtitles\GI-Subtitles.csproj" />
+    <ProjectReference Include="..\PaddleOCRSharp\PaddleOCRSharp.csproj" />
+  </ItemGroup>
+
+</Project>

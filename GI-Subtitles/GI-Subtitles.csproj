@@ -1,0 +1,311 @@
+<Project Sdk="Microsoft.NET.Sdk.WindowsDesktop">
+
+  <PropertyGroup>
+    <!-- Target framework history:
+         net48 → net8.0-windows on 2026-04-23 (phases 1-6).
+         net8.0-windows → net10.0-windows on 2026-04-24 (Phase 7) after stable
+         SDK 10.0.203 became available on the dev box. net10 is the current
+         LTS (Nov 2025 → Nov 2028 support), vs net8 LTS ending Nov 2026.
+         net9 was deliberately skipped because dotnet/sdk#43461 excluded
+         PresentationCore from publish; net10 resolves that path.
+
+         Key carry-overs:
+           * Workstation GC + DATAS explicitly disabled via runtimeconfig
+             (DATAS is default-ON from net9+ but hurts our burst workload).
+           * All phase 1-6 perf work (float[128*128], FrozenDictionary,
+             [GeneratedRegex], Span<char>, SocketsHttpHandler, stackalloc)
+             carries forward unchanged — net10 is an additive step. -->
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <!-- MainWindow + Screenshot use System.Windows.Forms types (Screen,
+         NotifyIcon). UseWPF alone does not pull Windows Forms in. -->
+    <UseWindowsForms>true</UseWindowsForms>
+
+    <OutputType>WinExe</OutputType>
+    <RootNamespace>GI_Subtitles</RootNamespace>
+    <AssemblyName>Kaption</AssemblyName>
+    <!-- LangVersion 12 is the net8 default; opt-in explicitly for
+         readability. Nullable left disabled for this migration PR; flip
+         per-file later. ImplicitUsings off — would churn every file. -->
+    <LangVersion>12</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Deterministic>true</Deterministic>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+
+    <!-- Silence warnings that don't apply to our shape:
+         - CA1416: net10.0-windows + manifest + Velopack Windows-only dist
+           make Windows-platform warnings pure noise (600+ fires).
+         - WFO0003: WinForms asks us to migrate DPI settings from
+           app.manifest to the ApplicationHighDpiMode MSBuild property.
+           Our WPF+WinForms hybrid has the manifest-based dpiAwareness
+           tested and working since net48; changing the DPI config path
+           has real behavioral risk (multi-monitor mixed-DPI math,
+           overlay positioning). Defer to a dedicated DPI-migration PR
+           with smoke tests on mixed-DPI rig. -->
+    <NoWarn>$(NoWarn);CA1416;WFO0003</NoWarn>
+
+    <!--
+      Velopack owns the process entry point: Main() must call
+      VelopackApp.Build().Run() BEFORE WPF's Application.Run bootstraps, so
+      the installer's hook-mode invocations (veloapp-install, obsoleted,
+      firstrun, restarted) can short-circuit without ever spinning up the
+      UI. We declare our own [STAThread] Main in App.xaml.cs and point
+      StartupObject at it; App.xaml drops to <Page/> below (via the item-
+      group override) so the XAML toolchain doesn't auto-generate a
+      competing Main. This is the OFFICIALLY documented Velopack pattern
+      for WPF on .NET 8 per docs.velopack.io/getting-started/csharp.
+    -->
+    <StartupObject>GI_Subtitles.App</StartupObject>
+
+    <!-- Branded icon + manifest from the old csproj. Both sit next to the
+         .csproj on disk. -->
+    <ApplicationIcon>Resources\kaption.ico</ApplicationIcon>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+
+    <!-- Release config targets x64 to match the legacy csproj and so the
+         OnnxRuntime.DirectML native-DLL copy gates through correctly. -->
+    <PlatformTarget Condition=" '$(Configuration)' == 'Release' ">x64</PlatformTarget>
+    <Prefer32Bit>false</Prefer32Bit>
+
+    <!-- RuntimeIdentifiers declaration pre-populates the win-x64 leg of
+         the restore graph so `dotnet build` doesn't fall back to NETSDK1047.
+         Publish path: `dotnet publish -c Release -r win-x64 [self-contained] -o bin\Release`. -->
+    <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
+
+    <!-- Preserve the sln ProjectGuid so .sln project-config entries still
+         resolve to this project under SDK-style. -->
+    <ProjectGuid>{8352D7DA-8B24-49AB-A76A-E96CB707F6CE}</ProjectGuid>
+
+    <!-- Hand-written Properties\AssemblyInfo.cs and auto-generated
+         Properties\VersionInfo.cs (rewritten by build-release.bat on every
+         release build) both carry [assembly: ...] attributes. Block the
+         SDK from auto-generating its own AssemblyInfo or we get CS0579
+         duplicate-attribute errors. -->
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+
+    <!-- Keep the flat bin\Release\ layout (no net8.0-windows\win-x64\
+         subfolder). Downstream build-release.bat and vpk pack (packDir
+         arg) point at bin\Release directly. -->
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
+
+    <!-- Binding redirects are inert on .NET 8 (Core+ assembly loader
+         ignores <bindingRedirect>). Previous landmine was NuGet.Versioning
+         6.x→7.3.0.70 for Velopack 0.0.1298. Velopack 0.0.1521+ drops the
+         NuGet.Versioning dependency entirely (custom SemanticVersion
+         class). AutoGenerateBindingRedirects stays off for safety. -->
+    <AutoGenerateBindingRedirects>false</AutoGenerateBindingRedirects>
+
+    <!-- Default-ON for net5+, but kept explicit for documentation: the
+         Properties\Resources.resx mask Icon entry is non-string and needs
+         the preserialized-resources shim. System.Resources.Extensions is
+         in-box on net8; the PackageReference was dropped. -->
+    <GenerateResourceUsePreserializedResources>true</GenerateResourceUsePreserializedResources>
+
+    <!-- R2R on for cold-start perf (-200 to -800 ms projected).
+         Non-Composite for Velopack-delta friendliness; composite would
+         blow up deltas from ~200 KB to 5–10 MB per release. SelfContained
+         must be explicit on net8 — no longer implied by PublishReadyToRun.
+         PublishTrimmed explicit-false to defend against someone enabling
+         it later (WPF is not trim-compatible per dotnet/wpf#3811). -->
+    <PublishReadyToRun>true</PublishReadyToRun>
+    <PublishReadyToRunComposite>false</PublishReadyToRunComposite>
+    <SelfContained>true</SelfContained>
+    <PublishTrimmed>false</PublishTrimmed>
+
+    <!-- Re-enable Microsoft.AI.DirectML's own .targets copy of the newer
+         DirectML.dll. OnnxRuntime.DirectML's .props sets
+         SkipLibraryCopy=true to prevent a conflict, but we WANT the newer
+         1.15.4 DirectML for RTX 50-series support. Setting this property
+         before the Import is processed re-enables the copy, and we delete
+         the legacy manual CopyDirectML target. See §6.a of the migration
+         analysis doc. -->
+    <Microsoft_AI_DirectML_SkipLibraryCopy>false</Microsoft_AI_DirectML_SkipLibraryCopy>
+  </PropertyGroup>
+
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+  </PropertyGroup>
+
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>pdbonly</DebugType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!--
+      App.xaml stays a <Page/>, NOT an <ApplicationDefinition/>.
+      Microsoft.NET.Sdk.WindowsDesktop's default glob auto-assigns
+      App.xaml the ApplicationDefinition build action, which makes the
+      XAML compiler emit its own [STAThread] Main() — that would race our
+      hand-written one and defeat the Velopack startup hooks. Undo the
+      default and pin App.xaml as a Page. See StartupObject above for the
+      full context.
+    -->
+    <ApplicationDefinition Remove="App.xaml" />
+    <Page Include="App.xaml" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Framework references that net48 carried by name ("System.Web",
+         "System.Management", etc.) are not available as framework refs on
+         net8. Replacements for the ones we actually use move to NuGet. -->
+    <PackageReference Include="System.Management" Version="10.0.7" />
+    <PackageReference Include="System.ServiceModel.Syndication" Version="10.0.7" />
+    <!-- System.Web dropped: LoopbackAuthListener.cs's HttpUtility.ParseQueryString +
+         HttpUtility.HtmlEncode calls rewritten to System.Net.WebUtility +
+         a 20-line ParseQueryString replacement. System.Web.HttpUtility as
+         a standalone NuGet package does not exist. -->
+    <!-- System.Configuration.ConfigurationManager: NOT added. Settings.Designer.cs
+         has zero real consumers (preflight grep verified); the pipeline
+         was deleted alongside this migration. -->
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Properties\Resources.resx preserves the .Designer.cs / .resx
+         codegen triad. Settings.settings + Settings.Designer.cs were
+         deleted — no code used Properties.Settings.Default anywhere. -->
+    <Compile Update="Properties\Resources.Designer.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>Resources.resx</DependentUpon>
+    </Compile>
+    <EmbeddedResource Update="Properties\Resources.resx">
+      <Generator>ResXFileCodeGenerator</Generator>
+      <LastGenOutput>Resources.Designer.cs</LastGenOutput>
+    </EmbeddedResource>
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Bundled resources that ship inside Kaption.exe. -->
+    <Resource Include="Resources\kaption.ico" />
+    <Resource Include="Resources\kaption-running.ico" />
+    <Resource Include="Resources\qrcode.jpg" />
+    <Resource Include="Resources\drag.png" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- log4net 3.x: drops APIs deprecated since 2015 (we use none of them —
+         verified). Fixes GHSA-4f7c-pmjv-c25w (NU1902) that 2.0.17 carries. -->
+    <PackageReference Include="log4net" Version="3.3.1" />
+    <!-- FST-indexed matcher blob. Lucene.Net 4.8.0-beta00017 multi-targets
+         netstandard2.0 + net6.0; runs cleanly on net8. Only the Fst
+         subsystem is used — no IO/Directory dependencies. Apache-2.0. -->
+    <PackageReference Include="Lucene.Net" Version="4.8.0-beta00017" />
+    <!-- ZstdSharp.Port 0.8.7 is pure-managed (no native DLL), targets
+         netstandard2.0 + net5+, MIT, zstd 1.5.7 parity. Used for
+         dictionary-trained per-value compression of the matcher's
+         Polish value pool. -->
+    <PackageReference Include="ZstdSharp.Port" Version="0.8.7" />
+    <!-- OnnxRuntime.DirectML 1.24 transitively pulls Microsoft.AI.DirectML
+         1.15.4 — but we still explicit-reference below to pin the version
+         and to let the .targets file copy the newer DirectML.dll. -->
+    <PackageReference Include="Microsoft.ML.OnnxRuntime.DirectML" Version="1.24.4" />
+    <PackageReference Include="Microsoft.ML.OnnxRuntime.Managed" Version="1.24.4" />
+    <!-- Explicit pin for the newer DirectML.dll (RTX 50 support). The
+         Microsoft_AI_DirectML_SkipLibraryCopy=false property above
+         re-enables .targets-based copy so we don't need a manual target. -->
+    <PackageReference Include="Microsoft.AI.DirectML" Version="1.15.4" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
+    <!-- Sentry 6.x: the "4.13.0 was last line with net462 support" comment
+         was stale advice. Sentry 6.4.1 still ships a net462 TFM alongside
+         net8/net9/netstandard2.0/2.1. The 5.0 class renames (User →
+         SentryUser, Transaction → SentryTransaction) don't affect
+         CrashReportingService.cs — we use none of the renamed types.
+         Options API (AutoSessionTracking, TracesSampleRate, SetBeforeSend,
+         Debug, MaxBreadcrumbs, SendDefaultPii, AttachStacktrace, Release,
+         Environment, Dsn) preserved unchanged through 6.x. -->
+    <PackageReference Include="Sentry" Version="6.4.1" />
+    <!-- Velopack: pinned at 0.0.1298 (current working version). Newer
+         Velopack releases (0.0.1521+ which drop NuGet.Versioning) ship
+         only as prerelease on NuGet; keeping the known-good pin during
+         the TFM migration. On net8, binding redirects are inert — the
+         NuGet.Versioning 6.14→7.3.0 drift that needed a redirect on net48
+         is no longer a concern because Core+ assembly loader ignores
+         <bindingRedirect>. -->
+    <PackageReference Include="Velopack" Version="0.0.1298" />
+    <!-- OpenCvSharp4.Windows is the metapackage — it pulls Core +
+         Extensions + runtime.win transitively. -->
+    <!-- OpenCvSharp 4.13 (2026-03-30). Unblocked by the net10 TFM jump: 4.13
+         transitively requires System.Drawing.Common 10.0.3 via
+         OpenCvSharp4.WpfExtensions, which was a cross-major error on net8 but
+         is in-TFM on net10. Native OpenCvSharpExtern.dll upgraded; dropped x86
+         support (we're x64 only). No API changes required in our Mat/Cv2
+         usage. -->
+    <PackageReference Include="OpenCvSharp4" Version="4.13.0.20260330" />
+    <PackageReference Include="OpenCvSharp4.Extensions" Version="4.13.0.20260330" />
+    <PackageReference Include="OpenCvSharp4.Windows" Version="4.13.0.20260302" />
+
+    <!-- DROPPED on net10 (in-box, NU1510-flagged as unnecessary):
+         - System.Drawing.Common (was 8.0.11)
+         - System.IO.Pipelines (was 9.0.0)
+         - System.Text.Encodings.Web (was 9.0.0)
+         - System.Text.Json (was 9.0.0 — net10's in-box STJ is 10.x, newer).
+    -->
+
+    <!-- DROPPED (in-box on net8 or obsolete):
+         - Microsoft.Bcl.AsyncInterfaces (IAsyncDisposable in-box)
+         - NuGet.Versioning (Velopack 0.0.1521+ drops the dep)
+         - System.Buffers (in-box)
+         - System.Collections.Immutable (in-box as 8.x)
+         - System.Memory (in-box)
+         - System.Numerics.Vectors (in-box)
+         - System.Reflection.Metadata (in-box as 8.x)
+         - System.Resources.Extensions (in-box)
+         - System.Runtime.CompilerServices.Unsafe (in-box)
+         - System.Runtime.InteropServices.RuntimeInformation (in-box)
+         - System.Threading.Tasks.Extensions (in-box)
+         - System.ValueTuple (language feature, in-box)
+    -->
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\PaddleOCRSharp\PaddleOCRSharp.csproj" />
+    <ProjectReference Include="..\Screenshot\Screenshot.csproj" />
+  </ItemGroup>
+
+  <!-- CopyDirectML target DELETED. Replaced by
+       <Microsoft_AI_DirectML_SkipLibraryCopy>false</...> in the PropertyGroup
+       above, which re-enables Microsoft.AI.DirectML's own .targets copy
+       (currently disabled by OnnxRuntime.DirectML's .props to prevent a
+       conflict). Effect is identical — DirectML.dll 1.15.4 lands in output
+       — but the legacy `..\packages\` path landmine is gone. -->
+
+  <!-- Strip dev-time byproducts the SDK-style resolution pulls out of the
+       Microsoft.ML.OnnxRuntime.DirectML package that the old-style csproj
+       never shipped. These add ~15 MB per install and flow into every
+       Velopack delta unnecessarily:
+         - DirectML.Debug.dll / .pdb — DX12 debug layer; runtime only loads
+           it when SDKLayers is enabled, which Kaption never does.
+         - DirectML.pdb — symbols for DirectML.dll; Kaption users have no
+           use for them.
+         - onnxruntime.lib — static link library for C++ projects; we
+           P/Invoke the managed wrapper, not the C lib. -->
+  <Target Name="StripDirectMLDevByproducts" AfterTargets="Build">
+    <ItemGroup>
+      <_KaptionDirectMLExtras Include="$(OutputPath)DirectML.Debug.dll" />
+      <_KaptionDirectMLExtras Include="$(OutputPath)DirectML.Debug.pdb" />
+      <_KaptionDirectMLExtras Include="$(OutputPath)DirectML.pdb" />
+      <_KaptionDirectMLExtras Include="$(OutputPath)onnxruntime.lib" />
+    </ItemGroup>
+    <Delete Files="@(_KaptionDirectMLExtras)" ContinueOnError="true" />
+  </Target>
+
+  <!-- Pre-build guard: catch {StaticResource X} typos before they become
+       a XamlParseException at window-open time. WPF has no compile-time
+       check for resource-key resolution, so we shell out to a small
+       PowerShell scanner. Skips the WPF _wpftmp.csproj intermediate
+       (that project re-invokes Build during markup compilation, and
+       running the scanner twice on every rebuild adds nothing).
+       Skips when the validator script is absent — the script lives in
+       tools/ which is intentionally not part of the public source mirror,
+       so a public-mirror checkout builds without it. -->
+  <Target Name="ValidateXamlResources"
+          BeforeTargets="BeforeBuild"
+          Condition="!$(MSBuildProjectFile.Contains('_wpftmp')) AND Exists('$(MSBuildProjectDirectory)\..\tools\validate-xaml-resources.ps1')">
+    <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\..\tools\validate-xaml-resources.ps1&quot; -ProjectRoot &quot;$(MSBuildProjectDirectory)\..&quot;" />
+  </Target>
+
+</Project>

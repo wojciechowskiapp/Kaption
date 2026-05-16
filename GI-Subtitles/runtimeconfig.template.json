@@ -1,0 +1,9 @@
+{
+  "configProperties": {
+    "System.GC.AllowVeryLargeObjects": true,
+    "System.GC.Server": false,
+    "System.GC.Concurrent": true,
+    "System.GC.RetainVM": false,
+    "System.GC.DynamicAdaptationMode": 0
+  }
+}

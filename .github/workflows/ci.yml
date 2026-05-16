@@ -1,0 +1,26 @@
+# Minimal public CI for the Kaption desktop source mirror. Builds and
+# runs the test suite on every push and pull request. Release / deploy
+# automation lives in the private repo.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Build
+        run: dotnet build GI-Subtitles.sln -c Release --nologo
+
+      - name: Test
+        run: dotnet test GI-Test/GI-Test.csproj -c Debug --nologo --logger "console;verbosity=normal"

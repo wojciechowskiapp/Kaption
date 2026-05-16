@@ -1,0 +1,1638 @@
+<Window x:Class="GI_Subtitles.Views.SettingsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:logging="clr-namespace:GI_Subtitles.Core.Logging"
+        Title="{DynamicResource App_Settings}"
+        Height="760" Width="820"
+        Icon="../Resources/kaption.ico"
+        Topmost="False"
+        WindowStartupLocation="CenterOwner"
+        Background="#F8F9FC"
+        ToolTipService.InitialShowDelay="0"
+        ToolTipService.BetweenShowDelay="0"
+        ToolTipService.ShowDuration="20000">
+
+    <Window.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="../Resources/ModernStyles.xaml"/>
+            </ResourceDictionary.MergedDictionaries>
+
+            <!-- Legacy aliases -->
+            <Style TargetType="Button" x:Key="PrimaryButton" BasedOn="{StaticResource ModernButton}"/>
+            <Style TargetType="Button" x:Key="HelpButton">
+                <Setter Property="Visibility" Value="Collapsed"/>
+            </Style>
+            <Style TargetType="TextBox" x:Key="LinkTextBox">
+                <Setter Property="Visibility" Value="Collapsed"/>
+            </Style>
+
+            <!-- Used by the Translations tab to hide per-row buttons when no
+                 local file exists. WPF ships this converter built-in. -->
+            <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
+
+            <!-- Shared hotkey row template — used by both the Everyday and
+                 Advanced ListViews on the Hotkeys tab. Layout: description +
+                 info (i) icon with hover-expanding "when to use" tooltip +
+                 click-to-record chip showing the current binding. -->
+            <DataTemplate x:Key="HotkeyRowTemplate">
+                <Grid Margin="4,6">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="{Binding Description}" VerticalAlignment="Center"
+                               FontSize="12" Foreground="#374151"
+                               TextWrapping="Wrap"/>
+                    <!-- Info icon. Tooltip body comes from Hotkey_<Id>_Info
+                         resource keys, populated on the viewmodel at load time. -->
+                    <Border Grid.Column="1" Width="22" Height="22" CornerRadius="11"
+                            Background="{StaticResource AccentLightBrush}"
+                            VerticalAlignment="Center" Margin="8,0,4,0" Cursor="Help"
+                            ToolTip="{Binding InfoText}">
+                        <ToolTipService.InitialShowDelay>0</ToolTipService.InitialShowDelay>
+                        <ToolTipService.ShowDuration>30000</ToolTipService.ShowDuration>
+                        <TextBlock Text="i" FontSize="12" FontWeight="Bold" FontStyle="Italic"
+                                   Foreground="{StaticResource AccentBrush}"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    <Button Grid.Column="2"
+                            Style="{StaticResource SecondaryButton}"
+                            Content="{Binding DisplayText}"
+                            MinWidth="170" Height="32"
+                            Padding="14,0"
+                            Margin="6,0,0,0"
+                            HorizontalAlignment="Right"
+                            VerticalAlignment="Center"
+                            FontFamily="Segoe UI" FontSize="12"
+                            Click="HotkeyChip_Click"
+                            PreviewKeyDown="HotkeyChip_PreviewKeyDown"
+                            LostKeyboardFocus="HotkeyChip_LostKeyboardFocus"
+                            Focusable="True"
+                            ToolTip="{DynamicResource Hotkey_ClickToRecord_Tooltip}"/>
+                </Grid>
+            </DataTemplate>
+        </ResourceDictionary>
+    </Window.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- ═══════════════════════════════════════════════════════════
+             CONTENT TABS
+             ═══════════════════════════════════════════════════════════ -->
+        <TabControl Grid.Row="0" Style="{StaticResource ModernTabControl}" Margin="16,4,16,0">
+
+            <!-- ═══════════════════════════════════════════════════════════
+                 TAB 1: DASHBOARD
+                 ═══════════════════════════════════════════════════════════ -->
+            <TabItem Header="{DynamicResource Tab_Dashboard}" Tag="Dashboard" Style="{StaticResource ModernTabItem}">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="4,20,4,16">
+
+                        <!-- ═════════════════════════════════════════════════
+                             ANNOUNCEMENT BANNERS (one per active broadcast)
+                             Populated at window open from
+                             /api/announcements/active. Admin-authored, tier-
+                             filtered server-side. Visibility toggles to
+                             Visible only when at least one banner is returned;
+                             the container stays empty + collapsed otherwise
+                             so there's no layout gap. See
+                             SettingsWindow.xaml.cs#LoadAnnouncementsAsync.
+                             ═════════════════════════════════════════════════ -->
+                        <StackPanel x:Name="AnnouncementsStack"
+                                    Visibility="Collapsed"
+                                    Margin="0,0,0,4"/>
+
+                        <!-- ═════════════════════════════════════════════════
+                             AUTO-UPDATE BANNER (dismissable pill)
+                             Hidden by default. MainWindow calls
+                             SettingsWindow.ShowUpdateBanner(...) when the
+                             background UpdateService reports an available
+                             version. Tailwind-ish: dark glassy bg, blue accent,
+                             auto-dismiss timer lives in code-behind.
+                             ═════════════════════════════════════════════════ -->
+                        <Border x:Name="UpdateBanner" Visibility="Collapsed"
+                                Background="#1E2A4A" CornerRadius="10"
+                                BorderBrush="#3B5BDB" BorderThickness="1"
+                                Padding="14,10" Margin="0,0,0,14">
+                            <Border.Effect>
+                                <DropShadowEffect Color="#3B5BDB" BlurRadius="18" ShadowDepth="0" Opacity="0.35"/>
+                            </Border.Effect>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+
+                                <StackPanel Grid.Column="0" Orientation="Vertical" VerticalAlignment="Center">
+                                    <TextBlock x:Name="UpdateBannerTitle"
+                                               Text="{DynamicResource Update_Available_Title}"
+                                               FontSize="13" FontWeight="SemiBold"
+                                               Foreground="#DDE4FF"/>
+                                    <TextBlock x:Name="UpdateBannerBody"
+                                               Text="{DynamicResource Update_Available_Body}"
+                                               FontSize="11" Foreground="#A9B4D8"
+                                               Margin="0,2,0,0"
+                                               TextWrapping="Wrap"/>
+                                </StackPanel>
+
+                                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                    <Button x:Name="UpdateBannerInstallButton"
+                                            Content="{DynamicResource Update_Install}"
+                                            ToolTip="{DynamicResource Tip_Update_Install}"
+                                            Click="UpdateBannerInstall_Click"
+                                            Background="#3B5BDB" Foreground="White"
+                                            BorderThickness="0"
+                                            Padding="12,6" Margin="8,0,0,0"
+                                            Cursor="Hand" FontSize="12" FontWeight="SemiBold"/>
+                                    <Button x:Name="UpdateBannerWhatsNewButton"
+                                            Content="{DynamicResource Update_WhatsNew}"
+                                            ToolTip="{DynamicResource Tip_Update_WhatsNew}"
+                                            Click="UpdateBannerWhatsNew_Click"
+                                            Background="Transparent" Foreground="#A9B4D8"
+                                            BorderBrush="#3B5BDB" BorderThickness="1"
+                                            Padding="10,5" Margin="8,0,0,0"
+                                            Cursor="Hand" FontSize="11"/>
+                                    <Button x:Name="UpdateBannerRemindButton"
+                                            Content="{DynamicResource Update_RemindLater}"
+                                            ToolTip="{DynamicResource Tip_Update_Remind}"
+                                            Click="UpdateBannerRemind_Click"
+                                            Background="Transparent" Foreground="#7E8BB6"
+                                            BorderThickness="0"
+                                            Padding="10,5" Margin="8,0,0,0"
+                                            Cursor="Hand" FontSize="11"/>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+
+                        <!-- Hidden compatibility elements — do not remove -->
+                        <StackPanel Visibility="Collapsed">
+                            <ComboBox Name="UILangSelector" SelectionChanged="UILangSelector_SelectionChanged">
+                                <ComboBoxItem Content="English" Tag="en-US" IsSelected="True"/>
+                                <ComboBoxItem Content="Polski" Tag="pl-PL"/>
+                                <ComboBoxItem Content="日本語" Tag="ja-JP"/>
+                                <ComboBoxItem Content="简体中文" Tag="zh-CN"/>
+                            </ComboBox>
+                            <ComboBox Name="InputSelector"><ComboBoxItem Content="English" IsSelected="True"/></ComboBox>
+                            <ListBox Name="OutputSelector" SelectionMode="Multiple"><ListBoxItem Content="Polski" IsSelected="True"/></ListBox>
+                            <Button x:Name="OutputConfirmButton" Click="OutputConfirmButton_Click"/>
+                            <TextBlock Name="outputFilePathDate2"/>
+                            <TextBox x:Name="InputLangDownloadUrl"/><TextBox x:Name="OutputLangDownloadUrl"/><TextBox x:Name="OutputLangDownloadUrl2"/>
+                            <Button x:Name="DownloadButton1" Click="DownloadButton1_Click"/>
+                            <Button x:Name="DownloadButton2" Click="DownloadButton2_Click"/>
+                            <CheckBox x:Name="ShowSecondLangCheckBox" Checked="ShowSecondLangCheckBox_Checked" Unchecked="ShowSecondLangCheckBox_Checked"/>
+                            <Image Name="Capture" HorizontalAlignment="Center"/>
+                            <Button x:Name="SyncButton" Click="SyncButton_Click"/>
+                            <Button x:Name="RestartButton" Click="RestartButton_Click"/>
+                            <Button x:Name="VideoButton" Click="VideoButton_Click"/>
+                            <Button x:Name="ConvertButton" Click="ConvertButton_Click"/>
+                            <Button x:Name="RegionButton" Click="RegionButton_Click"/>
+                            <TextBlock Name="inputFilePathDate"/><TextBlock Name="outputFilePathDate"/>
+                            <TextBlock Name="RepoModifiedDate"/>
+                        </StackPanel>
+
+                        <!-- ═════════════════════════════════════════════════
+                             ENGINE-FAILED BANNER (session 33)
+                             Hidden by default; shown by UpdateDashboardStatus
+                             when EngineStatus == Failed. Red accent to match
+                             Stopped/Error palette, with Retry + CPU-fallback
+                             buttons. Failures are also reported to GlitchTip
+                             in MainWindow so we don't lose the trace if the
+                             user clicks Dismiss and forgets.
+                             ═════════════════════════════════════════════════ -->
+                        <Border x:Name="DashEngineFailedBanner" Visibility="Collapsed"
+                                Background="{StaticResource ErrorLightBrush}" CornerRadius="10"
+                                BorderBrush="{StaticResource ErrorBrush}" BorderThickness="1"
+                                Padding="14,10" Margin="0,0,0,14">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+
+                                <StackPanel Grid.Column="0" Orientation="Vertical" VerticalAlignment="Center">
+                                    <TextBlock Text="{DynamicResource Dash_EngineFailed_Title}"
+                                               FontSize="13" FontWeight="SemiBold"
+                                               Foreground="{StaticResource ErrorBrush}"/>
+                                    <TextBlock Text="{DynamicResource Dash_EngineFailed_Body}"
+                                               FontSize="11" Foreground="{StaticResource TextBrush}"
+                                               Margin="0,2,0,0"
+                                               TextWrapping="Wrap"/>
+                                    <TextBlock x:Name="DashEngineFailedDetails"
+                                               FontSize="10" Foreground="{StaticResource TextTertiaryBrush}"
+                                               Margin="0,4,0,0"
+                                               TextWrapping="Wrap"
+                                               FontFamily="Consolas"/>
+                                </StackPanel>
+
+                                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                    <Button x:Name="DashEngineFailedRetryButton"
+                                            Content="{DynamicResource Dash_EngineFailed_Retry}"
+                                            ToolTip="{DynamicResource Dash_EngineFailed_Retry_Tooltip}"
+                                            Click="DashEngineFailedRetry_Click"
+                                            Background="{StaticResource ErrorBrush}" Foreground="White"
+                                            BorderThickness="0"
+                                            Padding="12,6" Margin="8,0,0,0"
+                                            Cursor="Hand" FontSize="12" FontWeight="SemiBold"/>
+                                    <Button x:Name="DashEngineFailedCpuButton"
+                                            Content="{DynamicResource Dash_EngineFailed_CpuFallback}"
+                                            ToolTip="{DynamicResource Dash_EngineFailed_CpuFallback_Tooltip}"
+                                            Click="DashEngineFailedCpu_Click"
+                                            Background="Transparent" Foreground="{StaticResource ErrorBrush}"
+                                            BorderBrush="{StaticResource ErrorBrush}" BorderThickness="1"
+                                            Padding="10,5" Margin="8,0,0,0"
+                                            Cursor="Hand" FontSize="11"/>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+
+                        <!-- ═════════════════════════════════════════════════
+                             CONTEXT CARD — "Currently translating …"
+                             Elevated to first surface after banners so the
+                             Dashboard reads "here's what you're doing" before
+                             "here's the big button to do it." Light-indigo
+                             background taught by the accent palette — the
+                             active translation is the user's current scope,
+                             everything else on this tab acts on it. -->
+                        <Border Background="{StaticResource AccentLightBrush}"
+                                CornerRadius="8" BorderBrush="{StaticResource AccentBrush}"
+                                BorderThickness="1" Padding="18,14" Margin="0,0,0,14">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                    <TextBlock Text="{DynamicResource Dash_ActiveTranslation_Label}" FontSize="10" FontWeight="Bold"
+                                               Foreground="{StaticResource AccentBrush}"
+                                               Margin="0,0,0,4"/>
+                                    <!-- Filled from code-behind by UpdateDashboardActiveTranslation
+                                         (called on load + whenever Config changes). Example:
+                                           "Genshin Impact  ·  English → Polski" -->
+                                    <TextBlock x:Name="DashActiveTranslationText"
+                                               Text="—"
+                                               FontSize="16" FontWeight="SemiBold"
+                                               Foreground="{StaticResource TextBrush}"
+                                               TextWrapping="Wrap"/>
+                                </StackPanel>
+                                <Button x:Name="DashChangeTranslationButton" Grid.Column="1"
+                                        Style="{StaticResource SecondaryButton}"
+                                        Content="{DynamicResource Dash_ChangeTranslation_Button}"
+                                        Click="DashChangeTranslation_Click"
+                                        MinWidth="90" Height="32"
+                                        VerticalAlignment="Center"
+                                        ToolTip="{DynamicResource Dash_ChangeTranslation_Tooltip}"/>
+                            </Grid>
+                        </Border>
+
+                        <!-- ═════════════════════════════════════════════════
+                             PRIMARY CTA + STATUS BADGE
+                             Start/Stop OCR is the Dashboard's job. Status
+                             badge teaches via icon AND color so colour-blind
+                             users get the state too. Stacked below the CTA
+                             so the button is unambiguously the primary. -->
+                        <Button x:Name="DashToggleOcrButton" Style="{StaticResource ModernButton}"
+                                Content="{DynamicResource Dash_StartOCR}"
+                                ToolTip="{DynamicResource Dash_Start_Tooltip}"
+                                Click="DashToggleOcr_Click"
+                                Height="52" FontSize="17" FontWeight="Bold"
+                                HorizontalAlignment="Stretch" Margin="0,0,0,10"/>
+                        <Border x:Name="DashOcrStatusBadge" CornerRadius="12" Padding="12,4"
+                                HorizontalAlignment="Center"
+                                Margin="0,0,0,20">
+                            <Border.Style>
+                                <Style TargetType="Border">
+                                    <Setter Property="Background" Value="{StaticResource ErrorLightBrush}"/>
+                                </Style>
+                            </Border.Style>
+                            <StackPanel Orientation="Horizontal">
+                                <!-- Status dot — icon-first so colour isn't the
+                                     only channel. Foreground swapped by
+                                     code-behind (UpdateOcrStatusBadge). -->
+                                <TextBlock x:Name="DashOcrStatusIcon"
+                                           Text="&#x25CF;"
+                                           FontSize="10" VerticalAlignment="Center"
+                                           Margin="0,0,6,0"
+                                           Foreground="{StaticResource ErrorBrush}"/>
+                                <TextBlock x:Name="DashOcrStatusText" Text="{DynamicResource Dash_Status_Stopped}"
+                                           FontSize="12" FontWeight="SemiBold"
+                                           Foreground="{StaticResource ErrorBrush}"/>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Feedback + Referrals cards moved to the Community
+                             tab in session 31. Dashboard stays focused on the
+                             core loop (status, active translation, start/stop). -->
+
+                        <!-- Legacy widgets kept in the tree but invisible.
+                             Code-behind still looks these up by name from
+                             multiple call sites; ripping them out would
+                             cascade into several handlers. Visibility=Collapsed
+                             keeps them functional-but-hidden. -->
+                        <StackPanel Visibility="Collapsed">
+                            <ComboBox Name="GameSelector">
+                                <ComboBoxItem Content="Genshin Impact" Tag="Genshin" IsSelected="True"/>
+                                <ComboBoxItem Content="Honkai: Star Rail" Tag="StarRail"/>
+                            </ComboBox>
+                            <!-- CHS removed — no Chinese PaddleOCR model ships with the app and
+                                 selecting it silently falls back to the English recognizer (dead UX).
+                                 Re-add when a chs_PP-OCRv4 model is bundled. -->
+                            <ComboBox x:Name="InputLanguageCombo"
+                                      SelectionChanged="InputLanguageCombo_SelectionChanged">
+                                <ComboBoxItem Content="English" Tag="EN" IsSelected="True"/>
+                                <ComboBoxItem Content="&#x65E5;&#x672C;&#x8A9E;" Tag="JP"/>
+                            </ComboBox>
+                            <ComboBox x:Name="OutputLanguageCombo"
+                                      SelectionChanged="OutputLanguageCombo_SelectionChanged">
+                                <ComboBoxItem Content="Polski" Tag="PL"/>
+                                <ComboBoxItem Content="English" Tag="EN"/>
+                                <ComboBoxItem Content="Deutsch" Tag="DE"/>
+                                <ComboBoxItem Content="Español" Tag="ES"/>
+                                <ComboBoxItem Content="Français" Tag="FR"/>
+                                <ComboBoxItem Content="Bahasa Indonesia" Tag="ID"/>
+                                <ComboBoxItem Content="&#x65E5;&#x672C;&#x8A9E;" Tag="JP"/>
+                                <ComboBoxItem Content="&#xD55C;&#xAD6D;&#xC5B4;" Tag="KR"/>
+                                <ComboBoxItem Content="Português" Tag="PT"/>
+                                <ComboBoxItem Content="Русский" Tag="RU"/>
+                                <ComboBoxItem Content="&#xE44;&#xE17;&#xE22;" Tag="TH"/>
+                                <ComboBoxItem Content="Tiếng Việt" Tag="VI"/>
+                                <ComboBoxItem Content="&#x7B80;&#x4F53;&#x4E2D;&#x6587;" Tag="CHS"/>
+                                <ComboBoxItem Content="&#x7E41;&#x9AD4;&#x4E2D;&#x6587;" Tag="CHT"/>
+                            </ComboBox>
+                            <TextBlock x:Name="OutputLangRestartHint"/>
+                            <TextBlock x:Name="TranslationDirectionText"/>
+                            <Button x:Name="DownloadAllButton" Click="DownloadAllButton_Click"/>
+                            <Label Name="Status"/>
+                            <ProgressBar Name="DownloadProgressBar" Minimum="0" Maximum="100"/>
+                            <TextBlock Name="DownloadSpeedText"/>
+                        </StackPanel>
+
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- ═══════════════════════════════════════════════════════════
+                 TAB 2: REGIONS
+                 ═══════════════════════════════════════════════════════════ -->
+            <TabItem Header="{DynamicResource Tab_Regions}" Tag="Regions" Style="{StaticResource ModernTabItem}">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="4,20,4,16">
+
+                        <!-- Region action buttons — single-primary-CTA layout.
+                             Auto-detect is the happy path; manual controls sit
+                             below in a quieter secondary row. The old eye-icon
+                             duplicate of "Show region" was removed — it did
+                             the same thing and added visual noise. -->
+                        <Border Style="{StaticResource Card}">
+                            <StackPanel>
+                                <TextBlock Text="{DynamicResource Regions_Capture_Label}" FontSize="13" FontWeight="SemiBold"
+                                           Foreground="#374151" Margin="0,0,0,10"/>
+                                <!-- Primary CTA -->
+                                <Button x:Name="DashAutoDetectButton" Style="{StaticResource ModernButton}"
+                                        Content="{DynamicResource Regions_AutoDetect_Button}"
+                                        ToolTip="{DynamicResource Tip_Region_AutoDetect}"
+                                        Click="DashAutoDetect_Click"
+                                        Height="40" FontSize="14" FontWeight="SemiBold"
+                                        HorizontalAlignment="Stretch" Margin="0,0,0,8"/>
+                                <TextBlock x:Name="DashAutoDetectStatus" FontSize="11"
+                                           Foreground="{StaticResource TextTertiaryBrush}" Margin="0,0,0,10"/>
+                                <!-- Manual fallback row -->
+                                <TextBlock Text="{DynamicResource Regions_Manual_Label}" FontSize="11"
+                                           FontWeight="SemiBold"
+                                           Foreground="{StaticResource TextTertiaryBrush}"
+                                           Margin="0,0,0,6"/>
+                                <WrapPanel>
+                                    <Button Content="{DynamicResource Dash_SelectRegion}" Style="{StaticResource SecondaryButton}"
+                                            ToolTip="{DynamicResource Tip_Region_Select}"
+                                            Click="DashSelectRegion_Click"
+                                            MinWidth="130" Height="32" Margin="0,0,8,6"/>
+                                    <Button Content="{DynamicResource Dash_ShowRegion}" Style="{StaticResource SecondaryButton}"
+                                            ToolTip="{DynamicResource Tip_Region_Show}"
+                                            Click="DashShowRegion_Click"
+                                            MinWidth="130" Height="32" Margin="0,0,0,6"/>
+                                    <!-- Answer-region button — shown only when FeatureAnswerTranslationEnabled. -->
+                                    <Button x:Name="DashSelectAnswerRegionButton"
+                                            Content="{DynamicResource Regions_Answer_Button}" Style="{StaticResource SecondaryButton}"
+                                            Click="DashSelectAnswerRegion_Click"
+                                            MinWidth="130" Height="32" Margin="8,0,0,6"
+                                            Visibility="Collapsed"
+                                            ToolTip="{DynamicResource Regions_Answer_Tooltip}"/>
+                                </WrapPanel>
+                                <!-- DashRegionInfo: legacy TextBlock referenced from
+                                     code-behind. Kept hidden; remove when all write
+                                     sites are gone. -->
+                                <TextBlock x:Name="DashRegionInfo" FontSize="12"
+                                           Foreground="{StaticResource TextSecondaryBrush}"
+                                           Text="{DynamicResource Dash_Region_NotSet}" TextWrapping="Wrap"
+                                           Visibility="Collapsed"/>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Recognition Region XYWH fields — visually hidden.
+                             Code-behind (RegionX/Y/Width/Height.Text = …, LostFocus
+                             handlers, PreviewRegion_Click) still binds to these,
+                             so collapsing the Border removes the UI without breaking
+                             compile. Eye icon moved up into Capture Regions above. -->
+                        <Border Visibility="Collapsed"
+                                Background="White" CornerRadius="8" BorderBrush="#E5E7EB" BorderThickness="1"
+                                Padding="16,14" Margin="0,0,0,14">
+                            <Border.Effect>
+                                <DropShadowEffect Color="#000000" BlurRadius="4" ShadowDepth="1" Opacity="0.03"/>
+                            </Border.Effect>
+                            <StackPanel>
+                                <TextBlock Text="{DynamicResource Config_Region_Label}" FontSize="13" FontWeight="SemiBold"
+                                           Foreground="#374151" Margin="0,0,0,10"/>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <WrapPanel VerticalAlignment="Center">
+                                        <StackPanel Orientation="Horizontal" Margin="0,0,12,4">
+                                            <TextBlock Text="X" FontSize="11" Foreground="{StaticResource TextTertiaryBrush}"
+                                                       VerticalAlignment="Center" Width="14"/>
+                                            <TextBox x:Name="RegionX" Style="{StaticResource ModernTextBox}"
+                                                     Width="68" Text="763" TextAlignment="Center"
+                                                     LostFocus="RegionField_LostFocus" KeyDown="TextBox_KeyDown"/>
+                                        </StackPanel>
+                                        <StackPanel Orientation="Horizontal" Margin="0,0,12,4">
+                                            <TextBlock Text="Y" FontSize="11" Foreground="{StaticResource TextTertiaryBrush}"
+                                                       VerticalAlignment="Center" Width="14"/>
+                                            <TextBox x:Name="RegionY" Style="{StaticResource ModernTextBox}"
+                                                     Width="68" Text="1797" TextAlignment="Center"
+                                                     LostFocus="RegionField_LostFocus" KeyDown="TextBox_KeyDown"/>
+                                        </StackPanel>
+                                        <StackPanel Orientation="Horizontal" Margin="0,0,12,4">
+                                            <TextBlock Text="W" FontSize="11" Foreground="{StaticResource TextTertiaryBrush}"
+                                                       VerticalAlignment="Center" Width="14"/>
+                                            <TextBox x:Name="RegionWidth" Style="{StaticResource ModernTextBox}"
+                                                     Width="68" Text="2226" TextAlignment="Center"
+                                                     LostFocus="RegionField_LostFocus" KeyDown="TextBox_KeyDown"/>
+                                        </StackPanel>
+                                        <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                                            <TextBlock Text="H" FontSize="11" Foreground="{StaticResource TextTertiaryBrush}"
+                                                       VerticalAlignment="Center" Width="14"/>
+                                            <TextBox x:Name="RegionHeight" Style="{StaticResource ModernTextBox}"
+                                                     Width="68" Text="110" TextAlignment="Center"
+                                                     LostFocus="RegionField_LostFocus" KeyDown="TextBox_KeyDown"/>
+                                        </StackPanel>
+                                    </WrapPanel>
+                                    <Button Grid.Column="1" Style="{StaticResource IconButton}"
+                                            ToolTip="{DynamicResource Config_PreviewRegion_Tooltip}"
+                                            Click="PreviewRegion_Click" VerticalAlignment="Center">
+                                        <TextBlock Text="&#x1F441;" FontSize="16"/>
+                                    </Button>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Setup Guide -->
+                        <Border Background="White" CornerRadius="8" BorderBrush="#E5E7EB" BorderThickness="1"
+                                Padding="16,14" Margin="0,0,0,0">
+                            <Border.Effect>
+                                <DropShadowEffect Color="#000000" BlurRadius="4" ShadowDepth="1" Opacity="0.03"/>
+                            </Border.Effect>
+                            <StackPanel>
+                                <TextBlock Text="{DynamicResource Regions_Help_Label}" FontSize="13" FontWeight="SemiBold"
+                                           Foreground="#374151" Margin="0,0,0,6"/>
+                                <TextBlock Text="{DynamicResource Regions_Help_Body}"
+                                           FontSize="12" Foreground="{StaticResource TextSecondaryBrush}"
+                                           TextWrapping="Wrap" Margin="0,0,0,10"/>
+                                <Button Style="{StaticResource SecondaryButton}"
+                                        Content="{DynamicResource Regions_SetupGuide_Button}" Click="DashSetupGuide_Click"
+                                        MinWidth="120" Height="34" HorizontalAlignment="Left"
+                                        ToolTip="{DynamicResource Regions_SetupGuide_Tooltip}"/>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Hidden SecondRegion button for code compat -->
+                        <Button Visibility="Collapsed" Click="SecondRegion_Click"/>
+
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- ═══════════════════════════════════════════════════════════
+                 TAB 3: APPEARANCE
+                 ═══════════════════════════════════════════════════════════ -->
+            <TabItem Header="{DynamicResource Tab_Appearance}" Tag="Appearance" Style="{StaticResource ModernTabItem}">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="4,20,4,16">
+
+                        <!-- UI Language card -->
+                        <Border Style="{StaticResource Card}">
+                            <StackPanel>
+                                <TextBlock Text="{DynamicResource Appearance_Language_Label}" FontSize="13" FontWeight="SemiBold"
+                                           Foreground="#374151" Margin="0,0,0,10"/>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="140"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="{DynamicResource Settings_UILanguage}" FontSize="12"
+                                               Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center"/>
+                                    <ComboBox x:Name="UILangCombo" Grid.Column="1" Style="{StaticResource ModernComboBox}"
+                                              Height="30" Width="200" HorizontalAlignment="Left"
+                                              SelectionChanged="UILangCombo_SelectionChanged">
+                                        <ComboBoxItem Content="English" Tag="en-US"/>
+                                        <ComboBoxItem Content="Polski" Tag="pl-PL"/>
+                                        <ComboBoxItem Content="日本語" Tag="ja-JP"/>
+                                        <ComboBoxItem Content="简体中文" Tag="zh-CN"/>
+                                    </ComboBox>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Font card -->
+                        <Border Style="{StaticResource Card}">
+                            <StackPanel>
+                                <TextBlock Text="{DynamicResource Appearance_Font_Label}" FontSize="13" FontWeight="SemiBold"
+                                           Foreground="#374151" Margin="0,0,0,10"/>
+                                <Grid Margin="0,0,0,10">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="70"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="72"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="{DynamicResource Config_FontSize}" FontSize="12"
+                                               Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center"/>
+                                    <Slider x:Name="FontSizeSlider" Grid.Column="1"
+                                            Minimum="10" Maximum="36" Value="22"
+                                            TickFrequency="1" IsSnapToTickEnabled="True"
+                                            VerticalAlignment="Center" Margin="8,0"
+                                            ToolTip="{DynamicResource Tip_Appearance_FontSize}"
+                                            ValueChanged="FontSizeSlider_ValueChanged"/>
+                                    <TextBox x:Name="FontSizeTextBox" Grid.Column="2" Style="{StaticResource ModernTextBox}"
+                                             Width="68" Text="22" TextAlignment="Center" FontSize="12"
+                                             ToolTip="{DynamicResource Tip_Appearance_FontSize}"
+                                             LostFocus="FontSizeTextBox_LostFocus" KeyDown="TextBox_KeyDown"/>
+                                </Grid>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="70"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="{DynamicResource Config_FontFamily}" FontSize="12"
+                                               Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center"/>
+                                    <ComboBox x:Name="FontFamilyComboBox" Grid.Column="1" Style="{StaticResource ModernComboBox}"
+                                              Height="30"
+                                              ToolTip="{DynamicResource Tip_Appearance_Font}"
+                                              SelectionChanged="FontFamilyComboBox_SelectionChanged">
+                                        <ComboBoxItem Content="Segoe UI" Tag="Segoe UI" IsSelected="True"/>
+                                        <ComboBoxItem Content="Arial" Tag="Arial"/>
+                                        <ComboBoxItem Content="Calibri" Tag="Calibri"/>
+                                        <ComboBoxItem Content="Verdana" Tag="Verdana"/>
+                                        <ComboBoxItem Content="Tahoma" Tag="Tahoma"/>
+                                        <ComboBoxItem Content="Trebuchet MS" Tag="Trebuchet MS"/>
+                                        <ComboBoxItem Content="Consolas" Tag="Consolas"/>
+                                    </ComboBox>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Subtitle box card — merged from "Position" + "Display Zone".
+                             Top: drag-with-mouse tip (the primary way to move the box).
+                             Middle: Max size sliders (ceiling on how big the box gets).
+                             Bottom: expert "Manual offset" expander for precise X/Y push,
+                             collapsed by default so the card stays short for everyone else. -->
+                        <Border Style="{StaticResource Card}" Margin="0,0,0,0">
+                            <StackPanel>
+                                <TextBlock Text="{DynamicResource Config_SubtitleBox_Label}" FontSize="13" FontWeight="SemiBold"
+                                           Foreground="#374151" Margin="0,0,0,4"/>
+                                <TextBlock Text="{DynamicResource Appearance_DragTip}"
+                                           FontSize="11" Foreground="{StaticResource TextTertiaryBrush}"
+                                           FontStyle="Italic" TextWrapping="Wrap" Margin="0,0,0,14"/>
+
+                                <!-- Max Height — top so users see the primary ceiling first. -->
+                                <Grid Margin="0,0,0,10">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="120"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="72"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="{DynamicResource Config_MaxHeight}" FontSize="12"
+                                               Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center"/>
+                                    <Slider x:Name="MaxHeightSlider" Grid.Column="1"
+                                            Minimum="100" Maximum="600" Value="0"
+                                            TickFrequency="10" IsSnapToTickEnabled="True"
+                                            VerticalAlignment="Center" Margin="8,0"
+                                            ToolTip="{DynamicResource Tip_Appearance_MaxHeight}"
+                                            ValueChanged="MaxHeightSlider_ValueChanged"/>
+                                    <TextBox x:Name="MaxHeightTextBox" Grid.Column="2" Style="{StaticResource ModernTextBox}"
+                                             Width="68" Text="Auto" TextAlignment="Center" FontSize="12"
+                                             ToolTip="{DynamicResource Tip_Appearance_MaxHeight}"
+                                             LostFocus="MaxHeightTextBox_LostFocus" KeyDown="TextBox_KeyDown"/>
+                                </Grid>
+
+                                <!-- Max Width -->
+                                <Grid Margin="0,0,0,10">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="120"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="72"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="{DynamicResource Config_MaxWidth}" FontSize="12"
+                                               Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center"/>
+                                    <Slider x:Name="MaxWidthSlider" Grid.Column="1"
+                                            Minimum="200" Maximum="1400" Value="0"
+                                            TickFrequency="10" IsSnapToTickEnabled="True"
+                                            VerticalAlignment="Center" Margin="8,0"
+                                            ToolTip="{DynamicResource Tip_Appearance_MaxWidth}"
+                                            ValueChanged="MaxWidthSlider_ValueChanged"/>
+                                    <TextBox x:Name="MaxWidthTextBox" Grid.Column="2" Style="{StaticResource ModernTextBox}"
+                                             Width="68" Text="Auto" TextAlignment="Center" FontSize="12"
+                                             ToolTip="{DynamicResource Tip_Appearance_MaxWidth}"
+                                             LostFocus="MaxWidthTextBox_LostFocus" KeyDown="TextBox_KeyDown"/>
+                                </Grid>
+
+                                <TextBlock Text="{DynamicResource Config_DisplayZone_Hint}" FontSize="11"
+                                           Foreground="{StaticResource TextTertiaryBrush}" FontStyle="Italic"
+                                           TextWrapping="Wrap" Margin="0,0,0,10"/>
+
+                                <!-- Auto-shrink: always on, hidden -->
+                                <CheckBox x:Name="AutoShrinkCheckBox" Style="{StaticResource ModernCheckBox}"
+                                          Content="{DynamicResource Config_AutoShrink}" IsChecked="True"
+                                          Visibility="Collapsed"
+                                          Checked="AutoShrinkCheckBox_Changed" Unchecked="AutoShrinkCheckBox_Changed"/>
+
+                                <!-- Manual offset — expert-only. Normal users drag the box
+                                     with the mouse (hint above). Collapsed by default so
+                                     power users can still dial a precise pixel value. -->
+                                <Expander Style="{StaticResource ModernExpander}"
+                                          Header="{DynamicResource Config_ManualOffset_Expander}"
+                                          IsExpanded="False" Margin="0,4,0,0">
+                                    <StackPanel Margin="0,10,0,0">
+                                        <Grid Margin="0,0,0,8">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="90"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="72"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="{DynamicResource Appearance_Vertical_Label}" FontSize="12"
+                                                       Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center"/>
+                                            <Slider x:Name="PadVerticalSlider" Grid.Column="1"
+                                                    Minimum="-500" Maximum="500" Value="-175"
+                                                    TickFrequency="10" IsSnapToTickEnabled="True"
+                                                    VerticalAlignment="Center" Margin="8,0"
+                                                    ToolTip="{DynamicResource Tip_Appearance_VertPad}"
+                                                    ValueChanged="PadVerticalSlider_ValueChanged"/>
+                                            <TextBox x:Name="PadTextBox" Grid.Column="2" Style="{StaticResource ModernTextBox}"
+                                                     Width="68" Text="-175" TextAlignment="Center" FontSize="12"
+                                                     ToolTip="{DynamicResource Tip_Appearance_VertPad}"
+                                                     LostFocus="PadTextBox_LostFocus" KeyDown="TextBox_KeyDown"/>
+                                        </Grid>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="90"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="72"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="{DynamicResource Appearance_Horizontal_Label}" FontSize="12"
+                                                       Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center"/>
+                                            <Slider x:Name="PadHorizontalSlider" Grid.Column="1"
+                                                    Minimum="-500" Maximum="500" Value="0"
+                                                    TickFrequency="10" IsSnapToTickEnabled="True"
+                                                    VerticalAlignment="Center" Margin="8,0"
+                                                    ToolTip="{DynamicResource Tip_Appearance_HorizPad}"
+                                                    ValueChanged="PadHorizontalSlider_ValueChanged"/>
+                                            <TextBox x:Name="PadHorizontalTextBox" Grid.Column="2" Style="{StaticResource ModernTextBox}"
+                                                     Width="68" Text="0" TextAlignment="Center" FontSize="12"
+                                                     ToolTip="{DynamicResource Tip_Appearance_HorizPad}"
+                                                     LostFocus="PadHorizontalTextBox_LostFocus" KeyDown="TextBox_KeyDown"/>
+                                        </Grid>
+                                    </StackPanel>
+                                </Expander>
+                            </StackPanel>
+                        </Border>
+
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- ═══════════════════════════════════════════════════════════
+                 TAB 4: GENERAL
+                 Session-32 split: the old "Settings" kitchen-sink tab was
+                 three pages in one. Hotkeys moved to their own top-level
+                 tab; OCR-tuning sliders folded into a collapsed Advanced
+                 expander so beginners never see them. Core options
+                 (auto-start, player name, hide-subtitles, crash reports)
+                 stay here — they're the ones most users actually touch.
+                 ═══════════════════════════════════════════════════════════ -->
+            <TabItem Header="{DynamicResource Tab_General}" Tag="General" Style="{StaticResource ModernTabItem}">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="4,20,4,16">
+
+                        <!-- ─── Card 1: Launch & behaviour ─── -->
+                        <Border Style="{StaticResource Card}" Padding="18,16">
+                            <StackPanel>
+                                <TextBlock Text="{DynamicResource Settings_Options_Label}" FontSize="13" FontWeight="SemiBold"
+                                           Foreground="#374151" Margin="0,0,0,16"/>
+                                <CheckBox x:Name="AutoStartCheckBox" Style="{StaticResource ModernCheckBox}"
+                                          Content="{DynamicResource Config_AutoStart}"
+                                          ToolTip="{DynamicResource Tip_Settings_AutoStart}"
+                                          Checked="AutoStartCheckBox_Checked" Unchecked="AutoStartCheckBox_Checked"/>
+                                <!-- Answer-translation feature is temporarily disabled (see
+                                     MainWindow.xaml.cs FeatureAnswerTranslationEnabled). The
+                                     checkbox is kept in the tree (Visibility=Collapsed) so the
+                                     code-behind name lookup still resolves — no need to touch
+                                     SettingsWindow.xaml.cs. Unhide when re-enabling. -->
+                                <CheckBox x:Name="EnableAnswerTranslationCheckBox" Style="{StaticResource ModernCheckBox}"
+                                          Content="{DynamicResource Settings_AnswerTranslation_Checkbox}"
+                                          Margin="0,12,0,0" Visibility="Collapsed"
+                                          Checked="EnableAnswerTranslationCheckBox_Changed" Unchecked="EnableAnswerTranslationCheckBox_Changed"/>
+
+                                <!-- DashToggleSubtitleButton moved out of General in session 32.
+                                     Kept in the tree (Visibility=Collapsed) so MainWindow +
+                                     SettingsWindow name lookups keep resolving. The same
+                                     action is on Ctrl+Shift+H (hotkey 9002, now under the
+                                     Advanced group on the Hotkeys tab) so end users don't
+                                     lose the capability. -->
+                                <Button x:Name="DashToggleSubtitleButton"
+                                        Visibility="Collapsed"
+                                        Click="DashToggleSubtitle_Click"
+                                        Content="{DynamicResource Dash_HideSubtitles}"/>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- ─── Card 2: Player identity ─── -->
+                        <Border Style="{StaticResource Card}" Padding="18,16">
+                            <StackPanel>
+                                <TextBlock Text="{DynamicResource Settings_PlayerName_Card_Label}" FontSize="13" FontWeight="SemiBold"
+                                           Foreground="#374151" Margin="0,0,0,6"/>
+                                <TextBlock Text="{DynamicResource Settings_PlayerName_Card_Body}"
+                                           FontSize="11" Foreground="{StaticResource TextTertiaryBrush}"
+                                           TextWrapping="Wrap" Margin="0,0,0,12"/>
+                                <!-- Grid (not StackPanel) so the TextBox adapts to available
+                                     card width — a fixed Width="240" would clip whenever
+                                     the window or ScrollViewer ate the expected space. -->
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="{DynamicResource Settings_PlayerName_Label}" FontSize="12"
+                                               Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center"
+                                               Margin="0,0,12,0"/>
+                                    <!-- No Height override — ModernTextBox sets MinHeight=34
+                                         + Padding=8,5. A tighter Height="32" was clipping
+                                         descenders on glyphs like "g" / "P" / "z". -->
+                                    <TextBox x:Name="PlayerNameTextBox" Grid.Column="1"
+                                             Style="{StaticResource ModernTextBox}"
+                                             FontSize="12"
+                                             HorizontalAlignment="Left"
+                                             Width="260"
+                                             ToolTip="{DynamicResource Settings_PlayerName_Tooltip}"
+                                             LostFocus="PlayerNameTextBox_LostFocus" KeyDown="TextBox_KeyDown"/>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- ─── Card 3: Privacy / crash reporting ─── -->
+                        <Border Style="{StaticResource Card}" Padding="18,16">
+                            <StackPanel>
+                                <TextBlock Text="{DynamicResource Settings_Privacy_Card_Label}" FontSize="13" FontWeight="SemiBold"
+                                           Foreground="#374151" Margin="0,0,0,12"/>
+                                <CheckBox x:Name="CrashReportingCheckBox"
+                                          Style="{StaticResource ModernCheckBox}"
+                                          Content="{DynamicResource CrashReporting_Setting_Label}"
+                                          Margin="0,0,0,6"
+                                          ToolTip="{DynamicResource Tip_Settings_CrashReports}"
+                                          Checked="CrashReportingCheckBox_Changed"
+                                          Unchecked="CrashReportingCheckBox_Changed"/>
+                                <TextBlock Text="{DynamicResource CrashReporting_Setting_Description}"
+                                           FontSize="11"
+                                           Foreground="{StaticResource TextTertiaryBrush}"
+                                           TextWrapping="Wrap"
+                                           Margin="26,0,0,0"/>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Advanced (OCR tuning) — collapsed by default.
+                             Beginners never need these; moving them out of
+                             sight kept the surface calm. Expand for power
+                             users who want to trade CPU for reaction time. -->
+                        <Expander Style="{StaticResource ModernExpander}"
+                                  Header="{DynamicResource Settings_Advanced_Expander}"
+                                  IsExpanded="False" Margin="0,0,0,14">
+                            <StackPanel Margin="0,10,0,0">
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                                    <TextBlock Text="{DynamicResource Config_OcrInterval}" FontSize="12"
+                                               Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center"
+                                               Width="110"/>
+                                    <TextBox x:Name="OcrIntervalTextBox" Style="{StaticResource ModernTextBox}"
+                                             Width="65" Text="100" TextAlignment="Center"
+                                             ToolTip="{DynamicResource Tip_Settings_OcrInterval}"
+                                             LostFocus="OcrIntervalTextBox_LostFocus" KeyDown="TextBox_KeyDown"/>
+                                    <TextBlock Text="ms" FontSize="11" Foreground="{StaticResource TextTertiaryBrush}"
+                                               VerticalAlignment="Center" Margin="6,0,0,0"/>
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                                    <TextBlock Text="{DynamicResource Config_UiRefresh}" FontSize="12"
+                                               Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center"
+                                               Width="110"/>
+                                    <TextBox x:Name="UiRefreshTextBox" Style="{StaticResource ModernTextBox}"
+                                             Width="65" Text="200" TextAlignment="Center"
+                                             ToolTip="{DynamicResource Tip_Settings_OcrRefresh}"
+                                             LostFocus="UiRefreshTextBox_LostFocus" KeyDown="TextBox_KeyDown"/>
+                                    <TextBlock Text="ms" FontSize="11" Foreground="{StaticResource TextTertiaryBrush}"
+                                               VerticalAlignment="Center" Margin="6,0,0,0"/>
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                    <TextBlock Text="{DynamicResource Settings_StabilityWindow_Label}" FontSize="12"
+                                               Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center"
+                                               Width="110"/>
+                                    <TextBox x:Name="StabilityWindowTextBox" Style="{StaticResource ModernTextBox}"
+                                             Width="65" Text="4" TextAlignment="Center"
+                                             ToolTip="{DynamicResource Tip_Settings_OcrStability}"
+                                             LostFocus="StabilityWindowTextBox_LostFocus" KeyDown="TextBox_KeyDown"/>
+                                    <TextBlock Text="{DynamicResource Settings_Frames_Unit}" FontSize="11" Foreground="{StaticResource TextTertiaryBrush}"
+                                               VerticalAlignment="Center" Margin="6,0,0,0"/>
+                                </StackPanel>
+                                <TextBlock Text="{DynamicResource Config_OcrSpeed_Hint}" FontSize="11"
+                                           Foreground="{StaticResource TextTertiaryBrush}" FontStyle="Italic"
+                                           TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </Expander>
+
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- ═══════════════════════════════════════════════════════════
+                 TAB 5: HOTKEYS
+                 Promoted to its own tab — hotkeys are the app's primary
+                 in-game affordance and deserve top-level navigation.
+                 ═══════════════════════════════════════════════════════════ -->
+            <TabItem Header="{DynamicResource Tab_Hotkeys}" Tag="Hotkeys" Style="{StaticResource ModernTabItem}">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="4,20,4,16">
+                        <!-- End-user model: each row is "What does this do" +
+                             a click-to-record chip + an info (i) icon that
+                             explains when to reach for the shortcut. Session-
+                             32 split the list into Everyday vs. Advanced so
+                             the default surface stays short. -->
+                        <Border Style="{StaticResource Card}">
+                            <StackPanel>
+                                <TextBlock Text="{DynamicResource Settings_Hotkeys_Label}" FontSize="13" FontWeight="SemiBold"
+                                           Foreground="#374151" Margin="0,0,0,4"/>
+                                <TextBlock Text="{DynamicResource Settings_Hotkeys_Hint}" FontSize="11"
+                                           Foreground="{StaticResource TextTertiaryBrush}"
+                                           TextWrapping="Wrap" Margin="0,0,0,14"/>
+
+                                <!-- Everyday shortcuts -->
+                                <TextBlock Text="{DynamicResource Hotkeys_Group_Primary}"
+                                           FontSize="10" FontWeight="Bold"
+                                           Foreground="{StaticResource TextTertiaryBrush}"
+                                           Margin="0,0,0,6"/>
+                                <Border Background="#FAFBFC" CornerRadius="6" BorderBrush="#E5E7EB" BorderThickness="1"
+                                        Padding="0" Margin="0,0,0,14">
+                                    <ListView x:Name="hotkeyListView" BorderThickness="0" Background="Transparent"
+                                              Margin="8,6,8,6" MaxHeight="360"
+                                              ItemTemplate="{StaticResource HotkeyRowTemplate}"/>
+                                </Border>
+
+                                <!-- Advanced shortcuts -->
+                                <TextBlock Text="{DynamicResource Hotkeys_Group_Advanced}"
+                                           FontSize="10" FontWeight="Bold"
+                                           Foreground="{StaticResource TextTertiaryBrush}"
+                                           Margin="0,0,0,6"/>
+                                <Border Background="#FAFBFC" CornerRadius="6" BorderBrush="#E5E7EB" BorderThickness="1"
+                                        Padding="0" Margin="0,0,0,14">
+                                    <ListView x:Name="hotkeyListViewAdvanced" BorderThickness="0" Background="Transparent"
+                                              Margin="8,6,8,6" MaxHeight="200"
+                                              ItemTemplate="{StaticResource HotkeyRowTemplate}"/>
+                                </Border>
+
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                    <!-- saveButton is hidden: auto-save fires on capture.
+                                         Kept in the tree so existing x:Name lookups still
+                                         resolve; remove entirely in a future cleanup pass. -->
+                                    <Button Content="{DynamicResource Btn_Save}" x:Name="saveButton"
+                                            Visibility="Collapsed"
+                                            Style="{StaticResource ModernButton}" Width="80" Height="32" Margin="0,0,8,0"/>
+                                    <Button Content="{DynamicResource Hotkeys_Reset_Action}" x:Name="resetButton"
+                                            Style="{StaticResource SecondaryButton}" Width="110" Height="32"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- ═══════════════════════════════════════════════════════════
+                 TAB 5: TRANSLATIONS
+                 (translation packs per game + language; replaces the old
+                 "what files do I have?" guesswork by showing provenance
+                 explicitly: local-built vs Kaption download vs not-installed)
+                 ═══════════════════════════════════════════════════════════ -->
+            <TabItem Header="{DynamicResource Tab_Translations}" Tag="Translations" Style="{StaticResource ModernTabItem}">
+                <Grid Margin="4,16,4,8">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- Row 0: offline banner (shown only when remote query failed).
+                         The old "Translation Packs + Sync" summary card here was
+                         dissolved — Refresh moved onto each game's group header
+                         (⟳ icon), Sync became a per-row "Update" action when a
+                         newer remote version is known. Inline summary text is
+                         now folded into the empty-state so the chrome stays
+                         light once packs are present. -->
+                    <Border Grid.Row="0" x:Name="TranslationsNoticeBanner" Visibility="Collapsed"
+                            Background="#FEF3C7" CornerRadius="8" BorderBrush="#FCD34D" BorderThickness="1"
+                            Padding="12,8" Margin="0,0,0,10">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="&#x26A0;&#xFE0F;" FontSize="14" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                            <TextBlock x:Name="TranslationsNoticeText" FontSize="12" Foreground="#92400E"
+                                       TextWrapping="Wrap" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Game + Input pickers (segmented pills).
+                         This is the authoritative input side of the
+                         translation pipeline — Game chooses which game we
+                         OCR, Input chooses what language the game is set to
+                         (which constrains the PaddleOCR recognizer + the
+                         TextMap JSON we fetch from the public game-data
+                         mirror). Dashboard used to duplicate these controls;
+                         with session-21's "Dashboard read-only" direction
+                         this tab is the sole editor.
+                         Pills are plain Buttons styled via Resources so the
+                         "selected" look can be driven from code-behind by
+                         swapping the Style on click. -->
+                    <Border Grid.Row="1" Background="White" CornerRadius="8"
+                            BorderBrush="{StaticResource CardBorderBrush}" BorderThickness="1"
+                            Padding="16,12" Margin="0,0,0,10">
+                        <StackPanel>
+                            <!-- Game row -->
+                            <Grid Margin="0,0,0,10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="80"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="{DynamicResource Translations_Game_Label}" FontSize="12" FontWeight="SemiBold"
+                                           Foreground="{StaticResource TextSecondaryBrush}"
+                                           VerticalAlignment="Center"/>
+                                <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                    <Button x:Name="GamePillGenshin" Tag="Genshin"
+                                            Style="{StaticResource SecondaryButton}"
+                                            Content="Genshin Impact"
+                                            Height="32" MinWidth="120" Padding="12,0" Margin="0,0,8,0"
+                                            Click="TranslationsGamePill_Click"
+                                            ToolTip="{DynamicResource Tip_Translations_Game}"/>
+                                    <Button x:Name="GamePillStarRail" Tag="StarRail"
+                                            Style="{StaticResource SecondaryButton}"
+                                            Content="Honkai: Star Rail"
+                                            Height="32" MinWidth="120" Padding="12,0"
+                                            Click="TranslationsGamePill_Click"
+                                            ToolTip="{DynamicResource Tip_Translations_Game}"/>
+                                </StackPanel>
+                            </Grid>
+
+                            <!-- Input (reading) row -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="80"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="{DynamicResource Translations_Reading_Label}" FontSize="12" FontWeight="SemiBold"
+                                           Foreground="{StaticResource TextSecondaryBrush}"
+                                           VerticalAlignment="Center"/>
+                                <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                    <!-- Two visible options — the PaddleOCR recognizer
+                                         models we actually ship (EN / JP). The CHS pill
+                                         below is kept in the tree but collapsed: there
+                                         is no Chinese recognizer bundled yet, so picking
+                                         it would silently fall back to the EN model.
+                                         Un-hide when a chs_PP-OCRv4 model ships. -->
+                                    <Button x:Name="InputPillEN" Tag="EN"
+                                            Style="{StaticResource SecondaryButton}"
+                                            Content="English"
+                                            Height="32" MinWidth="84" Padding="12,0" Margin="0,0,8,0"
+                                            Click="TranslationsInputPill_Click"
+                                            ToolTip="{DynamicResource Tip_Translations_ReadingEN}"/>
+                                    <Button x:Name="InputPillJP" Tag="JP"
+                                            Style="{StaticResource SecondaryButton}"
+                                            Content="&#x65E5;&#x672C;&#x8A9E;"
+                                            Height="32" MinWidth="84" Padding="12,0"
+                                            Click="TranslationsInputPill_Click"
+                                            ToolTip="{DynamicResource Tip_Translations_ReadingJP}"/>
+                                    <Button x:Name="InputPillCHS" Tag="CHS"
+                                            Visibility="Collapsed"
+                                            Style="{StaticResource SecondaryButton}"
+                                            Content="&#x7B80;&#x4F53;&#x4E2D;&#x6587;"
+                                            Height="32" MinWidth="84" Padding="12,0"
+                                            Click="TranslationsInputPill_Click"/>
+                                </StackPanel>
+                            </Grid>
+
+                            <!-- One-line human copy replacing the old 3-row jargon legend. -->
+                            <TextBlock Text="{DynamicResource Translations_Hint}" FontSize="11" Foreground="{StaticResource TextTertiaryBrush}"
+                                       TextWrapping="Wrap" Margin="0,12,0,0"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Packs list, grouped by game — with an empty-state
+                         overlay shown when TranslationsList has no items.
+                         WPF's ListView.HasItems property drives the trigger.
+                         We keep the ListView in the tree at all times so
+                         per-refresh bindings stay alive; the overlay just
+                         toggles its visibility. -->
+                    <Border Grid.Row="2" Background="White" CornerRadius="8" BorderBrush="#E5E7EB" BorderThickness="1"
+                            ClipToBounds="True">
+                        <Grid>
+                            <!-- Empty state: only visible when the list is
+                                 empty AND the summary isn't reporting an
+                                 offline-catalog error (in which case the
+                                 amber notice banner at the top is already
+                                 speaking for itself). -->
+                            <Border x:Name="TranslationsEmptyState" Padding="32,44"
+                                    Visibility="Collapsed">
+                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Top" MaxWidth="440">
+                                    <!-- Illustration dot -->
+                                    <Border Width="56" Height="56" CornerRadius="28"
+                                            Background="{StaticResource AccentLightBrush}"
+                                            HorizontalAlignment="Center" Margin="0,0,0,14">
+                                        <TextBlock Text="&#x1F4E6;" FontSize="28" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <TextBlock Text="{DynamicResource Translations_Empty_Title}"
+                                               FontSize="14" FontWeight="SemiBold"
+                                               Foreground="{StaticResource TextBrush}"
+                                               HorizontalAlignment="Center"/>
+                                    <TextBlock Text="{DynamicResource Translations_Empty_Body}"
+                                               FontSize="12" Foreground="{StaticResource TextSecondaryBrush}"
+                                               Margin="0,6,0,0" TextAlignment="Center" TextWrapping="Wrap"/>
+                                    <!-- Action checklist -->
+                                    <StackPanel Margin="0,14,0,0">
+                                        <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                                            <TextBlock Text="&#x2022;" FontSize="13" Foreground="{StaticResource AccentBrush}"
+                                                       VerticalAlignment="Top" Margin="0,1,8,0"/>
+                                            <TextBlock FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap">
+                                                <Run FontWeight="SemiBold">Dashboard tab</Run><Run> &#x2014; confirm Game + Translate (input &#x2192; output) are set.</Run>
+                                            </TextBlock>
+                                        </StackPanel>
+                                        <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                                            <TextBlock Text="&#x2022;" FontSize="13" Foreground="{StaticResource AccentBrush}"
+                                                       VerticalAlignment="Top" Margin="0,1,8,0"/>
+                                            <TextBlock FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap">
+                                                <Run FontWeight="SemiBold">Sync Now</Run><Run> &#x2014; the button above forces a fresh download check against your account.</Run>
+                                            </TextBlock>
+                                        </StackPanel>
+                                        <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                                            <TextBlock Text="&#x2022;" FontSize="13" Foreground="{StaticResource AccentBrush}"
+                                                       VerticalAlignment="Top" Margin="0,1,8,0"/>
+                                            <TextBlock FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap">
+                                                <Run FontWeight="SemiBold">Still empty?</Run><Run> &#x2014; a pack for your game + language may not be published yet. Email </Run><Hyperlink RequestNavigate="Hyperlink_RequestNavigate" NavigateUri="mailto:contact@kaption.one" Foreground="{StaticResource AccentBrush}">contact@kaption.one</Hyperlink><Run> and we&#x2019;ll sort it.</Run>
+                                            </TextBlock>
+                                        </StackPanel>
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
+
+                            <ListView x:Name="TranslationsList"
+                                  Background="Transparent" BorderThickness="0"
+                                  ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                  SelectionMode="Single">
+                            <ListView.GroupStyle>
+                                <GroupStyle>
+                                    <GroupStyle.HeaderTemplate>
+                                        <DataTemplate>
+                                            <Border Background="#F9FAFB" BorderBrush="#E5E7EB" BorderThickness="0,0,0,1"
+                                                    Padding="12,4,6,4">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                        <TextBlock Text="{Binding Name}" FontSize="12"
+                                                                   FontWeight="SemiBold" Foreground="#374151"
+                                                                   VerticalAlignment="Center"/>
+                                                        <TextBlock Text="{Binding ItemCount, StringFormat=' · {0} pack(s)'}"
+                                                                   FontSize="11" Foreground="#9CA3AF"
+                                                                   VerticalAlignment="Center" Margin="4,0,0,0"/>
+                                                    </StackPanel>
+                                                    <!-- Rescan icon — clicks any game's header refresh
+                                                         the whole tab (handler ignores sender). Replaces
+                                                         the old top-of-tab Refresh button. -->
+                                                    <Button Grid.Column="1" Style="{StaticResource IconButton}"
+                                                            Width="26" Height="26" MinWidth="26"
+                                                            Content="&#x27F3;" FontSize="14"
+                                                            Click="TranslationsRefresh_Click"
+                                                            ToolTip="{DynamicResource Translations_Rescan_Tooltip}"/>
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </GroupStyle.HeaderTemplate>
+                                </GroupStyle>
+                            </ListView.GroupStyle>
+
+                            <ListView.ItemContainerStyle>
+                                <Style TargetType="ListViewItem">
+                                    <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                    <Setter Property="Padding" Value="0"/>
+                                    <Setter Property="BorderBrush" Value="#F3F4F6"/>
+                                    <Setter Property="BorderThickness" Value="0,0,0,1"/>
+                                </Style>
+                            </ListView.ItemContainerStyle>
+
+                            <ListView.ItemTemplate>
+                                <DataTemplate>
+                                    <!-- Row layout (4 columns):
+                                           [accent][body ........................][size][action]
+                                         The accent column is 3px wide — visible only when
+                                         IsActiveTarget so the active row has a left edge
+                                         that stands out without shouting. Row is clickable
+                                         anywhere via MouseLeftButtonUp so the radio-select
+                                         behaviour doesn't require aiming at a button. -->
+                                    <Grid MouseLeftButtonUp="TranslationsPackRow_MouseLeftButtonUp"
+                                          Background="Transparent" Cursor="Hand">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="3"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+
+                                        <!-- Active-target accent stripe (toggles via IsActiveTarget). -->
+                                        <Border Grid.Column="0" Background="{StaticResource AccentBrush}"
+                                                Visibility="{Binding IsActiveTarget, Converter={StaticResource BoolToVisibilityConverter}}"/>
+
+                                        <StackPanel Grid.Column="1" Margin="12,10,0,10">
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock Text="{Binding LanguageDisplayName}"
+                                                           FontSize="13" FontWeight="SemiBold"
+                                                           Foreground="#111827" VerticalAlignment="Center"/>
+                                                <Border CornerRadius="6" Padding="6,1" Margin="8,0,0,0"
+                                                        VerticalAlignment="Center">
+                                                    <!-- Status-pill swatches keep the same color family
+                                                         as their heading/text color via the semantic
+                                                         *LightBrush tokens. Editing the palette updates
+                                                         every pill together. -->
+                                                    <Border.Style>
+                                                        <Style TargetType="Border">
+                                                            <Setter Property="Background" Value="{StaticResource CardBorderBrush}"/>
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding Source}" Value="LocalCache">
+                                                                    <Setter Property="Background" Value="{StaticResource SuccessLightBrush}"/>
+                                                                </DataTrigger>
+                                                                <DataTrigger Binding="{Binding Source}" Value="PaidCached">
+                                                                    <Setter Property="Background" Value="{StaticResource InfoLightBrush}"/>
+                                                                </DataTrigger>
+                                                                <DataTrigger Binding="{Binding Source}" Value="RemoteAvailable">
+                                                                    <Setter Property="Background" Value="{StaticResource WarnLightBrush}"/>
+                                                                </DataTrigger>
+                                                                <DataTrigger Binding="{Binding Source}" Value="RemoteLocked">
+                                                                    <Setter Property="Background" Value="{StaticResource ErrorLightBrush}"/>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </Border.Style>
+                                                    <TextBlock Text="{Binding StatusLabel}" FontSize="10" FontWeight="SemiBold">
+                                                        <TextBlock.Style>
+                                                            <Style TargetType="TextBlock">
+                                                                <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}"/>
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding Source}" Value="LocalCache">
+                                                                        <Setter Property="Foreground" Value="{StaticResource SuccessBrush}"/>
+                                                                    </DataTrigger>
+                                                                    <DataTrigger Binding="{Binding Source}" Value="PaidCached">
+                                                                        <Setter Property="Foreground" Value="{StaticResource InfoBrush}"/>
+                                                                    </DataTrigger>
+                                                                    <DataTrigger Binding="{Binding Source}" Value="RemoteAvailable">
+                                                                        <Setter Property="Foreground" Value="{StaticResource WarnBrush}"/>
+                                                                    </DataTrigger>
+                                                                    <DataTrigger Binding="{Binding Source}" Value="RemoteLocked">
+                                                                        <Setter Property="Foreground" Value="{StaticResource ErrorBrush}"/>
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </TextBlock.Style>
+                                                    </TextBlock>
+                                                </Border>
+                                            </StackPanel>
+                                            <!-- Direction indicator: "English → Polski".
+                                                 Populated by RefreshTranslationsAsync from the
+                                                 current Config["Input"] + pack's target language.
+                                                 Hidden when DirectionLabel is blank. -->
+                                            <TextBlock Text="{Binding DirectionLabel}"
+                                                       Visibility="{Binding HasDirection, Converter={StaticResource BoolToVisibilityConverter}}"
+                                                       FontSize="11" FontWeight="SemiBold"
+                                                       Foreground="{StaticResource AccentBrush}"
+                                                       Margin="0,2,0,0"/>
+                                            <TextBlock Text="{Binding SourceLabel}"
+                                                       FontSize="11" Foreground="{StaticResource TextSecondaryBrush}"
+                                                       Margin="0,2,0,0" TextWrapping="Wrap"/>
+                                            <TextBlock FontSize="10" Foreground="{StaticResource TextTertiaryBrush}"
+                                                       Margin="0,2,0,0" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis">
+                                                <Run Text="{Binding LocalPath, Mode=OneWay}"/>
+                                            </TextBlock>
+                                        </StackPanel>
+
+                                        <StackPanel Grid.Column="2" Orientation="Vertical"
+                                                    VerticalAlignment="Center" Margin="14,0,12,0">
+                                            <TextBlock Text="{Binding ActiveLabel}" FontSize="10"
+                                                       FontWeight="SemiBold"
+                                                       Foreground="{StaticResource AccentBrush}"
+                                                       HorizontalAlignment="Right"
+                                                       Visibility="{Binding IsActiveTarget, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                            <TextBlock Text="{Binding SizeLabel}" FontSize="12"
+                                                       FontWeight="SemiBold" Foreground="#374151"
+                                                       HorizontalAlignment="Right"/>
+                                            <TextBlock Text="{Binding ModifiedLabel}" FontSize="10"
+                                                       Foreground="{StaticResource TextTertiaryBrush}"
+                                                       HorizontalAlignment="Right" Margin="0,2,0,0"/>
+                                        </StackPanel>
+
+                                        <!-- Per-row action stack. CanDownload / CanUpdate /
+                                             CanOpenFolder are computed on the viewmodel so at
+                                             most one primary action shows at a time. Update
+                                             fires when the installed Kaption pack has a
+                                             different RemoteVersion than its LocalVersion. -->
+                                        <StackPanel Grid.Column="3" Orientation="Horizontal"
+                                                    VerticalAlignment="Center" Margin="0,0,12,0">
+                                            <Button Style="{StaticResource ModernButton}"
+                                                    Content="{DynamicResource Translations_Update_Button}" Tag="{Binding}"
+                                                    Click="TranslationsSyncPack_Click"
+                                                    Height="28" MinWidth="94" Padding="10,2" FontSize="11"
+                                                    Margin="0,0,6,0"
+                                                    ToolTip="{Binding RemoteVersion, StringFormat={}Update to {0}}"
+                                                    Visibility="{Binding CanUpdate, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                            <Button Style="{StaticResource ModernButton}"
+                                                    Content="{DynamicResource Translations_Download_Button}" Tag="{Binding}"
+                                                    Click="TranslationsDownloadPack_Click"
+                                                    Height="28" MinWidth="94" Padding="10,2" FontSize="11"
+                                                    Visibility="{Binding CanDownload, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                            <Button Style="{StaticResource SecondaryButton}"
+                                                    Content="{DynamicResource Translations_OpenFolder_Button}" Tag="{Binding LocalPath}"
+                                                    Click="TranslationsOpenFolder_Click"
+                                                    Height="28" Padding="10,2" FontSize="11"
+                                                    Visibility="{Binding CanOpenFolder, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                        </StackPanel>
+                                    </Grid>
+                                </DataTemplate>
+                            </ListView.ItemTemplate>
+                        </ListView>
+                        </Grid>
+                    </Border>
+                </Grid>
+            </TabItem>
+
+            <!-- ═══════════════════════════════════════════════════════════
+                 TAB 6: COMMUNITY
+                 A home for everything social/opinion-driven: feedback, the
+                 referral program, the upcoming-language poll, and jump-offs
+                 to Discord / web. Keeps the Translations tab clean of
+                 non-core clutter.
+                 ═══════════════════════════════════════════════════════════ -->
+            <TabItem Header="{DynamicResource Tab_Community}" Tag="Community" Style="{StaticResource ModernTabItem}">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="4,20,4,16">
+
+                        <!-- Section heading — big, friendly, no jargon. -->
+                        <TextBlock Text="{DynamicResource Community_Heading}"
+                                   FontSize="17" FontWeight="SemiBold"
+                                   Foreground="{StaticResource TextBrush}"/>
+                        <TextBlock Text="{DynamicResource Community_Subheading}"
+                                   FontSize="12"
+                                   Foreground="{StaticResource TextSecondaryBrush}"
+                                   Margin="0,4,0,14"
+                                   TextWrapping="Wrap"/>
+
+                        <!-- Feedback card — one-tap jump to the in-app form.
+                             Mirrors the Dashboard card but with more room to
+                             explain WHY feedback matters (closed-loop claim). -->
+                        <Border Style="{StaticResource Card}" Margin="0,0,0,12">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="14"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="&#x1F4AC;"
+                                           FontSize="24" VerticalAlignment="Center"/>
+                                <StackPanel Grid.Column="2" VerticalAlignment="Center">
+                                    <TextBlock Text="{DynamicResource Community_Feedback_Title}"
+                                               FontSize="13" FontWeight="SemiBold"
+                                               Foreground="{StaticResource TextBrush}"/>
+                                    <TextBlock Text="{DynamicResource Community_Feedback_Body}"
+                                               FontSize="11" Margin="0,2,0,0"
+                                               TextWrapping="Wrap"
+                                               Foreground="{StaticResource TextSecondaryBrush}"/>
+                                </StackPanel>
+                                <Button Grid.Column="3"
+                                        x:Name="CommunitySendFeedbackButton"
+                                        Style="{StaticResource ModernButton}"
+                                        Content="{DynamicResource Community_Feedback_Button}"
+                                        MinWidth="130" Height="32"
+                                        VerticalAlignment="Center"
+                                        ToolTip="{DynamicResource Tip_Community_Feedback}"
+                                        Click="DashSendFeedback_Click"/>
+                            </Grid>
+                        </Border>
+
+                        <!-- Referrals card — same mechanic, lighter framing. -->
+                        <Border Style="{StaticResource Card}" Margin="0,0,0,12">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="14"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="&#x1F381;"
+                                           FontSize="24" VerticalAlignment="Center"/>
+                                <StackPanel Grid.Column="2" VerticalAlignment="Center">
+                                    <TextBlock Text="{DynamicResource Community_Referrals_Title}"
+                                               FontSize="13" FontWeight="SemiBold"
+                                               Foreground="{StaticResource TextBrush}"/>
+                                    <TextBlock Text="{DynamicResource Community_Referrals_Body}"
+                                               FontSize="11" Margin="0,2,0,0"
+                                               TextWrapping="Wrap"
+                                               Foreground="{StaticResource TextSecondaryBrush}"/>
+                                </StackPanel>
+                                <Button Grid.Column="3"
+                                        x:Name="CommunityReferralsButton"
+                                        Style="{StaticResource SecondaryButton}"
+                                        Content="{DynamicResource Community_Referrals_Button}"
+                                        MinWidth="130" Height="32"
+                                        VerticalAlignment="Center"
+                                        ToolTip="{DynamicResource Tip_Community_Referrals}"
+                                        Click="DashReferrals_Click"/>
+                            </Grid>
+                        </Border>
+
+                        <!-- Next-language poll — relocated from Translations tab.
+                             Same visual green-accent treatment, same click handler. -->
+                        <Border x:Name="NextLanguageBanner"
+                                Background="#ECFDF5" CornerRadius="8"
+                                BorderBrush="#6EE7B7" BorderThickness="1"
+                                Padding="14,10" Margin="0,0,0,12">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="12"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock x:Name="NextLanguageFlag"
+                                           Grid.Column="0"
+                                           Text="&#x1F1EE;&#x1F1F9;"
+                                           FontSize="28"
+                                           VerticalAlignment="Center"/>
+                                <StackPanel Grid.Column="2" VerticalAlignment="Center">
+                                    <TextBlock x:Name="NextLanguageEyebrow"
+                                               Text="{DynamicResource Translations_NextUp_Eyebrow}"
+                                               FontSize="10" FontWeight="Bold"
+                                               Foreground="#047857"/>
+                                    <!-- Populated at runtime by UpdateNextLanguageBanner.
+                                         Empty by default — no hardcoded "Italian" fallback;
+                                         if the backend doesn't answer, the banner stays
+                                         collapsed so we never ship a stale claim. -->
+                                    <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
+                                        <TextBlock x:Name="NextLanguageName"
+                                                   FontSize="14" FontWeight="SemiBold"
+                                                   Foreground="#064E3B"/>
+                                        <TextBlock x:Name="NextLanguageNative"
+                                                   FontSize="12"
+                                                   Margin="6,2,0,0"
+                                                   Foreground="#047857"
+                                                   VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                    <TextBlock x:Name="NextLanguageNote"
+                                               Text="{DynamicResource Translations_NextUp_Note}"
+                                               FontSize="11"
+                                               Margin="0,3,0,0"
+                                               TextWrapping="Wrap"
+                                               Foreground="#065F46"/>
+                                </StackPanel>
+                                <Button Grid.Column="3"
+                                        x:Name="NextLanguageVoteButton"
+                                        Style="{StaticResource SecondaryButton}"
+                                        Content="{DynamicResource Translations_Vote_Button}"
+                                        MinWidth="130" Height="32"
+                                        VerticalAlignment="Center"
+                                        Click="NextLanguageVote_Click"
+                                        ToolTip="{DynamicResource Translations_Vote_Tooltip}"/>
+                            </Grid>
+                        </Border>
+
+                        <!-- Join-the-crew row — two small link chips, one each
+                             for Discord and the web home. Keeps this tab
+                             outward-facing without demanding clicks. -->
+                        <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
+                            <Button x:Name="CommunityDiscordButton"
+                                    Style="{StaticResource SecondaryButton}"
+                                    Content="{DynamicResource Community_Discord_Button}"
+                                    Height="30" Padding="12,0" Margin="0,0,8,0"
+                                    ToolTip="{DynamicResource Tip_Community_Discord}"
+                                    Click="CommunityDiscord_Click"/>
+                            <Button x:Name="CommunityXButton"
+                                    Style="{StaticResource SecondaryButton}"
+                                    Content="{DynamicResource Community_X_Button}"
+                                    Height="30" Padding="12,0" Margin="0,0,8,0"
+                                    ToolTip="{DynamicResource Tip_Community_X}"
+                                    Click="CommunityX_Click"/>
+                            <Button x:Name="CommunityWebsiteButton"
+                                    Style="{StaticResource SecondaryButton}"
+                                    Content="{DynamicResource Community_Website_Button}"
+                                    Height="30" Padding="12,0"
+                                    ToolTip="{DynamicResource Tip_Community_Web}"
+                                    Click="CommunityWebsite_Click"/>
+                        </StackPanel>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- ═══════════════════════════════════════════════════════════
+                 TAB 7: LOGS
+                 ═══════════════════════════════════════════════════════════ -->
+            <TabItem Header="{DynamicResource Tab_Logs}" Tag="Logs" Style="{StaticResource ModernTabItem}">
+                <Grid Margin="4,10,4,4">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- Log toolbar -->
+                    <WrapPanel Margin="0,0,0,8">
+                        <ComboBox x:Name="LogLevelFilter" Width="110" Height="28"
+                                  SelectionChanged="LogLevelFilter_SelectionChanged"
+                                  VerticalContentAlignment="Center" Style="{StaticResource ModernComboBox}"
+                                  Margin="0,0,8,4">
+                            <ComboBoxItem Content="{DynamicResource Log_Filter_All}" IsSelected="True" Tag="ALL"/>
+                            <ComboBoxItem Content="{DynamicResource Logs_Severity_Debug}" Tag="DEBUG"/>
+                            <ComboBoxItem Content="{DynamicResource Logs_Severity_Info}" Tag="INFO"/>
+                            <ComboBoxItem Content="{DynamicResource Logs_Severity_Warn}" Tag="WARN"/>
+                            <ComboBoxItem Content="{DynamicResource Logs_Severity_Error}" Tag="ERROR"/>
+                        </ComboBox>
+                        <Button x:Name="ClearLogsButton" Content="{DynamicResource Btn_ClearLogs}"
+                                Style="{StaticResource SecondaryButton}" Click="ClearLogsButton_Click"
+                                ToolTip="{DynamicResource Tip_Logs_Clear}"
+                                Width="65" Height="28" Margin="0,0,8,4"/>
+                        <Button x:Name="OpenLogFileButton" Content="{DynamicResource Logs_OpenAppLog}"
+                                Style="{StaticResource SecondaryButton}" Click="OpenLogFileButton_Click"
+                                ToolTip="{DynamicResource Tip_Logs_OpenApp}"
+                                MinWidth="120" Height="28" Margin="0,0,8,4"/>
+                        <Button Content="{DynamicResource Logs_OpenDialogueLog}" Style="{StaticResource SecondaryButton}"
+                                Click="OpenDialogueLogFolder_Click"
+                                ToolTip="{DynamicResource Tip_Logs_OpenDialogue}"
+                                MinWidth="140" Height="28" Margin="0,0,0,4"/>
+                    </WrapPanel>
+
+                    <!-- Log list (full height) -->
+                    <Border Grid.Row="1" Background="White" CornerRadius="6" BorderBrush="#E5E7EB" BorderThickness="1"
+                            Padding="0" ClipToBounds="True">
+                        <ListView x:Name="LogListView"
+                                  Background="Transparent" Foreground="#374151"
+                                  BorderThickness="0"
+                                  FontFamily="Consolas, Courier New"
+                                  FontSize="11"
+                                  AlternationCount="2"
+                                  ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                  VirtualizingStackPanel.IsVirtualizing="True">
+                            <!-- Column headers use the inherited Segoe UI explicitly.
+                                 Inheriting the LogListView monospace family caused
+                                 GridViewHeaderRowPresenter to trip ConstructCachedTypeface
+                                 when the system font cache (FNTCACHE.DAT) couldn't open
+                                 the requested font — observed in the wild as a hard UI
+                                 crash on the Logs tab. Pinning the header font to Segoe UI
+                                 isolates the monospace lookup to the cell content. -->
+                            <ListView.Resources>
+                                <Style TargetType="GridViewColumnHeader">
+                                    <Setter Property="FontFamily" Value="Segoe UI"/>
+                                    <Setter Property="FontSize" Value="11"/>
+                                    <Setter Property="FontWeight" Value="SemiBold"/>
+                                </Style>
+                            </ListView.Resources>
+                            <ListView.View>
+                                <GridView>
+                                    <GridViewColumn Header="{DynamicResource Log_Time}" Width="85"
+                                                    DisplayMemberBinding="{Binding TimeString}"/>
+                                    <GridViewColumn Header="{DynamicResource Log_Level}" Width="50">
+                                        <GridViewColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <TextBlock Text="{Binding Level}" FontWeight="SemiBold" FontSize="10">
+                                                    <TextBlock.Style>
+                                                        <Style TargetType="TextBlock">
+                                                            <Setter Property="Foreground" Value="#9CA3AF"/>
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding Level}" Value="ERROR">
+                                                                    <Setter Property="Foreground" Value="#DC2626"/>
+                                                                </DataTrigger>
+                                                                <DataTrigger Binding="{Binding Level}" Value="WARN">
+                                                                    <Setter Property="Foreground" Value="#D97706"/>
+                                                                </DataTrigger>
+                                                                <DataTrigger Binding="{Binding Level}" Value="INFO">
+                                                                    <Setter Property="Foreground" Value="#2563EB"/>
+                                                                </DataTrigger>
+                                                                <DataTrigger Binding="{Binding Level}" Value="DEBUG">
+                                                                    <Setter Property="Foreground" Value="#9CA3AF"/>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </TextBlock.Style>
+                                                </TextBlock>
+                                            </DataTemplate>
+                                        </GridViewColumn.CellTemplate>
+                                    </GridViewColumn>
+                                    <GridViewColumn Header="{DynamicResource Log_Message}" Width="380"
+                                                    DisplayMemberBinding="{Binding Message}"/>
+                                </GridView>
+                            </ListView.View>
+                            <ListView.ItemContainerStyle>
+                                <Style TargetType="ListViewItem">
+                                    <Setter Property="Background" Value="Transparent"/>
+                                    <Setter Property="Foreground" Value="#374151"/>
+                                    <Setter Property="Padding" Value="4,2"/>
+                                    <Setter Property="BorderBrush" Value="#F3F4F6"/>
+                                    <Setter Property="BorderThickness" Value="0,0,0,1"/>
+                                    <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                    <Style.Triggers>
+                                        <Trigger Property="ItemsControl.AlternationIndex" Value="1">
+                                            <Setter Property="Background" Value="#FAFBFC"/>
+                                        </Trigger>
+                                        <Trigger Property="IsSelected" Value="True">
+                                            <Setter Property="Background" Value="#EEF2FF"/>
+                                            <Setter Property="Foreground" Value="#111827"/>
+                                        </Trigger>
+                                        <MultiTrigger>
+                                            <MultiTrigger.Conditions>
+                                                <Condition Property="IsMouseOver" Value="True"/>
+                                                <Condition Property="IsSelected" Value="False"/>
+                                            </MultiTrigger.Conditions>
+                                            <Setter Property="Background" Value="#F9FAFB"/>
+                                        </MultiTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </ListView.ItemContainerStyle>
+                        </ListView>
+                    </Border>
+                </Grid>
+            </TabItem>
+
+        </TabControl>
+
+        <!-- ═══════════════════════════════════════════════════════════
+             FOOTER
+             ═══════════════════════════════════════════════════════════ -->
+        <Border Grid.Row="1" Background="White" BorderBrush="#E5E7EB" BorderThickness="0,1,0,0"
+                Padding="16,6,16,6">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                <TextBlock x:Name="DashOcrDetailStatus" FontSize="10"
+                           Foreground="{StaticResource TextTertiaryBrush}" VerticalAlignment="Center"
+                           Text="{DynamicResource Dash_Status_Stopped}"/>
+                <TextBlock Text=" · " FontSize="10" Foreground="#D1D5DB" VerticalAlignment="Center"/>
+                <TextBlock x:Name="DashEngineStatus" FontSize="10"
+                           Foreground="#D97706" VerticalAlignment="Center"
+                           Text="{DynamicResource Dash_Status_Loading}"/>
+                <TextBlock Text=" · " FontSize="10" Foreground="#D1D5DB" VerticalAlignment="Center"/>
+                <TextBlock x:Name="DashDictStatus" FontSize="10"
+                           Foreground="#D97706" VerticalAlignment="Center"
+                           Text="{DynamicResource Dash_Status_Loading}"/>
+                <TextBlock Text="        " VerticalAlignment="Center"/>
+                <TextBlock FontSize="10" VerticalAlignment="Center" ToolTip="{DynamicResource Tip_Footer_About}">
+                    <Hyperlink NavigateUri="https://kaption.one"
+                               RequestNavigate="Hyperlink_RequestNavigate"
+                               Foreground="{StaticResource AccentBrush}">
+                        <Run Text="{DynamicResource Footer_About}"/>
+                    </Hyperlink>
+                </TextBlock>
+                <TextBlock Text=" · " FontSize="10" Foreground="#D1D5DB" VerticalAlignment="Center"/>
+                <TextBlock FontSize="10" VerticalAlignment="Center"
+                           Foreground="{StaticResource AccentBrush}" Cursor="Hand"
+                           ToolTip="{DynamicResource Tip_Footer_Setup}"
+                           MouseLeftButtonDown="DashSetupGuide_Click"
+                           Text="{DynamicResource Footer_Setup}"/>
+                <TextBlock Text=" · " FontSize="10" Foreground="#D1D5DB" VerticalAlignment="Center"/>
+                <TextBlock FontSize="10" VerticalAlignment="Center" ToolTip="{DynamicResource Tip_Footer_Discord}">
+                    <Hyperlink NavigateUri="https://discord.gg/zUAbXEZktw"
+                               RequestNavigate="Hyperlink_RequestNavigate"
+                               Foreground="{StaticResource AccentBrush}">
+                        <Run Text="{DynamicResource Footer_Discord}"/>
+                    </Hyperlink>
+                </TextBlock>
+                <TextBlock Text=" · " FontSize="10" Foreground="#D1D5DB" VerticalAlignment="Center"/>
+                <TextBlock FontSize="10" VerticalAlignment="Center" ToolTip="{DynamicResource Tip_Footer_X}">
+                    <Hyperlink NavigateUri="https://x.com/KaptionOne"
+                               RequestNavigate="Hyperlink_RequestNavigate"
+                               Foreground="{StaticResource AccentBrush}">
+                        <Run Text="{DynamicResource Footer_X}"/>
+                    </Hyperlink>
+                </TextBlock>
+            </StackPanel>
+        </Border>
+
+        <!-- Hidden: kept for code compat -->
+        <TextBlock x:Name="DashPredictionStatus" Visibility="Collapsed"/>
+
+    </Grid>
+</Window>

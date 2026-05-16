@@ -1,0 +1,160 @@
+<Window x:Class="GI_Subtitles.Views.FullscreenTipWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Kaption"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="Transparent"
+        ShowInTaskbar="False"
+        SizeToContent="Height"
+        Width="500"
+        ResizeMode="NoResize"
+        Topmost="True"
+        WindowStartupLocation="CenterScreen"
+        Icon="../Resources/kaption.ico"
+        KeyDown="Window_KeyDown">
+
+    <Window.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="../Resources/ModernStyles.xaml"/>
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </Window.Resources>
+
+    <Border CornerRadius="12" Background="White"
+            BorderBrush="{StaticResource CardBorderBrush}" BorderThickness="1"
+            MouseLeftButtonDown="Border_MouseLeftButtonDown">
+        <Border.Effect>
+            <DropShadowEffect Color="#000000" BlurRadius="28" ShadowDepth="0" Opacity="0.18"/>
+        </Border.Effect>
+
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <!-- Top accent strip — same amber tint as Warn dialog -->
+            <Border Grid.Row="0" Height="4" CornerRadius="12,12,0,0"
+                    Background="#F59E0B"/>
+
+            <!-- Header: icon bubble + title -->
+            <Grid Grid.Row="1" Margin="24,20,14,4">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <Border Grid.Column="0"
+                        Width="42" Height="42" CornerRadius="21"
+                        Background="#FEF3C7"
+                        VerticalAlignment="Top">
+                    <Viewbox Width="22" Height="22" Margin="0">
+                        <!-- Stylised "monitor" glyph -->
+                        <Path Fill="#D97706"
+                              Stretch="Uniform"
+                              Data="M3,3 H21 V15 H3 Z M3,15 H21 M9,21 H15 M12,17 V21"
+                              Stroke="#D97706" StrokeThickness="1.5"/>
+                    </Viewbox>
+                </Border>
+
+                <TextBlock Grid.Column="1"
+                           x:Name="TitleText"
+                           Margin="14,4,10,0"
+                           Text="{DynamicResource FullscreenTip_Title}"
+                           FontSize="17" FontWeight="SemiBold"
+                           Foreground="{StaticResource TextBrush}"
+                           TextWrapping="Wrap"
+                           VerticalAlignment="Center"/>
+            </Grid>
+
+            <!-- Body: 3 numbered steps -->
+            <StackPanel Grid.Row="2" Margin="24,8,24,4">
+                <TextBlock Text="{DynamicResource FullscreenTip_Intro}"
+                           Foreground="{StaticResource TextSecondaryBrush}"
+                           FontSize="13" TextWrapping="Wrap"
+                           Margin="0,0,0,14"/>
+
+                <!-- Step 1 -->
+                <Grid Margin="0,0,0,10">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="28"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Border Grid.Column="0" Width="22" Height="22" CornerRadius="11"
+                            Background="#FEF3C7" VerticalAlignment="Top">
+                        <TextBlock Text="1" FontSize="12" FontWeight="Bold"
+                                   Foreground="#D97706"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    <TextBlock Grid.Column="1"
+                               Text="{DynamicResource FullscreenTip_Step1}"
+                               Foreground="{StaticResource TextBrush}"
+                               FontSize="13" TextWrapping="Wrap"/>
+                </Grid>
+
+                <!-- Step 2 -->
+                <Grid Margin="0,0,0,10">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="28"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Border Grid.Column="0" Width="22" Height="22" CornerRadius="11"
+                            Background="#FEF3C7" VerticalAlignment="Top">
+                        <TextBlock Text="2" FontSize="12" FontWeight="Bold"
+                                   Foreground="#D97706"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    <TextBlock Grid.Column="1"
+                               Text="{DynamicResource FullscreenTip_Step2}"
+                               Foreground="{StaticResource TextBrush}"
+                               FontSize="13" TextWrapping="Wrap"/>
+                </Grid>
+
+                <!-- Step 3 -->
+                <Grid Margin="0,0,0,4">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="28"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Border Grid.Column="0" Width="22" Height="22" CornerRadius="11"
+                            Background="#FEF3C7" VerticalAlignment="Top">
+                        <TextBlock Text="3" FontSize="12" FontWeight="Bold"
+                                   Foreground="#D97706"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    <TextBlock Grid.Column="1"
+                               Text="{DynamicResource FullscreenTip_Step3}"
+                               Foreground="{StaticResource TextBrush}"
+                               FontSize="13" TextWrapping="Wrap"/>
+                </Grid>
+            </StackPanel>
+
+            <!-- Action bar: tinted background, right-aligned buttons -->
+            <Border Grid.Row="3" Background="#F9FAFB" CornerRadius="0,0,12,12"
+                    BorderBrush="{StaticResource CardBorderBrush}" BorderThickness="0,1,0,0"
+                    Padding="16,14">
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                    <Button x:Name="CancelButton"
+                            Style="{StaticResource SecondaryButton}"
+                            Width="110" Height="34" Margin="0,0,8,0"
+                            Click="Cancel_Click">
+                        <TextBlock Text="{DynamicResource FullscreenTip_Cancel}"/>
+                    </Button>
+                    <Button x:Name="GotItButton"
+                            Style="{StaticResource ModernButton}"
+                            Width="140" Height="34"
+                            IsEnabled="False"
+                            IsDefault="True"
+                            Click="GotIt_Click">
+                        <TextBlock x:Name="GotItText"
+                                   Text="{DynamicResource FullscreenTip_GotItCounting}"/>
+                    </Button>
+                </StackPanel>
+            </Border>
+        </Grid>
+    </Border>
+</Window>

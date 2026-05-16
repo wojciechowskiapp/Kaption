@@ -1,0 +1,169 @@
+<Window x:Class="GI_Subtitles.Views.SendFeedbackWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="{DynamicResource Feedback_WindowTitle}"
+        Height="520" Width="520"
+        Icon="../Resources/kaption.ico"
+        WindowStartupLocation="CenterOwner"
+        WindowStyle="SingleBorderWindow"
+        ResizeMode="NoResize"
+        ShowInTaskbar="False"
+        Background="#F8F9FC">
+
+    <Window.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="../Resources/ModernStyles.xaml"/>
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </Window.Resources>
+
+    <Grid Margin="28,22,28,20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>   <!-- Title -->
+            <RowDefinition Height="Auto"/>   <!-- Subtitle / explainer -->
+            <RowDefinition Height="Auto"/>   <!-- Category chips -->
+            <RowDefinition Height="*"/>      <!-- Textbox -->
+            <RowDefinition Height="Auto"/>   <!-- Char counter / error row -->
+            <RowDefinition Height="Auto"/>   <!-- Button row -->
+        </Grid.RowDefinitions>
+
+        <!-- Title -->
+        <TextBlock Grid.Row="0"
+                   Text="{DynamicResource Feedback_Heading}"
+                   FontSize="20" FontWeight="SemiBold"
+                   Foreground="{StaticResource TextBrush}"/>
+
+        <!-- Short explainer. Warm tone — no surveys, no nagging. -->
+        <TextBlock Grid.Row="1"
+                   TextWrapping="Wrap"
+                   Margin="0,6,0,14"
+                   FontSize="12"
+                   Foreground="{StaticResource TextSecondaryBrush}"
+                   Text="{DynamicResource Feedback_Explainer}"/>
+
+        <!-- Category chips — lets the user signal tone in one click.
+             Selected category is prepended to the message body as
+             "[Bug] ..." so the backend needs no schema change. -->
+        <StackPanel x:Name="CategoryPanel" Grid.Row="2" Orientation="Horizontal" Margin="0,0,0,12">
+            <Button x:Name="CatBug" Tag="Bug"
+                    Style="{StaticResource SecondaryButton}"
+                    Content="{DynamicResource Feedback_Cat_Bug}"
+                    Height="30" Padding="12,0" Margin="0,0,8,0"
+                    Click="CategoryChip_Click"/>
+            <Button x:Name="CatIdea" Tag="Idea"
+                    Style="{StaticResource SecondaryButton}"
+                    Content="{DynamicResource Feedback_Cat_Idea}"
+                    Height="30" Padding="12,0" Margin="0,0,8,0"
+                    Click="CategoryChip_Click"/>
+            <Button x:Name="CatLove" Tag="Love"
+                    Style="{StaticResource SecondaryButton}"
+                    Content="{DynamicResource Feedback_Cat_Love}"
+                    Height="30" Padding="12,0" Margin="0,0,8,0"
+                    Click="CategoryChip_Click"/>
+            <Button x:Name="CatOther" Tag="Other"
+                    Style="{StaticResource SecondaryButton}"
+                    Content="{DynamicResource Feedback_Cat_Other}"
+                    Height="30" Padding="12,0"
+                    Click="CategoryChip_Click"/>
+        </StackPanel>
+
+        <!-- Compose area -->
+        <Grid x:Name="ComposePanel" Grid.Row="3" Grid.RowSpan="1">
+            <Border BorderBrush="{StaticResource CardBorderBrush}" BorderThickness="1" CornerRadius="6" Background="White">
+                <TextBox x:Name="MessageBox"
+                         AcceptsReturn="True"
+                         TextWrapping="Wrap"
+                         MaxLength="2000"
+                         VerticalScrollBarVisibility="Auto"
+                         BorderThickness="0" Padding="12,10"
+                         Background="Transparent"
+                         FontSize="13"
+                         Foreground="{StaticResource TextBrush}"
+                         TextChanged="MessageBox_TextChanged"/>
+            </Border>
+        </Grid>
+
+        <!-- Char counter / error row. Counter colour shifts at 80 % and 100 %. -->
+        <Grid Grid.Row="4" Margin="2,8,2,0">
+            <TextBlock x:Name="ErrorText"
+                       HorizontalAlignment="Left"
+                       FontSize="11"
+                       Foreground="#B91C1C"
+                       TextWrapping="Wrap"
+                       Visibility="Collapsed"/>
+            <TextBlock x:Name="CharCount"
+                       HorizontalAlignment="Right"
+                       FontSize="11"
+                       Foreground="{StaticResource TextTertiaryBrush}"
+                       Text="0 / 2000"/>
+        </Grid>
+
+        <!-- Action row -->
+        <Grid Grid.Row="5" Margin="0,16,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- Left: privacy note — no hidden data collection -->
+            <TextBlock Grid.Column="0"
+                       VerticalAlignment="Center"
+                       FontSize="11"
+                       Foreground="{StaticResource TextTertiaryBrush}"
+                       TextWrapping="Wrap"
+                       MaxWidth="260"
+                       Text="{DynamicResource Feedback_PrivacyNote}"/>
+
+            <Button x:Name="BtnCancel" Grid.Column="2"
+                    Style="{StaticResource SecondaryButton}"
+                    Content="{DynamicResource Common_Cancel}"
+                    Margin="0,0,8,0"
+                    Click="Cancel_Click"
+                    IsCancel="True"/>
+
+            <Button x:Name="BtnSend" Grid.Column="3"
+                    Style="{StaticResource ModernButton}"
+                    Content="{DynamicResource Feedback_Send}"
+                    MinWidth="96"
+                    IsEnabled="False"
+                    Click="Send_Click"
+                    IsDefault="True"/>
+        </Grid>
+
+        <!-- ============================================================
+             Thank-you panel (swaps in on success). Kept in the same grid
+             cell as ComposePanel so we don't shuffle layout; visibility
+             toggled from code-behind.
+             ============================================================ -->
+        <StackPanel x:Name="ThanksPanel"
+                    Grid.Row="3" Grid.RowSpan="3"
+                    VerticalAlignment="Center" HorizontalAlignment="Center"
+                    Visibility="Collapsed">
+            <TextBlock Text="&#x2713;"
+                       FontSize="48" FontWeight="Bold"
+                       HorizontalAlignment="Center"
+                       Foreground="{StaticResource SuccessBrush}"
+                       Margin="0,0,0,12"/>
+            <TextBlock Text="{DynamicResource Feedback_ThanksTitle}"
+                       FontSize="18" FontWeight="SemiBold"
+                       HorizontalAlignment="Center"
+                       Foreground="{StaticResource TextBrush}"
+                       Margin="0,0,0,6"/>
+            <TextBlock TextWrapping="Wrap" MaxWidth="360"
+                       FontSize="12"
+                       TextAlignment="Center"
+                       Foreground="{StaticResource TextSecondaryBrush}"
+                       Text="{DynamicResource Feedback_ThanksBody}"/>
+            <Button x:Name="BtnClose"
+                    Style="{StaticResource ModernButton}"
+                    Content="{DynamicResource Common_Close}"
+                    HorizontalAlignment="Center"
+                    MinWidth="120"
+                    Margin="0,18,0,0"
+                    Click="Cancel_Click"/>
+        </StackPanel>
+    </Grid>
+</Window>

@@ -1,0 +1,173 @@
+<Window x:Class="GI_Subtitles.Views.EulaAcceptanceWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="{DynamicResource Eula_WindowTitle}"
+        Height="460" Width="520"
+        Icon="../Resources/kaption.ico"
+        WindowStartupLocation="CenterScreen"
+        WindowStyle="SingleBorderWindow"
+        ResizeMode="NoResize"
+        Background="#F8F9FC"
+        Closing="Window_Closing">
+
+    <!--
+        First-run acceptance window. Shown BEFORE the LoginWindow on a fresh
+        install (or after the EULA version is bumped). Velopack's own Setup.exe
+        is intentionally silent for a smooth upgrade experience (delta updates
+        shouldn't re-prompt a returning user), so the legal acceptance step
+        lives here where we can re-prompt precisely when legal text changes.
+
+        Rules:
+          - The "Continue" button is disabled until the user ticks the EULA
+            checkbox. Crash-reporting is optional and defaults off (opt-in).
+          - "Decline and quit" exits the app with code 2 — App.xaml.cs
+            distinguishes this from a normal quit so logs stay honest.
+          - Acceptance persists to Config as (version, unix-seconds). When
+            EulaAcceptanceWindow.CurrentEulaVersion is bumped, prior
+            acceptances are ignored and the dialog reopens.
+    -->
+
+    <Window.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="../Resources/ModernStyles.xaml"/>
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </Window.Resources>
+
+    <Grid>
+        <!-- Header bar -->
+        <Border VerticalAlignment="Top" Height="100" Background="White"
+                BorderBrush="{StaticResource CardBorderBrush}" BorderThickness="0,0,0,1">
+            <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                <Image Source="../Resources/kaption.ico" Width="40" Height="40" Margin="0,0,0,6"/>
+                <TextBlock Text="{DynamicResource Eula_Heading}"
+                           FontSize="18" FontWeight="SemiBold"
+                           Foreground="{StaticResource TextBrush}"
+                           HorizontalAlignment="Center"/>
+            </StackPanel>
+        </Border>
+
+        <!-- Main content -->
+        <Grid Margin="0,100,0,0">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <!-- Scrollable body -->
+            <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto" Margin="36,24,36,0">
+                <StackPanel>
+                    <TextBlock TextWrapping="Wrap" LineHeight="20"
+                               FontSize="12.5"
+                               Foreground="{StaticResource TextSecondaryBrush}"
+                               Margin="0,0,0,14"
+                               Text="{DynamicResource Eula_Intro}"/>
+
+                    <!-- Links — still available to read, but no longer a required click -->
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
+                        <TextBlock>
+                            <Hyperlink x:Name="LinkEula"
+                                       NavigateUri="https://kaption.one/legal/eula"
+                                       RequestNavigate="Hyperlink_RequestNavigate"
+                                       Foreground="{StaticResource AccentBrush}">
+                                <Run x:Name="RunLinkEula" Text="EULA"/>
+                            </Hyperlink>
+                        </TextBlock>
+                        <TextBlock Text="   ·   "
+                                   Foreground="{StaticResource TextTertiaryBrush}"/>
+                        <TextBlock>
+                            <Hyperlink x:Name="LinkPrivacy"
+                                       NavigateUri="https://kaption.one/legal/privacy"
+                                       RequestNavigate="Hyperlink_RequestNavigate"
+                                       Foreground="{StaticResource AccentBrush}">
+                                <Run x:Name="RunLinkPrivacy" Text="Privacy Policy"/>
+                            </Hyperlink>
+                        </TextBlock>
+                        <TextBlock Text="   ·   "
+                                   Foreground="{StaticResource TextTertiaryBrush}"/>
+                        <TextBlock>
+                            <Hyperlink x:Name="LinkDiscord"
+                                       NavigateUri="https://discord.gg/zUAbXEZktw"
+                                       RequestNavigate="Hyperlink_RequestNavigate"
+                                       Foreground="{StaticResource AccentBrush}">
+                                Discord
+                            </Hyperlink>
+                        </TextBlock>
+                        <TextBlock Text="   ·   "
+                                   Foreground="{StaticResource TextTertiaryBrush}"/>
+                        <TextBlock>
+                            <Hyperlink x:Name="LinkTwitter"
+                                       NavigateUri="https://x.com/KaptionOne"
+                                       RequestNavigate="Hyperlink_RequestNavigate"
+                                       Foreground="{StaticResource AccentBrush}">
+                                X
+                            </Hyperlink>
+                        </TextBlock>
+                    </StackPanel>
+
+                    <!-- Crash-reporting opt-in — single compact toggle, still opt-in
+                         (defaults off). We removed the large required-checkbox card:
+                         the legal acceptance is now implicit in clicking the default
+                         "Accept & continue" button, with explicit copy under it. -->
+                    <Border Background="White" CornerRadius="8"
+                            BorderBrush="{StaticResource CardBorderBrush}" BorderThickness="1"
+                            Padding="14,12">
+                        <StackPanel>
+                            <CheckBox x:Name="CbCrashReports"
+                                      VerticalContentAlignment="Center">
+                                <TextBlock TextWrapping="Wrap"
+                                           FontSize="12.5"
+                                           Foreground="{StaticResource TextBrush}"
+                                           Text="{DynamicResource Eula_CrashOptIn}"/>
+                            </CheckBox>
+                            <TextBlock Text="{DynamicResource Eula_CrashOptInHint}"
+                                       FontSize="11"
+                                       Foreground="{StaticResource TextTertiaryBrush}"
+                                       TextWrapping="Wrap"
+                                       Margin="26,4,0,0"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Legal microcopy — makes the consent of clicking "Accept"
+                         explicit without a separate checkbox. -->
+                    <TextBlock TextWrapping="Wrap"
+                               FontSize="11"
+                               LineHeight="16"
+                               Foreground="{StaticResource TextTertiaryBrush}"
+                               Margin="0,14,0,0">
+                        <Run x:Name="RunLegalPrefix" Text="By clicking "/><Run x:Name="RunLegalAction" FontWeight="SemiBold" Text="Accept &amp; continue"/><Run x:Name="RunLegalSuffix" Text=", you agree to the End-User License Agreement and Privacy Policy linked above."/>
+                    </TextBlock>
+
+                </StackPanel>
+            </ScrollViewer>
+
+            <!-- Action bar -->
+            <Border Grid.Row="1" Background="White"
+                    BorderBrush="{StaticResource CardBorderBrush}" BorderThickness="0,1,0,0"
+                    Padding="24,14">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <Button x:Name="BtnQuit"
+                            Grid.Column="0"
+                            Style="{StaticResource SecondaryButton}"
+                            Content="{DynamicResource Eula_Decline}"
+                            HorizontalAlignment="Left"
+                            Click="Quit_Click"/>
+
+                    <Button x:Name="BtnContinue"
+                            Grid.Column="1"
+                            Style="{StaticResource ModernButton}"
+                            Content="{DynamicResource Eula_Continue}"
+                            MinWidth="150"
+                            IsDefault="True"
+                            Click="Continue_Click"/>
+                </Grid>
+            </Border>
+        </Grid>
+    </Grid>
+</Window>

@@ -1,0 +1,103 @@
+Kaption — Real-time in-game subtitle translation
+Copyright (c) 2026 Wojciechowski
+
+This software is dual-licensed.
+
+================================================================================
+OPTION 1: GNU Affero General Public License v3.0 (AGPL-3.0)
+================================================================================
+
+You may use Kaption under the GNU Affero General Public License, version 3,
+as published by the Free Software Foundation. The full text is in
+LICENSE-AGPL, and online at https://www.gnu.org/licenses/agpl-3.0.html.
+
+What this means in practice for the typical end user:
+
+  * Running the official Kaption installer (or building Kaption from this
+    source) for your own personal use imposes NO obligations on you.
+    You do not need to publish anything. Just running the binary is not
+    "distributing" the software.
+
+  * If you redistribute Kaption — for example, you fork the repository,
+    modify it, and ship a binary or installer to other people — the
+    AGPL-3.0 obligations apply: you must release your full modified
+    source code under AGPL-3.0, and you must preserve copyright and
+    licence notices.
+
+  * If you bundle Kaption code (or substantial portions of it) into a
+    larger product, that product must also be released under AGPL-3.0.
+
+  * The AGPL "network use" clause (Section 13) does not normally apply
+    to Kaption, because Kaption is a desktop client, not a hosted
+    service. If you build a network service that exposes Kaption to
+    remote users, Section 13 applies and you must offer those users
+    the source.
+
+================================================================================
+OPTION 2: Commercial Licence
+================================================================================
+
+If the AGPL-3.0 obligations do not work for your situation — for example,
+you want to ship a closed-source product that uses Kaption code, or you
+need a contractual warranty, indemnity, or support agreement — a separate
+commercial licence is available.
+
+See LICENSE-COMMERCIAL for an outline of typical terms and how to request
+one. Commercial enquiries are uncommon for an end-user desktop tool of
+this size, so please contact us before assuming you need this option;
+many uses fit comfortably under AGPL-3.0.
+
+================================================================================
+TRADEMARKS
+================================================================================
+
+"Kaption" and the Kaption logo are trademarks of the project author.
+Neither AGPL-3.0 nor any commercial licence grants rights to the Kaption
+name or logo. If you fork and redistribute, you MUST give your fork its
+own distinct name and icon. See TRADEMARKS.md for what is and isn't
+allowed.
+
+================================================================================
+WHICH OPTION APPLIES TO YOU?
+================================================================================
+
+You are using Kaption under AGPL-3.0 if any of the following are true:
+
+  * You install and run the official binary for personal use
+  * You build from source for personal use, evaluation, or security
+    research
+  * You publish a fork (under a different name) on GitHub, GitLab, etc.,
+    under AGPL-3.0 with full source available
+  * You contribute fixes or features back via pull requests
+
+You need a commercial licence if any of the following are true:
+
+  * You want to ship a closed-source product or service that includes
+    Kaption code
+  * You cannot or will not release your derivative work under AGPL-3.0
+  * You need a contractual warranty, SLA, indemnity, or formal support
+
+When in doubt, contact us — we will tell you which one applies and we
+do not charge for the conversation.
+
+  Email:   hello@kaption.one
+  Website: https://kaption.one
+
+================================================================================
+THIRD-PARTY COMPONENTS
+================================================================================
+
+Kaption bundles and depends on third-party software (PaddleOCR, ONNX
+Runtime, Velopack, OpenCV, Newtonsoft.Json, and others). Those components
+are distributed under their own licences, listed in
+THIRD_PARTY_LICENSES.txt. Nothing in this Kaption licence overrides their
+terms — you must comply with them as well.
+
+================================================================================
+NO WARRANTY
+================================================================================
+
+Kaption is provided "AS IS", without warranty of any kind, express or
+implied. The full disclaimer is in LICENSE-AGPL (Sections 15 and 16) and,
+for commercial-licence users, in the negotiated commercial-licence
+agreement.

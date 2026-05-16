@@ -1,0 +1,341 @@
+================================================================================
+Kaption — Third-Party Licenses
+================================================================================
+
+Kaption (the desktop application) bundles the following third-party components.
+Each is used under its original license. Attribution, full license texts, and
+copyright notices are reproduced below.
+
+For the desktop app's own source license, see LICENSE in the repository root.
+
+Last reviewed: 2026-04-14
+
+Table of contents
+
+    1.  PaddleOCRSharp                    LGPL-2.1
+    2.  OpenCvSharp4                      Apache-2.0
+    3.  OpenCV                            Apache-2.0
+    4.  ONNX Runtime                      MIT
+    5.  log4net                           Apache-2.0
+    6.  Newtonsoft.Json                   MIT
+    7.  BouncyCastle.NetCore              MIT
+    8.  DirectML                          Microsoft system library (notice)
+
+================================================================================
+1. PaddleOCRSharp
+================================================================================
+
+Project:   https://github.com/raoyutian/PaddleOCRSharp
+License:   GNU Lesser General Public License, version 2.1 (LGPL-2.1)
+Notice:    PaddleOCRSharp is a .NET wrapper around PaddlePaddle's OCR models.
+           Kaption consumes it as an unmodified library. No modifications were
+           made to the PaddleOCRSharp source. If you need the original source,
+           it is available at the project URL above.
+
+                   GNU LESSER GENERAL PUBLIC LICENSE
+                        Version 2.1, February 1999
+
+ Copyright (C) 1991, 1999 Free Software Foundation, Inc.
+ 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+
+ Everyone is permitted to copy and distribute verbatim copies of this license
+ document, but changing it is not allowed.
+
+ [The full text of the LGPL-2.1 license continues. The canonical, verbatim
+ text is available at: https://www.gnu.org/licenses/old-licenses/lgpl-2.1.txt]
+
+ The library may be used by a program for any purpose, and the program may be
+ proprietary, provided that the LGPL terms are followed: you may link against
+ an unmodified copy of the library, and users must be able to replace the
+ library with a modified version. Kaption satisfies this by shipping
+ PaddleOCRSharp as a separate DLL in the install directory; end users can
+ substitute their own build of PaddleOCRSharp.dll if desired.
+
+
+================================================================================
+2. OpenCvSharp4
+================================================================================
+
+Project:   https://github.com/shimat/opencvsharp
+License:   Apache License, Version 2.0
+Copyright: Copyright (c) 2013, shimat
+
+
+                                 Apache License
+                           Version 2.0, January 2004
+                        http://www.apache.org/licenses/
+
+ TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION
+
+ 1. Definitions.
+
+    "License" shall mean the terms and conditions for use, reproduction, and
+    distribution as defined by Sections 1 through 9 of this document.
+
+    "Licensor" shall mean the copyright owner or entity authorized by the
+    copyright owner that is granting the License.
+
+    "Legal Entity" shall mean the union of the acting entity and all other
+    entities that control, are controlled by, or are under common control
+    with that entity. For the purposes of this definition, "control" means
+    (i) the power, direct or indirect, to cause the direction or management
+    of such entity, whether by contract or otherwise, or (ii) ownership of
+    fifty percent (50%) or more of the outstanding shares, or (iii) beneficial
+    ownership of such entity.
+
+    "You" (or "Your") shall mean an individual or Legal Entity exercising
+    permissions granted by this License.
+
+    "Source" form shall mean the preferred form for making modifications,
+    including but not limited to software source code, documentation source,
+    and configuration files.
+
+    "Object" form shall mean any form resulting from mechanical transformation
+    or translation of a Source form, including but not limited to compiled
+    object code, generated documentation, and conversions to other media types.
+
+    "Work" shall mean the work of authorship, whether in Source or Object
+    form, made available under the License, as indicated by a copyright notice
+    that is included in or attached to the work.
+
+    "Derivative Works" shall mean any work, whether in Source or Object form,
+    that is based on (or derived from) the Work and for which the editorial
+    revisions, annotations, elaborations, or other modifications represent,
+    as a whole, an original work of authorship.
+
+    "Contribution" shall mean any work of authorship, including the original
+    version of the Work and any modifications or additions to that Work or
+    Derivative Works thereof, that is intentionally submitted to Licensor for
+    inclusion in the Work by the copyright owner or by an individual or Legal
+    Entity authorized to submit on behalf of the copyright owner.
+
+    "Contributor" shall mean Licensor and any individual or Legal Entity on
+    behalf of whom a Contribution has been received by Licensor and
+    subsequently incorporated within the Work.
+
+ 2. Grant of Copyright License. Subject to the terms and conditions of this
+    License, each Contributor hereby grants to You a perpetual, worldwide,
+    non-exclusive, no-charge, royalty-free, irrevocable copyright license to
+    reproduce, prepare Derivative Works of, publicly display, publicly perform,
+    sublicense, and distribute the Work and such Derivative Works in Source
+    or Object form.
+
+ 3. Grant of Patent License. Subject to the terms and conditions of this
+    License, each Contributor hereby grants to You a perpetual, worldwide,
+    non-exclusive, no-charge, royalty-free, irrevocable (except as stated in
+    this section) patent license to make, have made, use, offer to sell, sell,
+    import, and otherwise transfer the Work, where such license applies only
+    to those patent claims licensable by such Contributor that are necessarily
+    infringed by their Contribution(s) alone or by combination of their
+    Contribution(s) with the Work to which such Contribution(s) was submitted.
+
+ 4. Redistribution. You may reproduce and distribute copies of the Work or
+    Derivative Works thereof in any medium, with or without modifications,
+    and in Source or Object form, provided that You meet the following
+    conditions:
+
+    (a) You must give any other recipients of the Work or Derivative Works
+        a copy of this License; and
+    (b) You must cause any modified files to carry prominent notices stating
+        that You changed the files; and
+    (c) You must retain, in the Source form of any Derivative Works that You
+        distribute, all copyright, patent, trademark, and attribution notices
+        from the Source form of the Work; and
+    (d) If the Work includes a "NOTICE" text file as part of its distribution,
+        then any Derivative Works that You distribute must include a readable
+        copy of the attribution notices contained within such NOTICE file.
+
+ 5. Submission of Contributions. Unless You explicitly state otherwise, any
+    Contribution intentionally submitted for inclusion in the Work by You to
+    the Licensor shall be under the terms and conditions of this License,
+    without any additional terms or conditions.
+
+ 6. Trademarks. This License does not grant permission to use the trade names,
+    trademarks, service marks, or product names of the Licensor.
+
+ 7. Disclaimer of Warranty. Unless required by applicable law or agreed to in
+    writing, Licensor provides the Work on an "AS IS" BASIS, WITHOUT
+    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied, including,
+    without limitation, any warranties or conditions of TITLE, NON-INFRINGEMENT,
+    MERCHANTABILITY, or FITNESS FOR A PARTICULAR PURPOSE.
+
+ 8. Limitation of Liability. In no event and under no legal theory, whether
+    in tort (including negligence), contract, or otherwise, unless required
+    by applicable law (such as deliberate and grossly negligent acts) or
+    agreed to in writing, shall any Contributor be liable to You for damages.
+
+ 9. Accepting Warranty or Support. While redistributing the Work or Derivative
+    Works thereof, You may choose to offer, and charge a fee for, acceptance
+    of support, warranty, indemnity, or other liability obligations.
+
+ END OF TERMS AND CONDITIONS
+
+ [Full verbatim text at https://www.apache.org/licenses/LICENSE-2.0.txt]
+
+
+================================================================================
+3. OpenCV
+================================================================================
+
+Project:   https://opencv.org
+License:   Apache License, Version 2.0 (OpenCV 4.5+)
+Copyright: Copyright (C) 2000-2024, Intel Corporation, all rights reserved.
+           Copyright (C) 2009-2011, Willow Garage Inc., all rights reserved.
+           Copyright (C) 2009-2024, NVIDIA Corporation, all rights reserved.
+           Copyright (C) 2010-2013, Advanced Micro Devices, Inc., all rights reserved.
+           Copyright (C) 2015-2024, OpenCV Foundation, all rights reserved.
+           Copyright (C) 2015-2024, Itseez Inc., all rights reserved.
+           Copyright (C) 2019-2024, Xperience AI, all rights reserved.
+           Copyright (C) 2019-2024, Shenzhen Institute of Artificial Intelligence
+                and Robotics for Society, all rights reserved.
+
+ Licensed under the Apache License, Version 2.0 (see section 2 above for the
+ full text). You may obtain a copy of the license at
+ http://www.apache.org/licenses/LICENSE-2.0
+
+ Unless required by applicable law or agreed to in writing, software
+ distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+ WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+ License for the specific language governing permissions and limitations
+ under the License.
+
+
+================================================================================
+4. ONNX Runtime
+================================================================================
+
+Project:   https://github.com/microsoft/onnxruntime
+License:   MIT License
+Copyright: Copyright (c) Microsoft Corporation
+
+ MIT License
+
+ Permission is hereby granted, free of charge, to any person obtaining a copy
+ of this software and associated documentation files (the "Software"), to deal
+ in the Software without restriction, including without limitation the rights
+ to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ copies of the Software, and to permit persons to whom the Software is
+ furnished to do so, subject to the following conditions:
+
+ The above copyright notice and this permission notice shall be included in
+ all copies or substantial portions of the Software.
+
+ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ THE SOFTWARE.
+
+
+================================================================================
+5. log4net
+================================================================================
+
+Project:   https://logging.apache.org/log4net/
+License:   Apache License, Version 2.0
+Copyright: Copyright 2004-2017 The Apache Software Foundation
+
+ Licensed under the Apache License, Version 2.0 (see section 2 above for the
+ full text). Full verbatim text at
+ https://www.apache.org/licenses/LICENSE-2.0.txt
+
+
+================================================================================
+6. Newtonsoft.Json
+================================================================================
+
+Project:   https://www.newtonsoft.com/json
+License:   MIT License
+Copyright: Copyright (c) 2007 James Newton-King
+
+ MIT License
+
+ Permission is hereby granted, free of charge, to any person obtaining a copy
+ of this software and associated documentation files (the "Software"), to deal
+ in the Software without restriction, including without limitation the rights
+ to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ copies of the Software, and to permit persons to whom the Software is
+ furnished to do so, subject to the following conditions:
+
+ The above copyright notice and this permission notice shall be included in
+ all copies or substantial portions of the Software.
+
+ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ THE SOFTWARE.
+
+
+================================================================================
+7. BouncyCastle.NetCore
+================================================================================
+
+Project:   https://www.bouncycastle.org/csharp/
+License:   MIT X11 style License (BouncyCastle License)
+Copyright: Copyright (c) 2000 - 2024 The Legion of the Bouncy Castle Inc.
+           (https://www.bouncycastle.org)
+
+ Permission is hereby granted, free of charge, to any person obtaining a copy
+ of this software and associated documentation files (the "Software"), to deal
+ in the Software without restriction, including without limitation the rights
+ to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ copies of the Software, and to permit persons to whom the Software is
+ furnished to do so, subject to the following conditions:
+
+ The above copyright notice and this permission notice shall be included in
+ all copies or substantial portions of the Software.
+
+ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ THE SOFTWARE.
+
+
+================================================================================
+8. DirectML
+================================================================================
+
+Project:   Microsoft DirectML (https://learn.microsoft.com/windows/ai/directml/)
+License:   Microsoft system library — distributed as a Windows component.
+Notice:    DirectML.dll is a Microsoft-supplied system library that Kaption
+           bundles alongside ONNX Runtime to enable GPU-accelerated OCR on
+           Windows with DirectX 12 devices. It is redistributed under the
+           Microsoft redistribution terms that ship with the
+           Microsoft.AI.DirectML NuGet package. The full notice text is
+           included with that package and available from Microsoft's
+           documentation at the URL above.
+
+           DirectML is a Microsoft trademark. No endorsement by Microsoft
+           is implied.
+
+
+================================================================================
+NOTICE: Font and icon assets
+================================================================================
+
+UI icons in the desktop app and on the landing page use Heroicons
+(https://heroicons.com, MIT License, Copyright (c) Tailwind Labs, Inc.) and
+Lucide (https://lucide.dev, ISC License, Copyright (c) 2022 Lucide Contributors)
+where noted. Tailwind CSS utility classes (MIT License, Copyright (c) Tailwind
+Labs, Inc.) power the landing page styling.
+
+
+================================================================================
+Source availability
+================================================================================
+
+For any LGPL-licensed component bundled above, you are entitled to receive the
+corresponding source code on request. Send an email to contact@kaption.one with
+the component name and we will provide a download link within 30 days. The
+current versions of each component can also be obtained directly from their
+respective project URLs listed in each section above.
+
+--- End of THIRD_PARTY_LICENSES.txt ---

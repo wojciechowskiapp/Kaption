@@ -1,0 +1,181 @@
+<Window x:Class="GI_Subtitles.Views.ModernDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Kaption"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="Transparent"
+        ShowInTaskbar="False"
+        SizeToContent="Height"
+        MinWidth="420" MaxWidth="520" Width="460"
+        ResizeMode="NoResize"
+        Topmost="True"
+        Icon="../Resources/kaption.ico"
+        KeyDown="Window_KeyDown">
+
+    <Window.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="../Resources/ModernStyles.xaml"/>
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </Window.Resources>
+
+    <!-- ═════════════════════════════════════════════════════════════════════
+         Outer border does three things:
+           1. Rounded corners (the Window itself can't on WPF without this).
+           2. Drop shadow for a floating-card feel against the dimmed desktop.
+           3. Hosts the colored severity accent at the top.
+         MouseLeftButtonDown on the whole border lets the user drag the dialog
+         without a separate "drag handle" strip — same pattern as Slack/Notion
+         modal titles, keeps the chrome minimal.
+         ═════════════════════════════════════════════════════════════════════ -->
+    <Border CornerRadius="12" Background="White"
+            BorderBrush="{StaticResource CardBorderBrush}" BorderThickness="1"
+            MouseLeftButtonDown="Border_MouseLeftButtonDown">
+        <Border.Effect>
+            <DropShadowEffect Color="#000000" BlurRadius="28" ShadowDepth="0" Opacity="0.18"/>
+        </Border.Effect>
+
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <!-- 1. Severity accent strip along the very top.
+                 Color set from code-behind based on DialogSeverity.
+                 Purely decorative — communicates "tone" before any text is read. -->
+            <Border x:Name="AccentStrip" Grid.Row="0" Height="4" CornerRadius="12,12,0,0"
+                    Background="{StaticResource AccentBrush}"/>
+
+            <!-- 2. Header row — icon + title + close button. -->
+            <Grid Grid.Row="1" Margin="24,20,14,6">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- Icon bubble: a solid circle tinted with the severity color,
+                     with a glyph rendered on top. Using a Viewbox lets us keep
+                     the Path crisp at any size without bitmap scaling. -->
+                <Border x:Name="IconBubble" Grid.Column="0"
+                        Width="38" Height="38" CornerRadius="19"
+                        Background="{StaticResource AccentLightBrush}"
+                        VerticalAlignment="Top">
+                    <Viewbox Width="20" Height="20" Margin="0">
+                        <Path x:Name="IconPath"
+                              Fill="{StaticResource AccentBrush}"
+                              Stretch="Uniform"
+                              Data="M12,2 A10,10 0 1,0 12,22 A10,10 0 1,0 12,2 Z"/>
+                    </Viewbox>
+                </Border>
+
+                <TextBlock x:Name="TitleText" Grid.Column="1"
+                           Margin="14,3,10,0"
+                           FontSize="16" FontWeight="SemiBold"
+                           Foreground="{StaticResource TextBrush}"
+                           TextWrapping="Wrap"
+                           VerticalAlignment="Center"/>
+
+                <!-- Close X — always present so the user can dismiss even when
+                     both action buttons are Yes/No. Esc also closes (KeyDown). -->
+                <Button x:Name="CloseButton" Grid.Column="2"
+                        Width="28" Height="28"
+                        Background="Transparent" BorderThickness="0"
+                        Cursor="Hand"
+                        VerticalAlignment="Top"
+                        Click="CloseButton_Click"
+                        ToolTip="{DynamicResource Common_Close}">
+                    <Button.Template>
+                        <ControlTemplate TargetType="Button">
+                            <Border x:Name="bd" CornerRadius="6" Background="Transparent">
+                                <Path Stretch="Uniform" Width="10" Height="10"
+                                      Stroke="{StaticResource TextTertiaryBrush}"
+                                      StrokeThickness="2"
+                                      Data="M0,0 L10,10 M10,0 L0,10"/>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="bd" Property="Background" Value="#F3F4F6"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Button.Template>
+                </Button>
+            </Grid>
+
+            <!-- 3. Body: main message + optional secondary / details. -->
+            <ScrollViewer Grid.Row="2" Margin="24,6,24,16"
+                          VerticalScrollBarVisibility="Auto"
+                          MaxHeight="340">
+                <StackPanel>
+                    <TextBlock x:Name="BodyText"
+                               FontSize="13"
+                               Foreground="{StaticResource TextSecondaryBrush}"
+                               TextWrapping="Wrap"
+                               LineHeight="19"
+                               Margin="0,0,0,0"/>
+
+                    <!-- Optional sub-copy in slightly smaller type for "what
+                         will happen if I click yes" style reassurance. -->
+                    <TextBlock x:Name="DetailsText"
+                               FontSize="12"
+                               Foreground="{StaticResource TextTertiaryBrush}"
+                               TextWrapping="Wrap"
+                               LineHeight="18"
+                               Margin="0,10,0,0"
+                               Visibility="Collapsed"/>
+
+                    <!-- Collapsible technical details — used for error dialogs
+                         where we want to show exception.Message without
+                         dumping it on every visitor by default. -->
+                    <Expander x:Name="DetailsExpander" Header="{DynamicResource Dialog_ShowTechnical}"
+                              Margin="0,12,0,0" Visibility="Collapsed"
+                              Foreground="{StaticResource TextTertiaryBrush}"
+                              FontSize="11">
+                        <Border Background="#F9FAFB" CornerRadius="6"
+                                BorderBrush="{StaticResource CardBorderBrush}" BorderThickness="1"
+                                Padding="10,8" Margin="0,8,0,0">
+                            <TextBox x:Name="DetailsBox"
+                                     Background="Transparent" BorderThickness="0"
+                                     IsReadOnly="True"
+                                     FontFamily="Consolas, Courier New"
+                                     FontSize="11"
+                                     Foreground="{StaticResource TextSecondaryBrush}"
+                                     TextWrapping="Wrap"
+                                     MaxHeight="140"
+                                     VerticalScrollBarVisibility="Auto"/>
+                        </Border>
+                    </Expander>
+                </StackPanel>
+            </ScrollViewer>
+
+            <!-- 4. Action bar — tinted background differentiates it from the
+                 body and aligns the buttons to the right like native Windows
+                 dialogs. Kept thin (no extra chrome) for a light touch. -->
+            <Border Grid.Row="3" Background="#F9FAFB"
+                    BorderBrush="{StaticResource CardBorderBrush}" BorderThickness="0,1,0,0"
+                    CornerRadius="0,0,12,12"
+                    Padding="16,12">
+                <StackPanel Orientation="Horizontal"
+                            HorizontalAlignment="Right">
+                    <Button x:Name="SecondaryButton"
+                            Style="{StaticResource SecondaryButton}"
+                            MinWidth="92" Height="34"
+                            Margin="0,0,8,0"
+                            Click="SecondaryButton_Click"
+                            Visibility="Collapsed"/>
+                    <Button x:Name="PrimaryButton"
+                            Style="{StaticResource ModernButton}"
+                            MinWidth="92" Height="34"
+                            IsDefault="True"
+                            Click="PrimaryButton_Click"/>
+                </StackPanel>
+            </Border>
+        </Grid>
+    </Border>
+</Window>

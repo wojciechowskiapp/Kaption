@@ -1,0 +1,86 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- net48 → net8.0-windows on 2026-04-23 → net10.0-windows on 2026-04-24. -->
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <OutputType>Library</OutputType>
+    <RootNamespace>PaddleOCRSharp</RootNamespace>
+    <AssemblyName>PaddleOCRSharp</AssemblyName>
+    <LangVersion>12</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Deterministic>true</Deterministic>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+
+    <!-- Preserve the sln ProjectGuid so .sln project-config entries still
+         resolve to this project under SDK-style. -->
+    <ProjectGuid>{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}</ProjectGuid>
+
+    <!-- Hand-written Properties\AssemblyInfo.cs — block the SDK from
+         auto-generating a duplicate set of [assembly: ...] attributes. -->
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+
+    <!-- Keep flat bin\Release\ layout (no net8.0-windows\ subfolder). -->
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
+
+    <!-- Bindings are hand-tuned; don't let the SDK rewrite. -->
+    <AutoGenerateBindingRedirects>false</AutoGenerateBindingRedirects>
+
+    <!-- The OnnxRuntime.DirectML .props gates its native-DLL copy on
+         PlatformTarget=x64 OR (AnyCPU AND Prefer32Bit!=true). SDK-style
+         class libs default to Prefer32Bit=true, which would silently drop
+         the x64 natives when and if they are ever exercised here. Mirror
+         the old csproj to be safe. -->
+    <Prefer32Bit>false</Prefer32Bit>
+
+    <!-- Windows-only library by design (OpenCvSharp native + ONNX DirectML)
+         — same rationale as GI-Subtitles.csproj. Suppress CA1416 noise. -->
+    <NoWarn>$(NoWarn);CA1416</NoWarn>
+  </PropertyGroup>
+
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+  </PropertyGroup>
+
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>pdbonly</DebugType>
+  </PropertyGroup>
+
+  <!-- PaddleOCR inference models. These live next to PaddleOCRSharp.dll at
+       runtime (the engine resolves model paths via typeof(OCRModelConfig).Assembly.Location),
+       so they ride along every time this project is copied to a consumer's
+       output directory. The files are deliberately .gitignored (*.onnx rule +
+       large binary weights); the `inference/` folder is maintained out-of-band
+       and restored from the Velopack release if wiped. If someone runs a
+       fresh `git clean -xfd` they'll lose them — replenish from an installed
+       Kaption build (`%LOCALAPPDATA%\Kaption\current\inference`) or from the
+       PaddleOCRSharp release tarball. `Condition="Exists(...)"` keeps the
+       build from failing hard when the models are genuinely absent (early
+       dev-machine setup). -->
+  <ItemGroup>
+    <Content Include="inference\**\*"
+             Condition="Exists('inference')"
+             CopyToOutputDirectory="PreserveNewest">
+      <Pack>false</Pack>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="log4net" Version="3.3.1" />
+    <PackageReference Include="Microsoft.ML.OnnxRuntime.DirectML" Version="1.24.4" />
+    <PackageReference Include="Microsoft.ML.OnnxRuntime.Managed" Version="1.24.4" />
+    <PackageReference Include="OpenCvSharp4" Version="4.13.0.20260330" />
+    <PackageReference Include="OpenCvSharp4.Extensions" Version="4.13.0.20260330" />
+    <PackageReference Include="OpenCvSharp4.runtime.win" Version="4.13.0.20260302" />
+    <!-- System.Drawing.Common dropped: in-box on net10. -->
+
+    <!-- DROPPED (in-box on net8):
+         - System.Buffers, System.Memory, System.Numerics.Vectors,
+           System.Runtime.CompilerServices.Unsafe, System.ValueTuple
+         - System.Web framework reference (only the using was needed for
+           HttpUtility — not actually used in this project) -->
+  </ItemGroup>
+
+</Project>

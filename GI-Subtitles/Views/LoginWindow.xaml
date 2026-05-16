@@ -1,0 +1,139 @@
+<Window x:Class="GI_Subtitles.Views.LoginWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="{DynamicResource Login_WindowTitle}"
+        Height="560" Width="480"
+        Icon="../Resources/kaption.ico"
+        WindowStartupLocation="CenterScreen"
+        WindowStyle="SingleBorderWindow"
+        ResizeMode="NoResize"
+        Background="#F8F9FC"
+        Closing="Window_Closing">
+
+    <Window.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="../Resources/ModernStyles.xaml"/>
+            </ResourceDictionary.MergedDictionaries>
+
+            <!-- Infinite rotation animation for the spinner -->
+            <Storyboard x:Key="SpinnerStoryboard" RepeatBehavior="Forever">
+                <DoubleAnimation Storyboard.TargetName="SpinnerRotate"
+                                 Storyboard.TargetProperty="Angle"
+                                 From="0" To="360" Duration="0:0:1.2"/>
+            </Storyboard>
+        </ResourceDictionary>
+    </Window.Resources>
+
+    <Grid>
+        <!-- Header bar -->
+        <Border VerticalAlignment="Top" Height="120" Background="White"
+                BorderBrush="{StaticResource CardBorderBrush}" BorderThickness="0,0,0,1">
+            <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                <Image Source="../Resources/kaption.ico" Width="48" Height="48" Margin="0,0,0,8"/>
+                <TextBlock Text="Kaption" FontSize="22" FontWeight="SemiBold"
+                           Foreground="{StaticResource TextBrush}" HorizontalAlignment="Center"/>
+            </StackPanel>
+        </Border>
+
+        <!-- Main content area -->
+        <Grid Margin="0,120,0,0">
+
+            <!-- ============================================================
+                 STATE 1: Initial / ready to sign in
+                 ============================================================ -->
+            <StackPanel x:Name="InitialPanel" VerticalAlignment="Center" Margin="40,0,40,0">
+                <TextBlock Text="{DynamicResource Login_Heading}"
+                           FontSize="20" FontWeight="SemiBold"
+                           Foreground="{StaticResource TextBrush}"
+                           HorizontalAlignment="Center" Margin="0,0,0,8"/>
+                <TextBlock Text="{DynamicResource Login_Subheading}"
+                           FontSize="13" Foreground="{StaticResource TextSecondaryBrush}"
+                           HorizontalAlignment="Center" TextAlignment="Center"
+                           TextWrapping="Wrap" Margin="0,0,0,24"/>
+
+                <Button x:Name="BtnSignIn" Style="{StaticResource ModernButton}"
+                        Height="44" MinWidth="280" HorizontalAlignment="Center"
+                        Click="SignIn_Click">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="{DynamicResource Login_SignInButton}"
+                                   FontSize="14" FontWeight="SemiBold"
+                                   VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
+
+                <TextBlock Text="{DynamicResource Login_SignInHint}"
+                           FontSize="11" Foreground="{StaticResource TextTertiaryBrush}"
+                           HorizontalAlignment="Center" TextAlignment="Center"
+                           TextWrapping="Wrap" Margin="0,14,0,0"/>
+
+                <Button x:Name="BtnQuit" Style="{StaticResource SecondaryButton}"
+                        Content="{DynamicResource Login_QuitButton}" HorizontalAlignment="Center"
+                        Margin="0,24,0,0" Click="Quit_Click"/>
+            </StackPanel>
+
+            <!-- ============================================================
+                 STATE 2: Waiting for browser callback
+                 ============================================================ -->
+            <StackPanel x:Name="LoadingPanel" VerticalAlignment="Center" Margin="40,0,40,0"
+                        Visibility="Collapsed">
+                <!-- Spinner -->
+                <Grid Width="56" Height="56" HorizontalAlignment="Center" Margin="0,0,0,18">
+                    <Ellipse Width="56" Height="56" Stroke="#E5E7EB" StrokeThickness="5"/>
+                    <Ellipse x:Name="SpinnerArc" Width="56" Height="56"
+                             Stroke="{StaticResource AccentBrush}" StrokeThickness="5"
+                             StrokeDashArray="1,4" StrokeDashCap="Round"
+                             RenderTransformOrigin="0.5,0.5">
+                        <Ellipse.RenderTransform>
+                            <RotateTransform x:Name="SpinnerRotate" Angle="0"/>
+                        </Ellipse.RenderTransform>
+                    </Ellipse>
+                </Grid>
+
+                <TextBlock Text="{DynamicResource Login_Waiting}"
+                           FontSize="15" FontWeight="Medium"
+                           Foreground="{StaticResource TextBrush}"
+                           HorizontalAlignment="Center"/>
+                <TextBlock Text="{DynamicResource Login_WaitingHint}"
+                           FontSize="12" Foreground="{StaticResource TextSecondaryBrush}"
+                           HorizontalAlignment="Center" TextAlignment="Center"
+                           TextWrapping="Wrap" Margin="0,8,0,24"/>
+
+                <Button x:Name="BtnCancel" Style="{StaticResource SecondaryButton}"
+                        Content="{DynamicResource Common_Cancel}" HorizontalAlignment="Center"
+                        Click="Cancel_Click"/>
+            </StackPanel>
+
+            <!-- ============================================================
+                 STATE 3: Error — with retry
+                 ============================================================ -->
+            <StackPanel x:Name="ErrorPanel" VerticalAlignment="Center" Margin="40,0,40,0"
+                        Visibility="Collapsed">
+                <Border Background="#FEE2E2" CornerRadius="50" Width="60" Height="60"
+                        HorizontalAlignment="Center" Margin="0,0,0,16">
+                    <TextBlock Text="&#x2716;" FontSize="28" FontWeight="Bold"
+                               Foreground="{StaticResource ErrorBrush}"
+                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Border>
+
+                <TextBlock x:Name="ErrorTitle" Text="{DynamicResource Login_Error_Title_Generic}"
+                           FontSize="18" FontWeight="SemiBold"
+                           Foreground="{StaticResource TextBrush}"
+                           HorizontalAlignment="Center" Margin="0,0,0,10"/>
+                <TextBlock x:Name="ErrorMessage"
+                           Text=""
+                           FontSize="13" Foreground="{StaticResource TextSecondaryBrush}"
+                           HorizontalAlignment="Center" TextAlignment="Center"
+                           TextWrapping="Wrap" MaxWidth="360" Margin="0,0,0,24"/>
+
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                    <Button x:Name="BtnRetry" Style="{StaticResource ModernButton}"
+                            Content="{DynamicResource Common_TryAgain}" MinWidth="120" Margin="0,0,8,0"
+                            Click="SignIn_Click"/>
+                    <Button x:Name="BtnQuitError" Style="{StaticResource SecondaryButton}"
+                            Content="{DynamicResource Common_Quit}" Click="Quit_Click"/>
+                </StackPanel>
+            </StackPanel>
+        </Grid>
+    </Grid>
+</Window>
