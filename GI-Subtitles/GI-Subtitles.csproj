@@ -203,7 +203,7 @@
          1.15.4 — but we still explicit-reference below to pin the version
          and to let the .targets file copy the newer DirectML.dll. -->
     <PackageReference Include="Microsoft.ML.OnnxRuntime.DirectML" Version="1.24.4" />
-    <PackageReference Include="Microsoft.ML.OnnxRuntime.Managed" Version="1.24.4" />
+    <PackageReference Include="Microsoft.ML.OnnxRuntime.Managed" Version="1.26.0" />
     <!-- Explicit pin for the newer DirectML.dll (RTX 50 support). The
          Microsoft_AI_DirectML_SkipLibraryCopy=false property above
          re-enables .targets-based copy so we don't need a manual target. -->
