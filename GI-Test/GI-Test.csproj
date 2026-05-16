@@ -55,8 +55,8 @@
          net8+ (MSTest alone doesn't surface the VSTest console host).
          Adds IsTestProject=true implicitly. -->
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
-    <PackageReference Include="MSTest.TestAdapter" Version="3.6.1" />
-    <PackageReference Include="MSTest.TestFramework" Version="3.6.1" />
+    <PackageReference Include="MSTest.TestAdapter" Version="4.2.3" />
+    <PackageReference Include="MSTest.TestFramework" Version="4.2.3" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
     <PackageReference Include="OpenCvSharp4" Version="4.13.0.20260427" />
     <PackageReference Include="OpenCvSharp4.Extensions" Version="4.13.0.20260330" />
