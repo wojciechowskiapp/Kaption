@@ -3,8 +3,7 @@
 //  ---------------------------------------------------------------------------
 //  Single-line factory that hands tests an IFileProtectionService backed by
 //  the production ServerKeyFileProtectionService with a synthetic
-//  ActivationData. Any test that previously did `new AesFileProtectionService()`
-//  (the now-deleted legacy class) should call TestProtection.Create() instead.
+//  ActivationData.
 //
 //  The synthetic activation is deterministic — the secret bytes are computed
 //  from a fixed seed so two runs of the same test on the same machine derive

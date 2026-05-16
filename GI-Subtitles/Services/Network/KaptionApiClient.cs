@@ -768,7 +768,7 @@ namespace GI_Subtitles.Services.Network
                     // verified is over those encrypted bytes — same thing the
                     // attacker would see on the wire. Now we decrypt in place
                     // so callers see the plaintext, and downstream code (the
-                    // machine-bound AesFileProtectionService, JSON consumers)
+                    // machine-bound ServerKeyFileProtectionService, JSON consumers)
                     // doesn't need to know about this layer.
                     //
                     // If the caller didn't pass a distribution key, we assume

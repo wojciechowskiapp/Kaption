@@ -10,9 +10,8 @@
 //     class and its embedded AppSecret are gone; legacy files are deleted
 //     by App.WipeLegacyProtectedCacheFiles on first launch and re-downloaded.
 //   * Throws InvalidOperationException when called without a provisioned
-//     activation secret (the factory should have picked the legacy
-//     service in that case; surfacing it loudly catches misconfiguration
-//     instead of silently corrupting cache files).
+//     activation secret. Surfacing it loudly catches misconfiguration
+//     instead of silently corrupting cache files.
 //
 //  These tests stamp a deterministic ActivationData so they don't require
 //  a real activation.dat on disk. Machine fingerprint comes from the

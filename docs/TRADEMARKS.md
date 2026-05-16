@@ -1,8 +1,8 @@
 # Trademarks
 
-"Kaption" and the Kaption logo are trademarks of the project author. The
-licence in [`LICENSE`](./LICENSE) (AGPL-3.0 + Commercial) covers source
-code rights. **It does not grant any rights to the Kaption name, the
+"Kaption" and the Kaption logo are trademarks of Michał Wojciechowski,
+the project author. The licence in [`LICENSE`](../LICENSE) (AGPL-3.0 +
+Commercial) covers source code rights. **It does not grant any rights to the Kaption name, the
 Kaption logo, or related branding.** This page explains, in plain
 language, what is and isn't OK.
 

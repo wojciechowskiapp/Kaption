@@ -106,9 +106,9 @@ namespace GI_Subtitles.Services.Translation
         /// <summary>
         /// Load a matcher blob from an in-memory stream. Reads the full
         /// blob into a private byte[]. Suitable for tests and for
-        /// one-shot decrypt-to-memory loads (e.g. the legacy
-        /// <c>AesFileProtectionService</c> path). Reads forward-only;
-        /// the stream does not need to be seekable.
+        /// one-shot decrypt-to-memory loads (the v2 CBC path through
+        /// <see cref="ServerKeyFileProtectionService.DecryptToStream"/>).
+        /// Reads forward-only; the stream does not need to be seekable.
         /// </summary>
         public static MatcherBlobReader LoadFromStream(Stream input)
         {

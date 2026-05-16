@@ -1,69 +1,67 @@
 # Kaption — real-time in-game subtitle translation
 
+[![CI](https://github.com/wojciechowskiapp/Kaption/actions/workflows/ci.yml/badge.svg)](https://github.com/wojciechowskiapp/Kaption/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/wojciechowskiapp/Kaption/actions/workflows/codeql.yml/badge.svg)](https://github.com/wojciechowskiapp/Kaption/actions/workflows/codeql.yml)
 [![Website: kaption.one](https://img.shields.io/badge/website-kaption.one-2563EB?style=flat&logo=icloud&logoColor=white)](https://kaption.one)
-[![Download](https://img.shields.io/badge/download-Windows-2563EB?style=flat&logo=windows&logoColor=white)](https://kaption.one/#download)
-[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/wojciechowskiapp/kaption)
+[![Download for Windows](https://img.shields.io/badge/download-Windows-2563EB?style=flat&logo=windows&logoColor=white)](https://kaption.one/#download)
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/wojciechowskiapp/Kaption)
 [![License: AGPL-3.0 OR Commercial](https://img.shields.io/badge/license-AGPL--3.0%20OR%20Commercial-blue.svg)](./LICENSE)
 
-Kaption translates the dialogue in Hoyoverse games (Genshin Impact and Honkai: Star Rail) in real time on Windows. It reads on-screen text, matches it against the game's own translation strings, and renders an overlay above the dialogue box. No streaming, no cloud OCR. Everything runs on your machine.
+Kaption translates the dialogue in Hoyoverse games — **Genshin Impact** and **Honkai: Star Rail** — into your language in real time, on Windows. Everything runs locally on your machine: no streaming, no cloud OCR.
 
-The official build, install instructions, supported languages, pricing, and changelog are at [kaption.one](https://kaption.one). This repository is the full source of the desktop client, published source-available under AGPL-3.0 + Commercial. You can browse it, audit it, build it. Or just grab the installer:
+> 📥 **Get it for free at [kaption.one](https://kaption.one/#download)**
 
-> Download Kaption for Windows: [kaption.one/#download](https://kaption.one/#download)
+![Kaption translating an NPC dialogue in Genshin Impact](./docs/screenshots/hero-dialog.jpg)
 
-For a guided tour of the codebase, ask [DeepWiki](https://deepwiki.com/wojciechowskiapp/kaption).
+*Above: NPC name card, dialogue line, and answer options — all translated to Polish over the original English game UI.*
 
-## What it does
+---
 
-- Reads the dialogue from your game window using GPU-accelerated screen capture and the PaddleOCR engine.
-- Matches the recognised text against the game's TextMap with a three-stage matcher (SymSpell, then n-gram filter, then OCR-confusion-weighted Levenshtein) so typos and OCR noise don't break recognition.
-- Renders an anchored overlay above the dialogue box. Quest banner, NPC card, and answer translations are optional and toggleable in Settings.
-- Auto-detects your dialogue region on first launch, walks you through a four-step setup, and remembers per-game profiles.
-- Ships with the .NET 10 Desktop runtime bundled in the installer. Velopack handles delta updates after that.
-- Crash reporting is opt-in. Local-only unless you turn it on at first launch.
+## What you get
 
-End-to-end latency on a mid-range machine: about 80 ms from text appearing on screen to translation showing up.
+- **Smart OCR overlay.** Reads the dialogue from your game window with GPU-accelerated screen capture and a 3-stage matcher (SymSpell → n-gram → OCR-confusion-weighted Levenshtein). Typos and rendering noise don't break recognition.
+- **Anchored, clean translations.** The overlay sits above the dialogue box, sized to the line, in a card that doesn't get in the way of gameplay.
+- **NPC + answer translation.** Optional cards translate the NPC name, the line, and your three response options.
+- **Auto-setup.** Region selection, first-run wizard, per-game profiles. You launch it and it figures out where your game's dialogue lives.
+- **Zero install hassle.** The installer bundles the .NET 10 runtime. Velopack handles updates after that.
+- **Latency: ~80 ms** from "text appears on screen" to "translation shows up". You don't notice it during play.
 
-## Languages
+## Supported games
 
-Genshin Impact and Honkai: Star Rail are supported out of the box, with per-game OCR tuning. The primary translation target is Polish. Other language pairs work whenever a translation pack exists; new locales can be added on the backend without a client update.
+Genshin Impact and Honkai: Star Rail are tuned out of the box. The primary translation target is **Polish**. Other language pairs work whenever a translation pack exists; new locales can be added on the backend without a client update.
 
-## System requirements
+## Get it
 
-- Windows 10 version 2004 or later, 64-bit (`WDA_EXCLUDEFROMCAPTURE` needs 2004).
-- 64-bit CPU with AVX (PaddleOCR requirement).
+End users: head to **[kaption.one/#download](https://kaption.one/#download)**. That's the official installer; Velopack takes care of updates from there. Nothing else to install — the .NET 10 Desktop runtime ships in the bundle.
+
+System requirements:
+
+- Windows 10 version 2004 or later, 64-bit.
+- 64-bit CPU with AVX (PaddleOCR needs it).
+- A DirectX 12 / DirectML GPU is strongly preferred — recognition is under 10 ms there. The CPU path runs at 40–80 ms per frame, which is still fine.
 - About 500 MB of disk for translation packs.
-- A supported Hoyoverse game installed.
 
-GPU OCR is preferred. A DirectX 12 / DirectML-capable GPU recognises text in under 10 ms. The CPU path works on any AVX CPU at 40–80 ms per frame.
+## What this repo is
 
-## Install
+This is the **full source of the Kaption desktop client**, published source-available under AGPL-3.0 + Commercial dual licence. You can browse it, audit it, build it. The backend, landing site, and translation pipeline are separate services and stay private.
 
-End users: download the installer from [kaption.one/#download](https://kaption.one/#download). Velopack takes over for updates after that.
-
-The installer is self-contained. You don't need to install .NET or any other runtime; it's all in the package.
-
-## Per-device file protection
-
-Translation packs use AES-256-CBC and HMAC-SHA256 with PBKDF2-stretched keys. The 32-byte upstream secret is issued per device by Kaption's backend the first time you start, then mixed with your local machine fingerprint. A `.gisub` pulled off one machine cannot be decrypted on another, and nothing in this source tree is usable as a key on its own. The secret is fetched once on first launch (you'll see a brief "Preparing translations…" dialog) and then cached DPAPI-wrapped on disk.
+For an AI-assisted tour of the codebase, **[ask DeepWiki](https://deepwiki.com/wojciechowskiapp/Kaption)**.
 
 ## Building from source
 
-You can build, modify, and audit this code under AGPL-3.0. Selling a rebranded fork or shipping Kaption code in a closed-source product needs either AGPL-3.0 compliance or a commercial licence. See [`LICENSE`](./LICENSE).
+Prerequisites:
 
-Requirements:
-
-- .NET 10 SDK 10.0.203 or newer, from [dotnet.microsoft.com/download](https://dotnet.microsoft.com/download). Get the SDK package, not just the runtime.
-- Windows 10 or newer. The desktop project targets `net10.0-windows`; building on Linux or macOS won't produce a usable binary.
+- **.NET 10 SDK 10.0.203 or newer** ([dotnet.microsoft.com/download](https://dotnet.microsoft.com/download)).
+- **Windows 10 or newer.** The desktop project targets `net10.0-windows`; building on Linux or macOS won't produce a usable binary.
 
 ```
 dotnet build GI-Subtitles/GI-Subtitles.csproj -c Debug
 dotnet test  GI-Test/GI-Test.csproj            -c Debug
 ```
 
-Expected on a clean checkout: 188 tests pass, 2 pre-existing data-dependent fails (`DialoguePredictionTests`), 5 external-data skips.
+Expected: 188 tests pass, 2 pre-existing data-dependent fails (`DialoguePredictionTests`), 5 external-data skips.
 
-For a self-contained Release build that bundles the runtime (the same shape end users get from the official installer):
+For a self-contained Release build that bundles the runtime (the shape end users get from the official installer):
 
 ```
 dotnet publish GI-Subtitles/GI-Subtitles.csproj ^
@@ -72,38 +70,38 @@ dotnet publish GI-Subtitles/GI-Subtitles.csproj ^
 
 Output lands under `GI-Subtitles/bin/Release/net10.0-windows/win-x64/publish/`.
 
-## Configuration
+Configuration is per-user at `%APPDATA%\Kaption\Config.json`. Every key is documented in [`docs/CONFIG.md`](./docs/CONFIG.md).
 
-Settings live at `%APPDATA%\Kaption\Config.json`. See [`CONFIG.md`](./CONFIG.md) for every key. Short version:
+## How file protection works
 
-- Redirect the client to your own backend by setting `ApiUrl`, `AppUrl`, `UpdateFeedUrl`.
-- Disable crash reporting with `SentryDsn=""`.
+Translation packs use AES-256 with HMAC-SHA256 authentication, PBKDF2-stretched keys derived from a per-device 32-byte secret. The secret is issued by Kaption's backend the first time you launch the app, then mixed with your local machine fingerprint. A `.gisub` pulled off one machine cannot be decrypted on another, and **nothing in this source tree is a usable key on its own**. The secret is fetched once on first launch (you'll see a brief "Preparing translations…" dialog), then cached DPAPI-wrapped on disk.
+
+Full crypto details are in [`.github/SECURITY.md`](./.github/SECURITY.md).
 
 ## Project layout
 
-- `GI-Subtitles/` is the WPF app: OCR pipeline, matcher, overlay rendering, settings UI, licensing, networking.
-- `PaddleOCRSharp/` is an ONNX-Runtime-backed wrapper around PaddleOCR.
-- `Screenshot/` does screen capture (DXGI default, GDI fallback) and the region-selection UI.
-- `GI-Test/` holds MSTest coverage for text matching, dialogue prediction, and security primitives.
-
-For contributor expectations and PR rules, see [`CONTRIBUTING.md`](./CONTRIBUTING.md).
+- `GI-Subtitles/` — the WPF app: OCR pipeline, matcher, overlay rendering, settings UI, licensing, networking.
+- `PaddleOCRSharp/` — ONNX-Runtime wrapper around PaddleOCR.
+- `Screenshot/` — screen capture (DXGI default, GDI fallback) and the region-selection UI.
+- `GI-Test/` — MSTest coverage for matching, OCR primitives, dialogue prediction, and the security stack.
 
 ## Contributing
 
-Bug reports, translation additions, and focused PRs are welcome. Match the surrounding style, test on Windows with a real game, and attach screenshots for UI changes. Contributions land under the same dual licence (inbound = outbound).
+Bug reports, translation additions, and focused PRs are welcome. The full flow is in [`.github/CONTRIBUTING.md`](./.github/CONTRIBUTING.md).
 
-Security issues: see [`SECURITY.md`](./SECURITY.md). Please don't open public issues for anything exploitable; the disclosure address is in that file.
+Security issues: see [`.github/SECURITY.md`](./.github/SECURITY.md). Please don't open public issues for anything exploitable.
 
 ## Licence and trademarks
 
-- Code: dual-licensed under [AGPL-3.0](./LICENSE-AGPL) and a [commercial option](./LICENSE-COMMERCIAL). The top-level [`LICENSE`](./LICENSE) explains which option applies to which use.
-- Trademarks: "Kaption" and the Kaption logo are trademarks of the project author. The source licence does not grant trademark rights. If you fork and redistribute, ship under a different name and icon. See [`TRADEMARKS.md`](./TRADEMARKS.md).
-- Bundled third-party software: see [`THIRD_PARTY_LICENSES.txt`](./THIRD_PARTY_LICENSES.txt).
+- **Code:** dual-licensed under [AGPL-3.0](./LICENSE-AGPL) and a [commercial option](./LICENSE-COMMERCIAL). The top-level [`LICENSE`](./LICENSE) explains which option applies to which use.
+- **Trademarks:** "Kaption" and the Kaption logo are trademarks of Michał Wojciechowski. The source licence does not grant trademark rights. If you fork and redistribute, ship under a different name and icon. See [`docs/TRADEMARKS.md`](./docs/TRADEMARKS.md).
+- **Privacy:** [`docs/PRIVACY.md`](./docs/PRIVACY.md) is the source-repo summary; the authoritative policy is at [kaption.one/privacy](https://kaption.one/privacy).
+- **Bundled third-party software:** [`THIRD_PARTY_LICENSES.txt`](./THIRD_PARTY_LICENSES.txt).
 
 ## Acknowledgements
 
-Built on PaddleOCR, ONNX Runtime, Velopack, the Sentry SDK, and OpenCV. Hoyoverse owns the game text we match against; translation packs are licensed compilations published for personal in-game use.
+Built on PaddleOCR, ONNX Runtime, Velopack, Sentry, Lucene.Net, and OpenCV. Hoyoverse owns the game text we match against; translation packs are licensed compilations published for personal in-game use.
 
 ---
 
-Made at [kaption.one](https://kaption.one).
+Made at **[kaption.one](https://kaption.one)**.

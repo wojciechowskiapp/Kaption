@@ -14,8 +14,8 @@
 //         → KaptionApiClient.DownloadFileAsync writes plaintext (AES-CBC + HMAC
 //           under the global distribution key was decrypted in-place by
 //           DistributionCipher).
-//    4. Hand plaintext to AesFileProtectionService → re-encrypt machine-bound,
-//       overwrite the cached .gisub at the canonical local path.
+//    4. Hand plaintext to ServerKeyFileProtectionService (via FileProtectionFactory)
+//       → re-encrypt machine-bound, overwrite the cached .gisub at the canonical local path.
 //    5. Wipe the plaintext temp file.
 //    6. Update manifest.json with the new version + downloaded_at.
 //

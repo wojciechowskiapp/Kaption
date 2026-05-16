@@ -13,7 +13,7 @@ These four keys are the ones you want if you are running a private fork and need
 | `ApiUrl` | `https://api.kaption.one` | Backend API host. Activation, licence heartbeat, translation-pack catalog, feedback, and referral endpoints all live here. |
 | `AppUrl` | `https://kaption.one` | Web frontend for account pages, activation flow, and "open dashboard in browser" links. |
 | `UpdateFeedUrl` | `https://files.kaption.one/releases/stable/` | Velopack update feed URL. The client polls `releases.stable.json` at this prefix. Point it at your own R2/S3/static host if you ship your own build. |
-| `SentryDsn` | *baked-in GlitchTip DSN* | Crash-reporting ingestion URL (Sentry SDK, pointed at a Sentry or GlitchTip instance). Set to `""` to disable network crash sends entirely while still keeping local `[CRASH-REPORT:*]` log lines. |
+| `SentryDsn` | *empty in public source; the released installer ships with a baked-in GlitchTip DSN* | Crash-reporting ingestion URL (Sentry SDK, pointed at a Sentry or GlitchTip instance). When empty (the public-source-build default) no network crash sends happen, only local `[CRASH-REPORT:*]` log lines. Set to your own DSN to point at your Sentry/GlitchTip instance. |
 
 Change these when the app is closed, then relaunch. No migration is needed — the next boot picks them up.
 
@@ -130,4 +130,4 @@ Relaunch. The Logs tab in Settings shows the effective values on startup so you 
 
 ## What this document is not
 
-This is not an API reference for the backend. Forking the client is easy; running the backend is not — see `.plan/research/SOURCE-AVAILABLE-STRATEGY.md` for the design of `POST /api/app/file-protection-key` and the per-device key scheme that replaces the currently embedded encryption material.
+This is not an API reference for the backend. Forking the client is easy; running the backend is not — the desktop expects a `POST /api/app/file-protection-key` endpoint that issues a per-device 32-byte secret, plus the licensing and translation-pack endpoints documented in [SECURITY.md](../.github/SECURITY.md). If you need an end-to-end self-hosted setup, open an issue and we will help.

@@ -51,7 +51,7 @@ If you follow this policy in good faith, we will not pursue legal action, and we
 
 - Reverse-engineering the shipped Kaption binary to investigate a suspected issue.
 - Creating throwaway accounts to test multi-device / concurrency behaviour (please tag them so we can clean them up).
-- Reading our source code — it is published under the repo licence (see `LICENSE`) precisely so security researchers can audit it.
+- Reading our source code — it is published under the repo licence (see [`../LICENSE`](../LICENSE)) precisely so security researchers can audit it.
 
 We ask that you do not:
 
@@ -64,17 +64,19 @@ We ask that you do not:
 These are not secrets; knowing them helps you report actionable issues:
 
 - **Session auth**: HttpOnly JWT cookie, refreshed by the backend on every authenticated call.
-- **Device binding**: separate device-activation JWT, issued per device_id at activation time, revocable from the Dashboard.
+- **Device binding**: separate device-activation JWT, issued per `device_id` at activation time, revocable from the Dashboard.
 - **Licence-tier enforcement**: server-side effective-tier gate on every paid endpoint. Local-only gates are present for UX but are not relied on.
-- **File protection**: `.gisub` files are AES-256-CBC + HMAC-SHA256 with PBKDF2-stretched keys. The key-derivation scheme is being migrated from embedded-constant to server-issued per-device, with a versioned `.gisub` header so old files keep decrypting during the migration. If you find a decryption attack against a current-scheme file you recorded off your own machine, that is in scope.
-- **Crash reporting**: Sentry SDK pointing at a GlitchTip instance. PII minimisation is documented in `CrashReportingService.cs`.
+- **File protection**: `.gisub` translation packs use AES-256-CBC for the bulk path and AES-CTR-with-per-block-HMAC for the mmap-friendly matcher blob. Both derive their AES + HMAC keys from a per-device 32-byte secret issued by `POST /api/app/file-protection-key` and persisted DPAPI-wrapped on the user's machine. There is no embedded application secret in the public source. If you find a decryption attack against a current-scheme file you recorded off your own machine, that is in scope.
+- **Crash reporting**: Sentry SDK pointing at a self-hosted GlitchTip instance. The DSN is empty in the public source; the released installer ships with a baked-in DSN. PII minimisation rules live in `CrashReportingService.cs`.
 
 ## Cryptographic primitives we rely on
 
-- AES-256-CBC + HMAC-SHA256 (Encrypt-then-MAC) for `.gisub` translation packs.
+- AES-256-CBC + HMAC-SHA256 (Encrypt-then-MAC) for `.gisub` v2 (translation packs).
+- AES-256-CTR + HMAC-SHA256 per 4 KB block for `.gisub` v3 (mmap-friendly matcher blob).
 - HMAC-SHA256 for LemonSqueezy webhook signature verification.
-- PBKDF2-SHA256 (100,000 iterations) for key stretching.
+- PBKDF2-SHA256 (100,000 iterations, server-controllable within `[50,000, 500,000]`) for key stretching.
 - RFC 7519 JWT for session and device tokens.
+- DPAPI (CurrentUser scope) for at-rest activation blob and device-secret protection.
 
 Issues with our use of these primitives — wrong mode, reused IV, weak salt, timing-leak comparison — are in scope.
 
@@ -84,4 +86,4 @@ If you prefer credit, we will list you in the release notes that ship the fix, o
 
 ---
 
-*Last updated: 2026-04-19.*
+*Last updated: 2026-05-16.*

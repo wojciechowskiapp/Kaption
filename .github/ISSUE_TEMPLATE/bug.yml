@@ -1,0 +1,91 @@
+name: Bug report
+description: Something in Kaption isn't working as expected
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file a bug report. The more concrete
+        you can be, the faster we can fix it.
+
+        **Security issues:** do NOT file them here. Use the private
+        disclosure flow in [SECURITY.md](https://github.com/wojciechowskiapp/Kaption/blob/main/.github/SECURITY.md).
+
+  - type: input
+    id: kaption-version
+    attributes:
+      label: Kaption version
+      description: From Settings → About, or the first line of `%APPDATA%\Kaption\app.log`.
+      placeholder: e.g. 2.0.23270332
+    validations:
+      required: true
+
+  - type: input
+    id: windows-version
+    attributes:
+      label: Windows version
+      description: Settings → System → About → Windows specifications. Build number helps.
+      placeholder: e.g. Windows 11 23H2 (22631.4317)
+    validations:
+      required: true
+
+  - type: input
+    id: gpu
+    attributes:
+      label: GPU
+      description: Whatever the OCR engine ran on. Affects DirectML vs CPU fallback.
+      placeholder: e.g. NVIDIA RTX 4070, Intel Arc A380, none (laptop iGPU)
+    validations:
+      required: false
+
+  - type: dropdown
+    id: game
+    attributes:
+      label: Game
+      options:
+        - Genshin Impact
+        - Honkai Star Rail
+        - Both / either
+        - Neither (Kaption-only issue)
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected to happen
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: What actually happened
+      description: Include exact error messages and a screenshot if it's UI-visible.
+    validations:
+      required: true
+
+  - type: textarea
+    id: log-excerpt
+    attributes:
+      label: Relevant log excerpt
+      description: |
+        Last ~200 lines of `%APPDATA%\Kaption\app.log`. Drag-and-drop the file
+        directly into the box if it's small. Redact your activation token
+        (`device_session_jwt`) if you see one — don't post it publicly.
+      render: shell
+    validations:
+      required: false
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Launch Kaption with the cached translation pack.
+        2. Open Genshin and trigger an NPC dialogue.
+        3. Press Ctrl+Shift+S.
+        4. Observe X.
+    validations:
+      required: false

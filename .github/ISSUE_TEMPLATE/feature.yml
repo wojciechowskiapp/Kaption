@@ -1,0 +1,42 @@
+name: Feature request
+description: Suggest a new feature or improvement
+title: "[Feature] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for thinking about how to make Kaption better.
+
+        Lead with the workflow you want to enable. Pitch over implementation
+        — we will figure out the implementation together if the workflow
+        case is strong.
+
+  - type: textarea
+    id: workflow
+    attributes:
+      label: The workflow you want to enable
+      placeholder: |
+        As a player in <game>, I want <action>, so that <outcome>.
+
+        Example: As a Genshin player streaming on Twitch, I want to disable
+        the NPC name card without disabling dialogue translation, so that
+        my chat doesn't see Polish character names while still being able to
+        follow the conversation.
+    validations:
+      required: true
+
+  - type: textarea
+    id: workaround
+    attributes:
+      label: How you currently work around this
+    validations:
+      required: false
+
+  - type: textarea
+    id: scope
+    attributes:
+      label: Anything we should know about scope
+      description: Should this be a global toggle? A per-game profile? A keyboard shortcut?
+    validations:
+      required: false

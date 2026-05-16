@@ -1080,12 +1080,12 @@ namespace GI_Subtitles
         /// AppSecret) and delete them. Files written under the new server-key
         /// scheme (v2) are kept.
         ///
-        /// Why we delete instead of re-encrypt: there is no longer any code
-        /// path that can decrypt v1/v3 files (the <c>AesFileProtectionService</c>
-        /// class and its embedded <c>AppSecret</c> are gone). The cache rebuilds
-        /// itself on next sync — translation packs re-download from R2,
-        /// matcher blobs rebuild from the dialogue graph. One-time cost on
-        /// the first launch of the source-available release; ~30 s of disk
+        /// Why we delete instead of re-encrypt: the v1/v3 AppSecret-based
+        /// scheme is retired and there is no remaining code path that can
+        /// decrypt files written under it. The cache rebuilds itself on
+        /// next sync — translation packs re-download from R2, matcher
+        /// blobs rebuild from the dialogue graph. One-time cost on the
+        /// first launch of the source-available release; ~30 s of disk
         /// I/O + a download.
         ///
         /// Idempotent — a launch where every file is already v2 is a fast

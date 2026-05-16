@@ -72,8 +72,8 @@ namespace GI_Subtitles.Services.Security
         /// 32 raw bytes of the global R2 distribution key. Used by
         /// <c>DistributionCipher</c> to decrypt `.gisub-dist` files on
         /// download before the desktop re-encrypts them machine-bound via
-        /// <c>AesFileProtectionService</c>. Same value for every user; it's
-        /// delivered inside the activation flow so scraping the R2 bucket
+        /// <c>ServerKeyFileProtectionService</c>. Same value for every user;
+        /// it's delivered inside the activation flow so scraping the R2 bucket
         /// (or the /download endpoint without auth) yields encrypted bytes
         /// with no way to derive the key.
         /// </summary>
@@ -103,12 +103,11 @@ namespace GI_Subtitles.Services.Security
         //
         // 32 random bytes that the desktop combines with the local machine
         // fingerprint via PBKDF2 to derive AES + HMAC keys for .gisub
-        // translation packs. Replaces the embedded
-        // AesFileProtectionService.AppSecret constant.
+        // translation packs. Issued by POST /api/app/file-protection-key
+        // and persisted DPAPI-wrapped here.
         //
-        // NEVER LOG these bytes. Use the
-        // `<redacted, len={len}>` pattern documented in
-        // .plan/todo/SOURCE-AVAILABLE-IMPLEMENTATION.md §9.
+        // NEVER LOG these bytes. Use the `<redacted, len={len}>` pattern
+        // when emitting log lines that mention the secret.
 
         /// <summary>
         /// Server-issued 32-byte device secret. Persisted DPAPI-wrapped

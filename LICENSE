@@ -1,5 +1,5 @@
 Kaption — Real-time in-game subtitle translation
-Copyright (c) 2026 Wojciechowski
+Copyright (c) 2026 Michał Wojciechowski
 
 This software is dual-licensed.
 
@@ -101,3 +101,12 @@ Kaption is provided "AS IS", without warranty of any kind, express or
 implied. The full disclaimer is in LICENSE-AGPL (Sections 15 and 16) and,
 for commercial-licence users, in the negotiated commercial-licence
 agreement.
+
+================================================================================
+GOVERNING LAW
+================================================================================
+
+This licence and any commercial agreement entered under it are governed
+by the laws of Poland. Any dispute arising out of or in connection with
+this licence shall be subject to the exclusive jurisdiction of the
+courts of Warsaw, Poland.

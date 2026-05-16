@@ -8,7 +8,7 @@ copyright notices are reproduced below.
 
 For the desktop app's own source license, see LICENSE in the repository root.
 
-Last reviewed: 2026-04-14
+Last reviewed: 2026-05-16
 
 Table of contents
 
@@ -18,8 +18,11 @@ Table of contents
     4.  ONNX Runtime                      MIT
     5.  log4net                           Apache-2.0
     6.  Newtonsoft.Json                   MIT
-    7.  BouncyCastle.NetCore              MIT
-    8.  DirectML                          Microsoft system library (notice)
+    7.  Velopack                          MIT
+    8.  Sentry SDK for .NET               MIT
+    9.  Lucene.Net                        Apache-2.0
+   10.  ZstdSharp.Port                    MIT
+   11.  DirectML                          Microsoft system library (notice)
 
 ================================================================================
 1. PaddleOCRSharp
@@ -32,24 +35,21 @@ Notice:    PaddleOCRSharp is a .NET wrapper around PaddlePaddle's OCR models.
            made to the PaddleOCRSharp source. If you need the original source,
            it is available at the project URL above.
 
-                   GNU LESSER GENERAL PUBLIC LICENSE
-                        Version 2.1, February 1999
+           The full canonical GNU LESSER GENERAL PUBLIC LICENSE 2.1 text
+           is in the file `LICENSE-LGPL-2.1` next to this one. We keep the
+           licence text in its own file because reproducing 500 lines of
+           licence inline here would dwarf every other section. The
+           verbatim source is also available at:
+             https://www.gnu.org/licenses/old-licenses/lgpl-2.1.txt
 
- Copyright (C) 1991, 1999 Free Software Foundation, Inc.
- 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
-
- Everyone is permitted to copy and distribute verbatim copies of this license
- document, but changing it is not allowed.
-
- [The full text of the LGPL-2.1 license continues. The canonical, verbatim
- text is available at: https://www.gnu.org/licenses/old-licenses/lgpl-2.1.txt]
-
- The library may be used by a program for any purpose, and the program may be
- proprietary, provided that the LGPL terms are followed: you may link against
- an unmodified copy of the library, and users must be able to replace the
- library with a modified version. Kaption satisfies this by shipping
- PaddleOCRSharp as a separate DLL in the install directory; end users can
- substitute their own build of PaddleOCRSharp.dll if desired.
+           The library may be used by a program for any purpose, and the
+           program may be proprietary, provided that the LGPL terms are
+           followed: you may link against an unmodified copy of the
+           library, and users must be able to replace the library with a
+           modified version. Kaption satisfies this by shipping
+           PaddleOCRSharp as a separate DLL in the install directory; end
+           users can substitute their own build of PaddleOCRSharp.dll if
+           desired.
 
 
 ================================================================================
@@ -272,13 +272,14 @@ Copyright: Copyright (c) 2007 James Newton-King
 
 
 ================================================================================
-7. BouncyCastle.NetCore
+7. Velopack
 ================================================================================
 
-Project:   https://www.bouncycastle.org/csharp/
-License:   MIT X11 style License (BouncyCastle License)
-Copyright: Copyright (c) 2000 - 2024 The Legion of the Bouncy Castle Inc.
-           (https://www.bouncycastle.org)
+Project:   https://github.com/velopack/velopack
+License:   MIT License
+Copyright: Copyright (c) Caelan Sayler and Velopack contributors
+
+ MIT License
 
  Permission is hereby granted, free of charge, to any person obtaining a copy
  of this software and associated documentation files (the "Software"), to deal
@@ -300,7 +301,56 @@ Copyright: Copyright (c) 2000 - 2024 The Legion of the Bouncy Castle Inc.
 
 
 ================================================================================
-8. DirectML
+8. Sentry SDK for .NET
+================================================================================
+
+Project:   https://github.com/getsentry/sentry-dotnet
+License:   MIT License
+Copyright: Copyright (c) 2018 Sentry (https://sentry.io) and individual contributors.
+
+ Sentry's .NET SDK is bundled to forward opt-in crash reports from the desktop
+ client to a self-hosted GlitchTip instance. Users can opt out at first launch
+ or by clearing the Config["SentryDsn"] key.
+
+ MIT License (see Velopack section above for full text).
+
+
+================================================================================
+9. Lucene.Net
+================================================================================
+
+Project:   https://lucenenet.apache.org/
+License:   Apache License, Version 2.0
+Copyright: Copyright 2006-2024 The Apache Software Foundation
+
+ Licensed under the Apache License, Version 2.0 (see section 2 above for the
+ full text). Full verbatim text at
+ https://www.apache.org/licenses/LICENSE-2.0.txt
+
+ NOTICE (per Apache-2.0 §4(d)):
+   Apache Lucene.Net
+   Copyright 2006-2024 The Apache Software Foundation
+
+   This product includes software developed at
+   The Apache Software Foundation (https://www.apache.org/).
+
+
+================================================================================
+10. ZstdSharp.Port
+================================================================================
+
+Project:   https://github.com/oleg-st/ZstdSharp
+License:   MIT License
+Copyright: Copyright (c) 2021 Oleg Stepanischev and contributors
+
+ MIT License (see Velopack section above for full text).
+
+ ZstdSharp.Port is a managed C# port of the Zstandard compression library
+ (Facebook / Meta, BSD-licensed). The port itself is MIT-licensed.
+
+
+================================================================================
+11. DirectML
 ================================================================================
 
 Project:   Microsoft DirectML (https://learn.microsoft.com/windows/ai/directml/)

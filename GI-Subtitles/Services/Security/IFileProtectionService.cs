@@ -5,9 +5,11 @@ using System.IO;
 namespace GI_Subtitles.Services.Security
 {
     /// <summary>
-    /// File protection service interface for encrypting/decrypting proprietary data files.
-    /// Designed for easy swap between machine-bound encryption (current) and
-    /// server-key encryption (future login system).
+    /// File protection service interface for encrypting/decrypting proprietary
+    /// data files (translation packs and the matcher blob). The single
+    /// implementation is <see cref="ServerKeyFileProtectionService"/>, which
+    /// derives keys from a per-device secret issued by the backend mixed with
+    /// the local machine fingerprint.
     /// </summary>
     public interface IFileProtectionService
     {

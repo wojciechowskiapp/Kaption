@@ -40,3 +40,15 @@ Kaption.AdminTools/
 .plan/
 .claude/
 memory/
+
+# Belt-and-braces against accidental secret commits
+*.pfx
+*.p12
+*.pem
+*.key
+*.dev.vars
+.env
+.env.*
+secrets.*
+*.cer
+*.crt

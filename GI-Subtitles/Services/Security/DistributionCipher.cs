@@ -12,7 +12,7 @@ namespace GI_Subtitles.Services.Security
     ///
     ///   R2 (ciphertext .gisub-dist)  ---[this class]---> plaintext JSON
     ///                                                    |
-    ///                                       [AesFileProtectionService]
+    ///                                  [ServerKeyFileProtectionService]
     ///                                                    v
     ///                           local disk as machine-bound `.gisub`
     ///
@@ -52,7 +52,7 @@ namespace GI_Subtitles.Services.Security
         /// True if the file at <paramref name="path"/> starts with the
         /// distribution-layer magic bytes. Useful to tell apart a
         /// `.gisub-dist` (needs this class) from a raw `.gisub` (needs
-        /// AesFileProtectionService) from plaintext JSON (nothing).
+        /// ServerKeyFileProtectionService) from plaintext JSON (nothing).
         /// </summary>
         public static bool HasMagic(string path)
         {
@@ -128,7 +128,7 @@ namespace GI_Subtitles.Services.Security
         /// In-place: read a `.gisub-dist` file, decrypt, write plaintext over
         /// the same path. Atomic via a `.tmp` sibling. Used by the download
         /// pipeline to turn `.gisub-dist` into plaintext that downstream
-        /// code (AesFileProtectionService, JSON parsing) can consume.
+        /// code (ServerKeyFileProtectionService, JSON parsing) can consume.
         ///
         /// Delegates to <see cref="DecryptFileInPlaceStreaming"/> which keeps
         /// peak RAM bounded at ~16 KB regardless of file size. The old byte[]

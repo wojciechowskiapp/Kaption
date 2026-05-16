@@ -34,10 +34,13 @@ namespace GI_Subtitles.Services.Security
         public const byte HeaderVersion2ServerKey = 2;
 
         /// <summary>
-        /// Default version emitted by <see cref="WriteHeader(Stream, byte[], byte[], FileCategory)"/>.
-        /// Preserved at v1 so unmodified callers (the legacy AesFileProtectionService) continue
-        /// to write the format users have on disk today. ServerKeyFileProtectionService passes
-        /// <see cref="HeaderVersion2ServerKey"/> explicitly via the overload.
+        /// Default version emitted by the parameter-less
+        /// <see cref="WriteHeader(Stream, byte[], byte[], FileCategory)"/>.
+        /// Kept at v1 for backward compatibility with any external caller that
+        /// still uses that overload. The current writer
+        /// (<see cref="ServerKeyFileProtectionService"/>) passes
+        /// <see cref="HeaderVersion2ServerKey"/> explicitly via
+        /// <see cref="WriteHeaderVersion"/>.
         /// </summary>
         public const byte CurrentVersion = HeaderVersion1Legacy;
 
