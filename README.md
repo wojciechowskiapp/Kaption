@@ -91,10 +91,10 @@ Bug reports, translation additions, and focused PRs are welcome. The full flow i
 
 Security issues: see [`.github/SECURITY.md`](./.github/SECURITY.md). Please don't open public issues for anything exploitable.
 
-## Licence and trademarks
+## Licence
 
 - **Code:** dual-licensed under [AGPL-3.0](./LICENSE-AGPL) and a [commercial option](./LICENSE-COMMERCIAL). The top-level [`LICENSE`](./LICENSE) explains which option applies to which use.
-- **Trademarks:** "Kaption" and the Kaption logo are trademarks of Michał Wojciechowski. The source licence does not grant trademark rights. If you fork and redistribute, ship under a different name and icon. See [`docs/TRADEMARKS.md`](./docs/TRADEMARKS.md).
+- **Naming:** if you fork and redistribute this project, please pick a clearly different name and icon so users don't confuse your build with the upstream one. We don't claim any trademark or exclusive rights to the "Kaption" name.
 - **Privacy:** [`docs/PRIVACY.md`](./docs/PRIVACY.md) is the source-repo summary; the authoritative policy is at [kaption.one/privacy](https://kaption.one/privacy).
 - **Bundled third-party software:** [`THIRD_PARTY_LICENSES.txt`](./THIRD_PARTY_LICENSES.txt).
 

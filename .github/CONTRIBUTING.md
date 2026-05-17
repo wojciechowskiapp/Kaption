@@ -18,9 +18,11 @@ review.
   services. Issues or features that need backend changes are fine to
   discuss, but PRs that require coordinated backend or pipeline changes
   cannot be merged without our involvement on the other side.
-- **Trademarks.** "Kaption" and the icon are trademarks of the project
-  author. Source rights are not trademark rights. If you fork, give your
-  fork a different name. See [`../docs/TRADEMARKS.md`](../docs/TRADEMARKS.md).
+- **Naming.** If you fork this project and ship the fork to other people,
+  please give it a clearly different name and icon. That keeps users from
+  mistaking your build for the upstream one (and confusing support
+  channels). We don't claim any trademark or exclusive rights to the
+  "Kaption" name.
 
 ## Project layout
 
