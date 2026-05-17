@@ -8,7 +8,7 @@ copyright notices are reproduced below.
 
 For the desktop app's own source license, see LICENSE in the repository root.
 
-Last reviewed: 2026-05-16
+Last reviewed: 2026-05-17
 
 Table of contents
 
@@ -23,6 +23,7 @@ Table of contents
     9.  Lucene.Net                        Apache-2.0
    10.  ZstdSharp.Port                    MIT
    11.  DirectML                          Microsoft system library (notice)
+   12.  qew21/Genshin-Subtitles           Apache-2.0  (upstream fork)
 
 ================================================================================
 1. PaddleOCRSharp
@@ -365,6 +366,55 @@ Notice:    DirectML.dll is a Microsoft-supplied system library that Kaption
 
            DirectML is a Microsoft trademark. No endorsement by Microsoft
            is implied.
+
+
+================================================================================
+12. qew21/Genshin-Subtitles  (upstream fork — not a bundled component)
+================================================================================
+
+Project:   https://github.com/qew21/Genshin-Subtitles
+License:   Apache License, Version 2.0
+Notice:    Kaption began as a fork of qew21/Genshin-Subtitles. The codebase
+           has since been substantially rewritten: the OCR pipeline, the
+           three-stage matcher (SymSpell + n-gram + OCR-weighted
+           Levenshtein), screen capture, layout engine, networking,
+           licensing, security stack, and UI are all new work. The
+           original repository is nonetheless the starting point this
+           project grew out of, and that lineage is recorded here.
+
+           This entry is listed alongside the bundled components for
+           bookkeeping convenience. Unlike the other entries in this
+           file, qew21/Genshin-Subtitles is not a binary or library that
+           Kaption distributes at runtime; it is the historical ancestor
+           of the current codebase.
+
+           Apache-2.0 compliance:
+
+           §4(a) — License text. The full Apache License 2.0 text is
+                   reproduced in section 2 above (OpenCvSharp4) and is
+                   available verbatim at
+                   https://www.apache.org/licenses/LICENSE-2.0.txt
+
+           §4(b) — Notice of modifications. This notice records that
+                   source files derived from the upstream repository
+                   have been modified. The codebase has been
+                   substantially rewritten since the fork; references
+                   to specific file-level provenance are not maintained
+                   because no individual source files in the current
+                   tree carry upstream copyright headers.
+
+           §4(c) — Preservation of attribution. The upstream repository
+                   did not include per-file copyright headers as of the
+                   time of forking, so there are no per-file
+                   attribution notices to retain.
+
+           §4(d) — NOTICE file. The upstream repository did not include
+                   a NOTICE file as of the time of forking, so there
+                   is no NOTICE content to reproduce.
+
+           A public, plain-language acknowledgement also appears in
+           README.md (Acknowledgements section) and on the live credits
+           page at https://kaption.one/credits.
 
 
 ================================================================================

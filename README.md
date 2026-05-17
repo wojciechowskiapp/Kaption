@@ -100,7 +100,11 @@ Security issues: see [`.github/SECURITY.md`](./.github/SECURITY.md). Please don'
 
 ## Acknowledgements
 
-Built on PaddleOCR, ONNX Runtime, Velopack, Sentry, Lucene.Net, and OpenCV. Hoyoverse owns the game text we match against; translation packs are licensed compilations published for personal in-game use.
+Kaption started as a fork of [`qew21/Genshin-Subtitles`](https://github.com/qew21/Genshin-Subtitles) (Apache-2.0), the first OCR + TextMap overlay for Hoyoverse games. We've since rewritten the pipeline, matcher, networking, licensing, and UI, but the core idea (read dialogue off the screen with OCR, look it up in the game's TextMap, draw the translation over the top) started there. Thanks, qew21.
+
+Thanks also to **[Dimbreath](https://www.patreon.com/c/dimbreath/posts)**, who maintains the community game-data repositories every dialogue line Kaption recognises gets matched against: [AnimeGameData](https://github.com/DimbreathBot/AnimeGameData) for Genshin and [turnbasedgamedata](https://gitlab.com/Dimbreath/turnbasedgamedata) for HSR. Nothing downstream of OCR works without those repos staying current with each patch. There's a longer public note at [kaption.one/credits](https://kaption.one/credits); if Dimbreath's work has ever helped you, support them directly.
+
+Also built on PaddleOCR, ONNX Runtime, Velopack, Sentry, Lucene.Net, and OpenCV. Hoyoverse owns the game text we match against; translation packs are licensed compilations published for personal in-game use.
 
 ---
 
