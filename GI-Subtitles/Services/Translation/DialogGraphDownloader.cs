@@ -12,7 +12,7 @@ using Newtonsoft.Json.Linq;
 namespace GI_Subtitles.Services.Translation
 {
     /// <summary>
-    /// Downloads raw game data from DimbreathBot/AnimeGameData and builds
+    /// Downloads raw game data from Dimbreath/animegamedata2 and builds
     /// compact preprocessed dialogue graph files for the prediction engine.
     ///
     /// This is the C# equivalent of tools/build_dialogue_graph.py.
@@ -22,7 +22,7 @@ namespace GI_Subtitles.Services.Translation
     /// </summary>
     public static class DialogGraphDownloader
     {
-        private const string GITHUB_RAW = "https://raw.githubusercontent.com/DimbreathBot/AnimeGameData/master";
+        private const string GENSHIN_RAW = "https://gitlab.com/Dimbreath/animegamedata2/-/raw/main";
 
         // Net8: WebClient is obsolete (SYSLIB0014). Single static HttpClient
         // (correct net8 singleton pattern — see KaptionApiClient.CreateHttpClient
@@ -55,7 +55,7 @@ namespace GI_Subtitles.Services.Translation
         }
 
         /// <summary>
-        /// Download raw ExcelBin data from GitHub and build the dialogue graph.
+        /// Download raw ExcelBin data from Dimbreath's GitLab and build the dialogue graph.
         /// Downloads DialogExcelConfigData.json (~93MB), NpcExcelConfigData.json
         /// (~14MB), and TalkExcelConfigData files (~127MB total).
         ///
@@ -73,7 +73,7 @@ namespace GI_Subtitles.Services.Translation
         ///   * User is offline or has no session (bundle sync skipped).
         ///   * User is on a build older than the bundle publish date.
         /// In those cases we need SOMETHING to populate the prediction
-        /// indexes, and GitHub is the only source of truth. Keep it.
+        /// indexes, and Dimbreath's repository is the only source of truth. Keep it.
         /// </summary>
         public static void DownloadAndBuild(string gameDataDir, string textMapEnPath,
             IProgress<(int percent, string message)> progress = null,
@@ -81,19 +81,19 @@ namespace GI_Subtitles.Services.Translation
         {
             Logger.Log.Info(
                 "DialogGraphDownloader: FALLBACK path active — rebuilding graph from " +
-                "GitHub ExcelBin. This runs only when the R2 gamedata bundle is " +
+                "Dimbreath GitLab ExcelBin. This runs only when the R2 gamedata bundle is " +
                 "unavailable (unpublished, offline, unlicensed).");
 
             var cacheDir = Path.Combine(gameDataDir, "cache");
             Directory.CreateDirectory(cacheDir);
 
             // Step 1: Download raw files
-            progress?.Report((1, "Downloading dialogue data from GitHub..."));
+            progress?.Report((1, "Downloading dialogue data from Dimbreath GitLab..."));
 
             var dialogPath = Path.Combine(cacheDir, "DialogExcelConfigData.json");
             if (!File.Exists(dialogPath))
             {
-                DownloadFile($"{GITHUB_RAW}/ExcelBinOutput/DialogExcelConfigData.json",
+                DownloadFile($"{GENSHIN_RAW}/ExcelBinOutput/DialogExcelConfigData.json",
                     dialogPath, "DialogExcelConfigData", progress, 1, 30);
             }
             else
@@ -104,28 +104,28 @@ namespace GI_Subtitles.Services.Translation
             var npcPath = Path.Combine(cacheDir, "NpcExcelConfigData.json");
             if (!File.Exists(npcPath))
             {
-                DownloadFile($"{GITHUB_RAW}/ExcelBinOutput/NpcExcelConfigData.json",
+                DownloadFile($"{GENSHIN_RAW}/ExcelBinOutput/NpcExcelConfigData.json",
                     npcPath, "NpcExcelConfigData", progress, 30, 35);
             }
 
             var talk0Path = Path.Combine(cacheDir, "TalkExcelConfigData_0.json");
             if (!File.Exists(talk0Path))
             {
-                DownloadFile($"{GITHUB_RAW}/ExcelBinOutput/TalkExcelConfigData_0.json",
+                DownloadFile($"{GENSHIN_RAW}/ExcelBinOutput/TalkExcelConfigData_0.json",
                     talk0Path, "TalkExcelConfigData_0", progress, 35, 50);
             }
 
             var talk1Path = Path.Combine(cacheDir, "TalkExcelConfigData_1.json");
             if (!File.Exists(talk1Path))
             {
-                DownloadFile($"{GITHUB_RAW}/ExcelBinOutput/TalkExcelConfigData_1.json",
+                DownloadFile($"{GENSHIN_RAW}/ExcelBinOutput/TalkExcelConfigData_1.json",
                     talk1Path, "TalkExcelConfigData_1", progress, 50, 60);
             }
 
             var questPath = Path.Combine(cacheDir, "MainQuestExcelConfigData.json");
             if (!File.Exists(questPath))
             {
-                DownloadFile($"{GITHUB_RAW}/ExcelBinOutput/MainQuestExcelConfigData.json",
+                DownloadFile($"{GENSHIN_RAW}/ExcelBinOutput/MainQuestExcelConfigData.json",
                     questPath, "MainQuestExcelConfigData", progress, 60, 63);
             }
 

@@ -54,7 +54,9 @@ namespace GI_Subtitles.Views
     /// </summary>
     public partial class SettingsWindow : Window
     {
-        public string repoUrl = "https://github.com/DimbreathBot/AnimeGameData/commits/master.atom";
+        // GitHub's main branch mirrors Dimbreath's canonical GitLab repository
+        // and still provides the Atom feed shape consumed below.
+        public string repoUrl = "https://github.com/DimbreathBot/AnimeGameData/commits/main.atom";
         string Game = Config.Get<string>("Game") ?? "Genshin";
         // Read the OCR source language from config (persisted by the Dashboard's
         // InputLanguageCombo). Default "EN" — the English PaddleOCR model is the
@@ -823,12 +825,12 @@ namespace GI_Subtitles.Views
 
         public void RefreshUrl()
         {
-            InputLangDownloadUrl.Text = $"https://raw.githubusercontent.com/DimbreathBot/AnimeGameData/refs/heads/master/TextMap/TextMap{InputLanguage}.json";
-            OutputLangDownloadUrl.Text = $"https://raw.githubusercontent.com/DimbreathBot/AnimeGameData/refs/heads/master/TextMap/TextMap{OutputLanguage}.json";
+            InputLangDownloadUrl.Text = $"https://gitlab.com/Dimbreath/animegamedata2/-/raw/main/TextMap/TextMap{InputLanguage}.json";
+            OutputLangDownloadUrl.Text = $"https://gitlab.com/Dimbreath/animegamedata2/-/raw/main/TextMap/TextMap{OutputLanguage}.json";
             // Second output language download url (if configured)
             if (!string.IsNullOrEmpty(OutputLanguage2))
             {
-                OutputLangDownloadUrl2.Text = $"https://raw.githubusercontent.com/DimbreathBot/AnimeGameData/refs/heads/master/TextMap/TextMap{OutputLanguage2}.json";
+                OutputLangDownloadUrl2.Text = $"https://gitlab.com/Dimbreath/animegamedata2/-/raw/main/TextMap/TextMap{OutputLanguage2}.json";
             }
             else
             {
@@ -1101,7 +1103,7 @@ namespace GI_Subtitles.Views
             return true;
         }
 
-        public async Task CheckDataAsync(bool renew = false)
+        public async Task CheckDataAsync(bool renew = false, bool isCryptoRetry = false)
         {
             // Create progress handler that updates UI.
             // Must use Dispatcher explicitly because CheckDataAsync may be called from a background
@@ -1172,9 +1174,30 @@ namespace GI_Subtitles.Views
                 catch (Exception ex)
                 {
                     Logger.Log.Error($"Failed to load dictionary: {ex.Message}", ex);
+
+                    // A CryptographicException here is HMAC verification failing in
+                    // ServerKeyFileProtectionService: a cached .gisub was encrypted
+                    // under a different device key / machine fingerprint than the one
+                    // we derive now (HW change, OS reinstall, %APPDATA%\Kaption copied
+                    // or restored from another PC, or a rotated device secret). The
+                    // bytes are intact but undecryptable on this box, and nothing else
+                    // deletes the stale file, so the failure repeats on every launch.
+                    // First time we hit it, self-heal by wiping the machine-bound
+                    // caches and re-downloading. isCryptoRetry guards against looping
+                    // if the rebuilt data still won't decrypt.
+                    if (IsCryptographicFailure(ex) && !isCryptoRetry)
+                    {
+                        await RecoverFromStaleEncryptedCacheAsync(
+                            renew, outputFilePath1, effectiveOutputPath, jsonFilePath, indexPath);
+                        return;
+                    }
+
                     await Dispatcher.InvokeAsync(() =>
                     {
-                        Status.Content = $"Error loading data: {ex.Message}";
+                        Status.Content = IsCryptographicFailure(ex)
+                            ? "Couldn't prepare translation data on this device. "
+                              + "Open Settings → Translations to re-download the pack, or re-activate."
+                            : $"Error loading data: {ex.Message}";
                         DownloadProgressBar.Visibility = Visibility.Collapsed;
                     });
                     return;
@@ -1640,6 +1663,88 @@ namespace GI_Subtitles.Views
 
             // Must run on UI thread since it accesses WPF controls
             Dispatcher.Invoke(() => DisplayLocalFileDates());
+        }
+
+        /// <summary>
+        /// Self-heal after a cached .gisub failed HMAC verification (encrypted
+        /// under a stale device key / different machine). Deletes the offending
+        /// machine-bound caches for the current game/language pair so
+        /// <c>DictionarySync</c> sees them as "cache-missing", re-downloads the
+        /// distribution bundle, and re-encrypts under the current device key —
+        /// then rebuilds once. The caller passes <c>isCryptoRetry: true</c> into
+        /// the retry so a second failure surfaces an error instead of looping.
+        /// Input maps are intentionally left alone: they are plaintext/public and
+        /// re-downloading them would cost a ~67 MB round-trip for nothing.
+        /// </summary>
+        private async Task RecoverFromStaleEncryptedCacheAsync(
+            bool renew, string outputFilePath1, string effectiveOutputPath,
+            string jsonFilePath, string indexPath)
+        {
+            Logger.Log.Warn(
+                "Dictionary decrypt failed HMAC check — clearing stale machine-bound "
+                + "caches and re-downloading translation data under the current device key.");
+
+            try
+            {
+                // Encrypted output translation pack(s).
+                _protectionHelper.DeleteBothVariants(outputFilePath1);
+                if (!string.IsNullOrEmpty(OutputLanguage2))
+                {
+                    string outputFilePath2 = $"{Path.Combine(dataDir, Game)}\\TextMap{OutputLanguage2}.json";
+                    _protectionHelper.DeleteBothVariants(outputFilePath2);
+                }
+                // Merged multi-output json (only differs when two outputs selected).
+                if (!string.Equals(effectiveOutputPath, outputFilePath1, StringComparison.OrdinalIgnoreCase))
+                    _protectionHelper.DeleteBothVariants(effectiveOutputPath);
+                // Derived per-pair dictionary cache + serialized matcher indexes
+                // (.gsmx GSMX index and .kmx FST/mmap blob — both machine-bound).
+                _protectionHelper.DeleteBothVariants(jsonFilePath);
+                TryDeleteFile(indexPath);
+                TryDeleteFile(Path.Combine(Path.GetDirectoryName(jsonFilePath),
+                    Path.GetFileNameWithoutExtension(jsonFilePath) + ".kmx.gisub"));
+            }
+            catch (Exception wipeEx)
+            {
+                Logger.Log.Error($"Failed to clear stale caches after HMAC failure: {wipeEx.Message}");
+            }
+
+            await Dispatcher.InvokeAsync(() =>
+            {
+                Status.Content = "Translation data was from another device — re-downloading...";
+            });
+
+            await EnsureGameDataReadyAsync();
+            await CheckDataAsync(renew, isCryptoRetry: true);
+        }
+
+        /// <summary>
+        /// True when <paramref name="ex"/> (or anything in its inner-exception
+        /// chain) is a <see cref="System.Security.Cryptography.CryptographicException"/>
+        /// — i.e. a .gisub failed HMAC verification because it was encrypted
+        /// under a different device key / machine fingerprint. Walks the chain
+        /// in case the decrypt failure is wrapped before it reaches us.
+        /// </summary>
+        private static bool IsCryptographicFailure(Exception ex)
+        {
+            for (Exception cur = ex; cur != null; cur = cur.InnerException)
+            {
+                if (cur is System.Security.Cryptography.CryptographicException)
+                    return true;
+            }
+            return false;
+        }
+
+        private static void TryDeleteFile(string path)
+        {
+            try
+            {
+                if (!string.IsNullOrEmpty(path) && File.Exists(path))
+                    File.Delete(path);
+            }
+            catch (Exception ex)
+            {
+                Logger.Log.Warn($"TryDeleteFile failed for '{path}': {ex.Message}");
+            }
         }
 
         private void DisplayLocalFileDates()

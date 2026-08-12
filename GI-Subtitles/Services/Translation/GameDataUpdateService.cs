@@ -2,7 +2,7 @@
 //  GameDataUpdateService.cs
 //  ---------------------------------------------------------------------------
 //  Keeps the public game-data `TextMap*.json` files on disk in sync with the
-//  upstream mirrors (DimbreathBot/AnimeGameData for Genshin, Dimbreath's
+//  upstream mirrors (Dimbreath/animegamedata2 for Genshin, Dimbreath's
 //  turnbasedgamedata GitLab for Honkai Star Rail).
 //
 //  Why this exists:
@@ -110,7 +110,7 @@ namespace GI_Subtitles.Services.Translation
     public sealed class GameDataMetaSidecar
     {
         [JsonProperty("source")]
-        public string Source { get; set; } // e.g. "github:DimbreathBot/AnimeGameData"
+        public string Source { get; set; } // e.g. "gitlab:Dimbreath/animegamedata2"
 
         [JsonProperty("url")]
         public string Url { get; set; }
@@ -206,8 +206,8 @@ namespace GI_Subtitles.Services.Translation
             {
                 case "genshin":
                     return (
-                        $"https://raw.githubusercontent.com/DimbreathBot/AnimeGameData/refs/heads/master/TextMap/TextMap{lang.ToUpperInvariant()}.json",
-                        "github:DimbreathBot/AnimeGameData"
+                        $"https://gitlab.com/Dimbreath/animegamedata2/-/raw/main/TextMap/TextMap{lang.ToUpperInvariant()}.json",
+                        "gitlab:Dimbreath/animegamedata2"
                     );
                 case "starrail":
                     return (
@@ -631,7 +631,7 @@ namespace GI_Subtitles.Services.Translation
             string LANG = (lang ?? string.Empty).ToUpperInvariant();
             if (string.IsNullOrEmpty(LANG)) return;
 
-            string mediumUrl = $"https://raw.githubusercontent.com/DimbreathBot/AnimeGameData/refs/heads/master/TextMap/TextMap_Medium{LANG}.json";
+            string mediumUrl = $"https://gitlab.com/Dimbreath/animegamedata2/-/raw/main/TextMap/TextMap_Medium{LANG}.json";
             string gameDir = Path.GetDirectoryName(jsonPath);
             string mediumSidecarPath = Path.Combine(gameDir, $"TextMap_Medium{LANG}.meta.json");
             string mediumTmp = jsonPath + ".medium.tmp";
@@ -735,7 +735,7 @@ namespace GI_Subtitles.Services.Translation
                         long nowUnix = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
                         SaveSidecar(mediumSidecarPath, new GameDataMetaSidecar
                         {
-                            Source = "github:DimbreathBot/AnimeGameData#TextMap_Medium",
+                            Source = "gitlab:Dimbreath/animegamedata2#TextMap_Medium",
                             Url = mediumUrl,
                             Etag = etag,
                             LastModifiedHeader = lastModified,
