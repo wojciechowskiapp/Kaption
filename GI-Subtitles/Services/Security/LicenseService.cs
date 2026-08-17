@@ -157,7 +157,7 @@ namespace GI_Subtitles.Services.Security
             lock (_stateLock) { _current = loaded; }
             if (loaded != null)
                 Logger.Log.Info(
-                    $"License: loaded cached activation for {loaded.Email} (expires {loaded.ExpiresAtUtc:u}, " +
+                    $"License: loaded cached activation (expires {loaded.ExpiresAtUtc:u}, " +
                     $"hasFileProtSecret={loaded.HasDeviceFileProtectionSecret}, " +
                     $"secretLen={loaded.DeviceFileProtectionSecret?.Length ?? 0}, " +
                     $"scheme={loaded.DeviceFileProtectionSchemeVersion}).");
@@ -505,7 +505,7 @@ namespace GI_Subtitles.Services.Security
             lock (_stateLock) { _current = data; }
             RaiseStateChanged();
 
-            Logger.Log.Info($"License: activation complete for {data.Email} (tier={data.Tier}, expires {data.ExpiresAtUtc:u}).");
+            Logger.Log.Info($"License: activation complete (tier={data.Tier}, expires {data.ExpiresAtUtc:u}).");
             return ActivationResult.Ok(data);
         }
 

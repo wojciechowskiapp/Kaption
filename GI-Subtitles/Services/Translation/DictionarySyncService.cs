@@ -172,7 +172,7 @@ namespace GI_Subtitles.Services.Translation
             // not reflected? check the tier we sent here).
             Logger.Log.Info(
                 $"DictionarySync: starting for {game}/{language} " +
-                $"(user={session.Email ?? "?"} tier={session.EffectiveTier ?? "?"}) " +
+                $"(tier={session.EffectiveTier ?? "?"}) " +
                 $"→ {GameDataPaths.GameDir(game)}");
 
             // The distribution key must be present to decrypt anything we

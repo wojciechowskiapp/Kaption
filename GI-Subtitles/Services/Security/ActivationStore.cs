@@ -231,7 +231,7 @@ namespace GI_Subtitles.Services.Security
                     File.Move(tmp, path);
 
                     Logger.Log.Info(
-                        $"Activation saved for user {data.Email} (tier={data.Tier}, expires {data.ExpiresAtUtc:u}, " +
+                        $"Activation saved (tier={data.Tier}, expires {data.ExpiresAtUtc:u}, " +
                         $"hasFileProtSecret={data.HasDeviceFileProtectionSecret}, " +
                         $"secretLen={data.DeviceFileProtectionSecret?.Length ?? 0}).");
                 }

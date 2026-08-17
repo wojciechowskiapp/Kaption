@@ -2253,24 +2253,30 @@ namespace GI_Subtitles.Views
             Environment.Exit(0);
         }
 
-        public void LoadEngine()
+        public void LoadEngine(bool? useGpuOverride = null, string profileOverride = null)
         {
             // Build and swap as one serial operation. Retry, startup and the
             // Settings test buttons can otherwise dispose a session while a
             // second initialization is still publishing it.
             lock (_engineLoadLock)
             {
-                PaddleOCREngine replacement = LoadEngine(InputLanguage);
+                PaddleOCREngine replacement = LoadEngine(
+                    InputLanguage, useGpuOverride, profileOverride);
                 PaddleOCREngine previous = engine;
                 engine = replacement;
                 previous?.Dispose();
             }
         }
 
-        public static PaddleOCREngine LoadEngine(string input)
+        public static PaddleOCREngine LoadEngine(
+            string input,
+            bool? useGpuOverride = null,
+            string profileOverride = null)
         {
-            bool useGpu = Config.Get("UseGpuOcr", true);
-            string requestedId = Config.Get("OcrModelProfile", OcrModelProfiles.RecommendedId);
+            bool useGpu = useGpuOverride ?? Config.Get("UseGpuOcr", true);
+            string requestedId = string.IsNullOrWhiteSpace(profileOverride)
+                ? Config.Get("OcrModelProfile", OcrModelProfiles.RecommendedId)
+                : profileOverride;
             OcrModelProfile requested = OcrModelProfiles.Resolve(requestedId, input);
             string assemblyRoot = System.IO.Path.GetDirectoryName(typeof(OCRModelConfig).Assembly.Location);
             string inferenceRoot = System.IO.Path.Combine(assemblyRoot, "inference");
@@ -2304,11 +2310,36 @@ namespace GI_Subtitles.Views
                     $"detUnclip={parameters.det_db_unclip_ratio:F2}, " +
                     $"recScoreThreshold={parameters.rec_score_thresh:F2}");
 
-                var engine = new PaddleOCREngine(config, parameters);
-                Logger.Log.Info(
-                    $"OCR engine loaded successfully — model: {engine.ModelName}, " +
-                    $"provider: {engine.ExecutionProvider}, GPU active: {engine.IsUsingGpu}");
-                return engine;
+                PaddleOCREngine engine = null;
+                try
+                {
+                    engine = new PaddleOCREngine(config, parameters);
+                    try
+                    {
+                        engine.WarmUp(TimeSpan.FromSeconds(engine.IsUsingGpu ? 30 : 45));
+                    }
+                    catch (Exception warmupEx) when (engine.IsUsingGpu)
+                    {
+                        Logger.Log.Warn(
+                            $"DirectML OCR warm-up failed ({warmupEx.GetType().Name}: " +
+                            $"{warmupEx.Message}). Retrying {profile.ModelName} on CPU.");
+                        engine.Dispose();
+                        engine = null;
+                        parameters.use_gpu = false;
+                        engine = new PaddleOCREngine(config, parameters);
+                        engine.WarmUp(TimeSpan.FromSeconds(45));
+                    }
+
+                    Logger.Log.Info(
+                        $"OCR engine loaded successfully — model: {engine.ModelName}, " +
+                        $"provider: {engine.ExecutionProvider}, GPU active: {engine.IsUsingGpu}");
+                    return engine;
+                }
+                catch
+                {
+                    engine?.Dispose();
+                    throw;
+                }
             }
 
             try

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Data.SqlClient;
+using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.IO;
@@ -68,6 +69,8 @@ namespace PaddleOCRSharp
         private float DetUnclipRatio => Math.Max(0.1f, _parameter.det_db_unclip_ratio);
         private int RecImgHeight => Math.Max(8, _parameter.rec_img_h);
         private float RecScoreThreshold => Clamp(_parameter.rec_score_thresh, 0f, 1f);
+        private const int RecognitionWidthStep = 320;
+        private const int RecognitionMaxWidth = 3200;
 
         /// <summary>
         /// Clamp helper method - .NET Framework 4.8 does not contain Math.Clamp
@@ -77,6 +80,28 @@ namespace PaddleOCRSharp
             if (value.CompareTo(min) < 0) return min;
             if (value.CompareTo(max) > 0) return max;
             return value;
+        }
+
+        /// <summary>
+        /// Quantizes dynamic recognition widths to a small set of stable tensor
+        /// shapes. DirectML compiles kernels per input shape; using every exact
+        /// subtitle width caused cold compiles to repeat for each detected line.
+        /// PaddleOCR's official V6 preprocessing uses 320 as its base width and
+        /// supports dynamic widths up to 3200, so 320-wide buckets preserve the
+        /// source aspect ratio while making the compiled shapes reusable.
+        /// </summary>
+        internal static int GetRecognitionInputWidth(
+            int sourceWidth, int sourceHeight, int recognitionHeight)
+        {
+            if (sourceWidth <= 0 || sourceHeight <= 0)
+                return RecognitionWidthStep;
+
+            int height = Math.Max(8, recognitionHeight);
+            double scaled = height * (sourceWidth / (double)sourceHeight);
+            int contentWidth = Math.Max(16, (int)Math.Ceiling(scaled));
+            int bucket = ((contentWidth + RecognitionWidthStep - 1) /
+                          RecognitionWidthStep) * RecognitionWidthStep;
+            return Clamp(bucket, RecognitionWidthStep, RecognitionMaxWidth);
         }
 
         /// <summary>
@@ -444,15 +469,20 @@ namespace PaddleOCRSharp
                     catch (ObjectDisposedException) { /* inference already completed */ }
                 });
 
+                string inferenceStage = "detection";
+                var totalTimer = Stopwatch.StartNew();
                 try
                 {
                     cancellationToken.ThrowIfCancellationRequested();
 
                     // Text detection
+                    var stageTimer = Stopwatch.StartNew();
                     var rects = DetectTextRegions(src, runOptions, cancellationToken);
+                    long detectionMs = stageTimer.ElapsedMilliseconds;
 
                     // Text recognition
                     var textBlocks = new List<TextBlock>();
+                    long recognitionMs = 0;
                     if (rects.Length > 0)
                     {
                         var croppedMats = new List<Mat>();
@@ -481,7 +511,10 @@ namespace PaddleOCRSharp
                                 validRectIndices.Add(i); // Record original index of valid rectangles
                             }
 
+                            inferenceStage = "recognition";
+                            stageTimer.Restart();
                             var results = RecognizeText(croppedMats.ToArray(), runOptions, cancellationToken);
+                            recognitionMs = stageTimer.ElapsedMilliseconds;
                             for (int i = 0; i < results.Count && i < validRectIndices.Count; i++)
                             {
                                 if (string.IsNullOrWhiteSpace(results[i].Text) ||
@@ -507,6 +540,17 @@ namespace PaddleOCRSharp
                         }
                     }
 
+                    totalTimer.Stop();
+                    string timing =
+                        $"OCR inference: provider={ExecutionProvider}, source={src.Width}x{src.Height}, " +
+                        $"detection={detectionMs}ms, regions={rects.Length}, " +
+                        $"recognition={recognitionMs}ms, accepted={textBlocks.Count}, " +
+                        $"total={totalTimer.ElapsedMilliseconds}ms";
+                    if (totalTimer.ElapsedMilliseconds >= 2000)
+                        Logger.Log.Warn(timing);
+                    else
+                        Logger.Log.Debug(timing);
+
                     return new OCRResult
                     {
                         TextBlocks = textBlocks,
@@ -515,7 +559,14 @@ namespace PaddleOCRSharp
                 }
                 catch (Exception ex) when (cancellationToken.IsCancellationRequested)
                 {
-                    throw new OperationCanceledException("OCR inference was cancelled.", ex, cancellationToken);
+                    Logger.Log.Warn(
+                        $"OCR inference cancelled during {inferenceStage} after " +
+                        $"{totalTimer.ElapsedMilliseconds}ms (provider={ExecutionProvider}, " +
+                        $"source={src.Width}x{src.Height}).");
+                    throw new OperationCanceledException(
+                        $"OCR inference was cancelled during {inferenceStage}.",
+                        ex,
+                        cancellationToken);
                 }
             }
             finally
@@ -619,20 +670,34 @@ namespace PaddleOCRSharp
                     _ => SafeClone(src)
                 };
 
-                // Resize and normalize
+                // Preserve the text aspect ratio, then pad to a reusable width
+                // bucket. Padding with mid-gray maps to 0 after normalization,
+                // matching PaddleOCR's normalized zero-padding. The old path fed
+                // each exact crop width to DirectML and repeatedly paid the
+                // dynamic-shape compilation cost.
                 var ratio = channel3.Width / (double)channel3.Height;
-                var resizedW = (int)Math.Ceiling(RecImgHeight * ratio);
-                if (resizedW < 16) resizedW = 16;
-                // PP-OCRv6's official ONNX preprocessing caps dynamic width
-                // at 3200. Subtitle lines stay well below this in practice,
-                // but the bound prevents malformed regions from allocating an
-                // enormous tensor.
-                if (resizedW > 3200) resizedW = 3200;
-                using var resized = new Mat();
-                Cv2.Resize(channel3, resized, new CvSize(resizedW, RecImgHeight));
+                int contentWidth = (int)Math.Ceiling(RecImgHeight * ratio);
+                contentWidth = Clamp(contentWidth, 16, RecognitionMaxWidth);
+                int inputWidth = GetRecognitionInputWidth(
+                    channel3.Width, channel3.Height, RecImgHeight);
+                using var padded = new Mat(
+                    RecImgHeight,
+                    inputWidth,
+                    MatType.CV_8UC3,
+                    new Scalar(127.5, 127.5, 127.5));
+                using (var content = new Mat(padded, new Rect(0, 0, contentWidth, RecImgHeight)))
+                {
+                    Cv2.Resize(channel3, content, new CvSize(contentWidth, RecImgHeight));
+                }
 
                 // Normalize to [-1, 1]
-                using var blob = CvDnn.BlobFromImage(resized, 2.0 / 255.0, default, new Scalar(127.5, 127.5, 127.5), false, false);
+                using var blob = CvDnn.BlobFromImage(
+                    padded,
+                    2.0 / 255.0,
+                    default,
+                    new Scalar(127.5, 127.5, 127.5),
+                    false,
+                    false);
 
                 // Get blob data
                 var blobData = new float[blob.Total()];
@@ -640,7 +705,7 @@ namespace PaddleOCRSharp
 
                 var inputTensor = new DenseTensor<float>(
                     blobData,
-                    new[] { 1, resized.Channels(), resized.Rows, resized.Cols });
+                    new[] { 1, padded.Channels(), padded.Rows, padded.Cols });
 
                 // Run recognition model
                 var inputs = new List<NamedOnnxValue>
@@ -656,6 +721,76 @@ namespace PaddleOCRSharp
             }
 
             return results;
+        }
+
+        /// <summary>
+        /// Executes representative detector and recognizer shapes before the
+        /// application reports the engine as ready. ONNX Runtime's DirectML
+        /// provider compiles device-specific kernels lazily, so doing this on
+        /// the background engine-initialization task prevents the first real
+        /// dialogue from paying that cost (or being killed by the live timeout).
+        /// </summary>
+        public void WarmUp(TimeSpan timeout)
+        {
+            if (timeout <= TimeSpan.Zero)
+                throw new ArgumentOutOfRangeException(nameof(timeout));
+            if (_disposed)
+                throw new ObjectDisposedException(nameof(PaddleOCREngine));
+
+            using var cts = new CancellationTokenSource(timeout);
+            CancellationToken token = cts.Token;
+            _gate.Wait(token);
+            var timer = Stopwatch.StartNew();
+            try
+            {
+                if (_disposed)
+                    throw new ObjectDisposedException(nameof(PaddleOCREngine));
+
+                using var runOptions = new RunOptions();
+                using var cancellationRegistration = token.Register(() =>
+                {
+                    try { runOptions.Terminate = true; }
+                    catch (ObjectDisposedException) { }
+                });
+
+                // Common post-resize detector shapes for narrow and taller
+                // dialogue regions. Blank images are intentional: the graph is
+                // compiled and validated without manufacturing OCR text.
+                foreach (int height in new[] { 64, 160 })
+                {
+                    token.ThrowIfCancellationRequested();
+                    using var detectorInput = new Mat(
+                        height, 960, MatType.CV_8UC3, Scalar.All(0));
+                    _ = DetectTextRegions(detectorInput, runOptions, token);
+                }
+
+                // Warm both the official base width and the common long-line
+                // bucket used by Genshin dialogue. Recognition remains batch=1,
+                // so this also matches the exact production tensor layout.
+                foreach (int width in new[] { 320, 1280 })
+                {
+                    token.ThrowIfCancellationRequested();
+                    using var recognitionInput = new Mat(
+                        RecImgHeight, width, MatType.CV_8UC3,
+                        new Scalar(127.5, 127.5, 127.5));
+                    _ = RecognizeText(new[] { recognitionInput }, runOptions, token);
+                }
+
+                Logger.Log.Info(
+                    $"OCR warm-up completed in {timer.ElapsedMilliseconds}ms " +
+                    $"(provider={ExecutionProvider}, model={ModelName}).");
+            }
+            catch (Exception ex) when (cts.IsCancellationRequested)
+            {
+                throw new TimeoutException(
+                    $"OCR warm-up exceeded {timeout.TotalSeconds:F0}s " +
+                    $"(provider={ExecutionProvider}, model={ModelName}).",
+                    ex);
+            }
+            finally
+            {
+                _gate.Release();
+            }
         }
 
         /// <summary>

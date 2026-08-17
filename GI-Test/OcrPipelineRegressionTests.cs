@@ -85,6 +85,17 @@ namespace GI_Test
         }
 
         [TestMethod]
+        public void RecognitionInputWidth_UsesReusableOfficialWidthBuckets()
+        {
+            Assert.AreEqual(320, PaddleOCREngine.GetRecognitionInputWidth(100, 40, 48));
+            Assert.AreEqual(320, PaddleOCREngine.GetRecognitionInputWidth(320, 48, 48));
+            Assert.AreEqual(640, PaddleOCREngine.GetRecognitionInputWidth(321, 48, 48));
+            Assert.AreEqual(1280, PaddleOCREngine.GetRecognitionInputWidth(1000, 40, 48));
+            Assert.AreEqual(3200, PaddleOCREngine.GetRecognitionInputWidth(10000, 40, 48));
+            Assert.AreEqual(320, PaddleOCREngine.GetRecognitionInputWidth(0, 0, 48));
+        }
+
+        [TestMethod]
         public void OcrModelProfile_DefaultsToV6Small_WithSafeV4Fallback()
         {
             OcrModelProfile recommended = OcrModelProfiles.Resolve(null, "EN");
@@ -137,6 +148,9 @@ namespace GI_Test
             var timer = System.Diagnostics.Stopwatch.StartNew();
             using var engine = new PaddleOCREngine(config, parameters);
             long initializationMs = timer.ElapsedMilliseconds;
+            timer.Restart();
+            engine.WarmUp(System.TimeSpan.FromSeconds(30));
+            long warmupMs = timer.ElapsedMilliseconds;
             using var screenshot = OpenCvSharp.Cv2.ImRead(screenshotPath);
             using var dialogueArea = new OpenCvSharp.Mat(
                 screenshot,
@@ -152,7 +166,8 @@ namespace GI_Test
 
             System.Console.WriteLine(
                 $"PP-OCRv6 provider={engine.ExecutionProvider}; GPU={engine.IsUsingGpu}; " +
-                $"init={initializationMs}ms; first={firstInferenceMs}ms; warm={warmInferenceMs}ms");
+                $"init={initializationMs}ms; warmup={warmupMs}ms; " +
+                $"first={firstInferenceMs}ms; warm={warmInferenceMs}ms");
 
             StringAssert.Contains(
                 result.Text, "Welcome to my humble shop",

@@ -69,6 +69,11 @@ namespace GI_Subtitles.Views
         private volatile bool _isOcrRunning = false;
         private volatile bool _engineReady = false;
         private int _engineInitGeneration;
+        private const int OcrInferenceTimeoutSeconds = 15;
+        private const int OcrTimeoutsBeforeRuntimeRecovery = 2;
+        private int _consecutiveOcrTimeouts;
+        private int _runtimeOcrRecoveryLevel;
+        private int _runtimeOcrRecoveryInFlight;
         private const double ChangeThreshold = 0.01;
         private const int EmptyFrameRetryLimit = 2;
         private static readonly TimeSpan EmptyFrameRetryBackoff = TimeSpan.FromMilliseconds(500);
@@ -821,7 +826,10 @@ namespace GI_Subtitles.Views
             }
         }
 
-        private void KickOffEngineInit()
+        private void KickOffEngineInit(
+            bool forceCpuForSession = false,
+            string profileOverride = null,
+            int runtimeRecoveryLevel = 0)
         {
             // Volatile flag flips back off here (not inside the catch) so
             // any OCR tick that fires during the retry window sees the
@@ -834,13 +842,18 @@ namespace GI_Subtitles.Views
             {
                 try
                 {
-                    data.LoadEngine();
+                    data.LoadEngine(
+                        forceCpuForSession ? false : (bool?)null,
+                        profileOverride);
                     if (generation != Volatile.Read(ref _engineInitGeneration))
                     {
                         Logger.Log.Debug("Ignoring completion from a superseded OCR-engine initialization.");
                         return;
                     }
                     _engineReady = true;
+                    Interlocked.Exchange(ref _consecutiveOcrTimeouts, 0);
+                    Interlocked.Exchange(ref _runtimeOcrRecoveryLevel, runtimeRecoveryLevel);
+                    Interlocked.Exchange(ref _runtimeOcrRecoveryInFlight, 0);
                     Logger.Log.Debug("OCR engine loaded and ready");
                     data.SetEngineStatus(SettingsWindow.EngineStatus.Ready);
                     // Dashboard refresh is redundant with the event handler
@@ -857,6 +870,7 @@ namespace GI_Subtitles.Views
                         return;
                     }
                     Logger.Log.Error("Failed to load OCR engine: " + ex.Message, ex);
+                    Interlocked.Exchange(ref _runtimeOcrRecoveryInFlight, 0);
                     // Surface to telemetry — we only see GPU-init failures
                     // on the user's machine, so server-side visibility
                     // matters. CrashReportingService honors the user's opt-in
@@ -867,6 +881,62 @@ namespace GI_Subtitles.Views
                     Dispatcher.BeginInvoke(new Action(() => data.UpdateDashboardStatus()));
                 }
             });
+        }
+
+        private static bool IsOcrTimeout(Exception error)
+        {
+            for (Exception current = error; current != null; current = current.InnerException)
+            {
+                if (current is OperationCanceledException || current is TimeoutException)
+                    return true;
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// Runtime safety net for a provider which initializes successfully but
+        /// repeatedly stalls on real frames. Recovery is session-local: it does
+        /// not overwrite the user's GPU/model preference in Config, so the next
+        /// app launch can try a freshly warmed DirectML session again.
+        /// </summary>
+        private void ScheduleOcrRuntimeRecovery()
+        {
+            PaddleOCREngine current = data?.engine;
+            if (current == null)
+                return;
+
+            int nextLevel;
+            string profileOverride;
+            string reason;
+            if (current.IsUsingGpu)
+            {
+                nextLevel = 1;
+                profileOverride = null;
+                reason = "DirectML timed out repeatedly; rebuilding the selected OCR model on CPU";
+            }
+            else if (current.ModelName?.IndexOf("v6", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                nextLevel = 2;
+                profileOverride = OcrModelProfiles.CompatibilityId;
+                reason = "PP-OCRv6 timed out repeatedly on CPU; loading the compatibility model";
+            }
+            else
+            {
+                Logger.Log.Error(
+                    "OCR timed out repeatedly even on the CPU compatibility model; " +
+                    "automatic runtime recovery is exhausted.");
+                return;
+            }
+
+            if (nextLevel <= Volatile.Read(ref _runtimeOcrRecoveryLevel) ||
+                Interlocked.CompareExchange(ref _runtimeOcrRecoveryInFlight, 1, 0) != 0)
+                return;
+
+            Logger.Log.Warn(reason + ".");
+            KickOffEngineInit(
+                forceCpuForSession: true,
+                profileOverride: profileOverride,
+                runtimeRecoveryLevel: nextLevel);
         }
 
         private GI_Subtitles.Services.Detection.ForegroundTarget GetForegroundTarget()
@@ -3738,8 +3808,10 @@ namespace GI_Subtitles.Views
             string[] detectedAnswers = null;
             bool clearAnswers = false;
             bool wasCacheHit = false;
+            bool inferenceAttempted = false;
             Exception inferenceError = null;
-            var cts = new CancellationTokenSource(5000);
+            var cts = new CancellationTokenSource(
+                TimeSpan.FromSeconds(OcrInferenceTimeoutSeconds));
             try
             {
                 await Task.Run(() =>
@@ -3771,6 +3843,7 @@ namespace GI_Subtitles.Views
                             // the stale entry alive indefinitely. The "4+ stable frames" gate
                             // before OCR already guarantees bit-identical frames for the exact-
                             // hash path above, so the fuzzy fallback was pure downside.
+                            inferenceAttempted = true;
                             OCRResult ocrResult = data.engine.DetectTextFromMat(frameToProcess, cts.Token);
 
                             // Color-based NPC name detection with position preservation
@@ -3877,10 +3950,32 @@ namespace GI_Subtitles.Views
 
                             if (inferenceError != null)
                             {
-                                Logger.Log.Error(inferenceError);
+                                bool timedOut = cts.IsCancellationRequested || IsOcrTimeout(inferenceError);
+                                if (timedOut)
+                                {
+                                    int timeoutCount = Interlocked.Increment(
+                                        ref _consecutiveOcrTimeouts);
+                                    Logger.Log.Warn(
+                                        $"OCR exceeded the {OcrInferenceTimeoutSeconds}s live-frame limit " +
+                                        $"({timeoutCount}/{OcrTimeoutsBeforeRuntimeRecovery}); " +
+                                        $"provider={data.engine?.ExecutionProvider ?? "unknown"}, " +
+                                        $"model={data.engine?.ModelName ?? "unknown"}.");
+                                    Logger.Log.Debug(inferenceError);
+                                    if (timeoutCount >= OcrTimeoutsBeforeRuntimeRecovery)
+                                        ScheduleOcrRuntimeRecovery();
+                                }
+                                else
+                                {
+                                    Interlocked.Exchange(ref _consecutiveOcrTimeouts, 0);
+                                    Logger.Log.Error(inferenceError);
+                                }
                                 detectedText = string.Empty;
                                 detectedNpcName = string.Empty;
                                 detectedTextLayout = null;
+                            }
+                            else if (inferenceAttempted)
+                            {
+                                Interlocked.Exchange(ref _consecutiveOcrTimeouts, 0);
                             }
 
                             ocrText = detectedText;
@@ -3970,7 +4065,12 @@ namespace GI_Subtitles.Views
             }
             catch (OperationCanceledException)
             {
-                Logger.Log.Warn("OCR timed out after 5 seconds");
+                int timeoutCount = Interlocked.Increment(ref _consecutiveOcrTimeouts);
+                Logger.Log.Warn(
+                    $"OCR task exceeded the {OcrInferenceTimeoutSeconds}s live-frame limit " +
+                    $"({timeoutCount}/{OcrTimeoutsBeforeRuntimeRecovery}).");
+                if (timeoutCount >= OcrTimeoutsBeforeRuntimeRecovery)
+                    ScheduleOcrRuntimeRecovery();
             }
             catch (Exception ex)
             {
