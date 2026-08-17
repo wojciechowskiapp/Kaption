@@ -126,7 +126,7 @@ namespace GI_Test
             string assemblyRoot = Path.GetDirectoryName(typeof(OCRModelConfig).Assembly.Location);
             string repoRoot = Path.GetFullPath(Path.Combine(assemblyRoot, "..", "..", ".."));
             string screenshotPath = Path.Combine(
-                repoRoot, "landing", "public", "en-pl-npc-dialog2.jpg");
+                repoRoot, "docs", "screenshots", "hero-dialog.jpg");
             OcrModelProfile profile = OcrModelProfiles.Resolve(
                 OcrModelProfiles.RecommendedId, "EN");
             OCRModelConfig config = profile.CreateModelConfig(
@@ -183,7 +183,7 @@ namespace GI_Test
             string assemblyRoot = Path.GetDirectoryName(typeof(OCRModelConfig).Assembly.Location);
             string repoRoot = Path.GetFullPath(Path.Combine(assemblyRoot, "..", "..", ".."));
             string screenshotPath = Path.Combine(
-                repoRoot, "landing", "public", "en-pl-npc-dialog2.jpg");
+                repoRoot, "docs", "screenshots", "hero-dialog.jpg");
             OcrModelProfile profile = OcrModelProfiles.Resolve(
                 OcrModelProfiles.RecommendedId, "EN");
             var parameters = new OCRParameter
