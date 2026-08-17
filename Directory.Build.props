@@ -1,0 +1,10 @@
+<Project>
+  <PropertyGroup Condition="'$(OS)' != 'Windows_NT'">
+    <!--
+      GitHub's automatic NuGet dependency submission restores the solution on
+      Linux. The application remains Windows-only, but cross-OS restore must be
+      enabled so the scanner can read its package graph.
+    -->
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+  </PropertyGroup>
+</Project>
