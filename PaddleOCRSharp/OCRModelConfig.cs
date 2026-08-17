@@ -8,6 +8,11 @@ namespace PaddleOCRSharp
     public class OCRModelConfig
     {
         /// <summary>
+        /// Human-readable model family used for diagnostics.
+        /// </summary>
+        public string model_name { get; set; }
+
+        /// <summary>
         /// Detection model path
         /// </summary>
         public string det_infer { get; set; }
@@ -31,10 +36,15 @@ namespace PaddleOCRSharp
         {
             var root = GetRootDirectory();
             var modelPathRoot = Path.Combine(root, "inference");
-            det_infer = Path.Combine(modelPathRoot, "Det", "V5", "PP-OCRv5_mobile_det_infer", "slim.onnx");
+            // Keep this low-level default on the compatibility model so direct
+            // library consumers remain bootable. Kaption resolves the user-facing
+            // recommended PP-OCRv6 Small profile in OcrModelProfiles and falls
+            // back to these V4 paths when V6 cannot load.
+            det_infer = Path.Combine(modelPathRoot, "Det", "V4", "PP-OCRv4_mobile_det_infer", "slim.onnx");
+            model_name = "PP-OCRv4 Mobile";
             cls_infer = Path.Combine(modelPathRoot, "ch_ppocr_mobile_v2.0_cls_infer"); // Optional, not used
-            rec_infer = Path.Combine(modelPathRoot, "Rec", "V5", "PP-OCRv5_mobile_rec_infer", "slim.onnx");
-            keys = Path.Combine(modelPathRoot, "ppocr_keys.txt"); // Optional, character dictionary from inference.yml
+            rec_infer = Path.Combine(modelPathRoot, "Rec", "V4", "PP-OCRv4_mobile_rec_infer", "slim.onnx");
+            keys = Path.Combine(modelPathRoot, "Rec", "V4", "PP-OCRv4_mobile_rec_infer", "dict.txt");
         }
 
         /// <summary>

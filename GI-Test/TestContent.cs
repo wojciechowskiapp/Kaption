@@ -146,7 +146,7 @@ namespace GI_Test
             };
 
             // Read JSON in the normal way
-            string dataDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "GI-Subtitles");
+            string dataDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Kaption");
             string game = "Genshin";
             string inputLanguage = "CHS";
             string outputLanguage = "EN";
@@ -250,7 +250,7 @@ namespace GI_Test
             };
 
             // Read JSON in the normal way
-            string dataDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "GI-Subtitles");
+            string dataDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Kaption");
             string game = "StarRail";
             string inputLanguage = "EN";
             string outputLanguage = "CHS";
@@ -355,7 +355,7 @@ namespace GI_Test
             };
 
             // Read JSON in the normal way
-            string dataDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "GI-Subtitles");
+            string dataDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Kaption");
             string game = "Genshin";
             string inputLanguage = "EN";
             string outputLanguage = "CHS";

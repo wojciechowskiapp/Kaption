@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk.WindowsDesktop">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <!-- Target framework history:
@@ -112,6 +112,9 @@
     <PublishReadyToRun>true</PublishReadyToRun>
     <PublishReadyToRunComposite>false</PublishReadyToRunComposite>
     <SelfContained>true</SelfContained>
+    <!-- Pin self-contained Release artifacts to the latest serviced .NET 10
+         runtime even when an older feature-band SDK performs the publish. -->
+    <RuntimeFrameworkVersion Condition="'$(Configuration)' == 'Release'">10.0.11</RuntimeFrameworkVersion>
     <PublishTrimmed>false</PublishTrimmed>
 
     <!-- Re-enable Microsoft.AI.DirectML's own .targets copy of the newer
@@ -152,8 +155,8 @@
     <!-- Framework references that net48 carried by name ("System.Web",
          "System.Management", etc.) are not available as framework refs on
          net8. Replacements for the ones we actually use move to NuGet. -->
-    <PackageReference Include="System.Management" Version="10.0.7" />
-    <PackageReference Include="System.ServiceModel.Syndication" Version="10.0.7" />
+    <PackageReference Include="System.Management" Version="10.0.11" />
+    <PackageReference Include="System.ServiceModel.Syndication" Version="10.0.11" />
     <!-- System.Web dropped: LoopbackAuthListener.cs's HttpUtility.ParseQueryString +
          HttpUtility.HtmlEncode calls rewritten to System.Net.WebUtility +
          a 20-line ParseQueryString replacement. System.Web.HttpUtility as
@@ -189,16 +192,16 @@
   <ItemGroup>
     <!-- log4net 3.x: drops APIs deprecated since 2015 (we use none of them —
          verified). Fixes GHSA-4f7c-pmjv-c25w (NU1902) that 2.0.17 carries. -->
-    <PackageReference Include="log4net" Version="3.3.1" />
+    <PackageReference Include="log4net" Version="3.3.2" />
     <!-- FST-indexed matcher blob. Lucene.Net 4.8.0-beta00017 multi-targets
          netstandard2.0 + net6.0; runs cleanly on net8. Only the Fst
          subsystem is used — no IO/Directory dependencies. Apache-2.0. -->
     <PackageReference Include="Lucene.Net" Version="4.8.0-beta00017" />
-    <!-- ZstdSharp.Port 0.8.7 is pure-managed (no native DLL), targets
+    <!-- ZstdSharp.Port 0.8.8 is pure-managed (no native DLL), targets
          netstandard2.0 + net5+, MIT, zstd 1.5.7 parity. Used for
          dictionary-trained per-value compression of the matcher's
          Polish value pool. -->
-    <PackageReference Include="ZstdSharp.Port" Version="0.8.7" />
+    <PackageReference Include="ZstdSharp.Port" Version="0.8.8" />
     <!-- OnnxRuntime.DirectML 1.24 transitively pulls Microsoft.AI.DirectML
          1.15.4 — but we still explicit-reference below to pin the version
          and to let the .targets file copy the newer DirectML.dll. -->
@@ -210,33 +213,29 @@
     <PackageReference Include="Microsoft.AI.DirectML" Version="1.15.4" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
     <!-- Sentry 6.x: the "4.13.0 was last line with net462 support" comment
-         was stale advice. Sentry 6.4.1 still ships a net462 TFM alongside
+         was stale advice. Sentry 6.8.0 still ships a net462 TFM alongside
          net8/net9/netstandard2.0/2.1. The 5.0 class renames (User →
          SentryUser, Transaction → SentryTransaction) don't affect
          CrashReportingService.cs — we use none of the renamed types.
          Options API (AutoSessionTracking, TracesSampleRate, SetBeforeSend,
          Debug, MaxBreadcrumbs, SendDefaultPii, AttachStacktrace, Release,
          Environment, Dsn) preserved unchanged through 6.x. -->
-    <PackageReference Include="Sentry" Version="6.4.1" />
-    <!-- Velopack: pinned at 0.0.1298 (current working version). Newer
-         Velopack releases (0.0.1521+ which drop NuGet.Versioning) ship
-         only as prerelease on NuGet; keeping the known-good pin during
-         the TFM migration. On net8, binding redirects are inert — the
-         NuGet.Versioning 6.14→7.3.0 drift that needed a redirect on net48
-         is no longer a concern because Core+ assembly loader ignores
-         <bindingRedirect>. -->
+    <PackageReference Include="Sentry" Version="6.8.0" />
+    <!-- Velopack: pinned at the known-good 0.0.1298. Current 1.x releases
+         are stable but require a separately tested installer/updater
+         migration. scripts/build-release.bat enforces the matching CLI. -->
     <PackageReference Include="Velopack" Version="0.0.1298" />
     <!-- OpenCvSharp4.Windows is the metapackage — it pulls Core +
          Extensions + runtime.win transitively. -->
-    <!-- OpenCvSharp 4.13 (2026-03-30). Unblocked by the net10 TFM jump: 4.13
+    <!-- OpenCvSharp 4.13 patch (2026-06-27). Unblocked by the net10 TFM jump: 4.13
          transitively requires System.Drawing.Common 10.0.3 via
          OpenCvSharp4.WpfExtensions, which was a cross-major error on net8 but
          is in-TFM on net10. Native OpenCvSharpExtern.dll upgraded; dropped x86
          support (we're x64 only). No API changes required in our Mat/Cv2
          usage. -->
-    <PackageReference Include="OpenCvSharp4" Version="4.13.0.20260427" />
-    <PackageReference Include="OpenCvSharp4.Extensions" Version="4.13.0.20260330" />
-    <PackageReference Include="OpenCvSharp4.Windows" Version="4.13.0.20260302" />
+    <PackageReference Include="OpenCvSharp4" Version="4.13.0.20260627" />
+    <PackageReference Include="OpenCvSharp4.Extensions" Version="4.13.0.20260627" />
+    <PackageReference Include="OpenCvSharp4.Windows" Version="4.13.0.20260627" />
 
     <!-- DROPPED on net10 (in-box, NU1510-flagged as unnecessary):
          - System.Drawing.Common (was 8.0.11)
@@ -283,12 +282,16 @@
            use for them.
          - onnxruntime.lib — static link library for C++ projects; we
            P/Invoke the managed wrapper, not the C lib. -->
-  <Target Name="StripDirectMLDevByproducts" AfterTargets="Build">
+  <Target Name="StripDirectMLDevByproducts" AfterTargets="Build;Publish">
     <ItemGroup>
       <_KaptionDirectMLExtras Include="$(OutputPath)DirectML.Debug.dll" />
       <_KaptionDirectMLExtras Include="$(OutputPath)DirectML.Debug.pdb" />
       <_KaptionDirectMLExtras Include="$(OutputPath)DirectML.pdb" />
       <_KaptionDirectMLExtras Include="$(OutputPath)onnxruntime.lib" />
+      <_KaptionDirectMLExtras Include="$(PublishDir)DirectML.Debug.dll" Condition="'$(PublishDir)' != ''" />
+      <_KaptionDirectMLExtras Include="$(PublishDir)DirectML.Debug.pdb" Condition="'$(PublishDir)' != ''" />
+      <_KaptionDirectMLExtras Include="$(PublishDir)DirectML.pdb" Condition="'$(PublishDir)' != ''" />
+      <_KaptionDirectMLExtras Include="$(PublishDir)onnxruntime.lib" Condition="'$(PublishDir)' != ''" />
     </ItemGroup>
     <Delete Files="@(_KaptionDirectMLExtras)" ContinueOnError="true" />
   </Target>

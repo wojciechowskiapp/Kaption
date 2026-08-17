@@ -51,16 +51,23 @@ namespace PaddleOCRSharp
         /// </summary>
         public string ExecutionProvider { get; private set; } = "CPUExecutionProvider";
 
-        // Detection model parameters
-        private const int DetMaxSize = 960;
-        private const float DetBoxScoreThreshold = 0.7f;
-        private const float DetBoxThreshold = 0.3f;
-        private const int DetMinSize = 3;
-        private const float DetUnclipRatio = 2.0f;
+        /// <summary>
+        /// Human-readable active model family, included in diagnostics and UI.
+        /// </summary>
+        public string ModelName { get; private set; } = "PaddleOCR";
 
-        // Recognition model parameters
-        private const int RecImgHeight = 48;
-        private const int RecImgWidth = 320;
+        // Detection model parameters
+        private const int DetMinSize = 3;
+
+        // Read the public OCRParameter values instead of silently shadowing them with
+        // unrelated constants. The old hard-coded box score (0.7) was notably stricter
+        // than both our declared default and PaddleOCR's current pipeline default (0.6).
+        private int DetMaxSize => Math.Max(32, _parameter.max_side_len);
+        private float DetBoxScoreThreshold => Clamp(_parameter.det_db_box_thresh, 0f, 1f);
+        private float DetBoxThreshold => Clamp(_parameter.det_db_thresh, 0f, 1f);
+        private float DetUnclipRatio => Math.Max(0.1f, _parameter.det_db_unclip_ratio);
+        private int RecImgHeight => Math.Max(8, _parameter.rec_img_h);
+        private float RecScoreThreshold => Clamp(_parameter.rec_score_thresh, 0f, 1f);
 
         /// <summary>
         /// Clamp helper method - .NET Framework 4.8 does not contain Math.Clamp
@@ -162,7 +169,7 @@ namespace PaddleOCRSharp
         /// <summary>
         /// Load character dictionary from YAML file
         /// </summary>
-        private static List<string> LoadLabelsFromYaml(string yamlPath)
+        internal static List<string> LoadLabelsFromYaml(string yamlPath)
         {
             var labels = new List<string>();
             var lines = File.ReadAllLines(yamlPath, System.Text.Encoding.UTF8);
@@ -183,7 +190,7 @@ namespace PaddleOCRSharp
                     var match = regex.Match(line);
                     if (match.Success)
                     {
-                        var label = match.Groups[1].Value.Trim();
+                        var label = ParseYamlListScalar(match.Groups[1].Value);
                         labels.Add(label);
                     }
                     else if (!string.IsNullOrWhiteSpace(trimmed))
@@ -203,6 +210,33 @@ namespace PaddleOCRSharp
         }
 
         /// <summary>
+        /// Parses the small YAML scalar subset used by PaddleOCR's
+        /// character_dict. PP-OCRv6 quotes punctuation such as '#', quotes
+        /// and backslashes; retaining those quote marks would shift/corrupt
+        /// every decoded character.
+        /// </summary>
+        internal static string ParseYamlListScalar(string rawValue)
+        {
+            string value = (rawValue ?? string.Empty).TrimStart();
+            if (value.Length >= 2 && value[0] == '\'' && value[value.Length - 1] == '\'')
+            {
+                return value.Substring(1, value.Length - 2).Replace("''", "'");
+            }
+
+            if (value.Length >= 2 && value[0] == '"' && value[value.Length - 1] == '"')
+            {
+                return value.Substring(1, value.Length - 2)
+                    .Replace("\\\"", "\"")
+                    .Replace("\\\\", "\\")
+                    .Replace("\\n", "\n")
+                    .Replace("\\r", "\r")
+                    .Replace("\\t", "\t");
+            }
+
+            return value.TrimEnd();
+        }
+
+        /// <summary>
         /// PaddleOCR Engine initialization
         /// </summary>
         /// <param name="config">Model configuration object</param>
@@ -215,6 +249,9 @@ namespace PaddleOCRSharp
             if (parameter == null)
                 parameter = new OCRParameter();
             _parameter = parameter;
+            ModelName = string.IsNullOrWhiteSpace(config.model_name)
+                ? "PaddleOCR"
+                : config.model_name;
 
             // Check if model files exist
             if (!File.Exists(config.det_infer))
@@ -242,7 +279,7 @@ namespace PaddleOCRSharp
             {
                 try
                 {
-                    var gpuOptions = CreateSessionOptions(parameter, useDirectML: true);
+                    using var gpuOptions = CreateSessionOptions(parameter, useDirectML: true);
                     _detSession = new InferenceSession(config.det_infer, gpuOptions);
                     _recSession = new InferenceSession(config.rec_infer, gpuOptions);
                     IsUsingGpu = true;
@@ -261,7 +298,7 @@ namespace PaddleOCRSharp
                     _detSession = null;
                     _recSession = null;
 
-                    var cpuOptions = CreateSessionOptions(parameter, useDirectML: false);
+                    using var cpuOptions = CreateSessionOptions(parameter, useDirectML: false);
                     _detSession = new InferenceSession(config.det_infer, cpuOptions);
                     _recSession = new InferenceSession(config.rec_infer, cpuOptions);
                     Logger.Log.Info("OCR engine initialized with CPU execution provider (GPU fallback)");
@@ -269,7 +306,7 @@ namespace PaddleOCRSharp
             }
             else
             {
-                var cpuOptions = CreateSessionOptions(parameter, useDirectML: false);
+                using var cpuOptions = CreateSessionOptions(parameter, useDirectML: false);
                 _detSession = new InferenceSession(config.det_infer, cpuOptions);
                 _recSession = new InferenceSession(config.rec_infer, cpuOptions);
                 IsUsingGpu = false;
@@ -293,7 +330,14 @@ namespace PaddleOCRSharp
                 IntraOpNumThreads = parameter.cpu_math_library_num_threads > 0
                     ? parameter.cpu_math_library_num_threads
                     : 2,
-                InterOpNumThreads = 1
+                InterOpNumThreads = 1,
+                GraphOptimizationLevel = GraphOptimizationLevel.ORT_ENABLE_ALL,
+                // DirectML explicitly forbids memory-pattern optimisation and
+                // parallel graph execution. Keeping these options explicit
+                // prevents a capable GPU from failing session creation and
+                // silently dropping to CPU when ORT defaults change.
+                EnableMemoryPattern = !useDirectML,
+                ExecutionMode = ExecutionMode.ORT_SEQUENTIAL,
             };
 
             if (useDirectML)
@@ -340,7 +384,8 @@ namespace PaddleOCRSharp
             if (bitmap == null)
                 throw new ArgumentException("Image must be a Bitmap", nameof(image));
 
-            return DetectTextFromMat(bitmap.ToMat());
+            using var mat = bitmap.ToMat();
+            return DetectTextFromMat(mat);
         }
 
         /// <summary>
@@ -375,7 +420,7 @@ namespace PaddleOCRSharp
         /// <summary>
         /// 从Mat进行OCR识别
         /// </summary>
-        public OCRResult DetectTextFromMat(Mat src)
+        public OCRResult DetectTextFromMat(Mat src, CancellationToken cancellationToken = default)
         {
             if (src == null || src.IsDisposed || src.Empty())
                 throw new ArgumentException("Invalid Mat object", nameof(src));
@@ -386,69 +431,92 @@ namespace PaddleOCRSharp
             if (_disposed)
                 throw new ObjectDisposedException(nameof(PaddleOCREngine));
 
-            _gate.Wait();
+            _gate.Wait(cancellationToken);
             try
             {
                 if (_disposed)
                     throw new ObjectDisposedException(nameof(PaddleOCREngine));
 
-                // Text detection
-                var rects = DetectTextRegions(src);
-
-                // Text recognition
-                var textBlocks = new List<TextBlock>();
-                if (rects.Length > 0)
+                using var runOptions = new RunOptions();
+                using var cancellationRegistration = cancellationToken.Register(() =>
                 {
-                    var croppedMats = new List<Mat>();
-                    var validRectIndices = new List<int>(); // Record indices of valid rectangles
-                    try
-                    {
-                        var srcSize = src.Size();
-                        for (int i = 0; i < rects.Length; i++)
-                        {
-                            var rect = rects[i];
-                            var croppedRect = GetCroppedRect(rect.BoundingRect(), srcSize);
+                    try { runOptions.Terminate = true; }
+                    catch (ObjectDisposedException) { /* inference already completed */ }
+                });
 
-                            // Additional safety check: ensure rectangle is within Mat boundaries
-                            if (croppedRect.X < 0 || croppedRect.Y < 0 ||
-                                croppedRect.X + croppedRect.Width > srcSize.Width ||
-                                croppedRect.Y + croppedRect.Height > srcSize.Height ||
-                                croppedRect.Width <= 0 || croppedRect.Height <= 0)
+                try
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+
+                    // Text detection
+                    var rects = DetectTextRegions(src, runOptions, cancellationToken);
+
+                    // Text recognition
+                    var textBlocks = new List<TextBlock>();
+                    if (rects.Length > 0)
+                    {
+                        var croppedMats = new List<Mat>();
+                        var validRectIndices = new List<int>(); // Record indices of valid rectangles
+                        try
+                        {
+                            var srcSize = src.Size();
+                            for (int i = 0; i < rects.Length; i++)
                             {
-                                // If rectangle is invalid, skip this region
-                                continue;
+                                cancellationToken.ThrowIfCancellationRequested();
+                                var rect = rects[i];
+                                var croppedRect = GetCroppedRect(rect.BoundingRect(), srcSize);
+
+                                // Additional safety check: ensure rectangle is within Mat boundaries
+                                if (croppedRect.X < 0 || croppedRect.Y < 0 ||
+                                    croppedRect.X + croppedRect.Width > srcSize.Width ||
+                                    croppedRect.Y + croppedRect.Height > srcSize.Height ||
+                                    croppedRect.Width <= 0 || croppedRect.Height <= 0)
+                                {
+                                    // If rectangle is invalid, skip this region
+                                    continue;
+                                }
+
+                                var roi = src[croppedRect];
+                                croppedMats.Add(roi);
+                                validRectIndices.Add(i); // Record original index of valid rectangles
                             }
 
-                            var roi = src[croppedRect];
-                            croppedMats.Add(roi);
-                            validRectIndices.Add(i); // Record original index of valid rectangles
-                        }
-
-                        var results = RecognizeText(croppedMats.ToArray());
-                        for (int i = 0; i < results.Count && i < validRectIndices.Count; i++)
-                        {
-                            var originalIndex = validRectIndices[i];
-                            var textBlock = new TextBlock
+                            var results = RecognizeText(croppedMats.ToArray(), runOptions, cancellationToken);
+                            for (int i = 0; i < results.Count && i < validRectIndices.Count; i++)
                             {
-                                Text = results[i],
-                                Score = 1.0f,
-                                BoxPoints = GetBoxPoints(rects[originalIndex])
-                            };
-                            textBlocks.Add(textBlock);
+                                if (string.IsNullOrWhiteSpace(results[i].Text) ||
+                                    results[i].Score < RecScoreThreshold)
+                                {
+                                    continue;
+                                }
+
+                                var originalIndex = validRectIndices[i];
+                                var textBlock = new TextBlock
+                                {
+                                    Text = results[i].Text,
+                                    Score = results[i].Score,
+                                    BoxPoints = GetBoxPoints(rects[originalIndex])
+                                };
+                                textBlocks.Add(textBlock);
+                            }
+                        }
+                        finally
+                        {
+                            foreach (var mat in croppedMats)
+                                mat.Dispose();
                         }
                     }
-                    finally
-                    {
-                        foreach (var mat in croppedMats)
-                            mat.Dispose();
-                    }
-                }
 
-                return new OCRResult
+                    return new OCRResult
+                    {
+                        TextBlocks = textBlocks,
+                        Text = string.Join("\n", textBlocks.Select(tb => tb.Text))
+                    };
+                }
+                catch (Exception ex) when (cancellationToken.IsCancellationRequested)
                 {
-                    TextBlocks = textBlocks,
-                    Text = string.Join("\n", textBlocks.Select(tb => tb.Text))
-                };
+                    throw new OperationCanceledException("OCR inference was cancelled.", ex, cancellationToken);
+                }
             }
             finally
             {
@@ -459,7 +527,8 @@ namespace PaddleOCRSharp
         /// <summary>
         /// Text detection
         /// </summary>
-        private RotatedRect[] DetectTextRegions(Mat src)
+        private RotatedRect[] DetectTextRegions(
+            Mat src, RunOptions runOptions, CancellationToken cancellationToken)
         {
             if (src == null || src.IsDisposed || src.Empty())
                 throw new ArgumentException("Invalid Mat object", nameof(src));
@@ -478,7 +547,6 @@ namespace PaddleOCRSharp
 
             // Normalize
             var inputTensor = NormalizeImage(padded32);
-            using var _ = padded32;
 
             // Run detection model
             var inputs = new List<NamedOnnxValue>
@@ -486,7 +554,8 @@ namespace PaddleOCRSharp
                 NamedOnnxValue.CreateFromTensor(_detSession.InputNames[0], inputTensor)
             };
 
-            using var outputs = _detSession.Run(inputs);
+            cancellationToken.ThrowIfCancellationRequested();
+            using var outputs = _detSession.Run(inputs, _detSession.OutputNames, runOptions);
             var output = outputs.First().AsTensor<float>();
 
             // Convert to Mat
@@ -527,17 +596,19 @@ namespace PaddleOCRSharp
         /// <summary>
         /// Text recognition
         /// </summary>
-        private List<string> RecognizeText(Mat[] srcs)
+        private List<(string Text, float Score)> RecognizeText(
+            Mat[] srcs, RunOptions runOptions, CancellationToken cancellationToken)
         {
             if (srcs.Length == 0)
-                return new List<string>();
+                return new List<(string Text, float Score)>();
 
-            var results = new List<string>();
+            var results = new List<(string Text, float Score)>();
             foreach (var src in srcs)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 if (src == null || src.IsDisposed || src.Empty())
                 {
-                    results.Add(string.Empty);
+                    results.Add((string.Empty, 0f));
                     continue;
                 }
 
@@ -552,6 +623,11 @@ namespace PaddleOCRSharp
                 var ratio = channel3.Width / (double)channel3.Height;
                 var resizedW = (int)Math.Ceiling(RecImgHeight * ratio);
                 if (resizedW < 16) resizedW = 16;
+                // PP-OCRv6's official ONNX preprocessing caps dynamic width
+                // at 3200. Subtitle lines stay well below this in practice,
+                // but the bound prevents malformed regions from allocating an
+                // enormous tensor.
+                if (resizedW > 3200) resizedW = 3200;
                 using var resized = new Mat();
                 Cv2.Resize(channel3, resized, new CvSize(resizedW, RecImgHeight));
 
@@ -572,12 +648,11 @@ namespace PaddleOCRSharp
                     NamedOnnxValue.CreateFromTensor(_recSession.InputNames[0], inputTensor)
                 };
 
-                using var outputs = _recSession.Run(inputs);
+                using var outputs = _recSession.Run(inputs, _recSession.OutputNames, runOptions);
                 var output = outputs.First().AsTensor<float>();
 
                 // Decode text
-                var text = DecodeText(output);
-                results.Add(text);
+                results.Add(DecodeText(output, _labels));
             }
 
             return results;
@@ -586,13 +661,20 @@ namespace PaddleOCRSharp
         /// <summary>
         /// Decode recognition result
         /// </summary>
-        private string DecodeText(Tensor<float> output)
+        internal static (string Text, float Score) DecodeText(
+            Tensor<float> output, IReadOnlyList<string> labels)
         {
+            if (output == null) throw new ArgumentNullException(nameof(output));
+            if (labels == null) throw new ArgumentNullException(nameof(labels));
+
             var dimensions = output.Dimensions;
+            if (dimensions.Length != 3 || dimensions[0] != 1)
+                throw new ArgumentException("Recognition output must have shape [1, time, labels].", nameof(output));
+
             var charCount = dimensions[1];
             var labelCount = dimensions[2];
 
-            var text = "";
+            var text = new System.Text.StringBuilder(charCount);
             var lastIndex = 0;
             var score = 0f;
             var validChars = 0;
@@ -620,14 +702,14 @@ namespace PaddleOCRSharp
                     // Index 0 = blank (CTC blank character, skip)
                     // Index 1 to _labels.Count = characters in dictionary (index 1 corresponds to _labels[0])
                     // Index _labels.Count + 1 = space character
-                    if (maxIdx <= _labels.Count)
+                    if (maxIdx <= labels.Count)
                     {
-                        text += _labels[maxIdx - 1];
+                        text.Append(labels[maxIdx - 1]);
                     }
-                    else if (maxIdx == _labels.Count + 1)
+                    else if (maxIdx == labels.Count + 1)
                     {
                         // Handle space character
-                        text += " ";
+                        text.Append(' ');
                     }
                     // If index is out of range, skip
                 }
@@ -635,7 +717,7 @@ namespace PaddleOCRSharp
                 lastIndex = maxIdx;
             }
 
-            return text;
+            return (text.ToString(), validChars > 0 ? score / validChars : 0f);
         }
 
         /// <summary>
@@ -849,8 +931,13 @@ namespace PaddleOCRSharp
                 if (acquired)
                 {
                     try { _gate.Release(); } catch { /* disposed */ }
+                    try { _gate.Dispose(); } catch { /* idempotent */ }
                 }
-                try { _gate.Dispose(); } catch { /* idempotent */ }
+                // On timeout an in-flight Run still owns the semaphore and
+                // will Release it. Disposing the gate here would turn that
+                // normal unwind into ObjectDisposedException. The engine is
+                // already marked disposed, so leaving the tiny gate alive is
+                // safer than racing the active native call.
             }
         }
     }

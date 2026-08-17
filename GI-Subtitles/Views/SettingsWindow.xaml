@@ -423,13 +423,11 @@
                                             Visibility="Collapsed"
                                             ToolTip="{DynamicResource Regions_Answer_Tooltip}"/>
                                 </WrapPanel>
-                                <!-- DashRegionInfo: legacy TextBlock referenced from
-                                     code-behind. Kept hidden; remove when all write
-                                     sites are gone. -->
+                                <!-- Compact, human-readable confirmation of the active crop.
+                                     Raw editable XYWH fields remain hidden on the Settings tab. -->
                                 <TextBlock x:Name="DashRegionInfo" FontSize="12"
                                            Foreground="{StaticResource TextSecondaryBrush}"
-                                           Text="{DynamicResource Dash_Region_NotSet}" TextWrapping="Wrap"
-                                           Visibility="Collapsed"/>
+                                           Text="{DynamicResource Dash_Region_NotSet}" TextWrapping="Wrap"/>
                             </StackPanel>
                         </Border>
 
@@ -759,7 +757,48 @@
                             </StackPanel>
                         </Border>
 
-                        <!-- ─── Card 2: Player identity ─── -->
+                        <!-- ─── Card 2: OCR model ─── -->
+                        <Border Style="{StaticResource Card}" Padding="18,16">
+                            <StackPanel>
+                                <TextBlock Text="{DynamicResource Settings_OcrModel_Card_Label}"
+                                           FontSize="13" FontWeight="SemiBold"
+                                           Foreground="#374151" Margin="0,0,0,6"/>
+                                <TextBlock Text="{DynamicResource Settings_OcrModel_Card_Body}"
+                                           FontSize="11" Foreground="{StaticResource TextTertiaryBrush}"
+                                           TextWrapping="Wrap" Margin="0,0,0,12"/>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="140"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="{DynamicResource Settings_OcrModel_Label}"
+                                               FontSize="12" Foreground="{StaticResource TextSecondaryBrush}"
+                                               VerticalAlignment="Center"/>
+                                    <ComboBox x:Name="OcrModelComboBox" Grid.Column="1"
+                                              Style="{StaticResource ModernComboBox}"
+                                              Height="30" Width="300" HorizontalAlignment="Left"
+                                              ToolTip="{DynamicResource Tip_Settings_OcrModel}"
+                                              SelectionChanged="OcrModelComboBox_SelectionChanged">
+                                        <ComboBoxItem Content="{DynamicResource Settings_OcrModel_V6}"
+                                                      Tag="ppocr-v6-small"/>
+                                        <ComboBoxItem Content="{DynamicResource Settings_OcrModel_V4}"
+                                                      Tag="ppocr-v4-mobile"/>
+                                    </ComboBox>
+                                </Grid>
+                                <TextBlock x:Name="OcrModelDescription"
+                                           Text="{DynamicResource Settings_OcrModel_V6_Description}"
+                                           FontSize="11" Foreground="{StaticResource TextTertiaryBrush}"
+                                           TextWrapping="Wrap" Margin="140,9,0,0"/>
+                                <TextBlock x:Name="OcrModelRestartHint"
+                                           Text="{DynamicResource Settings_OcrModel_Restart}"
+                                           FontSize="11" FontWeight="SemiBold"
+                                           Foreground="{StaticResource AccentBrush}"
+                                           TextWrapping="Wrap" Margin="140,6,0,0"
+                                           Visibility="Collapsed"/>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- ─── Card 3: Player identity ─── -->
                         <Border Style="{StaticResource Card}" Padding="18,16">
                             <StackPanel>
                                 <TextBlock Text="{DynamicResource Settings_PlayerName_Card_Label}" FontSize="13" FontWeight="SemiBold"
@@ -792,7 +831,7 @@
                             </StackPanel>
                         </Border>
 
-                        <!-- ─── Card 3: Privacy / crash reporting ─── -->
+                        <!-- ─── Card 4: Privacy / crash reporting ─── -->
                         <Border Style="{StaticResource Card}" Padding="18,16">
                             <StackPanel>
                                 <TextBlock Text="{DynamicResource Settings_Privacy_Card_Label}" FontSize="13" FontWeight="SemiBold"
@@ -836,7 +875,7 @@
                                                Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center"
                                                Width="110"/>
                                     <TextBox x:Name="UiRefreshTextBox" Style="{StaticResource ModernTextBox}"
-                                             Width="65" Text="200" TextAlignment="Center"
+                                             Width="65" Text="150" TextAlignment="Center"
                                              ToolTip="{DynamicResource Tip_Settings_OcrRefresh}"
                                              LostFocus="UiRefreshTextBox_LostFocus" KeyDown="TextBox_KeyDown"/>
                                     <TextBlock Text="ms" FontSize="11" Foreground="{StaticResource TextTertiaryBrush}"

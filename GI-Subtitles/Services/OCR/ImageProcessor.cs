@@ -56,6 +56,8 @@ namespace GI_Subtitles.Services.OCR
             using var cropped = new OpenCvSharp.Mat(bin, roi);
             using var resized = new OpenCvSharp.Mat();
             Cv2.Resize(cropped, resized, new OpenCvSharp.Size(9, 8), 0, 0, InterpolationFlags.Area);
+            using var fingerprint = new OpenCvSharp.Mat();
+            Cv2.Resize(cropped, fingerprint, new OpenCvSharp.Size(32, 16), 0, 0, InterpolationFlags.Area);
 
             // 4. Compute hash (resized is derived from a binary image but becomes grayscale due to Area interpolation)
             var hash = new StringBuilder(64);
@@ -76,7 +78,32 @@ namespace GI_Subtitles.Services.OCR
                 }
             }
 
-            return hash.ToString();
+            // The legacy 64-bit dHash above deliberately ignores a lot of
+            // detail and produced exact collisions between different long
+            // subtitle lines. Keep it for coarse robustness, but append a
+            // second content signature over a denser normalized crop.
+            ulong contentSignature = 14695981039346656037UL; // FNV-1a offset
+            unsafe
+            {
+                byte* ptr = (byte*)fingerprint.DataPointer;
+                int step = (int)fingerprint.Step();
+                int rows = fingerprint.Rows;
+                int cols = fingerprint.Cols;
+                for (int y = 0; y < rows; y++)
+                {
+                    byte* row = ptr + y * step;
+                    for (int x = 0; x < cols; x++)
+                    {
+                        contentSignature ^= row[x];
+                        contentSignature *= 1099511628211UL;
+                    }
+                }
+            }
+            contentSignature ^= (uint)roi.Width;
+            contentSignature *= 1099511628211UL;
+            contentSignature ^= (uint)roi.Height;
+
+            return $"{hash}-{contentSignature:X16}-{roi.Width:X4}{roi.Height:X4}";
         }
 
         // CalculateHammingDistance + FindSimilarImageHash removed 2026-04-18
@@ -171,22 +198,61 @@ namespace GI_Subtitles.Services.OCR
             using var hsvFrame = new OpenCvSharp.Mat();
             Cv2.CvtColor(colorFrame, hsvFrame, ColorConversionCodes.BGR2HSV);
 
+            var candidates = new List<(TextBlockInfo Info, bool IsNpcColor)>();
             foreach (var block in textBlocks)
             {
                 if (block.BoxPoints == null || block.BoxPoints.Length < 4 || string.IsNullOrWhiteSpace(block.Text))
                     continue;
 
-                bool isColored = IsColoredTextBlock(hsvFrame, block.BoxPoints);
-                var info = ToTextBlockInfo(block, isColored);
-
-                if (isColored)
-                    result.NpcBlocks.Add(info);
-                else
-                    result.DialogueBlocks.Add(info);
+                bool isNpcColor = IsColoredTextBlock(hsvFrame, block.BoxPoints);
+                candidates.Add((ToTextBlockInfo(block, isNpcColor), isNpcColor));
             }
 
-            // Safety fallback: if ALL blocks were colored, treat all as dialogue
-            if (result.DialogueBlocks.Count == 0 && result.NpcBlocks.Count > 0)
+            // NPC names occupy the first accent-coloured line above the body.
+            // Genshin 7.0 also uses a light cyan name style. A highlighted word
+            // or a coloured/HDR background lower in the crop
+            // must remain dialogue instead of deleting most of the sentence.
+            var coloured = candidates.Where(candidate => candidate.IsNpcColor).ToList();
+            var nonColoured = candidates.Where(candidate => !candidate.IsNpcColor).ToList();
+            float npcBandBottom = float.MinValue;
+            if (coloured.Count > 0)
+            {
+                var topmost = coloured.OrderBy(candidate => candidate.Info.BoundingRect.Top).First();
+                float top = topmost.Info.BoundingRect.Top;
+                float topLineHeight = Math.Max(1f, topmost.Info.BoundingRect.Height);
+                float accentBottom = topmost.Info.BoundingRect.Bottom;
+
+                // A speaker name is a separate gold/cyan line above the white body.
+                // Accent highlighting on the same dialogue line must stay in the
+                // body. A lone accent line is kept as NPC-only so the bounded OCR
+                // retry can wait for typewriter text instead of matching a name
+                // as if it were dialogue.
+                bool isolatedNameOnly = candidates.Count == 1;
+                bool separatedFromBody = false;
+                if (nonColoured.Count > 0)
+                {
+                    float firstBodyTop = nonColoured.Min(candidate => candidate.Info.BoundingRect.Top);
+                    float requiredGap = Math.Max(2f, topLineHeight * 0.08f);
+                    separatedFromBody = firstBodyTop - accentBottom >= requiredGap;
+                }
+
+                if (isolatedNameOnly || separatedFromBody)
+                    npcBandBottom = top + topLineHeight * 1.5f;
+            }
+
+            foreach (var candidate in candidates)
+            {
+                bool isNpc = candidate.IsNpcColor && candidate.Info.BoundingRect.Top <= npcBandBottom;
+                candidate.Info.IsNpcText = isNpc;
+                if (isNpc)
+                    result.NpcBlocks.Add(candidate.Info);
+                else
+                    result.DialogueBlocks.Add(candidate.Info);
+            }
+
+            // Multiple all-accent blocks are more likely highlighted dialogue.
+            // Keep a single isolated top line as NPC-only (see above).
+            if (result.DialogueBlocks.Count == 0 && result.NpcBlocks.Count > 1)
             {
                 result.DialogueBlocks.AddRange(result.NpcBlocks);
                 result.NpcBlocks.Clear();
@@ -289,9 +355,14 @@ namespace GI_Subtitles.Services.OCR
                 }
             }
 
-            // Gap must be meaningful (>15px covers the decorative separator line in Genshin).
-            // Small gaps between multi-line dialogue blocks won't trigger this.
-            if (gapIndex < 0 || maxGap < 15f) return;
+            float medianDialogueHeight = sorted
+                .Select(block => Math.Max(1f, block.BoundingRect.Height))
+                .OrderBy(height => height)
+                .ElementAt(sorted.Count / 2);
+
+            // Resolution-relative gap: a fixed 15 px threshold wrongly
+            // reclassified ordinary two-line dialogue at 4K.
+            if (gapIndex < 0 || maxGap < Math.Max(8f, medianDialogueHeight * 0.65f)) return;
 
             var aboveGap = sorted.Take(gapIndex + 1).ToList();
             var belowGap = sorted.Skip(gapIndex + 1).ToList();
@@ -300,6 +371,12 @@ namespace GI_Subtitles.Services.OCR
             int aboveTextLen = aboveGap.Sum(b => b.Text.Length);
             int belowTextLen = belowGap.Sum(b => b.Text.Length);
             if (aboveTextLen >= belowTextLen) return;
+
+            // Role text is visibly smaller than dialogue. Character count alone
+            // is not evidence: a short first dialogue line is still dialogue.
+            float aboveAvgHeight = aboveGap.Average(b => Math.Max(1f, b.BoundingRect.Height));
+            float belowAvgHeight = belowGap.Average(b => Math.Max(1f, b.BoundingRect.Height));
+            if (aboveAvgHeight > belowAvgHeight * 0.82f) return;
 
             // Above-gap blocks must be near the NPC name (scales with resolution:
             // 3x NPC name height, minimum 80px to handle low-res captures)
@@ -317,8 +394,11 @@ namespace GI_Subtitles.Services.OCR
         }
 
         /// <summary>
-        /// Check if a text block's pixels are colored (high saturation) vs white (low saturation).
-        /// Samples bright pixels (V > 180) within the bounding rect and checks mean saturation.
+        /// Detect speaker-name accent pixels. Genshin uses gold/amber in the
+        /// classic dialogue UI and light cyan in the 7.0 blue dialogue UI.
+        /// Restricting cyan to H=75..105 deliberately excludes the deeper blue
+        /// panel/background (normally H≈107..115), while the 20% bright-pixel
+        /// ratio prevents a few background pixels from reclassifying white body.
         /// </summary>
         private static bool IsColoredTextBlock(OpenCvSharp.Mat hsvFrame, PointF[] boxPoints)
         {
@@ -350,9 +430,9 @@ namespace GI_Subtitles.Services.OCR
             var channels = Cv2.Split(cropped);
             try
             {
-                using var hChannel = channels[0];
-                using var sChannel = channels[1];
-                using var vChannel = channels[2];
+                var hChannel = channels[0];
+                var sChannel = channels[1];
+                var vChannel = channels[2];
 
                 // Mask: only bright pixels (V > 180) — these are the actual text pixels
                 using var brightMask = new OpenCvSharp.Mat();
@@ -362,11 +442,23 @@ namespace GI_Subtitles.Services.OCR
                 if (brightCount < 5)
                     return false; // Not enough bright pixels to classify
 
-                // Compute mean saturation of bright pixels only
-                var meanSat = Cv2.Mean(sChannel, brightMask);
+                // NPC names use a gold/amber or light-cyan hue. Saturation alone classified
+                // any bright HDR/coloured background as an NPC name and could
+                // discard most dialogue blocks.
+                using var saturatedMask = new OpenCvSharp.Mat();
+                Cv2.Threshold(sChannel, saturatedMask, 45, 255, ThresholdTypes.Binary);
+                using var goldHueMask = new OpenCvSharp.Mat();
+                Cv2.InRange(hChannel, new Scalar(8), new Scalar(45), goldHueMask);
+                using var cyanHueMask = new OpenCvSharp.Mat();
+                Cv2.InRange(hChannel, new Scalar(75), new Scalar(105), cyanHueMask);
+                using var accentHueMask = new OpenCvSharp.Mat();
+                Cv2.BitwiseOr(goldHueMask, cyanHueMask, accentHueMask);
+                using var accentTextMask = new OpenCvSharp.Mat();
+                Cv2.BitwiseAnd(brightMask, saturatedMask, accentTextMask);
+                Cv2.BitwiseAnd(accentTextMask, accentHueMask, accentTextMask);
 
-                // Saturation threshold: >45 means colored (golden NPC name), <=45 means white (dialogue)
-                return meanSat.Val0 > 45;
+                int accentCount = Cv2.CountNonZero(accentTextMask);
+                return accentCount >= Math.Max(5, (int)Math.Ceiling(brightCount * 0.20));
             }
             finally
             {

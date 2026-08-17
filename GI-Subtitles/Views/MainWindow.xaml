@@ -6,7 +6,7 @@
         xmlns:local="clr-namespace:GI_Subtitles.Views"
         xmlns:rendering="clr-namespace:GI_Subtitles.Services.Rendering"
         mc:Ignorable="d"
-        WindowStyle="None" Height="20"  ShowInTaskbar="False" Topmost="True" Background="Transparent" AllowsTransparency="True" MouseDown="Window_MouseDown">
+        WindowStyle="None" Height="20" ShowInTaskbar="False" Topmost="True" Background="Transparent" AllowsTransparency="True" PreviewMouseLeftButtonDown="Window_MouseDown">
     <Grid Background="Transparent">
         <!-- Default subtitle container with semi-transparent background -->
         <Border x:Name="SubtitleBackground"

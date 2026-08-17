@@ -13,11 +13,7 @@ namespace Screenshot
         {
             try
             {
-                // v2.0 rename: write to the Kaption AppData folder directly instead
-                // of the legacy "GI-Subtitles" path. The old path used to cause
-                // MigrateAppDataFolder to re-run every launch — Screenshot.dll
-                // recreated the folder after App.xaml.cs cleaned it up, so the
-                // next launch found "remnants" and merged them again.
+                // Screenshot diagnostics belong exclusively to Kaption.
                 string folder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Kaption");
                 if (!Directory.Exists(folder)) Directory.CreateDirectory(folder);
 

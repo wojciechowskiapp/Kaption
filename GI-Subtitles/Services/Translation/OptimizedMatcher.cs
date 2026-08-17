@@ -1373,7 +1373,10 @@ namespace GI_Subtitles.Services.Translation
                             if (weightedDist < globalBestWeightedDist)
                             {
                                 globalBestWeightedDist = weightedDist;
+                                globalBestDistance = currentDistance;
+                                bestIndex = id;
                             }
+                            continue;
                         }
                         else
                         {
@@ -1400,7 +1403,10 @@ namespace GI_Subtitles.Services.Translation
                             if (weightedDist < globalBestWeightedDist)
                             {
                                 globalBestWeightedDist = weightedDist;
+                                globalBestDistance = currentDistance;
+                                bestIndex = id;
                             }
+                            continue;
                         }
                         else
                         {

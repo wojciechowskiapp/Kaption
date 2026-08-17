@@ -1,4 +1,5 @@
 using System;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Text.RegularExpressions;
 using System.Threading;
@@ -26,13 +27,14 @@ namespace GI_Subtitles.Views
     {
         private readonly INotifyIcon _notify;
         private int _currentStep;
+        private bool _setupOutcomePersisted;
 
         // Track whether regions were set during this wizard session
         private bool _dialogueRegionSet;
         private bool _answerRegionSet;
 
         /// <summary>Invoked when the user clicks "Start Translating!" on the final step.</summary>
-        public Action OnStartOCR;
+        public Func<bool> OnStartOCR;
 
         /// <summary>Invoked when the user clicks "Open Settings" on the final step.</summary>
         public Action OnOpenSettings;
@@ -101,6 +103,58 @@ namespace GI_Subtitles.Views
             RefreshReferralCardVisibility();
             CollapseStep2IndicatorIfDisabled();
             UpdateStepDisplay();
+        }
+
+        /// <summary>
+        /// Closing the wizard with the title-bar X is an explicit dismissal,
+        /// not a request to reopen it on every Kaption launch. Keep that
+        /// separate from <c>SetupCompleted</c> so diagnostics can still tell
+        /// whether onboarding was actually finished.
+        /// </summary>
+        protected override void OnClosing(CancelEventArgs e)
+        {
+            base.OnClosing(e);
+
+            if (e.Cancel || _setupOutcomePersisted)
+                return;
+
+            // Do not turn an application shutdown (or updater restart) into
+            // an accidental permanent dismissal. Normal title-bar closes and
+            // other user-driven exits happen while the dispatcher is alive.
+            if (Application.Current?.Dispatcher?.HasShutdownStarted == true)
+                return;
+
+            PersistSetupOutcome(completed: false);
+        }
+
+        private void PersistSetupOutcome(bool completed)
+        {
+            if (_setupOutcomePersisted)
+                return;
+
+            try
+            {
+                if (completed)
+                {
+                    // SetupCompleted alone suppresses startup, so write the
+                    // decisive key first. Clearing an earlier dismissal is
+                    // useful for diagnostics but not required for safety.
+                    Config.Set("SetupCompleted", true);
+                    Config.Set("SetupDismissed", false);
+                }
+                else
+                {
+                    // Do not rewrite SetupCompleted=false here: dismissal is
+                    // its own outcome and one durable write is enough to stop
+                    // the startup loop.
+                    Config.Set("SetupDismissed", true);
+                }
+                _setupOutcomePersisted = true;
+            }
+            catch (Exception ex)
+            {
+                Logger.Log.Warn($"Could not persist setup wizard outcome: {ex.Message}");
+            }
         }
 
         /// <summary>
@@ -720,14 +774,17 @@ namespace GI_Subtitles.Views
 
         private void StartTranslating_Click(object sender, RoutedEventArgs e)
         {
-            Config.Set("SetupCompleted", true);
-            OnStartOCR?.Invoke();
+            bool started = OnStartOCR?.Invoke() ?? false;
+            if (!started)
+                return;
+
+            PersistSetupOutcome(completed: true);
             this.Close();
         }
 
         private void OpenSettings_Click(object sender, RoutedEventArgs e)
         {
-            Config.Set("SetupCompleted", true);
+            PersistSetupOutcome(completed: true);
             OnOpenSettings?.Invoke();
             this.Close();
         }

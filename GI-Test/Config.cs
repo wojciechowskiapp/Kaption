@@ -14,7 +14,7 @@ namespace GI_Test
 {
     public static class Config
     {
-        private static readonly string SettingsFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "GI-Subtitles");
+        private static readonly string SettingsFolder = Path.Combine(Path.GetTempPath(), "Kaption-GI-Test");
         private static readonly string SettingsFile = Path.Combine(SettingsFolder, "Config.json");
         private static readonly Dictionary<string, JToken> _settings = new Dictionary<string, JToken>();
 

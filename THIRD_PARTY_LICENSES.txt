@@ -8,7 +8,7 @@ copyright notices are reproduced below.
 
 For the desktop app's own source license, see LICENSE in the repository root.
 
-Last reviewed: 2026-05-17
+Last reviewed: 2026-08-17
 
 Table of contents
 
@@ -24,6 +24,7 @@ Table of contents
    10.  ZstdSharp.Port                    MIT
    11.  DirectML                          Microsoft system library (notice)
    12.  qew21/Genshin-Subtitles           Apache-2.0  (upstream fork)
+   13.  PaddleOCR model weights            Apache-2.0
 
 ================================================================================
 1. PaddleOCRSharp
@@ -415,6 +416,21 @@ Notice:    Kaption began as a fork of qew21/Genshin-Subtitles. The codebase
            A public, plain-language acknowledgement also appears in
            README.md (Acknowledgements section) and on the live credits
            page at https://kaption.one/credits.
+
+
+================================================================================
+13. PaddleOCR model weights
+================================================================================
+
+Project:   https://github.com/PaddlePaddle/PaddleOCR
+Catalogue: https://paddlepaddle.github.io/PaddleOCR/main/version2.x/ppocr/model_list.html
+License:   Apache License, Version 2.0
+Copyright: Copyright (c) PaddlePaddle Authors
+Notice:    Kaption bundles ONNX runtime copies of the official PP-OCRv6 Small
+           and PP-OCRv4 Mobile detection/recognition model families. The exact
+           asset origins and SHA-256 hashes are recorded in
+           PaddleOCRSharp/inference/README.md. The full Apache License 2.0 text
+           is reproduced in section 2 above.
 
 
 ================================================================================

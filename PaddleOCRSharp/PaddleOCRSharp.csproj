@@ -51,12 +51,9 @@
   <!-- PaddleOCR inference models. These live next to PaddleOCRSharp.dll at
        runtime (the engine resolves model paths via typeof(OCRModelConfig).Assembly.Location),
        so they ride along every time this project is copied to a consumer's
-       output directory. The files are deliberately .gitignored (*.onnx rule +
-       large binary weights); the `inference/` folder is maintained out-of-band
-       and restored from the Velopack release if wiped. If someone runs a
-       fresh `git clean -xfd` they'll lose them — replenish from an installed
-       Kaption build (`%LOCALAPPDATA%\Kaption\current\inference`) or from the
-       PaddleOCRSharp release tarball. `Condition="Exists(...)"` keeps the
+       output directory. The reviewed PP-OCRv6 Small and PP-OCRv4 Mobile
+       weights are versioned so a clean checkout has both the recommended
+       model and its compatibility fallback. `Condition="Exists(...)"` keeps the
        build from failing hard when the models are genuinely absent (early
        dev-machine setup). -->
   <ItemGroup>
@@ -68,12 +65,12 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="log4net" Version="3.3.1" />
+    <PackageReference Include="log4net" Version="3.3.2" />
     <PackageReference Include="Microsoft.ML.OnnxRuntime.DirectML" Version="1.24.4" />
     <PackageReference Include="Microsoft.ML.OnnxRuntime.Managed" Version="1.24.4" />
-    <PackageReference Include="OpenCvSharp4" Version="4.13.0.20260427" />
-    <PackageReference Include="OpenCvSharp4.Extensions" Version="4.13.0.20260330" />
-    <PackageReference Include="OpenCvSharp4.runtime.win" Version="4.13.0.20260302" />
+    <PackageReference Include="OpenCvSharp4" Version="4.13.0.20260627" />
+    <PackageReference Include="OpenCvSharp4.Extensions" Version="4.13.0.20260627" />
+    <PackageReference Include="OpenCvSharp4.runtime.win" Version="4.13.0.20260627" />
     <!-- System.Drawing.Common dropped: in-box on net10. -->
 
     <!-- DROPPED (in-box on net8):

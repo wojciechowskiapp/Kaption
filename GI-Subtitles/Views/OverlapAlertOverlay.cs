@@ -55,6 +55,9 @@ namespace GI_Subtitles.Views
         private const int GWL_EXSTYLE = -20;
         private const int WS_EX_TRANSPARENT = 0x00000020;
         private const int WS_EX_LAYERED = 0x00080000;
+        private const int WS_EX_NOACTIVATE = 0x08000000;
+        private const int WM_NCHITTEST = 0x0084;
+        private const int HTTRANSPARENT = -1;
 
         private Window _window;
         private Canvas _canvas;
@@ -63,6 +66,7 @@ namespace GI_Subtitles.Views
         private Border _banner;
         private TextBlock _bannerTitle;
         private TextBlock _bannerBody;
+        private HwndSource _windowSource;
 
         private readonly double _scale;
 
@@ -118,6 +122,8 @@ namespace GI_Subtitles.Views
 
         public void Dispose()
         {
+            try { _windowSource?.RemoveHook(WindowMessageHook); } catch { /* non-fatal */ }
+            _windowSource = null;
             try { _window?.Close(); } catch { /* non-fatal */ }
             _window = null;
         }
@@ -343,14 +349,22 @@ namespace GI_Subtitles.Views
                 // own feedback loop.
                 SetWindowDisplayAffinity(handle, WDA_EXCLUDEFROMCAPTURE);
 
-                // (2) Make the window truly click-through at the HWND level.
-                // This is the critical fix: without it, the subtitle box
-                // directly underneath the red outline can't be grabbed —
-                // clicks land on this alert window instead. With WS_EX_TRANSPARENT
-                // + WS_EX_LAYERED the OS skips this HWND during hit-testing
-                // and the click falls through to the subtitle box window.
+                // (2) Make the window click-through at the HWND level. The
+                // extended style helps, but WS_EX_TRANSPARENT primarily
+                // affects painting order and is not a reliable hit-test
+                // contract on every Windows/WPF combination. The
+                // WM_NCHITTEST hook below is the authoritative path.
                 int ex = GetWindowLong(handle, GWL_EXSTYLE);
-                SetWindowLong(handle, GWL_EXSTYLE, ex | WS_EX_TRANSPARENT | WS_EX_LAYERED);
+                SetWindowLong(handle, GWL_EXSTYLE,
+                    ex | WS_EX_TRANSPARENT | WS_EX_LAYERED | WS_EX_NOACTIVATE);
+
+                var source = HwndSource.FromHwnd(handle);
+                if (!ReferenceEquals(_windowSource, source))
+                {
+                    try { _windowSource?.RemoveHook(WindowMessageHook); } catch { /* non-fatal */ }
+                    _windowSource = source;
+                    _windowSource?.AddHook(WindowMessageHook);
+                }
             }
             catch
             {
@@ -359,5 +373,29 @@ namespace GI_Subtitles.Views
                 // redraw the region.
             }
         }
+
+        /// <summary>
+        /// A full-virtual-screen warning window must never consume the mouse.
+        /// Returning HTTRANSPARENT lets Windows continue hit-testing the
+        /// subtitle overlay underneath, so the red "drag me" card remains
+        /// movable even while the forbidden OCR region is highlighted.
+        /// </summary>
+        private IntPtr WindowMessageHook(
+            IntPtr hwnd,
+            int message,
+            IntPtr wParam,
+            IntPtr lParam,
+            ref bool handled)
+        {
+            if (IsTransparentHitTestMessage(message))
+            {
+                handled = true;
+                return new IntPtr(HTTRANSPARENT);
+            }
+
+            return IntPtr.Zero;
+        }
+
+        internal static bool IsTransparentHitTestMessage(int message) => message == WM_NCHITTEST;
     }
 }

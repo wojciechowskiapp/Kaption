@@ -106,6 +106,18 @@ namespace GI_Subtitles
         /// find a non-null task to await.</summary>
         public static Task InitialSyncTask { get; private set; }
 
+        private static int _translationUpdateRequiresRestart;
+        private static string _translationUpdateSummary = string.Empty;
+
+        /// <summary>True when startup replaced language data that had already
+        /// been loaded by an earlier Kaption session. The Settings window uses
+        /// this to offer a safe restart after the background update completes.</summary>
+        public static bool TranslationUpdateRequiresRestart =>
+            Volatile.Read(ref _translationUpdateRequiresRestart) != 0;
+
+        public static string TranslationUpdateSummary =>
+            Volatile.Read(ref _translationUpdateSummary) ?? string.Empty;
+
         /// <summary>
         /// Path to the per-user crash log, written directly (unbuffered) by
         /// the exception handlers below so evidence survives process death.
@@ -113,178 +125,6 @@ namespace GI_Subtitles
         private static readonly string CrashLogPath = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
             "Kaption", "crash.log");
-
-        /// <summary>
-        /// One-time AppData folder migration from the legacy "GI-Subtitles" name to
-        /// the new "Kaption" brand (v2.0 rename, 2026-04-14). Must run BEFORE anything
-        /// else touches %APPDATA% — that means before the Config static ctor runs,
-        /// before log4net resolves its file path, before any other IO.
-        ///
-        /// Safe to call repeatedly: no-op if new folder already exists, or if legacy
-        /// folder was never present. Antivirus / OneDrive file locks can cause the
-        /// Move to fail — in that case we log a warning and fall back to copy-then-
-        /// delete so at minimum the user keeps their data even if cleanup lags.
-        ///
-        /// 2026-04-15 fix: the old "Merged remnants" log kept firing on every launch
-        /// because <see cref="Screenshot.DebugLogger"/> (Screenshot.dll) still wrote
-        /// to %APPDATA%\GI-Subtitles\screenshot_log.txt after each migration. That
-        /// logger now writes to Kaption; the migration below also actively cleans up
-        /// the legacy folder (removing duplicate files that are already at the new
-        /// path, then deleting the empty directory). Net effect: a cleaned-up
-        /// install sees no MIGRATE log on subsequent launches.
-        /// </summary>
-        private static void MigrateAppDataFolder()
-        {
-            try
-            {
-                string appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-                string oldPath = Path.Combine(appData, "GI-Subtitles");
-                string newPath = Path.Combine(appData, "Kaption");
-
-                if (!Directory.Exists(oldPath))
-                {
-                    // Clean install, or migration already completed on a prior launch.
-                    return;
-                }
-
-                // Happy path: new folder doesn't exist yet → atomic rename.
-                if (!Directory.Exists(newPath))
-                {
-                    try
-                    {
-                        Directory.Move(oldPath, newPath);
-                        WriteCrashLogDirect("MIGRATE", $"Moved {oldPath} → {newPath}");
-                        return;
-                    }
-                    catch (IOException)
-                    {
-                        // Fallback: a file is locked (AV scanner, OneDrive sync,
-                        // etc.). Copy what we can and let cleanup sweep the rest
-                        // on next launch.
-                        int copied = CopyDirectory(oldPath, newPath);
-                        WriteCrashLogDirect("MIGRATE",
-                            $"Copied {copied} files from {oldPath} → {newPath} (move blocked, cleanup pending)");
-                        return;
-                    }
-                }
-
-                // Both folders exist. Merge missing files forward (never
-                // overwriting newer data), then prune the legacy folder of
-                // files that now have exact duplicates at the new path. This
-                // lets a second launch find no oldPath at all and skip the
-                // migration entirely — no more chronic "Merged remnants" logs.
-                int merged = CopyDirectory(oldPath, newPath, overwrite: false);
-                int pruned = PruneDuplicatesFromLegacy(oldPath, newPath);
-                bool oldStillExists = TryRemoveEmptyDirectoryTree(oldPath);
-
-                // Only log when something actually happened. A silent no-op
-                // keeps the app.log clean for users past the one-time cutover.
-                if (merged > 0 || pruned > 0 || !oldStillExists)
-                {
-                    WriteCrashLogDirect("MIGRATE",
-                        $"Merged {merged} new file(s) into {newPath}, " +
-                        $"pruned {pruned} duplicate(s), " +
-                        $"legacy folder {(oldStillExists ? "left (has remaining files)" : "removed")}.");
-                }
-            }
-            catch (Exception ex)
-            {
-                // Never fatal: if migration fails the app continues with a fresh %APPDATA%\Kaption
-                // folder. User's old data is untouched at %APPDATA%\GI-Subtitles.
-                WriteCrashLogDirect("MIGRATE_ERROR", ex.ToString());
-            }
-        }
-
-        /// <summary>
-        /// Recursively copy <paramref name="src"/> into <paramref name="dst"/>.
-        /// When <paramref name="overwrite"/> is false, skips files that already
-        /// exist at the destination — used for merging a legacy folder into an
-        /// already-migrated new folder without clobbering newer data.
-        /// Returns the number of files actually copied (not skipped) so the
-        /// caller can log whether any real work happened.
-        /// </summary>
-        private static int CopyDirectory(string src, string dst, bool overwrite = true)
-        {
-            Directory.CreateDirectory(dst);
-            int copied = 0;
-            foreach (var file in Directory.GetFiles(src))
-            {
-                string target = Path.Combine(dst, Path.GetFileName(file));
-                if (overwrite || !File.Exists(target))
-                {
-                    File.Copy(file, target, overwrite);
-                    copied++;
-                }
-            }
-            foreach (var dir in Directory.GetDirectories(src))
-            {
-                copied += CopyDirectory(dir, Path.Combine(dst, Path.GetFileName(dir)), overwrite);
-            }
-            return copied;
-        }
-
-        /// <summary>
-        /// Delete files in <paramref name="legacyRoot"/> that already exist at the
-        /// same relative path in <paramref name="newRoot"/> with an identical
-        /// length. Cheap "same content" heuristic (no hash) chosen intentionally:
-        /// migration runs at startup on the UI thread, and a full SHA check on
-        /// tens of MB of seed data would add seconds. Length-match plus "both
-        /// written by the same app" is good enough to safely remove a duplicate.
-        /// Returns the count of files removed.
-        /// </summary>
-        private static int PruneDuplicatesFromLegacy(string legacyRoot, string newRoot)
-        {
-            int removed = 0;
-            foreach (var legacyFile in Directory.EnumerateFiles(legacyRoot, "*", SearchOption.AllDirectories))
-            {
-                string relative = legacyFile.Substring(legacyRoot.Length).TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-                string newEquivalent = Path.Combine(newRoot, relative);
-
-                if (!File.Exists(newEquivalent)) continue;
-
-                try
-                {
-                    var legacyInfo = new FileInfo(legacyFile);
-                    var newInfo = new FileInfo(newEquivalent);
-                    if (legacyInfo.Length != newInfo.Length) continue;
-
-                    File.Delete(legacyFile);
-                    removed++;
-                }
-                catch (IOException) { /* file locked; leave for next launch */ }
-                catch (UnauthorizedAccessException) { /* ACL'd out; leave for manual cleanup */ }
-            }
-            return removed;
-        }
-
-        /// <summary>
-        /// Remove empty directories bottom-up, then the root. Returns true if
-        /// the root still exists after the sweep (i.e. it wasn't fully empty
-        /// and we kept whatever remained for manual cleanup).
-        /// </summary>
-        private static bool TryRemoveEmptyDirectoryTree(string root)
-        {
-            try
-            {
-                foreach (var dir in Directory.EnumerateDirectories(root, "*", SearchOption.AllDirectories).OrderByDescending(s => s.Length))
-                {
-                    try
-                    {
-                        if (Directory.GetFileSystemEntries(dir).Length == 0) Directory.Delete(dir);
-                    }
-                    catch (IOException) { }
-                    catch (UnauthorizedAccessException) { }
-                }
-                if (Directory.GetFileSystemEntries(root).Length == 0)
-                {
-                    Directory.Delete(root);
-                    return false;
-                }
-            }
-            catch (IOException) { }
-            catch (UnauthorizedAccessException) { }
-            return Directory.Exists(root);
-        }
 
         /// <summary>
         /// Write a fatal-crash entry directly to disk without going through log4net
@@ -531,12 +371,6 @@ namespace GI_Subtitles
             // "Application is shutting down". Restored below before
             // base.OnStartup so MainWindow-close terminates the app normally.
             ShutdownMode = ShutdownMode.OnExplicitShutdown;
-
-            // CRITICAL: migrate the legacy %APPDATA%\GI-Subtitles folder to %APPDATA%\Kaption
-            // BEFORE anything else touches AppData. Config's static ctor reads from the
-            // new path; log4net's config resolves to the new path on first log call; both
-            // break silently if the files aren't where they're expected.
-            MigrateAppDataFolder();
 
             // One-shot migration: older builds let users pick CHS as source language
             // but no Chinese PaddleOCR model ships, so it silently fell back to EN.
@@ -1167,11 +1001,9 @@ namespace GI_Subtitles
         }
 
         /// <summary>
-        /// Fire the first paid-dictionary sync on a background thread so the network
-        /// round-trip runs in parallel with MainWindow construction. Previously this
-        /// lived inside MainWindow_Loaded behind a 10s settle delay; moving it here
-        /// means the pack is usually on disk by the time the user sees the Start
-        /// button. <see cref="StartupStatus"/> goes to
+        /// Check public game data and sync the licensed dictionary on a background
+        /// thread so the network round-trips run alongside window construction.
+        /// <see cref="StartupStatus"/> goes to
         /// <see cref="InitialStartupStatus.DownloadingTranslations"/> on entry and
         /// back to <see cref="InitialStartupStatus.Ready"/> on any exit path
         /// (success, skip, or failure) so the UI never sticks on "Downloading…"
@@ -1193,18 +1025,12 @@ namespace GI_Subtitles
             try
             {
                 var license = LicenseService;
-                if (license == null || !license.IsActivated)
-                {
-                    // No session → nothing to sync. Stay Ready so the Dashboard
-                    // doesn't show a "downloading" state that will never clear.
-                    SetStartupStatus(InitialStartupStatus.Ready);
-                    Interlocked.Exchange(ref _initialSyncInFlight, 0);
-                    return;
-                }
-
                 string game = Config.Get("Game", "Genshin") ?? "Genshin";
-                string lang = ResolveInitialOutputLanguage();
-                if (string.IsNullOrWhiteSpace(game) || string.IsNullOrWhiteSpace(lang))
+                string inputLang = Config.Get("Input", "EN") ?? "EN";
+                string outputLang = ResolveInitialOutputLanguage();
+                if (string.IsNullOrWhiteSpace(game) ||
+                    string.IsNullOrWhiteSpace(inputLang) ||
+                    string.IsNullOrWhiteSpace(outputLang))
                 {
                     SetStartupStatus(InitialStartupStatus.Ready);
                     Interlocked.Exchange(ref _initialSyncInFlight, 0);
@@ -1214,19 +1040,56 @@ namespace GI_Subtitles
                 // Assign the task BEFORE flipping the status flag so any reader
                 // that observes DownloadingTranslations is guaranteed to find a
                 // non-null InitialSyncTask to await. (Publish-then-announce.)
+                bool hadInput = GI_Subtitles.Services.Data.GameDataPaths.HasAnyTextMap(game, inputLang);
+                bool hadOutput = GI_Subtitles.Services.Data.GameDataPaths.HasAnyTextMap(game, outputLang);
                 var cts = CancellationToken.None;
+                var startSignal = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
                 var task = Task.Run(async () =>
                 {
+                    // Do not let a very fast no-op/error path reach Ready before
+                    // InitialSyncTask and DownloadingTranslations are published.
+                    await startSignal.Task.ConfigureAwait(false);
+                    var updatedExisting = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                     try
                     {
-                        var sync = new GI_Subtitles.Services.Translation.DictionarySyncService(
-                            new GI_Subtitles.Services.Network.KaptionApiClient(),
-                            license,
-                            FileProtectionFactory.Create());
-                        var result = await sync.SyncAsync(game, lang, cts).ConfigureAwait(false);
-                        Logger.Log.Info(
-                            $"InitialDictionarySync: done — downloaded={result.Downloaded} " +
-                            $"upToDate={result.UpToDate} skipped={result.Skipped} failed={result.Failed}");
+                        // Startup is the one place where we deliberately bypass the
+                        // six-hour throttle. Conditional GET keeps an unchanged launch
+                        // cheap while still discovering a language update immediately.
+                        var updater = new GI_Subtitles.Services.Translation.GameDataUpdateService();
+                        var updateResult = await updater.CheckAndUpdateAsync(
+                            game, inputLang, outputLang, cts, forceCheck: true).ConfigureAwait(false);
+
+                        foreach (var language in updateResult.Languages)
+                        {
+                            if (language.Outcome != GI_Subtitles.Services.Translation.GameDataUpdateOutcome.Updated)
+                                continue;
+
+                            bool existedBefore =
+                                string.Equals(language.Language, inputLang, StringComparison.OrdinalIgnoreCase) ? hadInput :
+                                string.Equals(language.Language, outputLang, StringComparison.OrdinalIgnoreCase) && hadOutput;
+                            if (existedBefore)
+                                updatedExisting.Add($"{language.Game}/{language.Language}");
+                        }
+
+                        if (license?.IsActivated == true)
+                        {
+                            var sync = new GI_Subtitles.Services.Translation.DictionarySyncService(
+                                new GI_Subtitles.Services.Network.KaptionApiClient(),
+                                license,
+                                FileProtectionFactory.Create());
+                            var syncResult = await sync.SyncAsync(game, outputLang, cts).ConfigureAwait(false);
+                            Logger.Log.Info(
+                                $"InitialDictionarySync: done — downloaded={syncResult.Downloaded} " +
+                                $"upToDate={syncResult.UpToDate} skipped={syncResult.Skipped} failed={syncResult.Failed}");
+                            if (syncResult.Downloaded > 0 && hadOutput)
+                                updatedExisting.Add($"{game}/{outputLang}");
+                        }
+
+                        if (updatedExisting.Count > 0)
+                        {
+                            Volatile.Write(ref _translationUpdateSummary, string.Join(Environment.NewLine, updatedExisting));
+                            Interlocked.Exchange(ref _translationUpdateRequiresRestart, 1);
+                        }
                     }
                     catch (Exception ex)
                     {
@@ -1248,6 +1111,7 @@ namespace GI_Subtitles
                 });
                 InitialSyncTask = task;
                 SetStartupStatus(InitialStartupStatus.DownloadingTranslations);
+                startSignal.TrySetResult(true);
             }
             catch (Exception ex)
             {

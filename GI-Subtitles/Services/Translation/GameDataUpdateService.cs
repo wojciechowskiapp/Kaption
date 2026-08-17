@@ -147,6 +147,14 @@ namespace GI_Subtitles.Services.Translation
         // ~6 weeks; a 6-hour delay on picking up a new one is invisible).
         private static readonly TimeSpan CheckThrottle = TimeSpan.FromHours(6);
 
+        // Startup deliberately performs a conditional check on every launch,
+        // but an offline network or captive portal must not hold the matcher
+        // gate for HttpClient's full download timeout. This deadline covers
+        // only the wait for response headers; once a real update starts, the
+        // body keeps streaming with the caller's token so slower connections
+        // can still finish a large TextMap safely.
+        private static readonly TimeSpan ResponseHeadersTimeout = TimeSpan.FromSeconds(20);
+
         // Same shared HttpClient as elsewhere in the app.
         private static readonly HttpClient _http = BuildHttpClient();
 
@@ -156,6 +164,19 @@ namespace GI_Subtitles.Services.Translation
             var c = new HttpClient(handler) { Timeout = TimeSpan.FromMinutes(5) };
             c.DefaultRequestHeaders.UserAgent.ParseAdd($"Kaption-GameDataUpdate/{KaptionVersion()}");
             return c;
+        }
+
+        private static async Task<HttpResponseMessage> SendForHeadersAsync(
+            HttpRequestMessage request, CancellationToken ct)
+        {
+            using (var headerCts = CancellationTokenSource.CreateLinkedTokenSource(ct))
+            {
+                headerCts.CancelAfter(ResponseHeadersTimeout);
+                return await _http.SendAsync(
+                    request,
+                    HttpCompletionOption.ResponseHeadersRead,
+                    headerCts.Token).ConfigureAwait(false);
+            }
         }
 
         private static string KaptionVersion()
@@ -224,7 +245,8 @@ namespace GI_Subtitles.Services.Translation
         /// currently configured (game, input, output) triple.
         /// </summary>
         public async Task<GameDataUpdateResult> CheckAndUpdateAsync(
-            string game, string inputLang, string outputLang, CancellationToken ct)
+            string game, string inputLang, string outputLang, CancellationToken ct,
+            bool forceCheck = false)
         {
             var result = new GameDataUpdateResult();
             if (string.IsNullOrWhiteSpace(game)) return result;
@@ -233,7 +255,7 @@ namespace GI_Subtitles.Services.Translation
             // for input, since the PaddleOCR recognizer + hash-resolution
             // chain requires the mirror's canonical TextMap).
             if (!string.IsNullOrWhiteSpace(inputLang))
-                result.Languages.Add(await CheckOneAsync(game, inputLang, ct).ConfigureAwait(false));
+                result.Languages.Add(await CheckOneAsync(game, inputLang, ct, forceCheck).ConfigureAwait(false));
 
             // Output language — check only when the mirror covers it. If
             // it doesn't (e.g. Polish), DictionarySyncService is the
@@ -242,7 +264,7 @@ namespace GI_Subtitles.Services.Translation
                 !string.Equals(outputLang, inputLang, StringComparison.OrdinalIgnoreCase) &&
                 IsUpstreamMirrored(game, outputLang))
             {
-                result.Languages.Add(await CheckOneAsync(game, outputLang, ct).ConfigureAwait(false));
+                result.Languages.Add(await CheckOneAsync(game, outputLang, ct, forceCheck).ConfigureAwait(false));
             }
 
             return result;
@@ -253,7 +275,7 @@ namespace GI_Subtitles.Services.Translation
         // ────────────────────────────────────────────────────────────────────
 
         private async Task<GameDataUpdateLanguageResult> CheckOneAsync(
-            string game, string lang, CancellationToken ct)
+            string game, string lang, CancellationToken ct, bool forceCheck)
         {
             var r = new GameDataUpdateLanguageResult { Game = game, Language = lang };
 
@@ -278,7 +300,8 @@ namespace GI_Subtitles.Services.Translation
                 // Throttle: if we checked recently AND we actually have the
                 // JSON on disk, skip the network call entirely.
                 long nowUnix = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-                if (sidecar != null &&
+                if (!forceCheck &&
+                    sidecar != null &&
                     File.Exists(jsonPath) &&
                     nowUnix - sidecar.CheckedAtUnix < CheckThrottle.TotalSeconds)
                 {
@@ -336,7 +359,7 @@ namespace GI_Subtitles.Services.Translation
                         req.Headers.IfModifiedSince = lm;
                     }
 
-                    using (var resp = await _http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false))
+                    using (var resp = await SendForHeadersAsync(req, ct).ConfigureAwait(false))
                     {
                         if (resp.StatusCode == HttpStatusCode.NotModified)
                         {
@@ -345,6 +368,19 @@ namespace GI_Subtitles.Services.Translation
                             if (sidecar == null) sidecar = new GameDataMetaSidecar { Url = url, Source = source };
                             sidecar.CheckedAtUnix = nowUnix;
                             SaveSidecar(metaPath, sidecar);
+
+                            // Genshin's dialogue corpus lives in a separate
+                            // Medium shard whose version can change even when
+                            // the Small/UI TextMap returns 304. Probe it on the
+                            // same startup pass or newly added dialogue can be
+                            // missed until an unrelated Small-shard update.
+                            if (await RefreshGenshinMediumAfterUnchangedSmallAsync(
+                                    game, lang, jsonPath, gameDir, ct).ConfigureAwait(false))
+                            {
+                                r.Outcome = GameDataUpdateOutcome.Updated;
+                                return r;
+                            }
+
                             r.Outcome = GameDataUpdateOutcome.UpToDate;
                             Logger.Log.Info($"GameDataUpdate: {game}/{lang} is up-to-date (304).");
                             return r;
@@ -398,6 +434,12 @@ namespace GI_Subtitles.Services.Translation
                                 TryDelete(tmpPath);
                                 sidecar.CheckedAtUnix = nowUnix;
                                 SaveSidecar(metaPath, sidecar);
+                                if (await RefreshGenshinMediumAfterUnchangedSmallAsync(
+                                        game, lang, jsonPath, gameDir, ct).ConfigureAwait(false))
+                                {
+                                    r.Outcome = GameDataUpdateOutcome.Updated;
+                                    return r;
+                                }
                                 r.Outcome = GameDataUpdateOutcome.UpToDate;
                                 Logger.Log.Info($"GameDataUpdate: {game}/{lang} body matched existing sha — skipping.");
                                 return r;
@@ -495,6 +537,33 @@ namespace GI_Subtitles.Services.Translation
                 r.ErrorMessage = ex.Message;
                 Logger.Log.Warn($"GameDataUpdate: {game}/{lang} check failed: {ex.Message}");
                 return r;
+            }
+        }
+
+        private async Task<bool> RefreshGenshinMediumAfterUnchangedSmallAsync(
+            string game, string lang, string jsonPath, string gameDir, CancellationToken ct)
+        {
+            if (!string.Equals(game, "Genshin", StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            try
+            {
+                bool mediumUpdated = await FetchAndMergeMediumShardAsync(
+                    lang, jsonPath, ct).ConfigureAwait(false);
+                if (!mediumUpdated) return false;
+
+                int invalidated = InvalidateDownstreamCaches(gameDir, lang);
+                Logger.Log.Info(
+                    $"GameDataUpdate: {game}/{lang} Medium shard updated while Small was unchanged; " +
+                    $"invalidated {invalidated} cache file(s).");
+                return true;
+            }
+            catch (OperationCanceledException) { throw; }
+            catch (Exception ex)
+            {
+                Logger.Log.Warn(
+                    $"GameDataUpdate: {game}/{lang} Medium-shard check failed (non-fatal): {ex.Message}");
+                return false;
             }
         }
 
@@ -626,10 +695,10 @@ namespace GI_Subtitles.Services.Translation
         /// large), the Medium sidecar's conditional GET returns 304 and we
         /// skip. Throws on network / parse failure so the caller can log.
         /// </summary>
-        private async Task FetchAndMergeMediumShardAsync(string lang, string jsonPath, CancellationToken ct)
+        private async Task<bool> FetchAndMergeMediumShardAsync(string lang, string jsonPath, CancellationToken ct)
         {
             string LANG = (lang ?? string.Empty).ToUpperInvariant();
-            if (string.IsNullOrEmpty(LANG)) return;
+            if (string.IsNullOrEmpty(LANG)) return false;
 
             string mediumUrl = $"https://gitlab.com/Dimbreath/animegamedata2/-/raw/main/TextMap/TextMap_Medium{LANG}.json";
             string gameDir = Path.GetDirectoryName(jsonPath);
@@ -651,8 +720,14 @@ namespace GI_Subtitles.Services.Translation
                     }
                     catch (FormatException) { /* ignore bad sidecar */ }
                 }
+                if (mediumSidecar != null &&
+                    !string.IsNullOrEmpty(mediumSidecar.LastModifiedHeader) &&
+                    DateTimeOffset.TryParse(mediumSidecar.LastModifiedHeader, out var mediumLastModified))
+                {
+                    req.Headers.IfModifiedSince = mediumLastModified;
+                }
 
-                using (var resp = await _http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false))
+                using (var resp = await SendForHeadersAsync(req, ct).ConfigureAwait(false))
                 {
                     if (resp.StatusCode == HttpStatusCode.NotModified)
                     {
@@ -667,7 +742,7 @@ namespace GI_Subtitles.Services.Translation
                             mediumSidecar.CheckedAtUnix = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
                             SaveSidecar(mediumSidecarPath, mediumSidecar);
                             Logger.Log.Debug($"GameDataUpdate: Medium_{LANG} 304 and local file ≥30 MB — skipped.");
-                            return;
+                            return false;
                         }
                         Logger.Log.Info($"GameDataUpdate: Medium_{LANG} 304 but local file is {sizeOnDisk / 1024 / 1024} MB — forcing re-fetch.");
                         // Fall through to re-fetch by re-issuing without
@@ -681,7 +756,7 @@ namespace GI_Subtitles.Services.Translation
                         if (resp.StatusCode == HttpStatusCode.NotModified)
                         {
                             forcedReq = new HttpRequestMessage(HttpMethod.Get, mediumUrl);
-                            fetchResp = await _http.SendAsync(forcedReq, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
+                            fetchResp = await SendForHeadersAsync(forcedReq, ct).ConfigureAwait(false);
                         }
 
                         if (!fetchResp.IsSuccessStatusCode)
@@ -744,6 +819,7 @@ namespace GI_Subtitles.Services.Translation
                             FileSha256 = null,   // sidecar is Medium-specific; sha of combined file changes every merge
                             FileSize = 0,
                         });
+                        return true;
                     }
                     finally
                     {

@@ -29,10 +29,15 @@ namespace GI_Subtitles.Services.Capture
         private IntPtr _context;
         private IntPtr _duplication;
         private IntPtr _stagingTexture;
+        private readonly int _adapterIndex;
+        private readonly int _outputIndex;
+        private int _outputLeft;
+        private int _outputTop;
         private int _outputWidth;
         private int _outputHeight;
         private bool _initialized;
         private bool _disposed;
+        private bool _hasValidFrame;
 
         /// <summary>
         /// True if the last AcquireNextFrame returned a new frame.
@@ -45,11 +50,15 @@ namespace GI_Subtitles.Services.Capture
 
         public DxgiScreenCapture(int adapterIndex = 0, int outputIndex = 0)
         {
+            _adapterIndex = adapterIndex;
+            _outputIndex = outputIndex;
             try
             {
                 Initialize(adapterIndex, outputIndex);
                 _initialized = true;
-                Logger.Log.Info($"DXGI Desktop Duplication initialized ({_outputWidth}x{_outputHeight})");
+                Logger.Log.Info(
+                    $"DXGI Desktop Duplication initialized (adapter={adapterIndex}, output={outputIndex}, " +
+                    $"bounds={_outputLeft},{_outputTop} {_outputWidth}x{_outputHeight})");
             }
             catch (Exception ex)
             {
@@ -70,6 +79,8 @@ namespace GI_Subtitles.Services.Capture
                 throw new InvalidOperationException("DXGI not initialized");
             if (width <= 0) throw new ArgumentOutOfRangeException(nameof(width));
             if (height <= 0) throw new ArgumentOutOfRangeException(nameof(height));
+
+            EnsureRegionBelongsToOutput(x, y, width, height);
 
             // Acquire the next frame (updates the staging texture in-place).
             if (!AcquireFrameIntoStaging()) return null;
@@ -123,6 +134,8 @@ namespace GI_Subtitles.Services.Capture
                     nameof(destination));
             }
 
+            EnsureRegionBelongsToOutput(x, y, width, height);
+
             if (!AcquireFrameIntoStaging()) return null;
 
             return CopyStagingIntoBitmap(x, y, width, height, destination);
@@ -146,8 +159,10 @@ namespace GI_Subtitles.Services.Capture
                 if (hr == DXGI_ERROR_WAIT_TIMEOUT)
                 {
                     // No frame change — staging still holds the previous desktop content.
+                    // Before the first successful CopyResource the texture is uninitialised,
+                    // so it must never be exposed to OCR as a valid desktop frame.
                     LastFrameWasNew = false;
-                    return _stagingTexture != IntPtr.Zero;
+                    return _hasValidFrame;
                 }
 
                 if (hr < 0)
@@ -156,8 +171,12 @@ namespace GI_Subtitles.Services.Capture
                     {
                         Logger.Log.Warn("DXGI access lost — reinitializing");
                         Cleanup();
-                        try { Initialize(0, 0); _initialized = true; }
+                        try { Initialize(_adapterIndex, _outputIndex); _initialized = true; }
                         catch { _initialized = false; }
+                    }
+                    else
+                    {
+                        Logger.Log.Warn($"DXGI AcquireNextFrame failed: 0x{hr:X8}");
                     }
                     return false;
                 }
@@ -166,16 +185,23 @@ namespace GI_Subtitles.Services.Capture
 
                 IntPtr desktopTexture = IntPtr.Zero;
                 hr = IUnknown_QueryInterface(desktopResource, ref IID_ID3D11Texture2D, out desktopTexture);
+                bool copied = false;
                 if (hr >= 0 && desktopTexture != IntPtr.Zero)
                 {
                     ID3D11DeviceContext_CopyResource(_context, _stagingTexture, desktopTexture);
+                    copied = true;
+                    _hasValidFrame = true;
                     Marshal.Release(desktopTexture);
+                }
+                else
+                {
+                    Logger.Log.Warn($"DXGI frame texture query failed: 0x{hr:X8}");
                 }
 
                 IDXGIOutputDuplication_ReleaseFrame(_duplication);
                 Marshal.Release(desktopResource);
                 desktopResource = IntPtr.Zero;
-                return _stagingTexture != IntPtr.Zero;
+                return copied;
             }
             catch (Exception ex)
             {
@@ -205,12 +231,23 @@ namespace GI_Subtitles.Services.Capture
 
             try
             {
-                // Clamp region to output bounds
-                int sx = Math.Max(0, Math.Min(x, _outputWidth - 1));
-                int sy = Math.Max(0, Math.Min(y, _outputHeight - 1));
-                int sw = Math.Min(width, _outputWidth - sx);
-                int sh = Math.Min(height, _outputHeight - sy);
-                if (sw <= 0 || sh <= 0) return null;
+                // Desktop Duplication surfaces are output-local, while the region picker
+                // stores absolute virtual-desktop coordinates. Translate instead of
+                // clamping: clamping a second-monitor X to the rightmost primary-monitor
+                // pixel used to return a mostly stale bitmap and feed random desktop noise
+                // into OCR. Regions outside this output are rejected earlier and make the
+                // caller use its correctness-first GDI fallback.
+                if (!TryTranslateRegionToOutput(
+                    x, y, width, height,
+                    _outputLeft, _outputTop, _outputWidth, _outputHeight,
+                    out int sx, out int sy))
+                {
+                    throw new InvalidOperationException(
+                        $"Capture region {x},{y} {width}x{height} is outside DXGI output " +
+                        $"{_outputLeft},{_outputTop} {_outputWidth}x{_outputHeight}.");
+                }
+                int sw = width;
+                int sh = height;
 
                 // Destination may be oversized (pool bucket granularity) — lock only the
                 // region we're about to overwrite.
@@ -285,9 +322,13 @@ namespace GI_Subtitles.Services.Capture
                         {
                             IDXGIOutput_GetDesc(output, descPtr);
                             var outputDesc = (DXGI_OUTPUT_DESC)Marshal.PtrToStructure(descPtr, typeof(DXGI_OUTPUT_DESC));
+                            _outputLeft = outputDesc.DesktopCoordinates.Left;
+                            _outputTop = outputDesc.DesktopCoordinates.Top;
                             _outputWidth = outputDesc.DesktopCoordinates.Right - outputDesc.DesktopCoordinates.Left;
                             _outputHeight = outputDesc.DesktopCoordinates.Bottom - outputDesc.DesktopCoordinates.Top;
-                            Logger.Log.Debug($"DXGI output: {_outputWidth}x{_outputHeight}");
+                            Logger.Log.Debug(
+                                $"DXGI output: origin={_outputLeft},{_outputTop}, size={_outputWidth}x{_outputHeight}, " +
+                                $"rotation={outputDesc.Rotation}");
                         }
                         finally { Marshal.FreeHGlobal(descPtr); }
 
@@ -337,10 +378,55 @@ namespace GI_Subtitles.Services.Capture
 
         private void Cleanup()
         {
+            _hasValidFrame = false;
+            _initialized = false;
             if (_duplication != IntPtr.Zero) { Marshal.Release(_duplication); _duplication = IntPtr.Zero; }
             if (_stagingTexture != IntPtr.Zero) { Marshal.Release(_stagingTexture); _stagingTexture = IntPtr.Zero; }
             if (_context != IntPtr.Zero) { Marshal.Release(_context); _context = IntPtr.Zero; }
             if (_device != IntPtr.Zero) { Marshal.Release(_device); _device = IntPtr.Zero; }
+        }
+
+        /// <summary>
+        /// Convert an absolute virtual-desktop capture rectangle to coordinates local to
+        /// one DXGI output. Desktop Duplication exposes one surface per output; it cannot
+        /// legally satisfy a rectangle on another monitor or spanning two monitors.
+        /// </summary>
+        internal static bool TryTranslateRegionToOutput(
+            int x, int y, int width, int height,
+            int outputLeft, int outputTop, int outputWidth, int outputHeight,
+            out int localX, out int localY)
+        {
+            localX = 0;
+            localY = 0;
+            if (width <= 0 || height <= 0 || outputWidth <= 0 || outputHeight <= 0)
+                return false;
+
+            long right = (long)x + width;
+            long bottom = (long)y + height;
+            long outputRight = (long)outputLeft + outputWidth;
+            long outputBottom = (long)outputTop + outputHeight;
+
+            if (x < outputLeft || y < outputTop || right > outputRight || bottom > outputBottom)
+                return false;
+
+            localX = x - outputLeft;
+            localY = y - outputTop;
+            return true;
+        }
+
+        private void EnsureRegionBelongsToOutput(int x, int y, int width, int height)
+        {
+            if (TryTranslateRegionToOutput(
+                x, y, width, height,
+                _outputLeft, _outputTop, _outputWidth, _outputHeight,
+                out _, out _))
+            {
+                return;
+            }
+
+            throw new InvalidOperationException(
+                $"Capture region {x},{y} {width}x{height} is outside DXGI output " +
+                $"{_outputLeft},{_outputTop} {_outputWidth}x{_outputHeight}; use GDI fallback.");
         }
 
         public void Dispose()

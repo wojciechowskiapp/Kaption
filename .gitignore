@@ -29,8 +29,13 @@ Config.json
 *.gisub
 *.gisub-dist
 
-# OCR models (not bundled in source)
+# OCR models: ignore experiments, retain the five reviewed shipping assets.
 *.onnx
+!PaddleOCRSharp/inference/Det/V4/PP-OCRv4_mobile_det_infer/slim.onnx
+!PaddleOCRSharp/inference/Rec/V4/PP-OCRv4_mobile_rec_infer/slim.onnx
+!PaddleOCRSharp/inference/Rec/V4/jp_PP-OCRv4_mobile_rec_infer/slim.onnx
+!PaddleOCRSharp/inference/Det/V6/PP-OCRv6_small_det_infer/inference.onnx
+!PaddleOCRSharp/inference/Rec/V6/PP-OCRv6_small_rec_infer/inference.onnx
 
 # Game text dumps (large; redistributable from Hoyoverse, not us)
 TextMap*.json

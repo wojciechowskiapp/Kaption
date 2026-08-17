@@ -68,7 +68,10 @@ namespace GI_Subtitles.Views
         private Mat _lastOcrBinaryFrame = null;    // frame at last OCR for subtitle-change check
         private volatile bool _isOcrRunning = false;
         private volatile bool _engineReady = false;
+        private int _engineInitGeneration;
         private const double ChangeThreshold = 0.01;
+        private const int EmptyFrameRetryLimit = 2;
+        private static readonly TimeSpan EmptyFrameRetryBackoff = TimeSpan.FromMilliseconds(500);
 
         // ── Feature flags ────────────────────────────────────────────────────
         //
@@ -90,6 +93,10 @@ namespace GI_Subtitles.Views
         internal const bool FeatureAnswerTranslationEnabled = false;
         internal readonly OverlayCardManager _cardManager = new OverlayCardManager();
         private DateTime _lastOcrTime = DateTime.MinValue;
+        private DateTime _nextOcrAttemptUtc = DateTime.MinValue;
+        private int _ocrPipelineGeneration;
+        private readonly object _ocrPipelineStateLock = new object();
+        private int _emptyOcrRetryAttempts;
         // Live-reload: read from Config on each access so changes apply without restart.
         // Default 200ms matches the UI timer and was the stable pre-prediction value; going
         // tighter (150ms) amplified typewriter-phase re-triggers and caused visible flicker.
@@ -133,8 +140,17 @@ namespace GI_Subtitles.Views
         // re-appears after a brief empty OCR frame
         string _recentContent = null;
         DateTime _recentContentTime = DateTime.MinValue;
-        // Use an LRU cache to limit memory usage to 100 entries
-        readonly LRUCache<string, string> resDict = new LRUCache<string, string>(100);
+        private sealed class CachedTranslation
+        {
+            public string Result { get; init; }
+            public string Key { get; init; }
+            public string Header { get; init; }
+            public string Content { get; init; }
+        }
+
+        // One typed entry per OCR source. The old forward+reverse string map
+        // could collide when two source lines shared the same translation.
+        readonly LRUCache<string, CachedTranslation> resDict = new LRUCache<string, CachedTranslation>(100);
         public System.Windows.Threading.DispatcherTimer OCRTimer = new System.Windows.Threading.DispatcherTimer();
         public System.Windows.Threading.DispatcherTimer UITimer = new System.Windows.Threading.DispatcherTimer();
         readonly bool debug = Config.Get<bool>("Debug", false);
@@ -286,6 +302,8 @@ namespace GI_Subtitles.Views
 
         // Screen capture backend — DXGI preferred (GPU), GDI fallback
         private IScreenCapture _captureBackend;
+        private int _consecutiveDxgiNullFrames;
+        private const int DxgiNullFramesBeforeFallback = 3;
         private bool _wdaExcludeActive = false; // True only if SetWindowDisplayAffinity succeeded
 
         private volatile DetectedTextResult _lastDetectedText;
@@ -296,8 +314,7 @@ namespace GI_Subtitles.Views
         private DateTime _lastContentChangeTime = DateTime.MinValue;
         private bool _hiddenForFocusLoss = false;
 
-        // Drag positioning: suppress pad saves during programmatic moves
-        private volatile bool _isUserDragging = false;
+        // Drag positioning / optional input pass-through.
         private bool _clickThroughEnabled = false;
 
         // ── OCR active-time accumulator (session 26 — referrals) ──────────────
@@ -470,8 +487,7 @@ namespace GI_Subtitles.Views
                     // able to turn off what's already running.
                     OCRTimer.Stop();
                     UITimer.Stop();
-                    while (_stabilityBuffer.Count > 0)
-                        _stabilityBuffer.Dequeue().Dispose();
+                    ResetOcrPipelineState(clearImageCaches: true);
                     ResetActiveOcrWindow();
                     ClearReadyPlaceholderIfActive();
                     // Clear the "Continue anyway" override so the next Start
@@ -497,10 +513,12 @@ namespace GI_Subtitles.Views
                     if (!TryGateOcrStart()) return;
                     if (!TryGateInitialDictionarySync()) return;
                     if (!TryGateEngineReady()) return;
+                    if (!TryGateMatcherReady()) return;
                     if (!TryGateRegionConfigured()) return;
                     if (!TryGateGameRunning()) return;
                     if (!TryGateFullscreenTip()) return;
                     if (!TryGateOverlayNotInRegion()) return;
+                    ResetOcrPipelineState(clearImageCaches: true);
                     UpdateWindowPosition();
                     ResetActiveOcrWindow();
                     OCRTimer.Start();
@@ -537,7 +555,11 @@ namespace GI_Subtitles.Views
                 SubtitleText.Visibility = ShowText ? Visibility.Visible : Visibility.Collapsed;
                 HeaderText.Visibility = ShowText ? Visibility.Visible : Visibility.Collapsed;
                 if (ShowText) SystemSounds.Hand.Play();
-                else SystemSounds.Exclamation.Play();
+                else
+                {
+                    ClearReadyPlaceholderIfActive();
+                    SystemSounds.Exclamation.Play();
+                }
                 data.UpdateDashboardStatus();
             };
             data.IsOcrRunning = () => OCRTimer.IsEnabled;
@@ -545,14 +567,14 @@ namespace GI_Subtitles.Views
             data.IsEngineReady = () => _engineReady;
             data.OnOpenSetupWizard = () => ShowSetupWizard();
 
-            // First-run: show setup wizard if not completed yet
-            if (!Config.Get("SetupCompleted", false))
-            {
-                ShowSetupWizard();
-            }
-
             // Always open settings window on startup (non-modal so UI stays responsive)
             data.Show();
+
+            // Put the first-run wizard above its Settings owner. Previously it
+            // was shown first and then immediately covered by this larger window.
+            if (!Config.Get("SetupCompleted", false) &&
+                !Config.Get("SetupDismissed", false))
+                ShowSetupWizard();
 
             // Schedule the auto-updater. 5-second internal delay happens inside
             // StartBackgroundUpdateCheck so this call is fire-and-forget.
@@ -588,11 +610,11 @@ namespace GI_Subtitles.Views
             // Dashboard and the overlay loading strip both subscribe to.
             KickOffEngineInit();
 
-            OCRTimer.Interval = new TimeSpan(0, 0, 0, 0, 200);
+            OCRTimer.Interval = MinOcrInterval;
             OCRTimer.Tick += GetOCR;    // Delegate: method to execute
 
 
-            UITimer.Interval = new TimeSpan(0, 0, 0, 0, Config.Get<int>("UiRefreshInterval", 200));
+            UITimer.Interval = TimeSpan.FromMilliseconds(Config.Get<int>("UiRefreshInterval", 150));
             UITimer.Tick += UpdateText;    // Delegate: method to execute
 
             // Wire OCR-active-seconds reporting to the heartbeat so the
@@ -615,8 +637,6 @@ namespace GI_Subtitles.Views
             this.Width = screenBounds.Width;
             this.Top = screenBounds.Bottom / Scale - this.Height;
             this.Left = screenBounds.Left / Scale;
-            this.LocationChanged += MainWindow_LocationChanged;
-
             // Apply saved capture region position immediately so overlay doesn't start at bottom
             if (notify?.Region != null && notify.Region.Length >= 4 && notify.Region[1] != "0")
             {
@@ -636,6 +656,18 @@ namespace GI_Subtitles.Views
             _idleHideTimer.Tick += (s, args) =>
             {
                 _idleHideTimer.Stop();
+
+                // The overlap recovery card is an interactive handle, not a
+                // subtitle waiting to expire. A hide countdown may already
+                // have been armed just before the overlap was detected; do
+                // not let that stale tick make the only draggable window
+                // disappear behind the full-screen warning overlay.
+                if (_inRuntimeOverlapDragMode)
+                {
+                    EnsureRuntimeOverlapHandleVisible();
+                    return;
+                }
+
                 var fadeOut = new System.Windows.Media.Animation.DoubleAnimation(1, 0, TimeSpan.FromMilliseconds(500));
                 SubtitleBackground.BeginAnimation(OpacityProperty, fadeOut);
                 _subtitleVisible = false;
@@ -796,12 +828,18 @@ namespace GI_Subtitles.Views
             // correct state — _engineReady=false while init is in flight.
             _engineReady = false;
             data.SetEngineStatus(SettingsWindow.EngineStatus.Loading);
+            int generation = Interlocked.Increment(ref _engineInitGeneration);
 
             Task.Run(() =>
             {
                 try
                 {
                     data.LoadEngine();
+                    if (generation != Volatile.Read(ref _engineInitGeneration))
+                    {
+                        Logger.Log.Debug("Ignoring completion from a superseded OCR-engine initialization.");
+                        return;
+                    }
                     _engineReady = true;
                     Logger.Log.Debug("OCR engine loaded and ready");
                     data.SetEngineStatus(SettingsWindow.EngineStatus.Ready);
@@ -813,6 +851,11 @@ namespace GI_Subtitles.Views
                 }
                 catch (Exception ex)
                 {
+                    if (generation != Volatile.Read(ref _engineInitGeneration))
+                    {
+                        Logger.Log.Debug($"Ignoring failure from a superseded OCR-engine initialization: {ex.Message}");
+                        return;
+                    }
                     Logger.Log.Error("Failed to load OCR engine: " + ex.Message, ex);
                     // Surface to telemetry — we only see GPU-init failures
                     // on the user's machine, so server-side visibility
@@ -826,40 +869,59 @@ namespace GI_Subtitles.Views
             });
         }
 
-        private bool IsGameInForeground()
+        private GI_Subtitles.Services.Detection.ForegroundTarget GetForegroundTarget()
         {
             try
             {
                 IntPtr fg = GetForegroundWindow();
-                if (fg == IntPtr.Zero) return true;
-                // If our own app window is focused (e.g. Settings), keep overlay visible
+                if (fg == IntPtr.Zero)
+                    return GI_Subtitles.Services.Detection.ForegroundTarget.Other;
+
                 GetWindowThreadProcessId(fg, out uint fgPid);
-                if (fgPid == (uint)System.Diagnostics.Process.GetCurrentProcess().Id)
-                    return true;
                 var sb = new StringBuilder(256);
                 GetWindowText(fg, sb, sb.Capacity);
-                string title = sb.ToString().ToLowerInvariant();
-                string gameLower = (Game ?? "").ToLowerInvariant();
-                // Match common game window titles
-                return title.Contains(gameLower) ||
-                       title.Contains("genshin") ||
-                       title.Contains("star rail") ||
-                       title.Contains("zenless") ||
-                       title.Contains("wuthering") ||
-                       title.Contains("endfield") ||
-                       title.Contains("崩坏") ||
-                       title.Contains("原神") ||
-                       title.Contains("绝区零") ||
-                       string.IsNullOrEmpty(title); // fullscreen games sometimes report empty title
+                string processName = string.Empty;
+                if (fgPid != 0)
+                {
+                    try
+                    {
+                        using var process = Process.GetProcessById((int)fgPid);
+                        processName = process.ProcessName;
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Log.Debug($"Foreground process lookup failed for PID {fgPid}: {ex.Message}");
+                    }
+                }
+
+                string gameKey = Config.Get<string>("Game", Game ?? "Genshin");
+                var profile = GI_Subtitles.Services.Detection.GameRegionProfile.Get(gameKey);
+                return GI_Subtitles.Services.Detection.GameForegroundClassifier.Classify(
+                    fgPid,
+                    (uint)Environment.ProcessId,
+                    processName,
+                    _knownGameProcessIds.Contains(fgPid),
+                    sb.ToString(),
+                    profile,
+                    _gameGateBypassedThisSession,
+                    Config.Get("DevSkipGameGate", false));
             }
-            catch
+            catch (Exception ex)
             {
-                return true; // default to running if check fails
+                Logger.Log.Warn($"Foreground-window classification failed: {ex.Message}");
+                return GI_Subtitles.Services.Detection.ForegroundTarget.Other;
             }
         }
 
         public void GetOCR(object sender, EventArgs e)
         {
+            // Apply per-game/user pacing to the actual capture timer, not only
+            // to the inference throttle. This is especially important for HSR,
+            // whose short lines can disappear before a hard-coded 200 ms tick.
+            TimeSpan desiredCaptureInterval = MinOcrInterval;
+            if (OCRTimer.Interval != desiredCaptureInterval)
+                OCRTimer.Interval = desiredCaptureInterval;
+
             if (notify.isContextMenuOpen)
             {
                 return;
@@ -883,15 +945,30 @@ namespace GI_Subtitles.Views
             // NEXT in-foreground tick would then credit the whole absence.
             AccumulateActiveOcrTick();
 
-            // Auto-pause when game is not in foreground — hide overlay
-            if (!IsGameInForeground())
+            // Pause capture for every non-game foreground window. Keep the
+            // overlay visible while Kaption's own settings are focused (live
+            // appearance preview), but hide it on desktop/other applications.
+            var foregroundTarget = GetForegroundTarget();
+            if (foregroundTarget != GI_Subtitles.Services.Detection.ForegroundTarget.Game)
             {
-                if (!_hiddenForFocusLoss && _subtitleVisible)
+                if (foregroundTarget == GI_Subtitles.Services.Detection.ForegroundTarget.Other &&
+                    !_hiddenForFocusLoss && _subtitleVisible)
                 {
                     _hiddenForFocusLoss = true;
                     Dispatcher.BeginInvoke(new Action(() =>
                     {
                         SubtitleBackground.Visibility = Visibility.Collapsed;
+                    }));
+                }
+                else if (foregroundTarget == GI_Subtitles.Services.Detection.ForegroundTarget.Kaption &&
+                         _hiddenForFocusLoss && _subtitleVisible)
+                {
+                    _hiddenForFocusLoss = false;
+                    Dispatcher.BeginInvoke(new Action(() =>
+                    {
+                        SubtitleBackground.BeginAnimation(OpacityProperty, null);
+                        SubtitleBackground.Opacity = 1;
+                        SubtitleBackground.Visibility = Visibility.Visible;
                     }));
                 }
                 return;
@@ -1022,7 +1099,7 @@ namespace GI_Subtitles.Views
                                 if (IsOcrIntervalReady())
                                 {
                                     SetWindowPos(new WindowInteropHelper(this).Handle, -1, 0, 0, 0, 0, 1 | 2);
-                                    TriggerOcrAsync(frameMat.Clone(), target, answerTarget);
+                                    TriggerOcrAsync(frameMat.Clone(), target, answerTarget, null);
                                     passedToOcr = true;
                                 }
                                 else
@@ -1033,6 +1110,7 @@ namespace GI_Subtitles.Views
                         }
                         else
                         {
+                            int currentForegroundPixels = Cv2.CountNonZero(currentBinary);
                             // Check stability vs previous frame
                             bool isStableVsPrev = true;
                             if (_lastBinaryFrame != null)
@@ -1049,11 +1127,15 @@ namespace GI_Subtitles.Views
                                 }
                                 else
                                 {
-                                    // Absdiff allocates its output itself; rent a blank Mat shell.
-                                    diffFrame = MatPool.Default.RentBlank();
+                                    diffFrame = MatPool.Default.Rent(
+                                        currentBinary.Rows, currentBinary.Cols, currentBinary.Type());
                                     Cv2.Absdiff(currentBinary, _lastBinaryFrame, diffFrame);
                                     int nonZeroPrev = Cv2.CountNonZero(diffFrame);
-                                    double changePrev = (double)nonZeroPrev / (diffFrame.Rows * diffFrame.Cols);
+                                    double changePrev = BinaryFrameMetrics.NormalizedChangeRatio(
+                                        nonZeroPrev,
+                                        currentForegroundPixels,
+                                        Cv2.CountNonZero(_lastBinaryFrame),
+                                        diffFrame.Rows * diffFrame.Cols);
                                     if (debug)
                                     {
                                         Logger.Log.Debug($"Subtitle changeRatio(prev)={changePrev:F4}");
@@ -1084,12 +1166,17 @@ namespace GI_Subtitles.Views
                                 }
                                 else
                                 {
-                                    Mat diffToOcr = MatPool.Default.RentBlank();
+                                    Mat diffToOcr = MatPool.Default.Rent(
+                                        currentBinary.Rows, currentBinary.Cols, currentBinary.Type());
                                     try
                                     {
                                         Cv2.Absdiff(currentBinary, _lastOcrBinaryFrame, diffToOcr);
                                         int nonZeroOcr = Cv2.CountNonZero(diffToOcr);
-                                        double changeOcr = (double)nonZeroOcr / (diffToOcr.Rows * diffToOcr.Cols);
+                                        double changeOcr = BinaryFrameMetrics.NormalizedChangeRatio(
+                                            nonZeroOcr,
+                                            currentForegroundPixels,
+                                            Cv2.CountNonZero(_lastOcrBinaryFrame),
+                                            diffToOcr.Rows * diffToOcr.Cols);
                                         if (debug)
                                         {
                                             Logger.Log.Debug($"Subtitle changeRatio(ocr)={changeOcr:F4}");
@@ -1128,16 +1215,26 @@ namespace GI_Subtitles.Views
                                 if (currentBinary.Size() == oldFrame.Size() &&
                                     currentBinary.Channels() == oldFrame.Channels())
                                 {
-                                    using (Mat windowDiff = new Mat())
+                                    Mat windowDiff = MatPool.Default.Rent(
+                                        currentBinary.Rows, currentBinary.Cols, currentBinary.Type());
+                                    try
                                     {
                                         Cv2.Absdiff(currentBinary, oldFrame, windowDiff);
                                         int nonZero = Cv2.CountNonZero(windowDiff);
-                                        double changeOverWindow = (double)nonZero / (windowDiff.Rows * windowDiff.Cols);
+                                        double changeOverWindow = BinaryFrameMetrics.NormalizedChangeRatio(
+                                            nonZero,
+                                            currentForegroundPixels,
+                                            Cv2.CountNonZero(oldFrame),
+                                            windowDiff.Rows * windowDiff.Cols);
                                         isStableOverWindow = changeOverWindow <= ChangeThreshold;
                                         if (debug)
                                         {
                                             Logger.Log.Debug($"Stability window changeRatio={changeOverWindow:F4}, stable={isStableOverWindow}");
                                         }
+                                    }
+                                    finally
+                                    {
+                                        MatPool.Default.Return(windowDiff);
                                     }
                                 }
                                 oldFrame.Dispose();
@@ -1204,14 +1301,8 @@ namespace GI_Subtitles.Views
                             {
                                 if (!_isOcrRunning && IsOcrIntervalReady())
                                 {
-                                    if (_lastOcrBinaryFrame != null)
-                                    {
-                                        _lastOcrBinaryFrame.Dispose();
-                                    }
-                                    _lastOcrBinaryFrame = currentBinary.Clone();
                                     _consecutiveStableFrames = 0;
                                     _lastOcrWasFullyStable = isStableOverWindow;
-                                    _changedVsOcrSince = DateTime.MinValue;
 
                                     Logger.Log.Debug(forceOcr
                                         ? "Forced OCR re-check (screen changed >1.5s without stability)"
@@ -1219,7 +1310,7 @@ namespace GI_Subtitles.Views
                                             ? "Subtitle stable over window, start OCR"
                                             : "Subtitle eager preview (4+ stable frames), start OCR");
                                     SetWindowPos(new WindowInteropHelper(this).Handle, -1, 0, 0, 0, 0, 1 | 2);
-                                    TriggerOcrAsync(frameMat.Clone(), target, answerTarget);
+                                    TriggerOcrAsync(frameMat.Clone(), target, answerTarget, currentBinary.Clone());
                                     passedToOcr = true;
                                 }
                                 else
@@ -1358,8 +1449,8 @@ namespace GI_Subtitles.Views
         /// </summary>
         private bool HasConfiguredRegion()
         {
-            return notify?.Region != null && notify.Region.Length >= 4
-                   && notify.Region[2] != null && notify.Region[3] != null;
+            return GI_Subtitles.Services.Detection.CaptureRegionValidator.TryParse(
+                notify?.Region, out _, out _, out _, out _);
         }
 
         /// <summary>
@@ -1495,6 +1586,16 @@ namespace GI_Subtitles.Views
 
         public void UpdateText(object sender, EventArgs e)
         {
+            // OCR is deliberately paused in overlap-recovery mode. The normal
+            // UI loop must pause as well: otherwise its empty-content/idle
+            // logic overwrites the drag hint and fades the subtitle container
+            // to zero a moment after we made it interactive.
+            if (_inRuntimeOverlapDragMode)
+            {
+                EnsureRuntimeOverlapHandleVisible();
+                return;
+            }
+
             if (Interlocked.Exchange(ref UI_TIMER, 1) == 0)
             {
                 try
@@ -1510,20 +1611,12 @@ namespace GI_Subtitles.Views
                         {
                             Logger.Log.Warn("Matcher not loaded yet, skipping translation");
                         }
-                        else if (resDict.TryGetValue(ocrText, out string cachedRes))
+                        else if (resDict.TryGetValue(ocrText, out CachedTranslation cached))
                         {
-                            res = cachedRes;
-                            key = resDict[res];
-                            string[] parts = res.Split(new[] { "\n\n" }, StringSplitOptions.None);
-                            if (parts.Length >= 2)
-                            {
-                                header = parts[0];
-                                content = parts[1];
-                            }
-                            else
-                            {
-                                content = res;
-                            }
+                            res = cached.Result;
+                            key = cached.Key;
+                            header = cached.Header;
+                            content = cached.Content;
                         }
                         else
                         {
@@ -1659,12 +1752,13 @@ namespace GI_Subtitles.Views
 
                             Logger.Log.Debug($"Convert ocrResult for {ocrText}: header={header}, content={content}, key={key}");
 
-                            // Cache still uses the concatenated result for compatibility
-                            if (!resDict.ContainsKey(ocrText))
+                            resDict[ocrText] = new CachedTranslation
                             {
-                                resDict[ocrText] = res;
-                                resDict[res] = key;
-                            }
+                                Result = res,
+                                Key = key,
+                                Header = header,
+                                Content = content,
+                            };
                         }
                     }
 
@@ -1790,6 +1884,7 @@ namespace GI_Subtitles.Views
                             if (_placeholderActive)
                             {
                                 _placeholderActive = false;
+                                _placeholderMadeContainerVisible = false;
                                 _readyPlaceholderText = null;
                             }
 
@@ -2140,10 +2235,20 @@ namespace GI_Subtitles.Views
                 Bitmap captured = _captureBackend.CaptureRegionInto(x, y, width, height, rented);
                 if (captured == null)
                 {
-                    // Backend returned no frame (e.g. DXGI transient) — recycle, propagate null.
                     BitmapPool.Default.Return(rented);
+                    if (_captureBackend is DxgiScreenCapture)
+                    {
+                        int failures = ++_consecutiveDxgiNullFrames;
+                        if (failures >= DxgiNullFramesBeforeFallback)
+                        {
+                            return SwitchCaptureToGdiAndRetry(
+                                x, y, width, height,
+                                $"DXGI returned {failures} consecutive empty frames");
+                        }
+                    }
                     return null;
                 }
+                _consecutiveDxgiNullFrames = 0;
                 return captured;
             }
             catch (Exception ex)
@@ -2153,28 +2258,37 @@ namespace GI_Subtitles.Views
                 // If DXGI fails at runtime, fall back to GDI (same fallback semantics as before).
                 if (_captureBackend is DxgiScreenCapture dxgi)
                 {
-                    Logger.Log.Warn($"DXGI capture failed, falling back to GDI: {ex.Message}");
-                    dxgi.Dispose();
-                    _captureBackend = new GdiScreenCapture();
-
-                    Bitmap fallbackRented = BitmapPool.Default.Rent(width, height, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
-                    try
-                    {
-                        Bitmap fallbackCaptured = _captureBackend.CaptureRegionInto(x, y, width, height, fallbackRented);
-                        if (fallbackCaptured == null)
-                        {
-                            BitmapPool.Default.Return(fallbackRented);
-                            return null;
-                        }
-                        return fallbackCaptured;
-                    }
-                    catch
-                    {
-                        BitmapPool.Default.Return(fallbackRented);
-                        throw;
-                    }
+                    return SwitchCaptureToGdiAndRetry(x, y, width, height, ex.Message);
                 }
                 Logger.Log.Error($"Capture failed: x={x}, y={y}, w={width}, h={height}: {ex.Message}");
+                throw;
+            }
+        }
+
+        private Bitmap SwitchCaptureToGdiAndRetry(
+            int x, int y, int width, int height, string reason)
+        {
+            Logger.Log.Warn($"DXGI capture unavailable, falling back to GDI: {reason}");
+            _captureBackend?.Dispose();
+            _captureBackend = new GdiScreenCapture();
+            _consecutiveDxgiNullFrames = 0;
+
+            Bitmap fallbackRented = BitmapPool.Default.Rent(
+                width, height, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+            try
+            {
+                Bitmap captured = _captureBackend.CaptureRegionInto(
+                    x, y, width, height, fallbackRented);
+                if (captured == null)
+                {
+                    BitmapPool.Default.Return(fallbackRented);
+                    return null;
+                }
+                return captured;
+            }
+            catch
+            {
+                BitmapPool.Default.Return(fallbackRented);
                 throw;
             }
         }
@@ -2233,6 +2347,8 @@ namespace GI_Subtitles.Views
         private bool IsOcrIntervalReady()
         {
             var now = DateTime.UtcNow;
+            if (now < _nextOcrAttemptUtc)
+                return false;
             if (now - _lastOcrTime < MinOcrInterval)
             {
                 return false;
@@ -2240,6 +2356,46 @@ namespace GI_Subtitles.Views
 
             _lastOcrTime = now;
             return true;
+        }
+
+        /// <summary>
+        /// Drops every frame-derived decision. Region/model/start-stop changes
+        /// must not inherit a baseline or image hash from the previous run.
+        /// Incrementing the generation also prevents an in-flight old OCR task
+        /// from publishing its baseline after a reset.
+        /// </summary>
+        private void ResetOcrPipelineState(bool clearImageCaches)
+        {
+            lock (_ocrPipelineStateLock)
+            {
+                Interlocked.Increment(ref _ocrPipelineGeneration);
+
+                _lastBinaryFrame?.Dispose();
+                _lastBinaryFrame = null;
+                _lastOcrBinaryFrame?.Dispose();
+                _lastOcrBinaryFrame = null;
+                while (_stabilityBuffer.Count > 0)
+                    _stabilityBuffer.Dequeue()?.Dispose();
+
+                _consecutiveStableFrames = 0;
+                _changedVsOcrSince = DateTime.MinValue;
+                _lastOcrTime = DateTime.MinValue;
+                _nextOcrAttemptUtc = DateTime.MinValue;
+                _lastOcrWasFullyStable = false;
+                _detectedNpcName = string.Empty;
+                _lastDetectedText = null;
+                _lastAnswerPixelSum = 0;
+                Interlocked.Exchange(ref failedCount, 0);
+                usingRegion2 = false;
+                Interlocked.Exchange(ref _consecutiveEmptyOcrFrames, 0);
+                _emptyOcrRetryAttempts = 0;
+
+                if (clearImageCaches)
+                {
+                    BitmapDict.Clear();
+                    NpcNameCache.Clear();
+                }
+            }
         }
 
         // ══════════════════════════════════════════════════════════════════
@@ -2338,14 +2494,7 @@ namespace GI_Subtitles.Views
                 if (OCRTimer != null && OCRTimer.IsEnabled) OCRTimer.Stop();
                 if (UITimer != null && UITimer.IsEnabled) UITimer.Stop();
                 ResetActiveOcrWindow();
-                if (_stabilityBuffer != null)
-                {
-                    while (_stabilityBuffer.Count > 0)
-                    {
-                        try { _stabilityBuffer.Dequeue()?.Dispose(); }
-                        catch (Exception ex) { Logger.Log.Warn($"ForceStopOcr buffer drain: {ex.Message}"); }
-                    }
-                }
+                ResetOcrPipelineState(clearImageCaches: true);
                 try { SwitchIcon("kaption.ico"); } catch { /* non-fatal */ }
                 try { data?.UpdateDashboardStatus(); } catch { /* non-fatal */ }
                 if (wasRunning)
@@ -2430,11 +2579,11 @@ namespace GI_Subtitles.Views
             if (App.StartupStatus != App.InitialStartupStatus.DownloadingTranslations)
                 return true;
 
-            Logger.Log.Info("OCR start blocked: initial dictionary sync still in flight.");
+            Logger.Log.Info("OCR start blocked: startup language update still in flight.");
             GI_Subtitles.Views.ModernDialog.Info(
                 owner: this,
-                title: LocalizedString("Dialog_StillDownloading_Title", "Translations still downloading"),
-                body: LocalizedString("Dialog_StillDownloading_Body", "Kaption is still downloading the translation pack. It usually takes just a few seconds on a first launch — try again in a moment."));
+                title: LocalizedString("Dialog_StillDownloading_Title", "Translations are being updated"),
+                body: LocalizedString("Dialog_StillDownloading_Body", "Kaption is checking and updating language data. Try again when the update finishes."));
             return false;
         }
 
@@ -2479,6 +2628,31 @@ namespace GI_Subtitles.Views
                 owner: this,
                 title: LocalizedString("Dialog_EngineLoading_Title", "Translator still loading"),
                 body: LocalizedString("Dialog_EngineLoading_Body", "Give it a moment — the OCR engine is still warming up. Try Start again when the pill under the Start button shows Ready."));
+            return false;
+        }
+
+        private bool TryGateMatcherReady()
+        {
+            if (data?.IsMatcherReady == true)
+                return true;
+
+            if (data?.Matcher?.Loaded == true)
+            {
+                Logger.Log.Info("OCR start blocked: translation matcher has zero entries.");
+                try { if (!data.IsVisible) data.Show(); }
+                catch { /* non-fatal */ }
+                GI_Subtitles.Views.ModernDialog.Warn(
+                    owner: this,
+                    title: LocalizedString("Dash_Status_TranslationDataMissing", "Translation data missing"),
+                    body: LocalizedString("Dialog_MatcherMissing_Body", "The selected translation pack is missing or empty. Open Translations, download it, then restart Kaption."));
+                return false;
+            }
+
+            Logger.Log.Info("OCR start blocked: translation matcher is still loading.");
+            GI_Subtitles.Views.ModernDialog.Info(
+                owner: this,
+                title: LocalizedString("Dialog_StillStarting_Title", "Still starting up"),
+                body: LocalizedString("Dialog_MatcherLoading_Body", "Kaption is still preparing translations. Please try again in a moment."));
             return false;
         }
 
@@ -2544,12 +2718,27 @@ namespace GI_Subtitles.Views
                 if (profile?.ProcessNames == null || profile.ProcessNames.Length == 0)
                     return true; // Unknown game — we can't verify, so don't block.
 
+                _knownGameProcessIds.Clear();
                 foreach (var procName in profile.ProcessNames)
                 {
                     if (string.IsNullOrWhiteSpace(procName)) continue;
                     try
                     {
-                        if (System.Diagnostics.Process.GetProcessesByName(procName).Length > 0)
+                        var processes = System.Diagnostics.Process.GetProcessesByName(procName);
+                        try
+                        {
+                            foreach (var process in processes)
+                            {
+                                try { _knownGameProcessIds.Add((uint)process.Id); }
+                                catch { /* process may exit during enumeration */ }
+                            }
+                        }
+                        finally
+                        {
+                            foreach (var process in processes) process.Dispose();
+                        }
+
+                        if (_knownGameProcessIds.Count > 0)
                             return true;
                     }
                     catch (Exception ex)
@@ -2617,6 +2806,12 @@ namespace GI_Subtitles.Views
         {
             try
             {
+                // This dialog contains Genshin-specific menu paths and labels.
+                // Showing it for Star Rail/custom profiles is misleading.
+                if (!string.Equals(Config.Get("Game", Game ?? "Genshin"), "Genshin",
+                        StringComparison.OrdinalIgnoreCase))
+                    return true;
+
                 if (Config.Get("FullscreenTipAcknowledged", false))
                     return true;
 
@@ -2778,7 +2973,10 @@ namespace GI_Subtitles.Views
         /// on it.
         /// </summary>
         internal void OnCaptureRegionUserChange(System.Windows.Window dialogOwner)
-            => ShowOverlapWarnIfNeeded(dialogOwner, clearOverride: true);
+        {
+            ResetOcrPipelineState(clearImageCaches: true);
+            ShowOverlapWarnIfNeeded(dialogOwner, clearOverride: true);
+        }
 
         /// <summary>
         /// Post-change notification for Settings → Display edits that resize
@@ -2806,6 +3004,7 @@ namespace GI_Subtitles.Views
             try
             {
                 if (_inRuntimeOverlapDragMode) return; // drag-fix owns the text
+                if (!ShowText) return;
                 if (SubtitleText == null) return;
                 if (!string.IsNullOrWhiteSpace(SubtitleText.Text) && SubtitleText.Text != _readyPlaceholderText)
                     return; // real translation already on screen — don't overwrite
@@ -2816,7 +3015,15 @@ namespace GI_Subtitles.Views
                 SubtitleText.Text = _readyPlaceholderText;
                 SubtitleText.Visibility = System.Windows.Visibility.Visible;
                 if (SubtitleBackground != null)
+                {
+                    _placeholderMadeContainerVisible =
+                        SubtitleBackground.Visibility != System.Windows.Visibility.Visible ||
+                        SubtitleBackground.Opacity <= 0.01;
+                    SubtitleBackground.BeginAnimation(OpacityProperty, null);
+                    SubtitleBackground.Opacity = 1;
                     SubtitleBackground.Visibility = System.Windows.Visibility.Visible;
+                }
+                _subtitleVisible = true;
                 // Force the window to a reasonable size so the placeholder
                 // renders at a grabbable scale on first draw.
                 if (this.ActualWidth < 320) this.Width = 360;
@@ -2839,14 +3046,26 @@ namespace GI_Subtitles.Views
             try
             {
                 if (SubtitleText != null && SubtitleText.Text == _readyPlaceholderText)
+                {
                     SubtitleText.Text = string.Empty;
+                    SubtitleText.Visibility = System.Windows.Visibility.Collapsed;
+                }
+                if (_placeholderMadeContainerVisible && SubtitleBackground != null)
+                {
+                    SubtitleBackground.BeginAnimation(OpacityProperty, null);
+                    SubtitleBackground.Opacity = 0;
+                    SubtitleBackground.Visibility = System.Windows.Visibility.Collapsed;
+                    _subtitleVisible = false;
+                }
                 _placeholderActive = false;
+                _placeholderMadeContainerVisible = false;
                 _readyPlaceholderText = null;
             }
             catch { /* cosmetic, never fatal */ }
         }
 
         private bool _placeholderActive;
+        private bool _placeholderMadeContainerVisible;
         private string _readyPlaceholderText;
 
         /// <summary>
@@ -2992,10 +3211,16 @@ namespace GI_Subtitles.Views
                     // even if the user had previously enabled click-through
                     // — otherwise the drag attempt falls through to the
                     // game and nothing happens.
+                    _clickThroughRestoreTimer?.Stop();
                     SetClickThrough(false);
                 }
                 catch (Exception ex) { Logger.Log.Warn($"EnterRuntimeOverlapState visual: {ex.Message}"); }
             }
+
+            // Reassert on every overlap check, not only on the transition.
+            // A fade animation or queued layout callback may have been
+            // scheduled before the guard became active.
+            EnsureRuntimeOverlapHandleVisible();
 
             if (_overlapAlertOverlay == null)
                 _overlapAlertOverlay = new OverlapAlertOverlay(Scale);
@@ -3013,6 +3238,57 @@ namespace GI_Subtitles.Views
                 intersectionScreenPx: check.IntersectionRect,
                 titleText: title,
                 bodyText: body);
+        }
+
+        /// <summary>
+        /// Keep the actual subtitle HWND visible and grabbable for as long as
+        /// the red overlap warning is active. This cancels animations queued
+        /// by the normal subtitle lifetime logic and restores the drag hint
+        /// without altering the text saved for restoration after the move.
+        /// </summary>
+        private void EnsureRuntimeOverlapHandleVisible()
+        {
+            if (!_inRuntimeOverlapDragMode)
+                return;
+
+            try
+            {
+                _idleHideTimer?.Stop();
+
+                if (SubtitleText != null)
+                {
+                    SubtitleText.BeginAnimation(OpacityProperty, null);
+                    SubtitleText.Opacity = 1;
+                    SubtitleText.Text = LocalizedString(
+                        "Runtime_OverlapDragHint",
+                        "⇕  Drag me out of the dialogue area");
+                    SubtitleText.Visibility = System.Windows.Visibility.Visible;
+                }
+
+                if (SubtitleBackground != null)
+                {
+                    SubtitleBackground.BeginAnimation(OpacityProperty, null);
+                    SubtitleBackground.Opacity = 1;
+                    SubtitleBackground.Visibility = System.Windows.Visibility.Visible;
+                    SubtitleBackground.MinWidth = Math.Max(480, SubtitleBackground.MinWidth);
+                    SubtitleBackground.MinHeight = Math.Max(90, SubtitleBackground.MinHeight);
+                }
+
+                this.BeginAnimation(OpacityProperty, null);
+                this.Opacity = 1;
+                if (this.Visibility != System.Windows.Visibility.Visible)
+                    this.Visibility = System.Windows.Visibility.Visible;
+                if (this.ActualWidth < 480) this.Width = 520;
+                if (this.ActualHeight < 90) this.Height = 110;
+
+                _subtitleVisible = true;
+                _hiddenForFocusLoss = false;
+                SetClickThrough(false);
+            }
+            catch (Exception ex)
+            {
+                Logger.Log.Warn($"EnsureRuntimeOverlapHandleVisible: {ex.Message}");
+            }
         }
 
         private void ExitRuntimeOverlapState()
@@ -3179,15 +3455,17 @@ namespace GI_Subtitles.Views
                             title: LocalizedString("Dialog_RegionMissing_Title", "Capture region missing"),
                             body: LocalizedString("Dialog_RegionMissing_Body", "Pick the part of the screen where the game's dialogue appears before starting translation."),
                             details: LocalizedString("Dialog_RegionMissing_Details", "Go back to the wizard's Region step, or open Settings \u203A Regions and click \"Select Region\" — then try again."));
-                        return;
+                        return false;
                     }
 
-                    if (!TryGateOcrStart()) return;
-                    if (!TryGateInitialDictionarySync()) return;
-                    if (!TryGateEngineReady()) return;
-                    if (!TryGateGameRunning()) return;
-                    if (!TryGateFullscreenTip()) return;
-                    if (!TryGateOverlayNotInRegion()) return;
+                    if (!TryGateOcrStart()) return false;
+                    if (!TryGateInitialDictionarySync()) return false;
+                    if (!TryGateEngineReady()) return false;
+                    if (!TryGateMatcherReady()) return false;
+                    if (!TryGateGameRunning()) return false;
+                    if (!TryGateFullscreenTip()) return false;
+                    if (!TryGateOverlayNotInRegion()) return false;
+                    ResetOcrPipelineState(clearImageCaches: true);
                     UpdateWindowPosition();
                     ShowReadyPlaceholderIfEmpty();
                     ResetActiveOcrWindow();
@@ -3197,6 +3475,7 @@ namespace GI_Subtitles.Views
                     SwitchIcon("kaption-running.ico");
                     data.UpdateDashboardStatus();
                 }
+                return true;
             };
             wizard.OnOpenSettings = () =>
             {
@@ -3206,7 +3485,14 @@ namespace GI_Subtitles.Views
             wizard.GetEngine = () => data?.engine;
             wizard.GetGameId = () => Game;
             wizard.OnCaptureRegionUserChanged = () => OnCaptureRegionUserChange(dialogOwner: wizard);
+            try
+            {
+                wizard.Owner = data;
+                wizard.WindowStartupLocation = WindowStartupLocation.CenterOwner;
+            }
+            catch { /* owner is cosmetic; wizard remains usable */ }
             wizard.Show();
+            wizard.Activate();
         }
 
         /// <summary>
@@ -3224,32 +3510,39 @@ namespace GI_Subtitles.Views
             if (!TryGateOcrStart()) return;
             if (!TryGateInitialDictionarySync()) return;
             if (!TryGateEngineReady()) return;
+            if (!TryGateMatcherReady()) return;
             if (!TryGateRegionConfigured()) return;
             if (!TryGateGameRunning()) return;
             if (!TryGateFullscreenTip()) return;
             if (!TryGateOverlayNotInRegion()) return;
 
+            Bitmap target = null;
+            Mat frameMat = null;
             try
             {
-                Bitmap target = CaptureAndMask(notify.Region);
+                target = CaptureAndMask(notify.Region);
                 if (target == null) return;
 
-                Mat frameMat = target.ToMat();
+                frameMat = target.ToMat();
                 if (frameMat == null || frameMat.Empty())
                 {
-                    // target came from the pool-rented backend — Return, don't Dispose.
-                    ReleaseCapturedBitmap(target);
-                    frameMat?.Dispose();
                     return;
                 }
 
                 _lastOcrTime = DateTime.UtcNow;
                 SetWindowPos(new WindowInteropHelper(this).Handle, -1, 0, 0, 0, 0, 1 | 2);
-                TriggerOcrAsync(frameMat, target, null);
+                TriggerOcrAsync(frameMat, target, null, null);
+                frameMat = null;
+                target = null;
             }
             catch (Exception ex)
             {
                 Logger.Log.Error($"ForceOcrTranslate error: {ex}");
+            }
+            finally
+            {
+                frameMat?.Dispose();
+                ReleaseCapturedBitmap(target);
             }
         }
 
@@ -3260,6 +3553,7 @@ namespace GI_Subtitles.Views
             // See b42569d for the gate contract and the matching call sites
             // in OnToggleOCR / ForceOcrTranslate / WndProc / Setup Wizard.
             if (!TryGateEngineReady()) return;
+            if (!TryGateMatcherReady()) return;
 
             // Reject re-entry while a picker/OCR is already in flight, and
             // swallow auto-repeat inside a 300ms window. A press with no
@@ -3271,6 +3565,8 @@ namespace GI_Subtitles.Views
 
             CloseQuickTranslatePopup();
 
+            System.Drawing.Bitmap target = null;
+            OpenCvSharp.Mat frameMat = null;
             try
             {
                 // Let user draw a rectangle on screen
@@ -3290,14 +3586,12 @@ namespace GI_Subtitles.Views
                 };
 
                 // Capture the selected region (rented from BitmapPool.Default).
-                System.Drawing.Bitmap target = CaptureRegion(tempRegion);
+                target = CaptureRegion(tempRegion);
                 if (target == null) return;
 
-                OpenCvSharp.Mat frameMat = target.ToMat();
+                frameMat = target.ToMat();
                 if (frameMat == null || frameMat.Empty())
                 {
-                    ReleaseCapturedBitmap(target);
-                    frameMat?.Dispose();
                     return;
                 }
 
@@ -3311,7 +3605,7 @@ namespace GI_Subtitles.Views
                         if (string.IsNullOrWhiteSpace(text)) return "";
 
                         // Try to find translation
-                        string match = data.Matcher.FindClosestMatch(text, out string key);
+                        string match = data.Matcher?.FindClosestMatch(text, out string key);
                         string result = !string.IsNullOrEmpty(match) ? match : text;
                         return result.Replace("\\n", "\n");
                     }
@@ -3323,8 +3617,10 @@ namespace GI_Subtitles.Views
                     finally
                     {
                         frameMat?.Dispose();
+                        frameMat = null;
                         // target rented from BitmapPool — Return, don't Dispose.
                         ReleaseCapturedBitmap(target);
+                        target = null;
                     }
                 });
 
@@ -3339,6 +3635,8 @@ namespace GI_Subtitles.Views
             }
             finally
             {
+                frameMat?.Dispose();
+                ReleaseCapturedBitmap(target);
                 _quickTranslateBusy = false;
             }
         }
@@ -3426,9 +3724,21 @@ namespace GI_Subtitles.Views
         /// <param name="frameToProcess">Image Mat for OCR (caller has already Clone)</param>
         /// <param name="target">Original screenshot Bitmap, used for debugging and setting preview image</param>
         /// <param name="answerTarget">Optional answer region bitmap (null if no answer region configured)</param>
-        private async void TriggerOcrAsync(Mat frameToProcess, Bitmap target, Bitmap answerTarget)
+        private async void TriggerOcrAsync(
+            Mat frameToProcess, Bitmap target, Bitmap answerTarget, Mat binaryBaseline)
         {
             _isOcrRunning = true;
+            int pipelineGeneration = Volatile.Read(ref _ocrPipelineGeneration);
+            bool commitBaseline = false;
+            bool retryFrame = false;
+            string processedFrameHash = string.Empty;
+            string detectedText = string.Empty;
+            string detectedNpcName = string.Empty;
+            DetectedTextResult detectedTextLayout = null;
+            string[] detectedAnswers = null;
+            bool clearAnswers = false;
+            bool wasCacheHit = false;
+            Exception inferenceError = null;
             var cts = new CancellationTokenSource(5000);
             try
             {
@@ -3443,11 +3753,13 @@ namespace GI_Subtitles.Views
                         }
 
                         string bitStr = ImageProcessor.ComputeRobustHash(frameToProcess);
+                        processedFrameHash = bitStr;
 
                         if (BitmapDict.TryGetValue(bitStr, out string cachedOcrText))
                         {
-                            ocrText = cachedOcrText;
-                            _detectedNpcName = NpcNameCache.TryGetValue(bitStr, out string cachedNpc) ? cachedNpc : "";
+                            wasCacheHit = true;
+                            detectedText = cachedOcrText;
+                            detectedNpcName = NpcNameCache.TryGetValue(bitStr, out string cachedNpc) ? cachedNpc : "";
                         }
                         else
                         {
@@ -3459,7 +3771,7 @@ namespace GI_Subtitles.Views
                             // the stale entry alive indefinitely. The "4+ stable frames" gate
                             // before OCR already guarantees bit-identical frames for the exact-
                             // hash path above, so the fuzzy fallback was pure downside.
-                            OCRResult ocrResult = data.engine.DetectTextFromMat(frameToProcess);
+                            OCRResult ocrResult = data.engine.DetectTextFromMat(frameToProcess, cts.Token);
 
                             // Color-based NPC name detection with position preservation
                             if (ocrResult.TextBlocks != null && ocrResult.TextBlocks.Count > 0)
@@ -3467,18 +3779,16 @@ namespace GI_Subtitles.Views
                                 var detectedResult = ImageProcessor.ClassifyTextBlocksWithPositions(
                                     frameToProcess, ocrResult.TextBlocks);
 
-                                _detectedNpcName = detectedResult.NpcName;
-                                ocrText = detectedResult.DialogueText;
-                                _lastDetectedText = detectedResult;
+                                detectedNpcName = detectedResult.NpcName;
+                                detectedText = detectedResult.DialogueText;
+                                detectedTextLayout = detectedResult;
 
-                                Logger.Log.Debug($"Color classification: NPC=\"{_detectedNpcName}\", " +
-                                    $"Dialogue=\"{ocrText}\", DialogueBlocks={detectedResult.DialogueBlocks.Count}");
+                                Logger.Log.Debug($"Color classification: NPC=\"{detectedNpcName}\", " +
+                                    $"Dialogue=\"{detectedText}\", DialogueBlocks={detectedResult.DialogueBlocks.Count}");
                             }
                             else
                             {
-                                _detectedNpcName = "";
-                                ocrText = ocrResult.Text;
-                                _lastDetectedText = null;
+                                detectedText = ocrResult.Text ?? string.Empty;
                             }
 
                             if (debug)
@@ -3488,7 +3798,7 @@ namespace GI_Subtitles.Views
                                     string fileName = DateTime.Now.ToString("yyyy-MM-dd_HH_mm_ss_ffffff") + ".png";
                                     Logger.Log.Debug(fileName);
                                     target.Save(Path.Combine(dataDir, fileName));
-                                    Logger.Log.Debug($"OCR Text: {ocrText}");
+                                    Logger.Log.Debug($"OCR Text: {detectedText}");
                                 }
                                 catch (Exception ex)
                                 {
@@ -3496,45 +3806,20 @@ namespace GI_Subtitles.Views
                                 }
                             }
 
-                            BitmapDict[bitStr] = ocrText;
-                            if (!string.IsNullOrEmpty(_detectedNpcName))
-                                NpcNameCache[bitStr] = _detectedNpcName;
                         }
 
-                        Logger.Log.Debug($"OCR Content: {ocrText}");
-
-                        if (ocrText.Length < 2)
-                        {
-                            Interlocked.Increment(ref failedCount);
-
-                            // Drain stale OCR/NPC caches once we've seen the dialog region
-                            // stay empty for a few frames in a row — that's the "dialog
-                            // ended" signal. Keeps the fuzzy-match fast path from
-                            // resurrecting the previous dialog's text on unrelated frames.
-                            int empties = Interlocked.Increment(ref _consecutiveEmptyOcrFrames);
-                            if (empties == EmptyOcrCacheClearThreshold)
-                            {
-                                BitmapDict.Clear();
-                                NpcNameCache.Clear();
-                                Logger.Log.Debug(
-                                    $"OCR caches cleared after {EmptyOcrCacheClearThreshold} empty frames " +
-                                    "(dialog ended — prevents stale fuzzy-hash matches).");
-                            }
-                        }
-                        else
-                        {
-                            Interlocked.Exchange(ref _consecutiveEmptyOcrFrames, 0);
-                        }
+                        Logger.Log.Debug($"OCR Content: {detectedText}");
 
                         // --- Answer Region OCR (validates/supplements graph predictions) ---
                         // Skip answer OCR when dialogue text is game UI (menus, stats, etc.)
-                        if (answerTarget != null && ocrText.Length > 1 && !IsLikelyGameUI(ocrText))
+                        if (FeatureAnswerTranslationEnabled && answerTarget != null &&
+                            detectedText.Length > 1 && !IsLikelyGameUI(detectedText))
                         {
                             try
                             {
                                 using (var answerMat = answerTarget.ToMat())
                                 {
-                                    var answerOcr = data.engine.DetectTextFromMat(answerMat);
+                                    var answerOcr = data.engine.DetectTextFromMat(answerMat, cts.Token);
                                     if (answerOcr?.TextBlocks != null && answerOcr.TextBlocks.Count > 0)
                                     {
                                         var answerLines = MergeAnswerBlocks(answerOcr.TextBlocks);
@@ -3546,11 +3831,11 @@ namespace GI_Subtitles.Views
                                             // better results (more matches or fewer ~unmatched~)
                                             if (ocrTranslated.Length > 0)
                                             {
-                                                _translatedAnswers = ocrTranslated;
+                                                detectedAnswers = ocrTranslated;
                                             }
                                             // else: keep existing predictions from graph
                                         }
-                                        Logger.Log.Debug($"Answer OCR: {answerLines.Length} merged lines, translated: {_translatedAnswers?.Length ?? 0}");
+                                        Logger.Log.Debug($"Answer OCR: {answerLines.Length} merged lines, translated: {detectedAnswers?.Length ?? 0}");
                                     }
                                     // else: OCR found nothing — keep graph predictions if any
                                 }
@@ -3560,26 +3845,109 @@ namespace GI_Subtitles.Views
                                 Logger.Log.Error($"Answer OCR failed: {ex.Message}");
                                 // Keep existing predictions on error
                             }
-                            _lastAnswerOcrTime = DateTime.UtcNow;
                         }
-                        else if (ocrText.Length <= 1)
+                        else if (detectedText.Length <= 1)
                         {
-                            // No dialogue detected — clear answers and predictions
-                            _translatedAnswers = null;
-                            _predictedContent = null;
+                            clearAnswers = true;
                         }
                     }
                     catch (Exception ex)
                     {
-                        Logger.Log.Error(ex);
+                        inferenceError = ex;
                     }
                 }, cts.Token);
 
                 // After OCR, update the window position, preview, and force immediate translation
+                if (System.Windows.Application.Current?.Dispatcher == null ||
+                    System.Windows.Application.Current.Dispatcher.HasShutdownStarted)
+                {
+                    return;
+                }
                 System.Windows.Application.Current.Dispatcher.Invoke(() =>
                 {
                     try
                     {
+                        lock (_ocrPipelineStateLock)
+                        {
+                            if (pipelineGeneration != Volatile.Read(ref _ocrPipelineGeneration))
+                            {
+                                Logger.Log.Debug("Discarding OCR result from a reset pipeline generation.");
+                                return;
+                            }
+
+                            if (inferenceError != null)
+                            {
+                                Logger.Log.Error(inferenceError);
+                                detectedText = string.Empty;
+                                detectedNpcName = string.Empty;
+                                detectedTextLayout = null;
+                            }
+
+                            ocrText = detectedText;
+                            _detectedNpcName = detectedNpcName;
+                            _lastDetectedText = detectedTextLayout;
+
+                            // Publish caches only after the generation guard. A
+                            // superseded region/model task must never restore its
+                            // state after ResetOcrPipelineState.
+                            if (!wasCacheHit && detectedText.Length > 1 &&
+                                !string.IsNullOrEmpty(processedFrameHash))
+                            {
+                                BitmapDict[processedFrameHash] = detectedText;
+                                if (!string.IsNullOrEmpty(detectedNpcName))
+                                    NpcNameCache[processedFrameHash] = detectedNpcName;
+                            }
+
+                            if (detectedText.Length < 2)
+                            {
+                                Interlocked.Increment(ref failedCount);
+                                int empties = Interlocked.Increment(ref _consecutiveEmptyOcrFrames);
+                                _emptyOcrRetryAttempts++;
+                                retryFrame = _emptyOcrRetryAttempts <= EmptyFrameRetryLimit;
+                                commitBaseline = !retryFrame;
+                                if (commitBaseline)
+                                    _emptyOcrRetryAttempts = 0;
+                                if (empties == EmptyOcrCacheClearThreshold)
+                                {
+                                    BitmapDict.Clear();
+                                    NpcNameCache.Clear();
+                                    Logger.Log.Debug(
+                                        $"OCR caches cleared after {EmptyOcrCacheClearThreshold} empty frames.");
+                                }
+                            }
+                            else
+                            {
+                                Interlocked.Exchange(ref _consecutiveEmptyOcrFrames, 0);
+                                _emptyOcrRetryAttempts = 0;
+                                commitBaseline = true;
+                            }
+
+                            if (detectedAnswers != null)
+                            {
+                                _translatedAnswers = detectedAnswers;
+                                _lastAnswerOcrTime = DateTime.UtcNow;
+                            }
+                            else if (clearAnswers)
+                            {
+                                _translatedAnswers = null;
+                                _predictedContent = null;
+                            }
+
+                            if (binaryBaseline != null && commitBaseline)
+                            {
+                                _lastOcrBinaryFrame?.Dispose();
+                                _lastOcrBinaryFrame = binaryBaseline;
+                                binaryBaseline = null;
+                                _changedVsOcrSince = DateTime.MinValue;
+                                _nextOcrAttemptUtc = DateTime.MinValue;
+                            }
+                            else if (retryFrame)
+                            {
+                                _nextOcrAttemptUtc = DateTime.UtcNow + EmptyFrameRetryBackoff;
+                                Logger.Log.Debug("OCR returned no usable text; scheduling a same-frame retry.");
+                            }
+                        }
+
                         UpdateWindowPosition();
 
                         // SetImage keeps a long-lived reference (for the Settings → test-OCR
@@ -3588,10 +3956,7 @@ namespace GI_Subtitles.Views
                         if (data.IsVisible)
                         {
                             data.SetImage(target);
-                        }
-                        else
-                        {
-                            ReleaseCapturedBitmap(target);
+                            target = null;
                         }
 
                         // Force immediate translation instead of waiting for next UI timer tick (saves 0-200ms)
@@ -3607,10 +3972,18 @@ namespace GI_Subtitles.Views
             {
                 Logger.Log.Warn("OCR timed out after 5 seconds");
             }
+            catch (Exception ex)
+            {
+                Logger.Log.Error($"Unexpected OCR pipeline failure: {ex}");
+            }
             finally
             {
                 _isOcrRunning = false;
                 frameToProcess?.Dispose();
+                binaryBaseline?.Dispose();
+                // SetImage takes ownership only when Settings is visible.
+                // Every other path returns the capture exactly once here.
+                ReleaseCapturedBitmap(target);
                 // answerTarget is pool-rented (see CaptureRegionFromBackend) — Return instead
                 // of Dispose so the answer bucket is reused next tick.
                 ReleaseCapturedBitmap(answerTarget);
@@ -3738,7 +4111,7 @@ namespace GI_Subtitles.Views
 
             // `binary` is handed back to the caller (cloned then disposed every tick) —
             // leave as a plain allocation. `gray` is throwaway, so it goes through the pool.
-            Mat gray = MatPool.Default.RentBlank();
+            Mat gray = MatPool.Default.Rent(src.Rows, src.Cols, MatType.CV_8UC1);
             Mat binary = new Mat();
             try
             {
@@ -3764,29 +4137,53 @@ namespace GI_Subtitles.Views
             {
                 return;
             }
-            _isUserDragging = true;
+
             bool wasInDragFixMode = _inRuntimeOverlapDragMode;
-            DragMove(); // blocking until mouse released
-            _isUserDragging = false;
+            if (wasInDragFixMode && _overlapAlertOverlay?.IsShown == true)
+            {
+                // Once the click reached the real subtitle window, get the
+                // full-screen diagnostic HWND out of the drag operation. If
+                // the user drops inside the region it is recreated below.
+                _overlapAlertOverlay.Hide();
+            }
+
+            bool dragCompleted = false;
+            try
+            {
+                DragMove(); // blocking until mouse released
+                dragCompleted = true;
+                e.Handled = true;
+            }
+            catch (InvalidOperationException ex)
+            {
+                // DragMove can reject a stale mouse-down during a rapid
+                // visibility/focus transition. Do not leave the overlay in
+                // a broken state; the next click can retry.
+                Logger.Log.Debug($"Overlay DragMove was not started: {ex.Message}");
+            }
+
+            // Persist once after the drop. The old LocationChanged handler
+            // rewrote Config.json on nearly every mouse-move event, which
+            // made dragging stutter badly and could look completely stuck.
+            if (dragCompleted)
+                PersistManualPadAfterDrag();
 
             // If the user just dragged the subtitle box out of the runtime
-            // overlap state, persist their new vertical offset as the Pad
-            // so we don't reset them back on the next layout tick, then
-            // re-evaluate overlap. If clear now, translation resumes; if
-            // still inside the region, the red treatment + alert stay up.
+            // overlap state, re-evaluate it. If clear now, translation
+            // resumes; if still inside the region, the red treatment + alert
+            // return immediately.
             if (wasInDragFixMode)
             {
-                PersistManualPadAfterDrag();
                 CheckRuntimeOverlapAndApply();
             }
         }
 
         /// <summary>
-        /// After the user hand-drags the subtitle box (runtime drag-fix
-        /// mode), compute a new <c>Pad</c> (vertical offset relative to
-        /// the dialogue area) from the window's current Top so the next
-        /// auto-layout tick doesn't snap it back. Horizontal offset is
-        /// similarly preserved.
+        /// After the user hand-drags the subtitle box, compute a new
+        /// <c>Pad</c> (vertical offset relative to the dialogue area) from
+        /// the window's current Top so the next auto-layout tick doesn't
+        /// snap it back. Horizontal offset is similarly preserved. This is
+        /// deliberately called once after drop, never from LocationChanged.
         /// </summary>
         private void PersistManualPadAfterDrag()
         {
@@ -3822,7 +4219,7 @@ namespace GI_Subtitles.Views
                 int newPadH = (int)Math.Round(this.Left - expectedLeft);
 
                 Config.Set("Pad", new int[] { newPadV, newPadH });
-                Logger.Log.Info($"Drag-fix: saved new Pad = [{newPadV},{newPadH}] (top={this.Top}, left={this.Left}).");
+                Logger.Log.Info($"Overlay drag: saved new Pad = [{newPadV},{newPadH}] (top={this.Top}, left={this.Left}).");
             }
             catch (Exception ex)
             {
@@ -3839,6 +4236,9 @@ namespace GI_Subtitles.Views
             // ticks keeps shutdown snappy — we only wait on the current Run.
             try { OCRTimer?.Stop(); } catch { }
             try { UITimer?.Stop(); } catch { }
+            try { ResetOcrPipelineState(clearImageCaches: true); } catch { }
+            try { _captureBackend?.Dispose(); } catch { }
+            _captureBackend = null;
 
             notifyIcon.Dispose();
             notifyIcon = null;
@@ -3850,41 +4250,6 @@ namespace GI_Subtitles.Views
             try { BitmapPool.Default.Dispose(); } catch (Exception ex) { Logger.Log.Warn($"BitmapPool dispose failed: {ex.Message}"); }
             try { MatPool.Default.Dispose(); } catch (Exception ex) { Logger.Log.Warn($"MatPool dispose failed: {ex.Message}"); }
         }
-
-        private void MainWindow_LocationChanged(object sender, EventArgs e)
-        {
-            if (!_isUserDragging) return; // only save on user drag, not programmatic moves
-
-            try
-            {
-                int pad = Convert.ToInt16(this.Top - Convert.ToInt16(notify.Region[1]) / Scale);
-
-                // Compute horizontal offset relative to where UpdateWindowPosition would place us
-                int padHorizontal = 0;
-                foreach (var screen in Screen.AllScreens)
-                {
-                    if (screen.WorkingArea.Contains(
-                        new System.Drawing.Point(
-                            Convert.ToInt16(notify.Region[0]),
-                            Convert.ToInt16(notify.Region[1]))))
-                    {
-                        double scale = GetScaleForScreen(screen);
-                        double left = screen.Bounds.Left / scale;
-                        double width = Convert.ToInt16(notify.Region[2]) / scale + 200;
-                        double expectedLeft = left + (screen.Bounds.Width / scale - width) / 2;
-                        padHorizontal = (int)(this.Left - expectedLeft);
-                        break;
-                    }
-                }
-
-                Config.Set("Pad", new int[] { pad, padHorizontal });
-            }
-            catch (Exception ex)
-            {
-                Logger.Log.Error($"LocationChanged pad save failed: {ex.Message}");
-            }
-        }
-
 
         public void SwitchIcon(string iconName)
         {
@@ -3910,8 +4275,7 @@ namespace GI_Subtitles.Views
                     {
                         OCRTimer.Stop();
                         UITimer.Stop();
-                        while (_stabilityBuffer.Count > 0)
-                            _stabilityBuffer.Dequeue().Dispose();
+                        ResetOcrPipelineState(clearImageCaches: true);
                         ResetActiveOcrWindow();
                         ClearReadyPlaceholderIfActive();
                         _overlapOverrideAccepted = false;
@@ -3921,11 +4285,13 @@ namespace GI_Subtitles.Views
                     else if (TryGateOcrStart()
                           && TryGateInitialDictionarySync()
                           && TryGateEngineReady()
+                          && TryGateMatcherReady()
                           && TryGateRegionConfigured()
                           && TryGateGameRunning()
                           && TryGateFullscreenTip()
                           && TryGateOverlayNotInRegion())
                     {
+                        ResetOcrPipelineState(clearImageCaches: true);
                         UpdateWindowPosition();
                         ShowReadyPlaceholderIfEmpty();
                         ResetActiveOcrWindow();
@@ -3959,6 +4325,7 @@ namespace GI_Subtitles.Views
                     }
                     else
                     {
+                        ClearReadyPlaceholderIfActive();
                         SystemSounds.Exclamation.Play();
                     }
                     data.UpdateDashboardStatus();
@@ -4194,6 +4561,7 @@ namespace GI_Subtitles.Views
         /// or a session on a friend's PC doesn't permanently disarm the gate.
         /// </summary>
         private bool _gameGateBypassedThisSession;
+        private readonly HashSet<uint> _knownGameProcessIds = new HashSet<uint>();
 
         /// <summary>
         /// Session-scoped bypass for the overlay-overlap gate. True after the
@@ -4674,7 +5042,9 @@ namespace GI_Subtitles.Views
                 _clickThroughRestoreTimer.Tick += (s, e) =>
                 {
                     _clickThroughRestoreTimer.Stop();
-                    SetClickThrough(true);
+                    // Never make the subtitle HWND transparent while the
+                    // overlap recovery UI expects the user to drag it.
+                    SetClickThrough(_clickThroughEnabled && !_inRuntimeOverlapDragMode);
                 };
             }
             else

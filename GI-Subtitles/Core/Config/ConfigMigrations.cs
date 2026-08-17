@@ -27,7 +27,7 @@ namespace GI_Subtitles.Core.Config
     public static class ConfigMigrations
     {
         /// <summary>Current migration tip. Bump when adding a new case.</summary>
-        private const int CurrentVersion = 2;
+        private const int CurrentVersion = 3;
 
         private const string VersionKey = "ConfigMigrationVersion";
 
@@ -90,8 +90,12 @@ namespace GI_Subtitles.Core.Config
                     Migration2_OcrInterval_Defer_To_GameProfile();
                     return;
 
+                case 3:
+                    Migration3_UiRefreshInterval_200_to_150();
+                    return;
+
                 // Future migrations go here:
-                //   case 3: Migration3_SomethingElse(); return;
+                //   case 4: Migration4_SomethingElse(); return;
 
                 default:
                     Logger.Log.Warn($"ConfigMigrations: unknown version {version} — nothing to apply.");
@@ -170,5 +174,38 @@ namespace GI_Subtitles.Core.Config
                 Logger.Log.Info($"ConfigMigrations v2: OcrInterval={current} is user-tuned; keeping.");
             }
         }
+
+        /// <summary>
+        /// UI refresh migration (2026-08-17). The old default was 200 ms;
+        /// 150 ms makes already-matched subtitles feel more immediate without
+        /// increasing OCR inference frequency. Only the exact legacy default
+        /// is rewritten, so explicitly tuned values remain untouched. An
+        /// absent key also stays absent and picks up the new code default.
+        /// </summary>
+        private static void Migration3_UiRefreshInterval_200_to_150()
+        {
+            const string key = "UiRefreshInterval";
+            int? target = GetUiRefreshMigrationTarget(
+                Config.Has(key),
+                Config.Get<int>(key, 0));
+
+            if (target.HasValue)
+            {
+                Config.Set(key, target.Value);
+                Logger.Log.Info("ConfigMigrations v3: UiRefreshInterval=200 migrated to 150 ms.");
+            }
+            else if (Config.Has(key))
+            {
+                Logger.Log.Info(
+                    $"ConfigMigrations v3: UiRefreshInterval={Config.Get<int>(key, 0)} is user-tuned; keeping.");
+            }
+            else
+            {
+                Logger.Log.Info("ConfigMigrations v3: UiRefreshInterval not set — new 150 ms default will apply.");
+            }
+        }
+
+        internal static int? GetUiRefreshMigrationTarget(bool keyExists, int currentValue)
+            => keyExists && currentValue == 200 ? 150 : null;
     }
 }

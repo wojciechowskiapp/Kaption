@@ -681,11 +681,12 @@ namespace GI_Subtitles.Core.UI
             // two of them on screen with the old one still visible.
             CloseRegionOverlayIfOpen();
 
-            if (Region == null || Region.Length < 4 || Region[1] == "0") return;
-            int x = Convert.ToInt32(int.Parse(Region[0]) / Scale);
-            int y = Convert.ToInt32(int.Parse(Region[1]) / Scale);
-            int w = Convert.ToInt32(int.Parse(Region[2]) / Scale);
-            int h = Convert.ToInt32(int.Parse(Region[3]) / Scale);
+            if (!GI_Subtitles.Services.Detection.CaptureRegionValidator.TryParse(
+                    Region, out int rawX, out int rawY, out int rawW, out int rawH)) return;
+            int x = Convert.ToInt32(rawX / Scale);
+            int y = Convert.ToInt32(rawY / Scale);
+            int w = Convert.ToInt32(rawW / Scale);
+            int h = Convert.ToInt32(rawH / Scale);
             Logger.Log.Debug($"x {x} y {y} w {w} h {h}");
 
             // Compute overlap ONCE up front so the visual treatment of every

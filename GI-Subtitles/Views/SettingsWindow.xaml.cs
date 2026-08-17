@@ -45,6 +45,7 @@ using GI_Subtitles.Services.Video;
 using GI_Subtitles.Common;
 using GI_Subtitles.Core.Logging;
 using GI_Subtitles.Services.Detection;
+using GI_Subtitles.Services.OCR;
 using static GI_Subtitles.Core.Config.Config;
 
 namespace GI_Subtitles.Views
@@ -101,6 +102,7 @@ namespace GI_Subtitles.Views
         readonly static string dataDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Kaption");
         readonly string outpath = Path.Combine(dataDir, "out");
         public PaddleOCREngine engine;
+        private readonly object _engineLoadLock = new object();
         private Bitmap bitmap;
         double Scale = 1;
         INotifyIcon notifyIcon;
@@ -127,6 +129,52 @@ namespace GI_Subtitles.Views
         private ObservableCollection<HotkeyViewModel> _hotkeys;
         private bool REAL_CLOSE = false;
         public OptimizedMatcher Matcher;
+        internal bool IsMatcherReady => Matcher?.Loaded == true && Matcher.EntryCount > 0;
+        private bool _translationRestartPending;
+        private bool _startupUpdateRestartPromptShown;
+
+        private void MarkTranslationRestartPending()
+        {
+            _translationRestartPending = true;
+            if (IsOcrRunning?.Invoke() == true)
+                OnToggleOCR?.Invoke();
+
+            if (OutputLangRestartHint != null)
+            {
+                OutputLangRestartHint.Text = L("Dash_Status_RestartRequired", "Selected — restart required");
+                OutputLangRestartHint.Visibility = Visibility.Visible;
+            }
+            UpdateDashboardStatus();
+        }
+
+        private void TryPromptStartupTranslationRestart()
+        {
+            if (_startupUpdateRestartPromptShown ||
+                !IsLoaded ||
+                App.StartupStatus != App.InitialStartupStatus.Ready ||
+                !App.TranslationUpdateRequiresRestart)
+                return;
+
+            _startupUpdateRestartPromptShown = true;
+            string details = App.TranslationUpdateSummary;
+            try
+            {
+                GI_Subtitles.Views.AppRestartPrompt.PromptAndRestart(
+                    owner: this,
+                    title: L("Dialog_GameDataUpdated_Title", "Translation data updated"),
+                    body: L("Dialog_GameDataUpdated_Body",
+                        "Kaption downloaded newer language data. Restart Kaption to load the new dialogue and rebuild the translation index."),
+                    details: string.IsNullOrWhiteSpace(details) ? null : details,
+                    restartButtonText: L("Dialog_RestartGame_Restart", "Restart now"),
+                    laterButtonText: L("Dialog_RestartGame_Later", "Later"),
+                    severity: GI_Subtitles.Views.DialogSeverity.Info,
+                    onDeferred: MarkTranslationRestartPending);
+            }
+            catch (Exception ex)
+            {
+                Logger.Log.Error($"Startup translation-update prompt failed: {ex.Message}");
+            }
+        }
         public Services.Translation.IGameDialogueContext ContextEngine;
         // Used to suppress initial UILangSelector SelectionChanged events triggered by XAML default selection
         private bool _uiLangInitialized = false;
@@ -243,7 +291,12 @@ namespace GI_Subtitles.Views
             EngineStatusChanged += OnEngineStatusChanged;
             Loaded += (_, __) =>
             {
-                try { UpdateDashboardStatus(); }
+                try
+                {
+                    UpdateDashboardStatus();
+                    UpdateDashboardRegionInfo();
+                    TryPromptStartupTranslationRestart();
+                }
                 catch (Exception ex) { Logger.Log.Warn($"Initial Dashboard refresh failed: {ex.Message}"); }
             };
             Scale = scale;
@@ -432,9 +485,10 @@ namespace GI_Subtitles.Views
             _suppressSliderUpdate = false;
 
             // OCR Speed
-            OcrIntervalTextBox.Text = Config.Get<int>("OcrInterval", 100).ToString();
-            UiRefreshTextBox.Text = Config.Get<int>("UiRefreshInterval", 200).ToString();
-            StabilityWindowTextBox.Text = Config.Get<int>("StabilityWindow", 4).ToString();
+            OcrIntervalTextBox.Text = Services.Detection.GameOcrTuning.OcrIntervalMs().ToString();
+            UiRefreshTextBox.Text = Config.Get<int>("UiRefreshInterval", 150).ToString();
+            StabilityWindowTextBox.Text = Services.Detection.GameOcrTuning.StabilityWindow().ToString();
+            InitializeOcrModelSelector();
 
             // Region: parse the string "x,y,w,h"
             var regionStr = Config.Get("Region", "763,1797,2226,110");
@@ -748,6 +802,15 @@ namespace GI_Subtitles.Views
 
         public async Task Load()
         {
+            // App startup owns the update probe. Wait for it before bootstrap
+            // or matcher construction so no reader races an atomic TextMap swap.
+            var initialSync = App.InitialSyncTask;
+            if (initialSync != null)
+            {
+                try { await initialSync.ConfigureAwait(false); }
+                catch (Exception ex) { Logger.Log.Warn($"Initial language update failed (non-fatal): {ex.Message}"); }
+            }
+
             // v2.0.0+: run the bootstrap orchestrator first so missing files
             // (TextMap{Input}.json from GitHub, TextMap{Output}.gisub from R2)
             // are fetched BEFORE CheckDataAsync tries to build a matcher.
@@ -2192,57 +2255,90 @@ namespace GI_Subtitles.Views
 
         public void LoadEngine()
         {
-            if (engine != null)
+            // Build and swap as one serial operation. Retry, startup and the
+            // Settings test buttons can otherwise dispose a session while a
+            // second initialization is still publishing it.
+            lock (_engineLoadLock)
             {
-                engine.Dispose();
+                PaddleOCREngine replacement = LoadEngine(InputLanguage);
+                PaddleOCREngine previous = engine;
+                engine = replacement;
+                previous?.Dispose();
             }
-            engine = LoadEngine(InputLanguage);
         }
 
         public static PaddleOCREngine LoadEngine(string input)
         {
-            OCRModelConfig config = null;
             bool useGpu = Config.Get("UseGpuOcr", true);
-            OCRParameter oCRParameter = new OCRParameter
-            {
-                cpu_math_library_num_threads = 3,//Prediction concurrent thread count
-                enable_mkldnn = true,//If you deploy on the web, it is recommended to set this value to 0, otherwise it will error. If the memory is used very large, it is recommended to set this value to 0.
-                use_angle_cls = false,//Whether to enable direction detection, used to detect 180 degree rotation
-                det_db_score_mode = false,//Whether to use multiple segments, that is, whether the text area is used with multiple segments or with rectangles,
-                max_side_len = 960,
-                use_gpu = useGpu,
-                gpu_id = 0
-            };
-            Logger.Log.Info($"Loading OCR engine (GPU acceleration: {(useGpu ? "requested" : "disabled")})");
+            string requestedId = Config.Get("OcrModelProfile", OcrModelProfiles.RecommendedId);
+            OcrModelProfile requested = OcrModelProfiles.Resolve(requestedId, input);
+            string assemblyRoot = System.IO.Path.GetDirectoryName(typeof(OCRModelConfig).Assembly.Location);
+            string inferenceRoot = System.IO.Path.Combine(assemblyRoot, "inference");
 
-            if (input == "JP")
+            PaddleOCREngine CreateEngine(OcrModelProfile profile)
             {
-                config = new OCRModelConfig();
-                string root = System.IO.Path.GetDirectoryName(typeof(OCRModelConfig).Assembly.Location);
-                string modelPathroot = root + @"\inference";
-                config.det_infer = modelPathroot + @"\Det\V4\PP-OCRv4_mobile_det_infer\slim.onnx";
-                config.rec_infer = modelPathroot + @"\Rec\V4\jp_PP-OCRv4_mobile_rec_infer\slim.onnx";
-                config.keys = modelPathroot + @"\Rec\V4\jp_PP-OCRv4_mobile_rec_infer\dict.txt";
+                OCRModelConfig config = profile.CreateModelConfig(inferenceRoot);
+                OCRParameter parameters = new OCRParameter
+                {
+                    cpu_math_library_num_threads = 3,
+                    enable_mkldnn = true,
+                    use_angle_cls = false,
+                    det_db_score_mode = false,
+                    max_side_len = 960,
+                    det_db_thresh = profile.DetectionThreshold,
+                    det_db_box_thresh = profile.DetectionBoxThreshold,
+                    det_db_unclip_ratio = profile.DetectionUnclipRatio,
+                    rec_img_h = profile.RecognitionImageHeight,
+                    // Product policy: suppress low-confidence texture/UI
+                    // hallucinations even when the detector has high recall.
+                    rec_score_thresh = 0.5f,
+                    use_gpu = useGpu,
+                    gpu_id = 0
+                };
+
+                Logger.Log.Info(
+                    $"Loading OCR profile '{profile.Id}' ({profile.ModelName}); " +
+                    $"GPU acceleration: {(useGpu ? "requested" : "disabled")}, " +
+                    $"detThreshold={parameters.det_db_thresh:F2}, " +
+                    $"detBoxThreshold={parameters.det_db_box_thresh:F2}, " +
+                    $"detUnclip={parameters.det_db_unclip_ratio:F2}, " +
+                    $"recScoreThreshold={parameters.rec_score_thresh:F2}");
+
+                var engine = new PaddleOCREngine(config, parameters);
+                Logger.Log.Info(
+                    $"OCR engine loaded successfully — model: {engine.ModelName}, " +
+                    $"provider: {engine.ExecutionProvider}, GPU active: {engine.IsUsingGpu}");
+                return engine;
             }
-            else
-            {
-                config = new OCRModelConfig();
-                string root = System.IO.Path.GetDirectoryName(typeof(OCRModelConfig).Assembly.Location);
-                string modelPathroot = root + @"\inference";
-                config.det_infer = modelPathroot + @"\Det\V4\PP-OCRv4_mobile_det_infer\slim.onnx";
-                config.rec_infer = modelPathroot + @"\Rec\V4\PP-OCRv4_mobile_rec_infer\slim.onnx";
-                config.keys = modelPathroot + @"\Rec\V4\PP-OCRv4_mobile_rec_infer\dict.txt";
-            }
+
             try
             {
-                var engine = new PaddleOCREngine(config, oCRParameter);
-                Logger.Log.Info($"OCR engine loaded successfully — provider: {engine.ExecutionProvider}, GPU active: {engine.IsUsingGpu}");
-                return engine;
+                return CreateEngine(requested);
             }
             catch (Exception ex)
             {
-                Logger.Log.Error($"Error loading engine: {ex.Message}");
-                throw new Exception("Failed to load engine.");
+                if (!requested.FallsBackToCompatibilityProfile)
+                {
+                    Logger.Log.Error($"Error loading OCR profile '{requested.Id}': {ex}");
+                    throw new Exception($"Failed to load OCR model {requested.ModelName}.", ex);
+                }
+
+                OcrModelProfile fallback = OcrModelProfiles.Resolve(
+                    OcrModelProfiles.CompatibilityId, input);
+                Logger.Log.Warn(
+                    $"Recommended OCR profile '{requested.Id}' could not load " +
+                    $"({ex.GetType().Name}: {ex.Message}). Falling back to '{fallback.Id}'.");
+                try
+                {
+                    return CreateEngine(fallback);
+                }
+                catch (Exception fallbackEx)
+                {
+                    Logger.Log.Error($"OCR compatibility fallback failed: {fallbackEx}");
+                    throw new Exception(
+                        $"Failed to load both {requested.ModelName} and the compatibility OCR model.",
+                        fallbackEx);
+                }
             }
         }
         private void TestButton_Click(object sender, RoutedEventArgs e)
@@ -2288,16 +2384,8 @@ namespace GI_Subtitles.Views
         {
             using (MemoryStream ms = new MemoryStream())
             {
-                // Return the previous frame to the pool before replacing the reference —
-                // the MainWindow capture path rents from BitmapPool.Default, so every
-                // SetImage call would otherwise leak a pool slot's worth of bitmap per tick.
-                Bitmap previous = this.bitmap;
-                this.bitmap = bitmap;
-                if (previous != null && !ReferenceEquals(previous, bitmap))
-                {
-                    GI_Subtitles.Core.Pooling.BitmapPool.Default.Return(previous);
-                }
-
+                // Build the WPF preview before taking ownership. If encoding
+                // fails, the caller still owns and can safely return bitmap.
                 bitmap.Save(ms, System.Drawing.Imaging.ImageFormat.Png);
                 ms.Position = 0;
 
@@ -2311,6 +2399,10 @@ namespace GI_Subtitles.Views
 
                 // Set the Source property of the Image control
                 Capture.Source = bitmapImage;
+                Bitmap previous = this.bitmap;
+                this.bitmap = bitmap;
+                if (previous != null && !ReferenceEquals(previous, bitmap))
+                    GI_Subtitles.Core.Pooling.BitmapPool.Default.Return(previous);
             }
         }
 
@@ -2882,6 +2974,7 @@ namespace GI_Subtitles.Views
             {
                 try { _ = RefreshTranslationsAsync(); }
                 catch (Exception ex) { Logger.Log.Warn($"Post-sync RefreshTranslationsAsync failed: {ex.Message}"); }
+                TryPromptStartupTranslationRestart();
             }
 
             try { UpdateDashboardStatus(); }
@@ -3188,7 +3281,8 @@ namespace GI_Subtitles.Views
                     body: body,
                     restartButtonText: primary,
                     laterButtonText: secondary,
-                    severity: GI_Subtitles.Views.DialogSeverity.Question);
+                    severity: GI_Subtitles.Views.DialogSeverity.Question,
+                    onDeferred: MarkTranslationRestartPending);
             }
             catch (Exception ex)
             {
@@ -3237,7 +3331,10 @@ namespace GI_Subtitles.Views
                 string inputDisplay = HumanLang(input);
                 string outputDisplay = HumanLang(output);
 
-                DashActiveTranslationText.Text = $"{gameDisplay}  \u00B7  {inputDisplay}  \u2192  {outputDisplay}";
+                string pending = _translationRestartPending
+                    ? "  \u00B7  " + L("Dash_Status_RestartRequired", "Selected — restart required")
+                    : string.Empty;
+                DashActiveTranslationText.Text = $"{gameDisplay}  \u00B7  {inputDisplay}  \u2192  {outputDisplay}{pending}";
             }
             catch (Exception ex)
             {
@@ -3289,7 +3386,9 @@ namespace GI_Subtitles.Views
                 bool ocrRunning = IsOcrRunning?.Invoke() ?? false;
                 bool engineReady = IsEngineReady?.Invoke() ?? false;
                 bool subtitleVis = IsSubtitleVisible?.Invoke() ?? true;
-                bool dictLoaded = Matcher != null && Matcher.Loaded;
+                bool matcherLoaded = Matcher?.Loaded == true;
+                bool dictLoaded = IsMatcherReady;
+                bool dictMissing = matcherLoaded && !dictLoaded;
                 bool downloading = App.StartupStatus == App.InitialStartupStatus.DownloadingTranslations;
                 var engineState = Engine;
                 bool engineLoading = engineState == EngineStatus.Loading;
@@ -3309,7 +3408,8 @@ namespace GI_Subtitles.Views
                     // Stop is always allowed; Start is gated on initial sync
                     // AND on the engine being live. A failed engine still
                     // disables Start — the Retry banner below is the CTA.
-                    DashToggleOcrButton.IsEnabled = ocrRunning || (!downloading && !engineLoading && !engineFailed);
+                    DashToggleOcrButton.IsEnabled = ocrRunning ||
+                        (!downloading && !engineLoading && !engineFailed && engineReady && dictLoaded);
                 }
 
                 // OCR status badge — priority order: Running › Downloading ›
@@ -3334,7 +3434,7 @@ namespace GI_Subtitles.Views
                         var fg = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0xD9, 0x77, 0x06));
                         DashOcrStatusBadge.Background = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0xFE, 0xF3, 0xC7));
                         DashOcrStatusText.Foreground = fg;
-                        DashOcrStatusText.Text = TryFindResource("Dash_Status_Downloading") as string ?? "Downloading translations…";
+                        DashOcrStatusText.Text = TryFindResource("Dash_Status_Downloading") as string ?? "Checking and updating translations…";
                         if (DashOcrStatusIcon != null) DashOcrStatusIcon.Foreground = fg;
                     }
                     else if (engineFailed)
@@ -3351,6 +3451,22 @@ namespace GI_Subtitles.Views
                         DashOcrStatusBadge.Background = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0xFE, 0xF3, 0xC7));
                         DashOcrStatusText.Foreground = fg;
                         DashOcrStatusText.Text = TryFindResource("Dash_Status_EngineLoading") as string ?? "Loading OCR engine…";
+                        if (DashOcrStatusIcon != null) DashOcrStatusIcon.Foreground = fg;
+                    }
+                    else if (dictMissing)
+                    {
+                        var fg = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0xDC, 0x26, 0x26));
+                        DashOcrStatusBadge.Background = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0xFE, 0xE2, 0xE2));
+                        DashOcrStatusText.Foreground = fg;
+                        DashOcrStatusText.Text = TryFindResource("Dash_Status_TranslationDataMissing") as string ?? "Translation data missing";
+                        if (DashOcrStatusIcon != null) DashOcrStatusIcon.Foreground = fg;
+                    }
+                    else if (!dictLoaded)
+                    {
+                        var fg = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0xD9, 0x77, 0x06));
+                        DashOcrStatusBadge.Background = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0xFE, 0xF3, 0xC7));
+                        DashOcrStatusText.Foreground = fg;
+                        DashOcrStatusText.Text = TryFindResource("Dash_Status_PreparingTranslations") as string ?? "Preparing translations…";
                         if (DashOcrStatusIcon != null) DashOcrStatusIcon.Foreground = fg;
                     }
                     else
@@ -3397,7 +3513,12 @@ namespace GI_Subtitles.Views
                 // Engine status
                 if (DashEngineStatus != null)
                 {
-                    if (engineReady)
+                    if (engineFailed)
+                    {
+                        DashEngineStatus.Text = TryFindResource("Dash_Status_EngineFailed") as string ?? "Translator failed to load";
+                        DashEngineStatus.Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0xDC, 0x26, 0x26));
+                    }
+                    else if (engineReady)
                     {
                         DashEngineStatus.Text = TryFindResource("Dash_Status_Ready") as string ?? "Ready";
                         DashEngineStatus.Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x05, 0x96, 0x69));
@@ -3416,6 +3537,11 @@ namespace GI_Subtitles.Views
                     {
                         DashDictStatus.Text = $"{contentDict.Count:N0} entries";
                         DashDictStatus.Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x05, 0x96, 0x69));
+                    }
+                    else if (dictMissing)
+                    {
+                        DashDictStatus.Text = TryFindResource("Dash_Status_TranslationDataMissing") as string ?? "Translation data missing";
+                        DashDictStatus.Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0xDC, 0x26, 0x26));
                     }
                     else
                     {
@@ -3474,32 +3600,21 @@ namespace GI_Subtitles.Views
                 if (DashRegionInfo == null) return;
 
                 string regionStr = Config.Get<string>("Region", "");
-                if (string.IsNullOrEmpty(regionStr) || regionStr == "0" || regionStr.StartsWith("0,0,"))
+                if (!CaptureRegionValidator.TryParse(regionStr, out int x, out int y, out int width, out int height))
                 {
                     DashRegionInfo.Text = TryFindResource("Dash_Region_NotSet") as string ?? "Not set";
                 }
                 else
                 {
-                    string[] parts = regionStr.Split(',');
-                    if (parts.Length == 4)
-                    {
-                        DashRegionInfo.Text = $"X: {parts[0]}   Y: {parts[1]}   W: {parts[2]}   H: {parts[3]}";
-                    }
-                    else
-                    {
-                        DashRegionInfo.Text = regionStr;
-                    }
+                    DashRegionInfo.Text = $"✓  {width} × {height} px  ·  ({x}, {y})";
                 }
 
                 // Show answer region info if configured
                 string answerStr = Config.Get<string>("AnswerRegion", "");
-                if (!string.IsNullOrEmpty(answerStr) && answerStr != "0" && !answerStr.StartsWith("0,0,"))
+                if (MainWindow.FeatureAnswerTranslationEnabled &&
+                    CaptureRegionValidator.TryParse(answerStr, out int ax, out int ay, out int aw, out int ah))
                 {
-                    string[] ansParts = answerStr.Split(',');
-                    if (ansParts.Length == 4)
-                    {
-                        DashRegionInfo.Text += $"\nAnswer: X: {ansParts[0]}   Y: {ansParts[1]}   W: {ansParts[2]}   H: {ansParts[3]}";
-                    }
+                    DashRegionInfo.Text += $"\nAnswer: X: {ax}   Y: {ay}   W: {aw}   H: {ah}";
                 }
 
                 // Also sync the region text boxes on the Settings tab
@@ -3762,6 +3877,79 @@ namespace GI_Subtitles.Views
                 StabilityWindowTextBox.Text = val.ToString();
                 Config.Set("StabilityWindow", val);
             }
+        }
+
+        private void PromptRestartForTranslationChange()
+        {
+            try
+            {
+                GI_Subtitles.Views.AppRestartPrompt.PromptAndRestart(
+                    owner: this,
+                    title: L("Dialog_RestartTranslation_Title", "Restart to apply translation"),
+                    body: L("Dialog_RestartTranslation_Body",
+                        "Kaption needs a restart to load the selected OCR language and translation index. Until then, the running translator still uses the previous selection."),
+                    restartButtonText: L("Dialog_RestartGame_Restart", "Restart now"),
+                    laterButtonText: L("Dialog_RestartGame_Later", "Later"),
+                    severity: GI_Subtitles.Views.DialogSeverity.Question,
+                    onDeferred: MarkTranslationRestartPending);
+            }
+            catch (Exception ex)
+            {
+                Logger.Log.Error($"PromptRestartForTranslationChange: {ex.Message}");
+            }
+        }
+
+        private void InitializeOcrModelSelector()
+        {
+            if (OcrModelComboBox == null) return;
+
+            string configured = OcrModelProfiles.NormalizeId(
+                Config.Get("OcrModelProfile", OcrModelProfiles.RecommendedId));
+
+            try
+            {
+                OcrModelComboBox.SelectionChanged -= OcrModelComboBox_SelectionChanged;
+                var item = OcrModelComboBox.Items.Cast<ComboBoxItem>()
+                    .FirstOrDefault(i => string.Equals(
+                        i.Tag?.ToString(), configured, StringComparison.OrdinalIgnoreCase));
+                if (item != null)
+                    OcrModelComboBox.SelectedItem = item;
+            }
+            finally
+            {
+                OcrModelComboBox.SelectionChanged += OcrModelComboBox_SelectionChanged;
+            }
+
+            UpdateOcrModelDescription(configured);
+        }
+
+        private void OcrModelComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (!(OcrModelComboBox?.SelectedItem is ComboBoxItem selected)) return;
+
+            string selectedId = OcrModelProfiles.NormalizeId(selected.Tag?.ToString());
+            UpdateOcrModelDescription(selectedId);
+
+            string previousId = OcrModelProfiles.NormalizeId(
+                Config.Get("OcrModelProfile", OcrModelProfiles.RecommendedId));
+            if (string.Equals(previousId, selectedId, StringComparison.OrdinalIgnoreCase))
+                return;
+
+            Config.Set("OcrModelProfile", selectedId);
+            Logger.Log.Info($"OCR model profile changed: {previousId} -> {selectedId}; restart required.");
+            if (OcrModelRestartHint != null)
+                OcrModelRestartHint.Visibility = Visibility.Visible;
+        }
+
+        private void UpdateOcrModelDescription(string profileId)
+        {
+            if (OcrModelDescription == null) return;
+
+            string resourceKey = OcrModelProfiles.NormalizeId(profileId) == OcrModelProfiles.CompatibilityId
+                ? "Settings_OcrModel_V4_Description"
+                : "Settings_OcrModel_V6_Description";
+            OcrModelDescription.SetResourceReference(
+                System.Windows.Controls.TextBlock.TextProperty, resourceKey);
         }
 
         private void AutoStartCheckBox_Checked(object sender, RoutedEventArgs e)
@@ -4575,6 +4763,7 @@ namespace GI_Subtitles.Views
             });
 
             await RefreshTranslationsAsync();
+            PromptRestartForTranslationChange();
         }
 
         /// <summary>
@@ -4615,12 +4804,22 @@ namespace GI_Subtitles.Views
                 }
             }
 
-            // Config["Game"] must match the row's game so OCR runs on the
-            // right game-data. If the user clicks a StarRail row while
-            // Genshin is active, flip the Game too — one-click "use this
-            // translation" is the whole point of the redesign.
+            // Download first, then commit Config. A failed sign-in/network
+            // request must not leave the Dashboard claiming that a missing
+            // remote pack is active.
             bool gameChanged = !string.Equals(pack.Game, Game, StringComparison.OrdinalIgnoreCase);
             string previousGame = Game;
+            bool outputChanged = !string.Equals(pack.Language, OutputLanguage, StringComparison.OrdinalIgnoreCase);
+            bool installedNow = false;
+
+            if (!pack.IsInstalled && pack.Source == Models.TranslationPackSource.RemoteAvailable)
+            {
+                bool downloaded = await DownloadPackCoreAsync(pack);
+                if (!downloaded)
+                    return;
+                installedNow = true;
+            }
+
             if (gameChanged)
             {
                 Config.Set("Game", pack.Game);
@@ -4628,7 +4827,6 @@ namespace GI_Subtitles.Views
                 Logger.Log.Info($"Translations: game switched to {pack.Game} via row click.");
             }
 
-            bool outputChanged = !string.Equals(pack.Language, OutputLanguage, StringComparison.OrdinalIgnoreCase);
             if (outputChanged)
             {
                 Config.Set("Output", pack.Language);
@@ -4636,29 +4834,26 @@ namespace GI_Subtitles.Views
                 Logger.Log.Info($"Translations: output switched to {pack.Language} via row click.");
             }
 
-            // Offer restart BEFORE the (possibly long) download so an end-user
-            // who just wanted to switch games doesn't sit through a download
-            // that a clean relaunch would redo on next bootstrap anyway. If
-            // they pick Later the download proceeds.
+            // The pack is now present and Config has been committed; make the
+            // runtime-vs-selected distinction explicit with a restart prompt.
             if (gameChanged)
             {
                 PromptRestartForGameChange(previousGame, pack.Game);
             }
+            else if (outputChanged)
+            {
+                PromptRestartForTranslationChange();
+            }
+            else if (installedNow)
+            {
+                // Config already selected this missing pack. The running
+                // matcher cannot see the newly installed file until restart.
+                PromptRestartForTranslationChange();
+            }
 
-            // Download if the pack isn't cached yet. The SyncAsync path is
-            // already idempotent — if the user clicked an already-installed
-            // row, DictionarySync either no-ops (manifest up-to-date) or
-            // re-downloads when versions diverge, both safe.
-            if (!pack.IsInstalled && pack.Source == Models.TranslationPackSource.RemoteAvailable)
-            {
-                await DownloadPackCoreAsync(pack);
-            }
-            else
-            {
-                // No download needed — just repaint so the newly-active row
-                // gets its accent stripe.
-                SyncTranslationPickerState();
-            }
+            // Repaint so the newly-active row gets its accent stripe. The
+            // download path has already refreshed inventory if one was needed.
+            SyncTranslationPickerState();
         }
 
         /// <summary>
@@ -4666,7 +4861,7 @@ namespace GI_Subtitles.Views
         /// and the row-click-triggered auto-download. Returns after the
         /// sync has settled + the inventory has been re-scanned.
         /// </summary>
-        private async Task DownloadPackCoreAsync(Models.TranslationPackInfo pack)
+        private async Task<bool> DownloadPackCoreAsync(Models.TranslationPackInfo pack)
         {
             var license = App.LicenseService;
             if (license?.CurrentActivation == null)
@@ -4675,7 +4870,7 @@ namespace GI_Subtitles.Views
                     owner: this,
                     title: "Sign in required",
                     body: "Sign in to your Kaption account to download translation packs.");
-                return;
+                return false;
             }
 
             // Debounce: if a download for this exact (game, lang) pair is
@@ -4690,13 +4885,14 @@ namespace GI_Subtitles.Views
                 if (_activeDownloads.Contains(dedupeKey))
                 {
                     Logger.Log.Debug($"DownloadPackCore: {dedupeKey} already in flight, ignoring re-entry.");
-                    return;
+                    return false;
                 }
                 _activeDownloads.Add(dedupeKey);
             }
 
             SetTranslationsSummary($"Downloading {pack.LanguageDisplayName} for {pack.GameDisplayName}\u2026");
 
+            bool success = false;
             try
             {
                 var sync = new Services.Translation.DictionarySyncService(
@@ -4713,10 +4909,18 @@ namespace GI_Subtitles.Views
                     string wireGame = (pack.Game ?? "").ToLowerInvariant();
                     string wireLang = (pack.Language ?? "").ToLowerInvariant();
                     var result = await Task.Run(() => sync.SyncAsync(wireGame, wireLang, cts.Token));
-                    if (!result.Ok && result.Messages.Count > 0)
+                    success = result.Ok &&
+                        GameDataPaths.HasAnyTextMap(pack.Game, pack.Language);
+                    if (result.Messages.Count > 0)
                     {
                         TranslationsNoticeText.Text = result.Messages[0];
                         TranslationsNoticeBanner.Visibility = Visibility.Visible;
+                    }
+                    if (!success)
+                    {
+                        Logger.Log.Warn(
+                            $"DownloadPackCore: sync completed without an installed map for {pack.Game}/{pack.Language} " +
+                            $"(downloaded={result.Downloaded}, skipped={result.Skipped}, failed={result.Failed}).");
                     }
                 }
             }
@@ -4735,6 +4939,7 @@ namespace GI_Subtitles.Views
             }
 
             await RefreshTranslationsAsync();
+            return success;
         }
 
         /// <summary>
@@ -4779,29 +4984,13 @@ namespace GI_Subtitles.Views
 
             try
             {
-                var sync = new Services.Translation.DictionarySyncService(
-                    new Services.Network.KaptionApiClient(),
-                    license,
-                    Services.Security.FileProtectionFactory.Create());
-                using (var cts = new CancellationTokenSource(TimeSpan.FromMinutes(5)))
+                bool installed = await DownloadPackCoreAsync(pack);
+                if (installed &&
+                    string.Equals(pack.Game, Config.Get("Game", "Genshin"), StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(pack.Language, Config.Get("Output", "PL"), StringComparison.OrdinalIgnoreCase))
                 {
-                    var result = await Task.Run(() => sync.SyncAsync(pack.Game, pack.Language, cts.Token));
-
-                    if (!result.Ok && result.Messages.Count > 0)
-                    {
-                        TranslationsNoticeText.Text = result.Messages[0];
-                        TranslationsNoticeBanner.Visibility = Visibility.Visible;
-                    }
+                    PromptRestartForTranslationChange();
                 }
-            }
-            catch (Exception ex)
-            {
-                Logger.Log.Warn($"TranslationsDownloadPack: {pack.Game}/{pack.Language} failed: {ex.Message}");
-                GI_Subtitles.Views.ModernDialog.Error(
-                    owner: this,
-                    title: "Download failed",
-                    body: $"Couldn't download {pack.LanguageDisplayName} for {pack.GameDisplayName}. Check your connection and try again.",
-                    technicalDetails: ex.ToString());
             }
             finally
             {
@@ -4813,9 +5002,7 @@ namespace GI_Subtitles.Views
                 btn.IsEnabled = true;
             }
 
-            // Re-scan so the row reflects reality (Installed / still Available
-            // if download failed mid-way / Missing if backend yanked it etc.).
-            await RefreshTranslationsAsync();
+            // DownloadPackCoreAsync already re-scans the inventory.
         }
 
         /// <summary>

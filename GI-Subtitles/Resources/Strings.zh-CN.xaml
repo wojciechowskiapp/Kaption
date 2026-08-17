@@ -103,6 +103,15 @@
     <sys:String x:Key="Config_OcrInterval" xmlns:sys="clr-namespace:System;assembly=mscorlib">OCR 间隔 (ms):</sys:String>
     <sys:String x:Key="Config_UiRefresh" xmlns:sys="clr-namespace:System;assembly=mscorlib">界面刷新 (ms):</sys:String>
     <sys:String x:Key="Config_OcrSpeed_Hint" xmlns:sys="clr-namespace:System;assembly=mscorlib">越小越快 (100-1000，需重启)</sys:String>
+    <sys:String x:Key="Settings_OcrModel_Card_Label" xmlns:sys="clr-namespace:System;assembly=mscorlib">OCR 模型</sys:String>
+    <sys:String x:Key="Settings_OcrModel_Card_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">选择 Kaption 读取游戏对话的方式。推荐模型对屏幕文字识别更准确；兼容模型保留之前的轻量引擎。</sys:String>
+    <sys:String x:Key="Settings_OcrModel_Label" xmlns:sys="clr-namespace:System;assembly=mscorlib">识别模型</sys:String>
+    <sys:String x:Key="Settings_OcrModel_V6" xmlns:sys="clr-namespace:System;assembly=mscorlib">PP-OCRv6 Small — 推荐</sys:String>
+    <sys:String x:Key="Settings_OcrModel_V4" xmlns:sys="clr-namespace:System;assembly=mscorlib">PP-OCRv4 Mobile — 兼容</sys:String>
+    <sys:String x:Key="Settings_OcrModel_V6_Description" xmlns:sys="clr-namespace:System;assembly=mscorlib">适合现代电脑的精度与速度平衡方案。更擅长屏幕文字，并用一个模型支持英语和日语。加载失败时会自动回退到 V4。</sys:String>
+    <sys:String x:Key="Settings_OcrModel_V4_Description" xmlns:sys="clr-namespace:System;assembly=mscorlib">之前的轻量模型。如果 V6 在此电脑上异常缓慢或不兼容，请使用此选项。</sys:String>
+    <sys:String x:Key="Settings_OcrModel_Restart" xmlns:sys="clr-namespace:System;assembly=mscorlib">重启 Kaption 以应用新的 OCR 模型。</sys:String>
+    <sys:String x:Key="Tip_Settings_OcrModel" xmlns:sys="clr-namespace:System;assembly=mscorlib">更改用于检测和读取游戏对话的本地 ONNX 模型。</sys:String>
 
     <!-- Dashboard Tab -->
     <sys:String x:Key="Tab_Dashboard" xmlns:sys="clr-namespace:System;assembly=mscorlib">控制面板</sys:String>
@@ -123,6 +132,7 @@
     <sys:String x:Key="Dash_Status_Running" xmlns:sys="clr-namespace:System;assembly=mscorlib">运行中</sys:String>
     <sys:String x:Key="Dash_Status_Ready" xmlns:sys="clr-namespace:System;assembly=mscorlib">就绪</sys:String>
     <sys:String x:Key="Dash_Status_Loading" xmlns:sys="clr-namespace:System;assembly=mscorlib">加载中...</sys:String>
+    <sys:String x:Key="Dash_Status_Downloading" xmlns:sys="clr-namespace:System;assembly=mscorlib">正在检查并更新翻译数据…</sys:String>
     <sys:String x:Key="Dash_Status_NotLoaded" xmlns:sys="clr-namespace:System;assembly=mscorlib">未加载</sys:String>
     <sys:String x:Key="Dash_Region_NotSet" xmlns:sys="clr-namespace:System;assembly=mscorlib">未设置 - 点击"选择区域"选择识别区域</sys:String>
     <sys:String x:Key="Dash_QuickStart" xmlns:sys="clr-namespace:System;assembly=mscorlib">快速上手：1) 在语言包标签下载数据  2) 点击下方"选择区域"  3) 点击"开始识别"</sys:String>
@@ -134,4 +144,13 @@
     <sys:String x:Key="Log_Level" xmlns:sys="clr-namespace:System;assembly=mscorlib">级别</sys:String>
     <sys:String x:Key="Log_Message" xmlns:sys="clr-namespace:System;assembly=mscorlib">消息</sys:String>
     <sys:String x:Key="Log_Filter_All" xmlns:sys="clr-namespace:System;assembly=mscorlib">所有级别</sys:String>
+    <sys:String x:Key="Dash_Status_PreparingTranslations" xmlns:sys="clr-namespace:System;assembly=mscorlib">正在准备翻译…</sys:String>
+    <sys:String x:Key="Dash_Status_TranslationDataMissing" xmlns:sys="clr-namespace:System;assembly=mscorlib">缺少翻译数据</sys:String>
+    <sys:String x:Key="Dash_Status_RestartRequired" xmlns:sys="clr-namespace:System;assembly=mscorlib">已选择 — 需要重新启动</sys:String>
+    <sys:String x:Key="Dialog_MatcherLoading_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">Kaption 仍在准备翻译，请稍后再试。</sys:String>
+    <sys:String x:Key="Dialog_MatcherMissing_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">所选翻译包缺失或为空。请在“翻译”中下载，然后重新启动 Kaption。</sys:String>
+    <sys:String x:Key="Dialog_RestartTranslation_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">重启以应用翻译</sys:String>
+    <sys:String x:Key="Dialog_RestartTranslation_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">Kaption 需要重启以加载所选 OCR 语言和翻译索引。重启前，正在运行的翻译仍会使用之前的设置。</sys:String>
+    <sys:String x:Key="Dialog_GameDataUpdated_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">翻译数据已更新</sys:String>
+    <sys:String x:Key="Dialog_GameDataUpdated_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">请重启 Kaption 以加载新的语言数据并重建翻译索引。</sys:String>
 </ResourceDictionary>

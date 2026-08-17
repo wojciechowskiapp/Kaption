@@ -43,12 +43,12 @@ namespace PaddleOCRSharp
         /// <summary>
         /// Detection model DB box threshold
         /// </summary>
-        public float det_db_box_thresh { get; set; } = 0.5f;
+        public float det_db_box_thresh { get; set; } = 0.6f;
 
         /// <summary>
         /// Detection model DB expansion ratio
         /// </summary>
-        public float det_db_unclip_ratio { get; set; } = 1.6f;
+        public float det_db_unclip_ratio { get; set; } = 2.0f;
 
         /// <summary>
         /// Whether to use dilation
@@ -94,6 +94,13 @@ namespace PaddleOCRSharp
         /// Recognition model image width
         /// </summary>
         public int rec_img_w { get; set; } = 320;
+
+        /// <summary>
+        /// Minimum mean CTC confidence for a recognized text line. PaddleOCR's
+        /// visualization helpers conventionally use 0.5 to suppress background noise.
+        /// Set to 0 to keep every recognition result.
+        /// </summary>
+        public float rec_score_thresh { get; set; } = 0.5f;
 
         /// <summary>
         /// Whether to display image visualization result

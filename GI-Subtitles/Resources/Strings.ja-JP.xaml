@@ -100,6 +100,15 @@
     <sys:String x:Key="Config_OcrInterval" xmlns:sys="clr-namespace:System;assembly=mscorlib">OCR間隔 (ms):</sys:String>
     <sys:String x:Key="Config_UiRefresh" xmlns:sys="clr-namespace:System;assembly=mscorlib">UI更新 (ms):</sys:String>
     <sys:String x:Key="Config_OcrSpeed_Hint" xmlns:sys="clr-namespace:System;assembly=mscorlib">小さいほど速い (100-1000、再起動が必要)</sys:String>
+    <sys:String x:Key="Settings_OcrModel_Card_Label" xmlns:sys="clr-namespace:System;assembly=mscorlib">OCRモデル</sys:String>
+    <sys:String x:Key="Settings_OcrModel_Card_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">ゲーム内の会話を読み取る方法を選択します。推奨モデルは画面テキストの精度が高く、互換モデルは以前の軽量エンジンです。</sys:String>
+    <sys:String x:Key="Settings_OcrModel_Label" xmlns:sys="clr-namespace:System;assembly=mscorlib">認識モデル</sys:String>
+    <sys:String x:Key="Settings_OcrModel_V6" xmlns:sys="clr-namespace:System;assembly=mscorlib">PP-OCRv6 Small — 推奨</sys:String>
+    <sys:String x:Key="Settings_OcrModel_V4" xmlns:sys="clr-namespace:System;assembly=mscorlib">PP-OCRv4 Mobile — 互換性</sys:String>
+    <sys:String x:Key="Settings_OcrModel_V6_Description" xmlns:sys="clr-namespace:System;assembly=mscorlib">最新PC向けの精度と速度の最良バランスです。画面テキストに強く、英語と日本語を1つのモデルで認識します。読み込めない場合はV4へ自動的に戻ります。</sys:String>
+    <sys:String x:Key="Settings_OcrModel_V4_Description" xmlns:sys="clr-namespace:System;assembly=mscorlib">以前の軽量モデルです。このPCでV6が極端に遅い、または互換性がない場合に使用してください。</sys:String>
+    <sys:String x:Key="Settings_OcrModel_Restart" xmlns:sys="clr-namespace:System;assembly=mscorlib">新しいOCRモデルを適用するにはKaptionを再起動してください。</sys:String>
+    <sys:String x:Key="Tip_Settings_OcrModel" xmlns:sys="clr-namespace:System;assembly=mscorlib">ゲーム内会話の検出と認識に使うローカルONNXモデルを変更します。</sys:String>
 
     <!-- Dashboard Tab -->
     <sys:String x:Key="Tab_Dashboard" xmlns:sys="clr-namespace:System;assembly=mscorlib">コントロール</sys:String>
@@ -120,6 +129,7 @@
     <sys:String x:Key="Dash_Status_Running" xmlns:sys="clr-namespace:System;assembly=mscorlib">実行中</sys:String>
     <sys:String x:Key="Dash_Status_Ready" xmlns:sys="clr-namespace:System;assembly=mscorlib">準備完了</sys:String>
     <sys:String x:Key="Dash_Status_Loading" xmlns:sys="clr-namespace:System;assembly=mscorlib">読み込み中...</sys:String>
+    <sys:String x:Key="Dash_Status_Downloading" xmlns:sys="clr-namespace:System;assembly=mscorlib">翻訳データを確認・更新中…</sys:String>
     <sys:String x:Key="Dash_Status_NotLoaded" xmlns:sys="clr-namespace:System;assembly=mscorlib">未読み込み</sys:String>
     <sys:String x:Key="Dash_Region_NotSet" xmlns:sys="clr-namespace:System;assembly=mscorlib">未設定 - 「領域を選択」をクリックしてください</sys:String>
     <sys:String x:Key="Dash_QuickStart" xmlns:sys="clr-namespace:System;assembly=mscorlib">クイックスタート：1) 言語パックタブでデータをダウンロード  2) 下の「領域を選択」をクリック  3) 「OCR開始」をクリック</sys:String>
@@ -131,4 +141,13 @@
     <sys:String x:Key="Log_Level" xmlns:sys="clr-namespace:System;assembly=mscorlib">レベル</sys:String>
     <sys:String x:Key="Log_Message" xmlns:sys="clr-namespace:System;assembly=mscorlib">メッセージ</sys:String>
     <sys:String x:Key="Log_Filter_All" xmlns:sys="clr-namespace:System;assembly=mscorlib">すべてのレベル</sys:String>
+    <sys:String x:Key="Dash_Status_PreparingTranslations" xmlns:sys="clr-namespace:System;assembly=mscorlib">翻訳を準備中…</sys:String>
+    <sys:String x:Key="Dash_Status_TranslationDataMissing" xmlns:sys="clr-namespace:System;assembly=mscorlib">翻訳データがありません</sys:String>
+    <sys:String x:Key="Dash_Status_RestartRequired" xmlns:sys="clr-namespace:System;assembly=mscorlib">選択済み — 再起動が必要です</sys:String>
+    <sys:String x:Key="Dialog_MatcherLoading_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">Kaption は翻訳を準備中です。しばらくしてからもう一度お試しください。</sys:String>
+    <sys:String x:Key="Dialog_MatcherMissing_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">選択した翻訳パックが見つからないか空です。翻訳画面でダウンロードしてから、Kaption を再起動してください。</sys:String>
+    <sys:String x:Key="Dialog_RestartTranslation_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">翻訳を適用するため再起動</sys:String>
+    <sys:String x:Key="Dialog_RestartTranslation_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">選択した OCR 言語と翻訳インデックスを読み込むには Kaption の再起動が必要です。再起動するまでは以前の設定が使われます。</sys:String>
+    <sys:String x:Key="Dialog_GameDataUpdated_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">翻訳データを更新しました</sys:String>
+    <sys:String x:Key="Dialog_GameDataUpdated_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">新しい言語データを読み込み、翻訳インデックスを再構築するには Kaption を再起動してください。</sys:String>
 </ResourceDictionary>

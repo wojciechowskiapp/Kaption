@@ -122,6 +122,15 @@
     <sys:String x:Key="Config_OcrInterval" xmlns:sys="clr-namespace:System;assembly=mscorlib">Interwał skanowania (ms):</sys:String>
     <sys:String x:Key="Config_UiRefresh" xmlns:sys="clr-namespace:System;assembly=mscorlib">Odświeżanie UI (ms):</sys:String>
     <sys:String x:Key="Config_OcrSpeed_Hint" xmlns:sys="clr-namespace:System;assembly=mscorlib">Mniej = szybsze napisy, więcej = mniejsze obciążenie CPU</sys:String>
+    <sys:String x:Key="Settings_OcrModel_Card_Label" xmlns:sys="clr-namespace:System;assembly=mscorlib">Model OCR</sys:String>
+    <sys:String x:Key="Settings_OcrModel_Card_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">Wybierz, jak Kaption odczytuje dialogi z gry. Rekomendowany model lepiej rozpoznaje tekst ekranowy, a tryb zgodności zachowuje poprzedni, lżejszy silnik.</sys:String>
+    <sys:String x:Key="Settings_OcrModel_Label" xmlns:sys="clr-namespace:System;assembly=mscorlib">Model rozpoznawania</sys:String>
+    <sys:String x:Key="Settings_OcrModel_V6" xmlns:sys="clr-namespace:System;assembly=mscorlib">PP-OCRv6 Small — rekomendowany</sys:String>
+    <sys:String x:Key="Settings_OcrModel_V4" xmlns:sys="clr-namespace:System;assembly=mscorlib">PP-OCRv4 Mobile — zgodność</sys:String>
+    <sys:String x:Key="Settings_OcrModel_V6_Description" xmlns:sys="clr-namespace:System;assembly=mscorlib">Najlepszy balans dla współczesnych komputerów. Dokładniej czyta tekst ekranowy i obsługuje angielski oraz japoński jednym modelem. Jeśli nie wystartuje, aplikacja automatycznie wróci do V4.</sys:String>
+    <sys:String x:Key="Settings_OcrModel_V4_Description" xmlns:sys="clr-namespace:System;assembly=mscorlib">Poprzedni, lekki model. Wybierz go, jeśli V6 działa na tym komputerze nietypowo wolno albo niekompatybilnie.</sys:String>
+    <sys:String x:Key="Settings_OcrModel_Restart" xmlns:sys="clr-namespace:System;assembly=mscorlib">Uruchom Kaption ponownie, aby zastosować nowy model OCR.</sys:String>
+    <sys:String x:Key="Tip_Settings_OcrModel" xmlns:sys="clr-namespace:System;assembly=mscorlib">Zmienia lokalne modele ONNX używane do wykrywania i odczytywania dialogów z gry.</sys:String>
 
     <!-- Dashboard Tab -->
     <sys:String x:Key="Tab_Dashboard" xmlns:sys="clr-namespace:System;assembly=mscorlib">Ogólne</sys:String>
@@ -130,7 +139,7 @@
     <sys:String x:Key="Dash_StartOCR" xmlns:sys="clr-namespace:System;assembly=mscorlib">Uruchom</sys:String>
     <sys:String x:Key="Dash_StopOCR" xmlns:sys="clr-namespace:System;assembly=mscorlib">Zatrzymaj</sys:String>
     <sys:String x:Key="Dash_Start_Tooltip" xmlns:sys="clr-namespace:System;assembly=mscorlib">Rozpocznij przechwytywanie i tłumaczenie dialogów w grze. Gra musi być uruchomiona.</sys:String>
-    <sys:String x:Key="Dash_Status_Downloading" xmlns:sys="clr-namespace:System;assembly=mscorlib">Pobieranie tłumaczeń…</sys:String>
+    <sys:String x:Key="Dash_Status_Downloading" xmlns:sys="clr-namespace:System;assembly=mscorlib">Sprawdzanie i aktualizowanie tłumaczeń…</sys:String>
     <sys:String x:Key="Dash_Region_Section" xmlns:sys="clr-namespace:System;assembly=mscorlib">Obszar rozpoznawania</sys:String>
     <sys:String x:Key="Dash_SelectRegion" xmlns:sys="clr-namespace:System;assembly=mscorlib">Wybierz obszar</sys:String>
     <sys:String x:Key="Dash_ShowRegion" xmlns:sys="clr-namespace:System;assembly=mscorlib">Pokaż obszar</sys:String>
@@ -149,6 +158,9 @@
     <sys:String x:Key="Dash_Status_Ready" xmlns:sys="clr-namespace:System;assembly=mscorlib">Gotowy</sys:String>
     <sys:String x:Key="Dash_Status_Loading" xmlns:sys="clr-namespace:System;assembly=mscorlib">Wczytywanie...</sys:String>
     <sys:String x:Key="Dash_Status_EngineLoading" xmlns:sys="clr-namespace:System;assembly=mscorlib">Wczytywanie silnika OCR…</sys:String>
+    <sys:String x:Key="Dash_Status_PreparingTranslations" xmlns:sys="clr-namespace:System;assembly=mscorlib">Przygotowywanie tłumaczeń…</sys:String>
+    <sys:String x:Key="Dash_Status_TranslationDataMissing" xmlns:sys="clr-namespace:System;assembly=mscorlib">Brak danych tłumaczenia</sys:String>
+    <sys:String x:Key="Dash_Status_RestartRequired" xmlns:sys="clr-namespace:System;assembly=mscorlib">Wybrano — wymagany restart</sys:String>
     <sys:String x:Key="Dash_Status_EngineFailed" xmlns:sys="clr-namespace:System;assembly=mscorlib">Tłumacz się nie wczytał</sys:String>
     <sys:String x:Key="Dash_EngineFailed_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">Tłumacz się nie wczytał</sys:String>
     <sys:String x:Key="Dash_EngineFailed_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">Kaption nie uruchomił silnika OCR. Zwykle pomaga „Spróbuj ponownie"; jeśli tryb GPU wciąż się sypie, przełącz na CPU — wolniej, ale pewnie.</sys:String>
@@ -206,8 +218,8 @@
     <sys:String x:Key="Restart_Prompt_Primary" xmlns:sys="clr-namespace:System;assembly=mscorlib">Zrestartuj teraz</sys:String>
     <sys:String x:Key="Restart_Prompt_Secondary" xmlns:sys="clr-namespace:System;assembly=mscorlib">Później</sys:String>
 
-    <sys:String x:Key="Dialog_StillDownloading_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">Tłumaczenia jeszcze się pobierają</sys:String>
-    <sys:String x:Key="Dialog_StillDownloading_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">Kaption jeszcze dociąga paczkę tłumaczeń. Przy pierwszym uruchomieniu trwa to zwykle kilka sekund — spróbuj za chwilę.</sys:String>
+    <sys:String x:Key="Dialog_StillDownloading_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">Trwa aktualizacja tłumaczeń</sys:String>
+    <sys:String x:Key="Dialog_StillDownloading_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">Kaption sprawdza i aktualizuje dane językowe. Spróbuj ponownie po zakończeniu aktualizacji.</sys:String>
     <sys:String x:Key="Dash_LangData_Section" xmlns:sys="clr-namespace:System;assembly=mscorlib">Dane językowe</sys:String>
 
     <!-- Community Tab -->
@@ -332,6 +344,10 @@
     <sys:String x:Key="Dialog_OcrEngineFailed_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">Tłumaczenie napisów nie zadziała, dopóki tego nie rozwiążemy. Spróbuj uruchomić Kaption ponownie; jeśli błąd się powtarza, zwykle pomaga reinstalacja.</sys:String>
     <sys:String x:Key="Dialog_StillStarting_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">Uruchamianie w toku</sys:String>
     <sys:String x:Key="Dialog_StillStarting_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">Kaption jeszcze się przygotowuje. Spróbuj ponownie za chwilę.</sys:String>
+    <sys:String x:Key="Dialog_MatcherLoading_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">Kaption nadal przygotowuje tłumaczenia. Spróbuj ponownie za chwilę.</sys:String>
+    <sys:String x:Key="Dialog_MatcherMissing_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">Wybrany pakiet tłumaczeń jest pusty albo go brakuje. Otwórz Tłumaczenia, pobierz pakiet i uruchom Kaption ponownie.</sys:String>
+    <sys:String x:Key="Dialog_RestartTranslation_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">Uruchom ponownie, aby zastosować tłumaczenie</sys:String>
+    <sys:String x:Key="Dialog_RestartTranslation_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">Kaption musi uruchomić się ponownie, aby wczytać wybrany język OCR i indeks tłumaczeń. Do tego czasu uruchomiony tłumacz nadal korzysta z poprzedniego wyboru.</sys:String>
     <sys:String x:Key="Dialog_SignInOpenFailed_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">Nie udało się otworzyć logowania</sys:String>
     <sys:String x:Key="Dialog_SignInOpenFailed_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">Kaption nie otworzył okna logowania. Zamknij aplikację i uruchom ją ponownie.</sys:String>
     <sys:String x:Key="Dialog_RegionMissing_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">Brak obszaru przechwytywania</sys:String>
@@ -339,8 +355,8 @@
     <sys:String x:Key="Dialog_RegionMissing_Details" xmlns:sys="clr-namespace:System;assembly=mscorlib">Wróć do kroku Obszar w kreatorze albo otwórz Ustawienia › Obszary i kliknij „Wybierz obszar", po czym spróbuj ponownie.</sys:String>
     <sys:String x:Key="Dialog_PackMissing_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">Brak paczki tłumaczeń</sys:String>
     <sys:String x:Key="Dialog_PackMissing_Details" xmlns:sys="clr-namespace:System;assembly=mscorlib">Napisy będą wyświetlane w oryginalnym języku angielskim, dopóki paczka nie będzie dostępna. Język docelowy zmienisz w Ustawieniach › Pulpicie.</sys:String>
-    <sys:String x:Key="Dialog_GameDataUpdated_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">Dane gry zaktualizowane</sys:String>
-    <sys:String x:Key="Dialog_GameDataUpdated_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">Kaption pobrał nowszą wersję publicznych danych gry. Uruchom Kaption ponownie, aby zbudować indeks tłumaczeń z nowymi tekstami.</sys:String>
+    <sys:String x:Key="Dialog_GameDataUpdated_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">Dane tłumaczeń zaktualizowane</sys:String>
+    <sys:String x:Key="Dialog_GameDataUpdated_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">Kaption pobrał nowsze dane językowe. Uruchom Kaption ponownie, aby wczytać nowe dialogi i przebudować indeks tłumaczeń.</sys:String>
     <sys:String x:Key="Dialog_UpdateDownloadFailed_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">Nie udało się pobrać aktualizacji. Sprawdź połączenie z internetem i spróbuj później.</sys:String>
     <sys:String x:Key="Dialog_UpdateRestartFailed_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">Aktualizacja pobrała się poprawnie, ale nie udało się zakolejkować ponownego uruchomienia. Spróbuj później.</sys:String>
     <sys:String x:Key="Dialog_UpdateInstallFailed_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">Nie udało się dokończyć aktualizacji Kaption. Spróbuj później; jeśli problem się powtarza, zainstaluj ponownie.</sys:String>

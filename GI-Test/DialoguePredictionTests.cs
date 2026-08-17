@@ -40,9 +40,7 @@ namespace GI_Test
         public void Setup()
         {
             string appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-            // Note the "Kaption" brand (v2.0 rename). The legacy "GI-Subtitles"
-            // folder is one-time migrated at app startup; if a user has only
-            // the legacy folder, they need to launch the app once to trigger it.
+            // Optional integration data comes only from Kaption's current store.
             string dataDir = Path.Combine(appData, "Kaption", "Genshin");
 
             string graphPath = Path.Combine(dataDir, "DialogGraph.gisub");

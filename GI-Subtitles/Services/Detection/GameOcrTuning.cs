@@ -32,24 +32,24 @@ namespace GI_Subtitles.Services.Detection
     {
         /// <summary>Minimum ms between OCR runs for the current game.</summary>
         public static int OcrIntervalMs() =>
-            ResolveInt("OcrInterval", p => p.OcrIntervalMs, 100);
+            Math.Clamp(ResolveInt("OcrInterval", p => p.OcrIntervalMs, 100), 50, 1000);
 
         /// <summary>Window size (in ticks) for the "stable over window" check.</summary>
         public static int StabilityWindow() =>
-            ResolveInt("StabilityWindow", p => p.StabilityWindowFrames, 5);
+            Math.Clamp(ResolveInt("StabilityWindow", p => p.StabilityWindowFrames, 5), 1, 30);
 
         /// <summary>Consecutive stable frames needed when chain prediction is active.</summary>
         public static int StableFramesChain() =>
-            ResolveInt("StableFramesChain", p => p.StableFramesChain, 2);
+            Math.Clamp(ResolveInt("StableFramesChain", p => p.StableFramesChain, 2), 1, 30);
 
         /// <summary>Consecutive stable frames needed when no chain prediction is active.</summary>
         public static int StableFramesDefault() =>
-            ResolveInt("StableFramesDefault", p => p.StableFramesDefault, 3);
+            Math.Clamp(ResolveInt("StableFramesDefault", p => p.StableFramesDefault, 3), 1, 30);
 
         /// <summary>Seconds after which we force an OCR re-check when the screen
         /// keeps changing without ever stabilising.</summary>
         public static double ForceOcrAfterSeconds() =>
-            ResolveDouble("ForceOcrAfterSeconds", p => p.ForceOcrAfterSeconds, 1.0);
+            Math.Clamp(ResolveDouble("ForceOcrAfterSeconds", p => p.ForceOcrAfterSeconds, 1.0), 0.1, 10.0);
 
         private static int ResolveInt(
             string configKey,
