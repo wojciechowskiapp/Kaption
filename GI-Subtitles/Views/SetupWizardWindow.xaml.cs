@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Text.RegularExpressions;
@@ -15,6 +15,8 @@ using GI_Subtitles.Services.Detection;
 using GI_Subtitles.Services.Network;
 using GI_Subtitles.Services.Security;
 using PaddleOCRSharp;
+// Explicit alias: PaddleOCRSharp also exports a `Logger`, so a bare `Logger` is ambiguous here.
+using Logger = GI_Subtitles.Common.Logger;
 
 namespace GI_Subtitles.Views
 {
@@ -838,13 +840,23 @@ namespace GI_Subtitles.Views
                     UpdateDialogueStatus(result.DialogueRegion);
 
                     // Save answer region if detected
-                    if (!string.IsNullOrEmpty(result.AnswerRegion))
+                    #pragma warning disable CS0162 // feature flag is a const today
+                    // Only persist the answer region while the feature that reads it exists.
+                    // FeatureAnswerTranslationEnabled is false, so nothing consumes this value —
+                    // but writing it anyway had two visible effects: INotifyIcon.ShowRegionOverlay
+                    // drew a stray "Answer Region" rectangle unrelated to anything on screen, and
+                    // OverlayRegionValidator.Check probes it, so TryGateOverlayNotInRegion could
+                    // block starting OCR over a region no code reads. The ratio fallback emits a
+                    // region on every run, including when the game is not on a dialogue screen,
+                    // so this fired routinely rather than rarely.
+                    if (MainWindow.FeatureAnswerTranslationEnabled && !string.IsNullOrEmpty(result.AnswerRegion))
                     {
                         Config.Set("AnswerRegion", result.AnswerRegion);
                         _notify.AnswerRegion = result.AnswerRegion.Split(',');
                         _answerRegionSet = true;
                         UpdateAnswerStatus(result.AnswerRegion);
                     }
+                    #pragma warning restore CS0162
 
                     AutoDetectStatus.Text = string.Format(
                         L("Wizard_AutoDetect_Detected_Format", "\u2713 Detected at {0} ({1})"),

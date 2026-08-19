@@ -1,4 +1,4 @@
-// ─────────────────────────────────────────────────────────────────────────────
+﻿// ─────────────────────────────────────────────────────────────────────────────
 //  GameDataBootstrapService.cs
 //  ---------------------------------------------------------------------------
 //  First-run / self-heal orchestrator. Before this service existed, fresh
@@ -159,7 +159,10 @@ namespace GI_Subtitles.Services.Data
             }
             else
             {
-                Logger.Log.Debug($"Bootstrap: input TextMap{inputLang.ToUpperInvariant()}.json already present.");
+                if (Logger.IsDebugEnabled)
+                {
+                    Logger.Log.Debug($"Bootstrap: input TextMap{inputLang.ToUpperInvariant()}.json already present.");
+                }
             }
 
             if (inputMirrored && !File.Exists(GameDataPaths.TextMapJson(game, inputLang)))
@@ -235,7 +238,10 @@ namespace GI_Subtitles.Services.Data
                 // refresh: GameDataUpdateService is throttled + conditional,
                 // DictionarySync compares version IDs — both are cheap when
                 // nothing has changed upstream.
-                Logger.Log.Debug($"Bootstrap: output TextMap{outputLang.ToUpperInvariant()} already present; opportunistic refresh.");
+                if (Logger.IsDebugEnabled)
+                {
+                    Logger.Log.Debug($"Bootstrap: output TextMap{outputLang.ToUpperInvariant()} already present; opportunistic refresh.");
+                }
                 try
                 {
                     if (mirrored)

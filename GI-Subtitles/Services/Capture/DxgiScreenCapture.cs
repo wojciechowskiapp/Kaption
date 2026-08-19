@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.Runtime.InteropServices;
@@ -443,7 +443,10 @@ namespace GI_Subtitles.Services.Capture
             }
             catch (Exception ex)
             {
-                Logger.Log.Debug($"DXGI adapter description unavailable: {ex.Message}");
+                if (Logger.IsDebugEnabled)
+                {
+                    Logger.Log.Debug($"DXGI adapter description unavailable: {ex.Message}");
+                }
                 return false;
             }
             finally

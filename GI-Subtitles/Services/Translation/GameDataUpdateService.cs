@@ -1,4 +1,4 @@
-// ─────────────────────────────────────────────────────────────────────────────
+﻿// ─────────────────────────────────────────────────────────────────────────────
 //  GameDataUpdateService.cs
 //  ---------------------------------------------------------------------------
 //  Keeps the public game-data `TextMap*.json` files on disk in sync with the
@@ -799,7 +799,10 @@ namespace GI_Subtitles.Services.Translation
                         {
                             mediumSidecar.CheckedAtUnix = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
                             SaveSidecar(mediumSidecarPath, mediumSidecar);
-                            Logger.Log.Debug($"GameDataUpdate: Medium_{LANG} 304 and local file ≥30 MB — skipped.");
+                            if (Logger.IsDebugEnabled)
+                            {
+                                Logger.Log.Debug($"GameDataUpdate: Medium_{LANG} 304 and local file ≥30 MB — skipped.");
+                            }
                             return false;
                         }
                         Logger.Log.Info($"GameDataUpdate: Medium_{LANG} 304 but local file is {sizeOnDisk / 1024 / 1024} MB — forcing re-fetch.");

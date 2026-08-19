@@ -1,4 +1,4 @@
-using OpenCvSharp;
+﻿using OpenCvSharp;
 using PaddleOCRSharp;
 using System;
 using System.Collections.Generic;
@@ -26,6 +26,8 @@ using GI_Subtitles.Services.Translation;
 using GI_Subtitles.Core.Config;
 using GI_Subtitles.Common;
 using static GI_Subtitles.Core.Config.Config;
+// Explicit alias: PaddleOCRSharp also exports a `Logger`, so a bare `Logger` is ambiguous here.
+using Logger = GI_Subtitles.Common.Logger;
 
 namespace GI_Subtitles.Views
 {

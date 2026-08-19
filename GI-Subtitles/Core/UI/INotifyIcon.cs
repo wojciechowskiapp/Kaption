@@ -1,4 +1,4 @@
-using GI_Subtitles.Properties;
+﻿using GI_Subtitles.Properties;
 using Microsoft.Win32;
 using Screenshot;
 using System;
@@ -687,7 +687,10 @@ namespace GI_Subtitles.Core.UI
             int y = Convert.ToInt32(rawY / Scale);
             int w = Convert.ToInt32(rawW / Scale);
             int h = Convert.ToInt32(rawH / Scale);
-            Logger.Log.Debug($"x {x} y {y} w {w} h {h}");
+            if (Logger.IsDebugEnabled)
+            {
+                Logger.Log.Debug($"x {x} y {y} w {w} h {h}");
+            }
 
             // Compute overlap ONCE up front so the visual treatment of every
             // region and the placement of the "⚠ Overlap" label stay consistent.

@@ -1,4 +1,4 @@
-using OpenCvSharp;
+﻿using OpenCvSharp;
 using PaddleOCRSharp;
 using System;
 using System.Collections.Generic;
@@ -9,6 +9,8 @@ using Newtonsoft.Json;
 using GI_Subtitles.Models;
 using GI_Subtitles.Common;
 using GI_Subtitles.Core.Config;
+// Explicit alias: PaddleOCRSharp also exports a `Logger`, so a bare `Logger` is ambiguous here.
+using Logger = GI_Subtitles.Common.Logger;
 
 namespace GI_Subtitles.Services.Video
 {

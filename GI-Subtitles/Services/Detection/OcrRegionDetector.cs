@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
@@ -114,7 +114,10 @@ namespace GI_Subtitles.Services.Detection
             }
 
             result.TextBlocksFound = ocrResult.TextBlocks.Count;
-            Logger.Log.Debug($"Region detection: OCR found {result.TextBlocksFound} text blocks");
+            if (Logger.IsDebugEnabled)
+            {
+                Logger.Log.Debug($"Region detection: OCR found {result.TextBlocksFound} text blocks");
+            }
 
             // ── Step 2: Convert BoxPoints to axis-aligned bounding rects ──
             var allBlocks = new List<BlockRect>();
@@ -146,8 +149,11 @@ namespace GI_Subtitles.Services.Detection
                 return result;
             }
 
-            Logger.Log.Debug($"Region detection: {contentBlocks.Count} content blocks after UI filter " +
-                             $"(filtered {allBlocks.Count - contentBlocks.Count} UI blocks)");
+            if (Logger.IsDebugEnabled)
+            {
+                Logger.Log.Debug($"Region detection: {contentBlocks.Count} content blocks after UI filter " +
+                                 $"(filtered {allBlocks.Count - contentBlocks.Count} UI blocks)");
+            }
 
             // ── Step 4: Split blocks by horizontal position ──
             // Answers are RIGHT-aligned (centerX past the split), dialogue is CENTER-aligned.
@@ -156,7 +162,10 @@ namespace GI_Subtitles.Services.Detection
             var centerBlocks = contentBlocks.Where(b => b.CenterX <= xSplitThreshold).ToList();
             var rightBlocks = contentBlocks.Where(b => b.CenterX > xSplitThreshold).ToList();
 
-            Logger.Log.Debug($"Region detection: {centerBlocks.Count} center blocks, {rightBlocks.Count} right blocks (split at x={xSplitThreshold:F0})");
+            if (Logger.IsDebugEnabled)
+            {
+                Logger.Log.Debug($"Region detection: {centerBlocks.Count} center blocks, {rightBlocks.Count} right blocks (split at x={xSplitThreshold:F0})");
+            }
 
             // ── Dialogue detection (from CENTER blocks only) ──
             var dialogueRegion = DetectDialogueRegion(centerBlocks, frameW, frameH, vision);
@@ -204,13 +213,19 @@ namespace GI_Subtitles.Services.Detection
                     {
                         extraTopPad = (int)(frameH * 0.05);
                         extraBottomPad = (int)(frameH * 0.05);
-                        Logger.Log.Debug($"Region detection: few answer options, adding extra vertical padding");
+                        if (Logger.IsDebugEnabled)
+                        {
+                            Logger.Log.Debug($"Region detection: few answer options, adding extra vertical padding");
+                        }
                     }
                     // Short answer text: extend left to catch longer options
                     if (answerClusterW < frameW * 0.20)
                     {
                         extraLeftPad = (int)(frameW * 0.08);
-                        Logger.Log.Debug($"Region detection: narrow answers ({answerClusterW}px), adding {extraLeftPad}px left padding");
+                        if (Logger.IsDebugEnabled)
+                        {
+                            Logger.Log.Debug($"Region detection: narrow answers ({answerClusterW}px), adding {extraLeftPad}px left padding");
+                        }
                     }
 
                     int ax = Math.Max(0, aLeft - padX - extraLeftPad);
@@ -245,7 +260,10 @@ namespace GI_Subtitles.Services.Detection
                 }
                 else
                 {
-                    Logger.Log.Debug($"Region detection: no answer blocks found ({rightBlocks.Count} right blocks, {answerCandidates.Count} passed filters)");
+                    if (Logger.IsDebugEnabled)
+                    {
+                        Logger.Log.Debug($"Region detection: no answer blocks found ({rightBlocks.Count} right blocks, {answerCandidates.Count} passed filters)");
+                    }
                 }
             }
             else
@@ -313,13 +331,19 @@ namespace GI_Subtitles.Services.Detection
             if (bestCluster.Count <= 2 || clusterHeight < frameH * 0.06)
             {
                 extraBottomPad = (int)(frameH * 0.06);
-                Logger.Log.Debug($"Region detection: single-line dialogue, adding {extraBottomPad}px bottom padding");
+                if (Logger.IsDebugEnabled)
+                {
+                    Logger.Log.Debug($"Region detection: single-line dialogue, adding {extraBottomPad}px bottom padding");
+                }
             }
             // Short detected text: extend horizontally to catch longer dialogue lines
             if (clusterWidth < frameW * 0.35)
             {
                 extraHorizPad = (int)(frameW * 0.10);
-                Logger.Log.Debug($"Region detection: narrow dialogue ({clusterWidth}px), adding {extraHorizPad}px horizontal padding");
+                if (Logger.IsDebugEnabled)
+                {
+                    Logger.Log.Debug($"Region detection: narrow dialogue ({clusterWidth}px), adding {extraHorizPad}px horizontal padding");
+                }
             }
 
             int finalX = unionLeft - padX - extraHorizPad;
@@ -425,8 +449,11 @@ namespace GI_Subtitles.Services.Detection
                 }
             }
 
-            Logger.Log.Debug($"Region detection: {clusters.Count} vertical clusters, " +
-                             $"largest has {bestCount} blocks (median height={medianHeight}, maxGap={maxGap})");
+            if (Logger.IsDebugEnabled)
+            {
+                Logger.Log.Debug($"Region detection: {clusters.Count} vertical clusters, " +
+                                 $"largest has {bestCount} blocks (median height={medianHeight}, maxGap={maxGap})");
+            }
 
             return best;
         }
@@ -467,8 +494,11 @@ namespace GI_Subtitles.Services.Detection
             if (candidates.Count < 2)
                 return null;
 
-            Logger.Log.Debug($"Region detection: {candidates.Count} answer candidates " +
-                             $"(right side, above dialogue)");
+            if (Logger.IsDebugEnabled)
+            {
+                Logger.Log.Debug($"Region detection: {candidates.Count} answer candidates " +
+                                 $"(right side, above dialogue)");
+            }
 
             // Step 14: Find vertically stacked blocks with similar X centers.
             // Answer choices in most games are vertically aligned with consistent X

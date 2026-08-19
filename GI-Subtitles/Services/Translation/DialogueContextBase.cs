@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -1124,8 +1124,10 @@ namespace GI_Subtitles.Services.Translation
                     }
                 }
 
-                if (loaded > 0)
+                if (loaded > 0 && Logger.IsDebugEnabled)
+                {
                     Logger.Log.Debug($"Pre-loaded {loaded} first-lines for NPC \"{normName}\"");
+                }
             }
         }
 

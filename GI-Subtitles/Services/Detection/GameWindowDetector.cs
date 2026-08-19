@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
@@ -118,9 +118,12 @@ namespace GI_Subtitles.Services.Detection
                 var result = FindWindowByPids(targetPids);
                 if (result != null)
                 {
-                    Logger.Log.Debug($"Found game window by process: \"{result.Value.Title}\" " +
-                                     $"at ({result.Value.GameX},{result.Value.GameY}) " +
-                                     $"{result.Value.GameW}x{result.Value.GameH}");
+                    if (Logger.IsDebugEnabled)
+                    {
+                        Logger.Log.Debug($"Found game window by process: \"{result.Value.Title}\" " +
+                                         $"at ({result.Value.GameX},{result.Value.GameY}) " +
+                                         $"{result.Value.GameW}x{result.Value.GameH}");
+                    }
                     return result;
                 }
             }
@@ -131,9 +134,12 @@ namespace GI_Subtitles.Services.Detection
                 var result = FindWindowByTitles(profile.WindowTitles);
                 if (result != null)
                 {
-                    Logger.Log.Debug($"Found game window by title: \"{result.Value.Title}\" " +
-                                     $"at ({result.Value.GameX},{result.Value.GameY}) " +
-                                     $"{result.Value.GameW}x{result.Value.GameH}");
+                    if (Logger.IsDebugEnabled)
+                    {
+                        Logger.Log.Debug($"Found game window by title: \"{result.Value.Title}\" " +
+                                         $"at ({result.Value.GameX},{result.Value.GameY}) " +
+                                         $"{result.Value.GameW}x{result.Value.GameH}");
+                    }
                     return result;
                 }
             }
@@ -188,8 +194,11 @@ namespace GI_Subtitles.Services.Detection
             string dialogueRegion = $"{dX},{dY},{dW},{dH}";
             string answerRegion = $"{aX},{aY},{aW},{aH}";
 
-            Logger.Log.Debug($"Ratio-based regions (ref {refW}x{refH} at +{refX},+{refY}): " +
-                             $"dialogue={dialogueRegion}, answer={answerRegion}");
+            if (Logger.IsDebugEnabled)
+            {
+                Logger.Log.Debug($"Ratio-based regions (ref {refW}x{refH} at +{refX},+{refY}): " +
+                                 $"dialogue={dialogueRegion}, answer={answerRegion}");
+            }
 
             return (dialogueRegion, answerRegion);
         }

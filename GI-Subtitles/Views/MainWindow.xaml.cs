@@ -38,15 +38,19 @@ using GI_Subtitles.Services.Rendering;
 using static GI_Subtitles.Core.Config.Config;
 using MatchSource = GI_Subtitles.Services.Rendering.MatchSource;
 using System.Windows.Threading;
+// Explicit alias: PaddleOCRSharp also exports a `Logger`, so a bare `Logger` is ambiguous here.
+using Logger = GI_Subtitles.Common.Logger;
 
 [assembly: log4net.Config.XmlConfigurator(Watch = true)]
 namespace GI_Subtitles.Views
 {
-    public static class Logger
-    {
-        public static log4net.ILog Log = log4net.LogManager.GetLogger("LogFileAppender");
-    }
-
+    // GI_Subtitles.Views.Logger used to be declared here: a second static
+    // Logger wrapping the SAME log4net logger name as
+    // GI_Subtitles.Common.Logger. Because it sat in this namespace it won
+    // name resolution over the Common one for every file under Views/, so
+    // the two drifted apart silently — anything added to Common.Logger was
+    // invisible here. Removed; all ten Views files already carry
+    // `using GI_Subtitles.Common;` and now resolve to the single class.
 
     /// <summary>
     /// Interaction logic for MainWindow.xaml
@@ -935,7 +939,10 @@ namespace GI_Subtitles.Views
                 {
                     if (generation != Volatile.Read(ref _engineInitGeneration))
                     {
-                        Logger.Log.Debug($"Ignoring failure from a superseded OCR-engine initialization: {ex.Message}");
+                        if (Logger.IsDebugEnabled)
+                        {
+                            Logger.Log.Debug($"Ignoring failure from a superseded OCR-engine initialization: {ex.Message}");
+                        }
                         return;
                     }
                     Logger.Log.Error("Failed to load OCR engine: " + ex.Message, ex);
@@ -1093,7 +1100,10 @@ namespace GI_Subtitles.Views
                     }
                     catch (Exception ex)
                     {
-                        Logger.Log.Debug($"Foreground process lookup failed for PID {fgPid}: {ex.Message}");
+                        if (Logger.IsDebugEnabled)
+                        {
+                            Logger.Log.Debug($"Foreground process lookup failed for PID {fgPid}: {ex.Message}");
+                        }
                     }
                 }
 
@@ -1463,7 +1473,10 @@ namespace GI_Subtitles.Views
                                         if (pred != null && !string.IsNullOrEmpty(pred.Value.Translation))
                                         {
                                             _predictedContent = pred.Value.Translation;
-                                            Logger.Log.Debug($"Predictive pre-display: \"{pred.Value.Translation}\"");
+                                            if (Logger.IsDebugEnabled)
+                                            {
+                                                Logger.Log.Debug($"Predictive pre-display: \"{pred.Value.Translation}\"");
+                                            }
                                         }
                                     }
                                 }
@@ -1877,7 +1890,10 @@ namespace GI_Subtitles.Views
                                         content = hotResult;
                                         key = hotKey;
                                         hotCacheHit = true;
-                                        Logger.Log.Debug($"HOT CACHE {(isPartialMatch ? "PREFIX" : "HIT")} for \"{ocrText}\": \"{content}\"");
+                                        if (Logger.IsDebugEnabled)
+                                        {
+                                            Logger.Log.Debug($"HOT CACHE {(isPartialMatch ? "PREFIX" : "HIT")} for \"{ocrText}\": \"{content}\"");
+                                        }
                                     }
                                 }
                                 catch (Exception hotEx)
@@ -1907,7 +1923,10 @@ namespace GI_Subtitles.Views
                                         content = "";
                                         key = "";
                                     }
-                                    Logger.Log.Debug($"Color-detected NPC=\"{_detectedNpcName}\" (discarded), body match for \"{ocrText}\": content=\"{content}\"");
+                                    if (Logger.IsDebugEnabled)
+                                    {
+                                        Logger.Log.Debug($"Color-detected NPC=\"{_detectedNpcName}\" (discarded), body match for \"{ocrText}\": content=\"{content}\"");
+                                    }
                                 }
                                 else
                                 {
@@ -1973,7 +1992,10 @@ namespace GI_Subtitles.Views
                                 }
                             }
 
-                            Logger.Log.Debug($"Convert ocrResult for {ocrText}: header={header}, content={content}, key={key}");
+                            if (Logger.IsDebugEnabled)
+                            {
+                                Logger.Log.Debug($"Convert ocrResult for {ocrText}: header={header}, content={content}, key={key}");
+                            }
 
                             resDict[ocrText] = new CachedTranslation
                             {
@@ -2549,7 +2571,10 @@ namespace GI_Subtitles.Views
             catch (Exception ex)
             {
                 candidate?.Dispose();
-                Logger.Log.Debug($"DXGI re-init attempt failed: {ex.Message}");
+                if (Logger.IsDebugEnabled)
+                {
+                    Logger.Log.Debug($"DXGI re-init attempt failed: {ex.Message}");
+                }
             }
         }
 
@@ -3051,7 +3076,10 @@ namespace GI_Subtitles.Views
                 // within this app run. Next app launch reverts to the gate.
                 if (_gameGateBypassedThisSession)
                 {
-                    Logger.Log.Debug($"TryGateGameRunning: bypassed via prior session grant (game '{gameKey}' not local).");
+                    if (Logger.IsDebugEnabled)
+                    {
+                        Logger.Log.Debug($"TryGateGameRunning: bypassed via prior session grant (game '{gameKey}' not local).");
+                    }
                     return true;
                 }
 
@@ -4090,9 +4118,12 @@ namespace GI_Subtitles.Views
                                 detectedText = detectedResult.DialogueText;
                                 detectedTextLayout = detectedResult;
 
-                                Logger.Log.Debug($"Text classification ({classifier.GetType().Name}): " +
-                                    $"NPC=\"{detectedNpcName}\", " +
-                                    $"Dialogue=\"{detectedText}\", DialogueBlocks={detectedResult.DialogueBlocks.Count}");
+                                if (Logger.IsDebugEnabled)
+                                {
+                                    Logger.Log.Debug($"Text classification ({classifier.GetType().Name}): " +
+                                        $"NPC=\"{detectedNpcName}\", " +
+                                        $"Dialogue=\"{detectedText}\", DialogueBlocks={detectedResult.DialogueBlocks.Count}");
+                                }
                             }
                             else
                             {
@@ -4106,7 +4137,10 @@ namespace GI_Subtitles.Views
                                     string fileName = DateTime.Now.ToString("yyyy-MM-dd_HH_mm_ss_ffffff") + ".png";
                                     Logger.Log.Debug(fileName);
                                     target.Save(Path.Combine(dataDir, fileName));
-                                    Logger.Log.Debug($"OCR Text: {detectedText}");
+                                    if (Logger.IsDebugEnabled)
+                                    {
+                                        Logger.Log.Debug($"OCR Text: {detectedText}");
+                                    }
                                 }
                                 catch (Exception ex)
                                 {
@@ -4116,7 +4150,10 @@ namespace GI_Subtitles.Views
 
                         }
 
-                        Logger.Log.Debug($"OCR Content: {detectedText}");
+                        if (Logger.IsDebugEnabled)
+                        {
+                            Logger.Log.Debug($"OCR Content: {detectedText}");
+                        }
 
                         // --- Answer Region OCR (validates/supplements graph predictions) ---
                         // Skip answer OCR when dialogue text is game UI (menus, stats, etc.)
@@ -4143,7 +4180,10 @@ namespace GI_Subtitles.Views
                                             }
                                             // else: keep existing predictions from graph
                                         }
-                                        Logger.Log.Debug($"Answer OCR: {answerLines.Length} merged lines, translated: {detectedAnswers?.Length ?? 0}");
+                                        if (Logger.IsDebugEnabled)
+                                        {
+                                            Logger.Log.Debug($"Answer OCR: {answerLines.Length} merged lines, translated: {detectedAnswers?.Length ?? 0}");
+                                        }
                                     }
                                     // else: OCR found nothing — keep graph predictions if any
                                 }
@@ -4419,7 +4459,10 @@ namespace GI_Subtitles.Views
                                     if (ocrTranslated.Length > 0)
                                         _translatedAnswers = ocrTranslated;
                                 }
-                                Logger.Log.Debug($"Answer-only OCR: {answerLines.Length} lines, translated: {_translatedAnswers?.Length ?? 0}");
+                                if (Logger.IsDebugEnabled)
+                                {
+                                    Logger.Log.Debug($"Answer-only OCR: {answerLines.Length} lines, translated: {_translatedAnswers?.Length ?? 0}");
+                                }
                             }
                             // else: keep graph predictions if any
                         }
@@ -4501,7 +4544,10 @@ namespace GI_Subtitles.Views
                 // DragMove can reject a stale mouse-down during a rapid
                 // visibility/focus transition. Do not leave the overlay in
                 // a broken state; the next click can retry.
-                Logger.Log.Debug($"Overlay DragMove was not started: {ex.Message}");
+                if (Logger.IsDebugEnabled)
+                {
+                    Logger.Log.Debug($"Overlay DragMove was not started: {ex.Message}");
+                }
             }
 
             // Persist once after the drop. The old LocationChanged handler

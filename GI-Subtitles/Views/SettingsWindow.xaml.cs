@@ -47,6 +47,8 @@ using GI_Subtitles.Core.Logging;
 using GI_Subtitles.Services.Detection;
 using GI_Subtitles.Services.OCR;
 using static GI_Subtitles.Core.Config.Config;
+// Explicit alias: PaddleOCRSharp also exports a `Logger`, so a bare `Logger` is ambiguous here.
+using Logger = GI_Subtitles.Common.Logger;
 
 namespace GI_Subtitles.Views
 {
@@ -1306,7 +1308,10 @@ namespace GI_Subtitles.Views
             }
             catch (Exception ex)
             {
-                Logger.Log.Debug($"Corpus sample log failed: {ex.Message}");
+                if (Logger.IsDebugEnabled)
+                {
+                    Logger.Log.Debug($"Corpus sample log failed: {ex.Message}");
+                }
             }
 
             // Build or load the matcher with progress reporting (50-98%).
@@ -2502,11 +2507,20 @@ namespace GI_Subtitles.Views
 
             int idx = 0;
             string configRegion = Config.Get<string>("Region");
-            Logger.Log.Debug($"Config Region: {configRegion}");
+            if (Logger.IsDebugEnabled)
+            {
+                Logger.Log.Debug($"Config Region: {configRegion}");
+            }
             foreach (var screen in Screen.AllScreens)
             {
-                Logger.Log.Debug($"Capturing screen {idx}: {screen.DeviceName}");
-                Logger.Log.Debug($"Bounds: {screen.Bounds.Width}x{screen.Bounds.Height} at {screen.Bounds.Location}");
+                if (Logger.IsDebugEnabled)
+                {
+                    Logger.Log.Debug($"Capturing screen {idx}: {screen.DeviceName}");
+                }
+                if (Logger.IsDebugEnabled)
+                {
+                    Logger.Log.Debug($"Bounds: {screen.Bounds.Width}x{screen.Bounds.Height} at {screen.Bounds.Location}");
+                }
 
                 // Use 'using' to ensure resources are properly disposed
                 using (Bitmap bitmap = new Bitmap(screen.Bounds.Width, screen.Bounds.Height))
@@ -2528,7 +2542,10 @@ namespace GI_Subtitles.Views
                     foreach (var i in res.TextBlocks)
                     {
                         Logger.Log.Debug(i);
-                        Logger.Log.Debug($"Region:\"{i.BoxPoints[0].X - 400},{i.BoxPoints[0].Y - 20},{i.BoxPoints[1].X - i.BoxPoints[0].X + 800},{i.BoxPoints[2].Y - i.BoxPoints[0].Y + 40}\"");
+                        if (Logger.IsDebugEnabled)
+                        {
+                            Logger.Log.Debug($"Region:\"{i.BoxPoints[0].X - 400},{i.BoxPoints[0].Y - 20},{i.BoxPoints[1].X - i.BoxPoints[0].X + 800},{i.BoxPoints[2].Y - i.BoxPoints[0].Y + 40}\"");
+                        }
                     }
                 }
                 idx++;
@@ -3169,11 +3186,21 @@ namespace GI_Subtitles.Views
                     Config.Set("Region", result.DialogueRegion);
                     notifyIcon.Region = result.DialogueRegion.Split(',');
 
-                    if (!string.IsNullOrEmpty(result.AnswerRegion))
+                    #pragma warning disable CS0162 // feature flag is a const today
+                    // Only persist the answer region while the feature that reads it exists.
+                    // FeatureAnswerTranslationEnabled is false, so nothing consumes this value —
+                    // but writing it anyway had two visible effects: INotifyIcon.ShowRegionOverlay
+                    // drew a stray "Answer Region" rectangle unrelated to anything on screen, and
+                    // OverlayRegionValidator.Check probes it, so TryGateOverlayNotInRegion could
+                    // block starting OCR over a region no code reads. The ratio fallback emits a
+                    // region on every run, including when the game is not on a dialogue screen,
+                    // so this fired routinely rather than rarely.
+                    if (MainWindow.FeatureAnswerTranslationEnabled && !string.IsNullOrEmpty(result.AnswerRegion))
                     {
                         Config.Set("AnswerRegion", result.AnswerRegion);
                         notifyIcon.AnswerRegion = result.AnswerRegion.Split(',');
                     }
+                    #pragma warning restore CS0162
 
                     DashAutoDetectStatus.Text = $"\u2713 {result.Resolution} ({result.Method})";
                     DashAutoDetectStatus.Foreground = new SolidColorBrush(
@@ -5174,7 +5201,10 @@ namespace GI_Subtitles.Views
             {
                 if (_activeDownloads.Contains(dedupeKey))
                 {
-                    Logger.Log.Debug($"DownloadPackCore: {dedupeKey} already in flight, ignoring re-entry.");
+                    if (Logger.IsDebugEnabled)
+                    {
+                        Logger.Log.Debug($"DownloadPackCore: {dedupeKey} already in flight, ignoring re-entry.");
+                    }
                     return false;
                 }
                 _activeDownloads.Add(dedupeKey);

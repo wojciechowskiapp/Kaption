@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
@@ -23,7 +23,10 @@ namespace GI_Subtitles.Common
             var pngFiles = Directory.GetFiles(testOcrFolderPath, "*.JPG", SearchOption.TopDirectoryOnly)
                                     .OrderBy(f => f)
                                     .ToList();
-            Logger.Log.Debug($"Total files: {pngFiles.Count}");
+            if (Logger.IsDebugEnabled)
+            {
+                Logger.Log.Debug($"Total files: {pngFiles.Count}");
+            }
 
             var results = new List<OCRTestResult>();
             var totalDuration = 0.0;
@@ -31,7 +34,10 @@ namespace GI_Subtitles.Common
             foreach (var file in pngFiles)
             {
                 string fileName = Path.GetFileName(file);
-                Logger.Log.Debug($"Processing: {fileName}");
+                if (Logger.IsDebugEnabled)
+                {
+                    Logger.Log.Debug($"Processing: {fileName}");
+                }
                 Bitmap bitmap;
 
                 try

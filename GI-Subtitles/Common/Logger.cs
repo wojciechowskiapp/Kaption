@@ -10,6 +10,18 @@ namespace GI_Subtitles.Common
     {
         public static log4net.ILog Log = log4net.LogManager.GetLogger("LogFileAppender");
 
+        /// <summary>
+        /// True when debug records would actually be recorded somewhere.
+        /// <para>Guard every <c>Log.Debug($"...")</c> with this. log4net
+        /// checks the level itself, but only AFTER the caller has already
+        /// built the interpolated string — the level check cannot save an
+        /// allocation that happened before log4net was entered. On a
+        /// per-frame path that is a string built and thrown away on every
+        /// tick, for output nobody will ever read.</para>
+        /// <para>Cheap to call: one volatile read of the logger level.</para>
+        /// </summary>
+        public static bool IsDebugEnabled => Log.IsDebugEnabled;
+
         public static void RegisterInMemoryAppender()
         {
             var appender = new InMemoryAppender();

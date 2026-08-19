@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Buffers;
 using System.Collections.Generic;
 using System.IO;
@@ -1146,7 +1146,10 @@ namespace GI_Subtitles.Common
                 }
             );
 
-            // Logger.Log.Debug($"closestKey {globalBestKey} length {inputLen} closestDistance {globalBestDistance}");
+            if (Logger.IsDebugEnabled)
+            {
+                // Logger.Log.Debug($"closestKey {globalBestKey} length {inputLen} closestDistance {globalBestDistance}");
+            }
 
             // Original threshold decision logic
             if (globalBestDistance < inputLen / 1.5)

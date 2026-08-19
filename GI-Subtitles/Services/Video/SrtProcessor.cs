@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text.RegularExpressions;
@@ -119,7 +119,10 @@ namespace GI_Subtitles.Services.Video
             // Here is just an example: convert the text to uppercase
             string key;
             string res = Matcher.FindClosestMatch(text, out key);
-            Logger.Log.Debug($"Convert {text} ocrResult: {res}");
+            if (Logger.IsDebugEnabled)
+            {
+                Logger.Log.Debug($"Convert {text} ocrResult: {res}");
+            }
             return res;
         }
 

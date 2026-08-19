@@ -1,6 +1,7 @@
-using System;
+﻿using System;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using GI_Subtitles.Common;   // Logger — was resolved via the removed Views.Logger
 
 namespace GI_Subtitles.Core.Runtime
 {
@@ -57,7 +58,7 @@ namespace GI_Subtitles.Core.Runtime
             catch (Exception ex)
             {
                 // Never let diagnostic code break the app.
-                try { Common.Logger.Log.Debug($"[RAM] {name}: checkpoint failed: {ex.Message}"); } catch { /* swallow */ }
+                try { if (Common.Logger.IsDebugEnabled) Common.Logger.Log.Debug($"[RAM] {name}: checkpoint failed: {ex.Message}"); } catch { /* swallow */ }
             }
         }
 
@@ -77,14 +78,17 @@ namespace GI_Subtitles.Core.Runtime
                     if (!ok)
                     {
                         int err = Marshal.GetLastWin32Error();
-                        Common.Logger.Log.Debug($"[RAM] TrimWorkingSet: SetProcessWorkingSetSize failed (win32 {err}).");
+                        if (Logger.IsDebugEnabled)
+                        {
+                            Common.Logger.Log.Debug($"[RAM] TrimWorkingSet: SetProcessWorkingSetSize failed (win32 {err}).");
+                        }
                     }
                     return ok;
                 }
             }
             catch (Exception ex)
             {
-                try { Common.Logger.Log.Debug($"[RAM] TrimWorkingSet failed: {ex.Message}"); } catch { /* swallow */ }
+                try { if (Common.Logger.IsDebugEnabled) Common.Logger.Log.Debug($"[RAM] TrimWorkingSet failed: {ex.Message}"); } catch { /* swallow */ }
                 return false;
             }
         }
@@ -108,7 +112,7 @@ namespace GI_Subtitles.Core.Runtime
             }
             catch (Exception ex)
             {
-                try { Common.Logger.Log.Debug($"[RAM] AggressiveReclaim({reason}) failed: {ex.Message}"); } catch { /* swallow */ }
+                try { if (Common.Logger.IsDebugEnabled) Common.Logger.Log.Debug($"[RAM] AggressiveReclaim({reason}) failed: {ex.Message}"); } catch { /* swallow */ }
             }
         }
 
@@ -190,7 +194,7 @@ namespace GI_Subtitles.Core.Runtime
             }
             catch (Exception ex)
             {
-                try { Common.Logger.Log.Debug($"[RAM] StopBackgroundMonitor: {ex.Message}"); } catch { /* swallow */ }
+                try { if (Common.Logger.IsDebugEnabled) Common.Logger.Log.Debug($"[RAM] StopBackgroundMonitor: {ex.Message}"); } catch { /* swallow */ }
             }
         }
 
@@ -213,7 +217,7 @@ namespace GI_Subtitles.Core.Runtime
                 }
                 catch (Exception ex)
                 {
-                    try { Common.Logger.Log.Debug($"[RAM] WaitForFullGCApproach: {ex.Message}"); } catch { /* swallow */ }
+                    try { if (Common.Logger.IsDebugEnabled) Common.Logger.Log.Debug($"[RAM] WaitForFullGCApproach: {ex.Message}"); } catch { /* swallow */ }
                     break;
                 }
 
@@ -253,7 +257,7 @@ namespace GI_Subtitles.Core.Runtime
                     }
                     catch (Exception ex)
                     {
-                        try { Common.Logger.Log.Debug($"[RAM] WaitForFullGCComplete: {ex.Message}"); } catch { /* swallow */ }
+                        try { if (Common.Logger.IsDebugEnabled) Common.Logger.Log.Debug($"[RAM] WaitForFullGCComplete: {ex.Message}"); } catch { /* swallow */ }
                     }
                 }
             }

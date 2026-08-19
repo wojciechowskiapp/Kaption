@@ -1,4 +1,4 @@
-// ─────────────────────────────────────────────────────────────────────────────
+﻿// ─────────────────────────────────────────────────────────────────────────────
 //  CrashReportingService.cs
 //  ---------------------------------------------------------------------------
 //  Opt-in crash reporting. Wire-level target is GlitchTip (an open-source,
@@ -205,7 +205,10 @@ namespace GI_Subtitles.Services.Observability
         {
             _userId = userId;
 
-            Logger.Log.Debug($"CrashReportingService user context set: id={userId ?? "(null)"}");
+            if (Logger.IsDebugEnabled)
+            {
+                Logger.Log.Debug($"CrashReportingService user context set: id={userId ?? "(null)"}");
+            }
 
             if (!_sdkStarted) return;
 
