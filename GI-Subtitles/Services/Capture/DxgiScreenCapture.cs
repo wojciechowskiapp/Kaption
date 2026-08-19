@@ -7,6 +7,19 @@ using GI_Subtitles.Common;
 namespace GI_Subtitles.Services.Capture
 {
     /// <summary>
+    /// The requested capture rectangle does not live on the DXGI output this
+    /// backend duplicates — a game on the secondary monitor, in practice.
+    /// Distinct from the generic <see cref="InvalidOperationException"/> the
+    /// backend throws for a dead device, because this one is permanent for the
+    /// current region: the caller must switch to GDI and stay there instead of
+    /// re-probing DXGI on a timer.
+    /// </summary>
+    public sealed class DxgiRegionOutsideOutputException : InvalidOperationException
+    {
+        public DxgiRegionOutsideOutputException(string message) : base(message) { }
+    }
+
+    /// <summary>
     /// DXGI Desktop Duplication-based screen capture.
     /// Uses GPU-side frame copy — significantly faster than GDI CopyFromScreen.
     ///
@@ -242,7 +255,7 @@ namespace GI_Subtitles.Services.Capture
                     _outputLeft, _outputTop, _outputWidth, _outputHeight,
                     out int sx, out int sy))
                 {
-                    throw new InvalidOperationException(
+                    throw new DxgiRegionOutsideOutputException(
                         $"Capture region {x},{y} {width}x{height} is outside DXGI output " +
                         $"{_outputLeft},{_outputTop} {_outputWidth}x{_outputHeight}.");
                 }
@@ -387,6 +400,60 @@ namespace GI_Subtitles.Services.Capture
         }
 
         /// <summary>
+        /// Best-effort adapter description for diagnostics — "which GPU is this
+        /// machine actually running Kaption on" is the first question every
+        /// DirectML performance ticket raises, and app.log is all we get.
+        /// Reuses the factory/adapter interop already needed for duplication so
+        /// no extra dependency is pulled in for one log line.
+        ///
+        /// Returns false (and logs nothing beyond Debug) whenever the adapter
+        /// cannot be enumerated — this must never be able to break engine init.
+        /// </summary>
+        public static bool TryGetAdapterName(int adapterIndex, out string name)
+        {
+            name = null;
+            IntPtr factory = IntPtr.Zero;
+            IntPtr adapter = IntPtr.Zero;
+            try
+            {
+                int hr = CreateDXGIFactory1(ref IID_IDXGIFactory1, out factory);
+                if (hr < 0 || factory == IntPtr.Zero) return false;
+
+                hr = IDXGIFactory1_EnumAdapters1(factory, Math.Max(0, adapterIndex), out adapter);
+                if (hr < 0 || adapter == IntPtr.Zero) return false;
+
+                int descSize = Marshal.SizeOf(typeof(DXGI_ADAPTER_DESC1));
+                IntPtr descPtr = Marshal.AllocHGlobal(descSize);
+                try
+                {
+                    hr = IDXGIAdapter1_GetDesc1(adapter, descPtr);
+                    if (hr < 0) return false;
+
+                    var desc = (DXGI_ADAPTER_DESC1)Marshal.PtrToStructure(descPtr, typeof(DXGI_ADAPTER_DESC1));
+                    if (string.IsNullOrWhiteSpace(desc.Description)) return false;
+
+                    // DedicatedVideoMemory is SIZE_T; report MB so the line stays
+                    // readable and an integrated-GPU misroute is obvious.
+                    ulong dedicatedMb = (ulong)desc.DedicatedVideoMemory / (1024UL * 1024UL);
+                    name = $"{desc.Description.Trim()} (vendor 0x{desc.VendorId:X4}, " +
+                           $"device 0x{desc.DeviceId:X4}, {dedicatedMb} MB dedicated)";
+                    return true;
+                }
+                finally { Marshal.FreeHGlobal(descPtr); }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log.Debug($"DXGI adapter description unavailable: {ex.Message}");
+                return false;
+            }
+            finally
+            {
+                if (adapter != IntPtr.Zero) Marshal.Release(adapter);
+                if (factory != IntPtr.Zero) Marshal.Release(factory);
+            }
+        }
+
+        /// <summary>
         /// Convert an absolute virtual-desktop capture rectangle to coordinates local to
         /// one DXGI output. Desktop Duplication exposes one surface per output; it cannot
         /// legally satisfy a rectangle on another monitor or spanning two monitors.
@@ -424,7 +491,7 @@ namespace GI_Subtitles.Services.Capture
                 return;
             }
 
-            throw new InvalidOperationException(
+            throw new DxgiRegionOutsideOutputException(
                 $"Capture region {x},{y} {width}x{height} is outside DXGI output " +
                 $"{_outputLeft},{_outputTop} {_outputWidth}x{_outputHeight}; use GDI fallback.");
         }
@@ -479,6 +546,9 @@ namespace GI_Subtitles.Services.Capture
         private delegate int EnumOutputsDelegate(IntPtr self, int index, out IntPtr ppOutput);
 
         [UnmanagedFunctionPointer(CallingConvention.StdCall)]
+        private delegate int GetDesc1Delegate(IntPtr self, IntPtr pDesc);
+
+        [UnmanagedFunctionPointer(CallingConvention.StdCall)]
         private delegate int GetDescDelegate(IntPtr self, IntPtr pDesc);
 
         [UnmanagedFunctionPointer(CallingConvention.StdCall)]
@@ -508,7 +578,7 @@ namespace GI_Subtitles.Services.Capture
         // Vtable slot numbers (from COM interface definitions)
         // IUnknown: 0=QI, 1=AddRef, 2=Release
         // IDXGIFactory1: 12=EnumAdapters1
-        // IDXGIAdapter1: 7=EnumOutputs
+        // IDXGIAdapter1: 7=EnumOutputs, 10=GetDesc1
         // IDXGIOutput: 7=GetDesc
         // IDXGIOutput1: 22=DuplicateOutput
         // IDXGIOutputDuplication: 8=AcquireNextFrame, 14=ReleaseFrame
@@ -530,6 +600,9 @@ namespace GI_Subtitles.Services.Capture
 
         private static int IDXGIAdapter1_EnumOutputs(IntPtr adapter, int index, out IntPtr ppOutput)
             => GetVtblDelegate<EnumOutputsDelegate>(adapter, 7)(adapter, index, out ppOutput);
+
+        private static int IDXGIAdapter1_GetDesc1(IntPtr adapter, IntPtr descPtr)
+            => GetVtblDelegate<GetDesc1Delegate>(adapter, 10)(adapter, descPtr);
 
         private static void IDXGIOutput_GetDesc(IntPtr output, IntPtr descPtr)
             => GetVtblDelegate<GetDescDelegate>(output, 7)(output, descPtr);
@@ -588,6 +661,26 @@ namespace GI_Subtitles.Services.Capture
 
         [StructLayout(LayoutKind.Sequential)]
         private struct RECT { public int Left, Top, Right, Bottom; }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct LUID { public uint LowPart; public int HighPart; }
+
+        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+        private struct DXGI_ADAPTER_DESC1
+        {
+            [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 128)]
+            public string Description;
+            public uint VendorId;
+            public uint DeviceId;
+            public uint SubSysId;
+            public uint Revision;
+            // SIZE_T — must be pointer-sized or the struct layout shifts on x64.
+            public UIntPtr DedicatedVideoMemory;
+            public UIntPtr DedicatedSystemMemory;
+            public UIntPtr SharedSystemMemory;
+            public LUID AdapterLuid;
+            public uint Flags;
+        }
 
         [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
         private struct DXGI_OUTPUT_DESC

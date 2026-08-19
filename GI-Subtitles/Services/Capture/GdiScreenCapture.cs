@@ -12,6 +12,14 @@ namespace GI_Subtitles.Services.Capture
     /// </summary>
     public sealed class GdiScreenCapture : IScreenCapture
     {
+        // Static, not per-instance: MainWindow builds a fresh GdiScreenCapture
+        // when DXGI dies, and the static CaptureRegion helper builds one per
+        // call, so an instance-scoped throttle would reset itself constantly.
+        // CopyFromScreen fails on every tick while the secure desktop is up
+        // (Ctrl+Alt+Del, UAC, lock screen) — one line a minute is plenty.
+        private static readonly ThrottledLogger CaptureErrorLog =
+            new ThrottledLogger(TimeSpan.FromSeconds(60));
+
         public bool IsAvailable => true;
 
         /// <summary>
@@ -74,7 +82,12 @@ namespace GI_Subtitles.Services.Capture
             }
             catch (Exception ex)
             {
-                Logger.Log.Error($"GDI capture failed: {ex.Message}");
+                if (CaptureErrorLog.ShouldLog(ex.Message, out int suppressed))
+                {
+                    Logger.Log.Error(
+                        $"GDI capture failed: {ex.Message}" +
+                        CaptureErrorLog.SuppressionSuffix(suppressed));
+                }
                 throw;
             }
         }

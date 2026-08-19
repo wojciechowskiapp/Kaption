@@ -490,6 +490,28 @@ namespace GI_Subtitles.Services.Translation
 
                 if (!graphExists)
                 {
+                    // DialogGraphDownloader is Genshin-specific: it pulls
+                    // ExcelBin*.json from Dimbreath/animegamedata2 and builds a
+                    // Genshin graph keyed by Genshin hashes. Running it for
+                    // another game writes that graph into THAT game's folder,
+                    // where it can neither be detected (no BundleMeta sidecar
+                    // is produced, so ValidateBundleMeta accepts it) nor
+                    // resolve a single line. For ZZZ it would also fight the
+                    // bundle's own TextMapEN.json. The bundle is the only
+                    // source for anything but Genshin — say so and stop.
+                    bool legacyFallbackApplies =
+                        string.IsNullOrEmpty(ExpectedBundleGame) ||
+                        string.Equals(ExpectedBundleGame, "genshin", StringComparison.OrdinalIgnoreCase);
+
+                    if (!legacyFallbackApplies)
+                    {
+                        Logger.Log.Warn(
+                            $"DialogGraph missing for \"{ExpectedBundleGame}\" and the legacy " +
+                            "GitHub rebuild only knows how to build Genshin — prediction disabled. " +
+                            "Expected the gamedata bundle to supply it; check the GamedataSync log lines.");
+                        return;
+                    }
+
                     try
                     {
                         DialogGraphDownloader.DownloadAndBuild(dataDir, textMapEnPath,

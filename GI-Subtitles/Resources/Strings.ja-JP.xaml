@@ -13,7 +13,7 @@
 
     <sys:String x:Key="Game_Genshin" xmlns:sys="clr-namespace:System;assembly=mscorlib">原神</sys:String>
     <sys:String x:Key="Game_StarRail" xmlns:sys="clr-namespace:System;assembly=mscorlib">崩壊：スターレイル</sys:String>
-    <sys:String x:Key="Game_zzz" xmlns:sys="clr-namespace:System;assembly=mscorlib">ゼンレスゾーンゼロ</sys:String>
+    <sys:String x:Key="Game_ZZZ" xmlns:sys="clr-namespace:System;assembly=mscorlib">ゼンレスゾーンゼロ</sys:String>
     <sys:String x:Key="Game_Wuthering" xmlns:sys="clr-namespace:System;assembly=mscorlib">鳴潮</sys:String>
     <sys:String x:Key="Game_Endfield" xmlns:sys="clr-namespace:System;assembly=mscorlib">終末地</sys:String>
     <sys:String x:Key="Game_BH3" xmlns:sys="clr-namespace:System;assembly=mscorlib">崩壊三</sys:String>

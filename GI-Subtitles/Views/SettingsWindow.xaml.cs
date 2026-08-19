@@ -93,11 +93,17 @@ namespace GI_Subtitles.Views
                 { "English", "EN"},
                 { "日本語", "JP"}
             };
-        readonly Dictionary<string, string> GameDict = new Dictionary<string, string>
-        {
-            ["Genshin Impact"] = "Genshin",
-            ["Honkai: Star Rail"] = "StarRail",
-        };
+        // Display name → canonical Config["Game"] tag, derived from
+        // GameRegionProfile so it can't drift from the region/pacing registry
+        // the way the hardcoded copy did.
+        //
+        // NOTE: this currently has no callers anywhere in the solution — it
+        // survives only because it's cheap and matches the InputLanguages /
+        // OutputLanguages fields next to it. If it's still unused the next time
+        // someone works in this file, delete it.
+        readonly Dictionary<string, string> GameDict =
+            Services.Detection.GameRegionProfile.RegisteredProfiles
+                .ToDictionary(p => p.DisplayName ?? p.GameId, p => p.GameId);
         readonly Stopwatch sw = new Stopwatch();
         readonly static string dataDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Kaption");
         readonly string outpath = Path.Combine(dataDir, "out");
@@ -475,7 +481,7 @@ namespace GI_Subtitles.Views
             saveButton.Click += SaveButton_Click;
             resetButton.Click += ResetButton_Click;
             // Pad - set text and slider values
-            int pad = Config.GetPad(-140);
+            int pad = Config.GetPad(DefaultPadVertical);
             int padHorizontal = Config.GetPadHorizontal(0);
             _suppressSliderUpdate = true;
             PadTextBox.Text = pad.ToString();
@@ -913,19 +919,21 @@ namespace GI_Subtitles.Views
                     OutputLangDownloadUrl2.Text = string.Empty;
                 }
             }
-            else if (Game == "Zenless")
+            else if (Game == "ZZZ")
             {
-                repoUrl = "https://git.mero.moe/dimbreath/ZenlessData";
-                InputLangDownloadUrl.Text = ZenlessUrl(InputLanguage);
-                OutputLangDownloadUrl.Text = ZenlessUrl(OutputLanguage);
-                if (!string.IsNullOrEmpty(OutputLanguage2))
-                {
-                    OutputLangDownloadUrl2.Text = ZenlessUrl(OutputLanguage2);
-                }
-                else
-                {
-                    OutputLangDownloadUrl2.Text = string.Empty;
-                }
+                repoUrl = ZenlessRepoUrl;
+                // Deliberately blank. ZZZ's on-disk TextMaps are keyed by ids
+                // that tools/build-gamedata-zzz.cjs mints; they arrive in the
+                // gamedata bundle's `textmap_en` section, not from any mirror.
+                // The upstream ZenlessData TextMap is string-keyed, so pasting
+                // it into %APPDATA%\Kaption\ZZZ\ (which is exactly what the
+                // DownloadButton1/2 handlers below do with these URLs) yields a
+                // dialogue engine that loads cleanly and resolves nothing.
+                // GameDataUpdateService.IsUpstreamMirrored says the same thing
+                // for the automatic path; this is the manual one.
+                InputLangDownloadUrl.Text = string.Empty;
+                OutputLangDownloadUrl.Text = string.Empty;
+                OutputLangDownloadUrl2.Text = string.Empty;
             }
             else if (Game == "Wuthering")
             {
@@ -957,19 +965,9 @@ namespace GI_Subtitles.Views
             }
         }
 
-        private string ZenlessUrl(string language)
-        {
-            string url = "https://git.mero.moe/dimbreath/ZenlessData/raw/branch/master/TextMap/TextMapTemplateTb.json";
-            if (language != "CHS")
-            {
-                if (language == "JP")
-                {
-                    language = "JA";
-                }
-                url = $"https://git.mero.moe/dimbreath/ZenlessData/raw/branch/master/TextMap/TextMap_{language}TemplateTb.json";
-            }
-            return url;
-        }
+        /// <summary>Gitea repo landing page — its first <c>datetime="…"</c>
+        /// attribute is the newest commit's timestamp.</summary>
+        private const string ZenlessRepoUrl = "https://git.mero.moe/dimbreath/ZenlessData";
 
         private string WutheringUrl(string language)
         {
@@ -1883,6 +1881,46 @@ namespace GI_Subtitles.Views
         }
 
 
+        /// <summary>
+        /// Pull the newest-commit timestamp out of a Gitea repo landing page.
+        /// Gitea renders it as <c>&lt;relative-time datetime="2026-08-01T12:34:56Z"&gt;</c>
+        /// in the latest-commit row, so the first <c>datetime=</c> attribute on
+        /// the page is the one we want. Returns null (having logged) when the
+        /// attribute is absent or unparseable, so each caller keeps its own
+        /// "couldn't read it" behaviour.
+        ///
+        /// Only ZZZ uses this — the Dimbreath GitLab repos answer with JSON and
+        /// the GitHub ones with an Atom feed.
+        ///
+        /// Verified against a live git.mero.moe response on 2026-08-19: the
+        /// dimbreath/ZenlessData landing page returned 43,559 bytes carrying
+        /// exactly five <c>datetime=</c> attributes, all on
+        /// <c>&lt;relative-time&gt;</c> elements. The first four are the
+        /// latest-commit row, so taking the first match is correct, and the
+        /// offset form (<c>+02:00</c>) parses. If the repo-date line ever
+        /// renders blank, start here — Gitea markup is the likely change.
+        /// </summary>
+        private static string ParseGiteaCommitDate(string responseText)
+        {
+            Match match = Regex.Match(responseText ?? string.Empty, @"datetime=""([^""]*)""");
+            if (!match.Success)
+            {
+                Logger.Log.Error("No datetime attribute found in the input string.");
+                return null;
+            }
+
+            try
+            {
+                DateTimeOffset dateTimeOffset = DateTimeOffset.Parse(match.Groups[1].Value);
+                return dateTimeOffset.LocalDateTime.ToString();
+            }
+            catch (Exception ex)
+            {
+                Logger.Log.Error("Error parsing datetime: " + ex.Message);
+                return null;
+            }
+        }
+
         public async Task GetRepositoryModificationDateAsync()
         {
             try
@@ -1891,30 +1929,13 @@ namespace GI_Subtitles.Views
                 HttpResponseMessage response = await client.GetAsync(repoUrl);
                 response.EnsureSuccessStatusCode();
                 string responseText = await response.Content.ReadAsStringAsync();
-                if (Game == "Zenless")
+                if (Game == "ZZZ")
                 {
-                    string pattern = @"datetime=""([^""]*)""";
-                    Match match = Regex.Match(responseText, pattern);
-
-                    if (match.Success)
-                    {
-                        string dateTimeString = match.Groups[1].Value;
-                        try
-                        {
-                            DateTimeOffset dateTimeOffset = DateTimeOffset.Parse(dateTimeString);
-                            DateTime localTime = dateTimeOffset.LocalDateTime; // 自动转换为本地时区
-                            RepoModifiedDate.Text = localTime.ToString();
-                        }
-                        catch (Exception ex)
-                        {
-                            Logger.Log.Error("Error parsing datetime: " + ex.Message);
-                        }
-                    }
-                    else
-                    {
-                        Logger.Log.Error("No datetime attribute found in the input string.");
-                    }
-
+                    // Leave the existing text alone when parsing fails — same
+                    // as before the dedupe; ParseGiteaCommitDate has already
+                    // logged whatever went wrong.
+                    string parsed = ParseGiteaCommitDate(responseText);
+                    if (parsed != null) RepoModifiedDate.Text = parsed;
                 }
                 else if (Game == "Wuthering" || Game == "Genshin")
                 {
@@ -1958,30 +1979,12 @@ namespace GI_Subtitles.Views
                 HttpResponseMessage response = await client.GetAsync(url);
                 response.EnsureSuccessStatusCode();
                 string responseText = await response.Content.ReadAsStringAsync();
-                if (Game == "Zenless")
+                if (Game == "ZZZ")
                 {
-                    string pattern = @"datetime=""([^""]*)""";
-                    Match match = Regex.Match(responseText, pattern);
-
-                    if (match.Success)
-                    {
-                        string dateTimeString = match.Groups[1].Value;
-                        try
-                        {
-                            DateTimeOffset dateTimeOffset = DateTimeOffset.Parse(dateTimeString);
-                            DateTime localTime = dateTimeOffset.LocalDateTime;
-                            return localTime.ToString();
-                        }
-                        catch (Exception ex)
-                        {
-                            Logger.Log.Error("Error parsing datetime: " + ex.Message);
-                        }
-                    }
-                    else
-                    {
-                        Logger.Log.Error("No datetime attribute found in the input string.");
-                    }
-
+                    // Parse failure falls through to the `return ""` at the
+                    // bottom, exactly as the pre-dedupe code did.
+                    string parsed = ParseGiteaCommitDate(responseText);
+                    if (parsed != null) return parsed;
                 }
                 else if (Game == "Wuthering" || Game == "Genshin")
                 {
@@ -2268,12 +2271,30 @@ namespace GI_Subtitles.Views
             }
         }
 
+        /// <summary>
+        /// A DirectML warm-up slower than this is treated as a failed warm-up
+        /// even though it technically finished. See the comment at the call
+        /// site for why "slow but successful" is not good enough.
+        /// </summary>
+        private static readonly TimeSpan GpuWarmUpBudget = TimeSpan.FromSeconds(10);
+
         public static PaddleOCREngine LoadEngine(
             string input,
             bool? useGpuOverride = null,
             string profileOverride = null)
         {
             bool useGpu = useGpuOverride ?? Config.Get("UseGpuOcr", true);
+            // A quarantine recorded by an earlier session (or by this one's
+            // runtime recovery) outranks the preference until the next release.
+            // The user's UseGpuOcr value is left untouched — see OcrGpuQuarantine.
+            if (useGpu && OcrGpuQuarantine.IsActiveForCurrentVersion())
+            {
+                useGpu = false;
+                Logger.Log.Warn(
+                    $"GPU OCR quarantined since {OcrGpuQuarantine.EngagedUtc ?? "an earlier session"} " +
+                    $"({OcrGpuQuarantine.Reason ?? "no reason recorded"}); using CPU. " +
+                    "Re-tick \"Use GPU acceleration\" in Settings → General to retry the GPU.");
+            }
             string requestedId = string.IsNullOrWhiteSpace(profileOverride)
                 ? Config.Get("OcrModelProfile", OcrModelProfiles.RecommendedId)
                 : profileOverride;
@@ -2310,19 +2331,57 @@ namespace GI_Subtitles.Views
                     $"detUnclip={parameters.det_db_unclip_ratio:F2}, " +
                     $"recScoreThreshold={parameters.rec_score_thresh:F2}");
 
+                // One INFO line naming the device DirectML will target. We only
+                // ever see GPU stalls second-hand through app.log, and "which
+                // GPU" is the first question every such ticket raises. Reuses
+                // the DXGI interop already in the capture backend; the DML
+                // device id and the DXGI adapter index share an enumeration
+                // order in practice, so gpu_id is the right index to describe.
+                if (useGpu)
+                {
+                    if (GI_Subtitles.Services.Capture.DxgiScreenCapture.TryGetAdapterName(
+                            parameters.gpu_id, out string adapterName))
+                        Logger.Log.Info($"DirectML target adapter {parameters.gpu_id}: {adapterName}.");
+                    else
+                        Logger.Log.Info($"DirectML target adapter {parameters.gpu_id}: name unavailable.");
+                }
+
                 PaddleOCREngine engine = null;
                 try
                 {
                     engine = new PaddleOCREngine(config, parameters);
+                    string gpuUnfitReason = null;
                     try
                     {
-                        engine.WarmUp(TimeSpan.FromSeconds(engine.IsUsingGpu ? 30 : 45));
+                        TimeSpan warmUpDuration = engine.WarmUp(
+                            TimeSpan.FromSeconds(engine.IsUsingGpu ? 30 : 45));
+                        if (engine.IsUsingGpu && warmUpDuration > GpuWarmUpBudget)
+                        {
+                            gpuUnfitReason =
+                                $"DirectML OCR warm-up succeeded but took " +
+                                $"{warmUpDuration.TotalSeconds:F1}s " +
+                                $"(budget {GpuWarmUpBudget.TotalSeconds:F0}s)";
+                        }
                     }
                     catch (Exception warmupEx) when (engine.IsUsingGpu)
                     {
-                        Logger.Log.Warn(
+                        gpuUnfitReason =
                             $"DirectML OCR warm-up failed ({warmupEx.GetType().Name}: " +
-                            $"{warmupEx.Message}). Retrying {profile.ModelName} on CPU.");
+                            $"{warmupEx.Message})";
+                    }
+
+                    if (gpuUnfitReason != null)
+                    {
+                        // A slow warm-up is not a one-off startup cost. ONNX
+                        // Runtime's DirectML kernel cache lives in the process,
+                        // so the same compilation happens at every launch, and
+                        // again in-game for every tensor shape the warm-up did
+                        // not cover. A device that needs >10s for nine known
+                        // shapes will blow the 15s live-frame watchdog on the
+                        // tenth. CPU inference at ~300ms/frame is strictly
+                        // better than that gamble repeated at every start.
+                        Logger.Log.Warn($"{gpuUnfitReason}. Retrying {profile.ModelName} on CPU.");
+                        OcrGpuQuarantine.Engage(gpuUnfitReason);
                         engine.Dispose();
                         engine = null;
                         parameters.use_gpu = false;
@@ -2985,6 +3044,11 @@ namespace GI_Subtitles.Views
         {
             try { UpdateDashboardStatus(); }
             catch (Exception ex) { Logger.Log.Warn($"OnEngineStatusChanged: UpdateDashboardStatus threw: {ex.Message}"); }
+            // Every engine rebuild is a chance for the GPU quarantine to have
+            // engaged (warm-up over budget, or runtime recovery), so re-read it
+            // here rather than only at window construction.
+            try { RefreshGpuOcrControls(); }
+            catch (Exception ex) { Logger.Log.Warn($"OnEngineStatusChanged: RefreshGpuOcrControls threw: {ex.Message}"); }
         }
 
         private void OnAppStartupStatusChanged(object sender, EventArgs e)
@@ -3351,13 +3415,11 @@ namespace GI_Subtitles.Views
                 string input = Config.Get("Input", "EN") ?? "EN";
                 string output = Config.Get("Output", "PL") ?? "PL";
 
-                string gameDisplay;
-                switch (game.ToLowerInvariant())
-                {
-                    case "genshin":  gameDisplay = "Genshin Impact";      break;
-                    case "starrail": gameDisplay = "Honkai: Star Rail";   break;
-                    default:         gameDisplay = game;                   break;
-                }
+                // One registry, one label. The switch that used to live here
+                // silently fell through to the raw tag for any game added
+                // elsewhere — which is exactly how "ZZZ" would have shown up
+                // on the Dashboard while the pills said "Zenless Zone Zero".
+                string gameDisplay = Services.Detection.GameRegionProfile.DisplayNameOf(game);
 
                 string inputDisplay = HumanLang(input);
                 string outputDisplay = HumanLang(output);
@@ -3665,6 +3727,19 @@ namespace GI_Subtitles.Views
 
         private bool _suppressSliderUpdate = false;
 
+        /// <summary>
+        /// Per-game default for the vertical overlay pad, in WPF logical pixels.
+        ///
+        /// <para>This has to be the same value MainWindow lays the overlay out
+        /// with. It used to be the literal <c>-140</c> at three sites here while
+        /// MainWindow resolved it per game, so on ZZZ (default −180) the slider
+        /// would have shown a position the overlay never actually used — and
+        /// worse, the first nudge of the slider would have written the wrong
+        /// number into Config and moved the overlay for real.</para>
+        /// </summary>
+        private static int DefaultPadVertical =>
+            Services.Detection.GameRegionProfile.ForCurrentGame().SubtitlePadVertical;
+
         private void PadVerticalSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
         {
             if (_suppressSliderUpdate || PadTextBox == null) return;
@@ -3680,7 +3755,7 @@ namespace GI_Subtitles.Views
             if (_suppressSliderUpdate || PadHorizontalTextBox == null) return;
             int padHorizontal = (int)e.NewValue;
             PadHorizontalTextBox.Text = padHorizontal.ToString();
-            int pad = Config.GetPad(-140);
+            int pad = Config.GetPad(DefaultPadVertical);
             Config.Set("Pad", new int[] { pad, padHorizontal });
             UpdateMainWindowPosition();
         }
@@ -3706,7 +3781,7 @@ namespace GI_Subtitles.Views
                 _suppressSliderUpdate = true;
                 PadHorizontalSlider.Value = Math.Max(PadHorizontalSlider.Minimum, Math.Min(PadHorizontalSlider.Maximum, padHorizontal));
                 _suppressSliderUpdate = false;
-                int pad = Config.GetPad(-140);
+                int pad = Config.GetPad(DefaultPadVertical);
                 Config.Set("Pad", new int[] { pad, padHorizontal });
                 UpdateMainWindowPosition();
                 OnOverlaySizeUserChanged?.Invoke();
@@ -3952,6 +4027,7 @@ namespace GI_Subtitles.Views
             }
 
             UpdateOcrModelDescription(configured);
+            RefreshGpuOcrControls();
         }
 
         private void OcrModelComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -3968,6 +4044,57 @@ namespace GI_Subtitles.Views
 
             Config.Set("OcrModelProfile", selectedId);
             Logger.Log.Info($"OCR model profile changed: {previousId} -> {selectedId}; restart required.");
+            if (OcrModelRestartHint != null)
+                OcrModelRestartHint.Visibility = Visibility.Visible;
+        }
+
+        /// <summary>
+        /// Reflects <c>UseGpuOcr</c> and the current quarantine state into the
+        /// OCR-model card. Called during window setup and again on every
+        /// engine-status transition, so a quarantine engaged mid-session shows
+        /// up without a restart.
+        /// </summary>
+        private void RefreshGpuOcrControls()
+        {
+            if (UseGpuOcrCheckBox == null) return;
+
+            bool quarantined = OcrGpuQuarantine.IsActiveForCurrentVersion();
+            try
+            {
+                UseGpuOcrCheckBox.Checked -= UseGpuOcrCheckBox_Changed;
+                UseGpuOcrCheckBox.Unchecked -= UseGpuOcrCheckBox_Changed;
+                UseGpuOcrCheckBox.IsChecked = Config.Get("UseGpuOcr", true);
+            }
+            finally
+            {
+                UseGpuOcrCheckBox.Checked += UseGpuOcrCheckBox_Changed;
+                UseGpuOcrCheckBox.Unchecked += UseGpuOcrCheckBox_Changed;
+            }
+
+            if (OcrGpuQuarantineHint != null)
+            {
+                OcrGpuQuarantineHint.Visibility = quarantined
+                    ? Visibility.Visible
+                    : Visibility.Collapsed;
+            }
+        }
+
+        /// <summary>
+        /// The GPU toggle. Ticking it is an explicit "try DirectML again", so
+        /// it also lifts the persistent quarantine — otherwise a machine that
+        /// once measured as unfit would stay on the CPU until the next release
+        /// no matter what the user does.
+        /// </summary>
+        private void UseGpuOcrCheckBox_Changed(object sender, RoutedEventArgs e)
+        {
+            bool enabled = UseGpuOcrCheckBox?.IsChecked == true;
+            Config.Set("UseGpuOcr", enabled);
+            if (enabled)
+                OcrGpuQuarantine.Clear("user re-enabled GPU acceleration in Settings");
+
+            Logger.Log.Info($"UseGpuOcr changed to {enabled}; restart required to rebuild the OCR engine.");
+            if (OcrGpuQuarantineHint != null)
+                OcrGpuQuarantineHint.Visibility = Visibility.Collapsed;
             if (OcrModelRestartHint != null)
                 OcrModelRestartHint.Visibility = Visibility.Visible;
         }
@@ -4302,10 +4429,21 @@ namespace GI_Subtitles.Views
 
         private string _logLevelFilter = "ALL";
 
+        private bool _suppressDetailedLoggingEvent;
+
         public void InitializeLogTab()
         {
             LogListView.ItemsSource = LogBuffer.Entries;
             LogBuffer.EntryAdded += OnLogEntryAdded;
+
+            if (DetailedLoggingCheckBox != null)
+            {
+                _suppressDetailedLoggingEvent = true;
+                // Fully qualified: inside the Views namespace a bare `Logger`
+                // binds to the Views.Logger stub, which only exposes .Log.
+                DetailedLoggingCheckBox.IsChecked = GI_Subtitles.Common.Logger.IsDetailedLoggingEnabled();
+                _suppressDetailedLoggingEvent = false;
+            }
         }
 
         private void OnLogEntryAdded()
@@ -4329,6 +4467,122 @@ namespace GI_Subtitles.Views
             if (File.Exists(logPath))
             {
                 Process.Start(new ProcessStartInfo { FileName = logPath, UseShellExecute = true });
+            }
+        }
+
+        /// <summary>
+        /// "Detailed logging" toggle. Takes effect immediately — log4net reads
+        /// the level on every call — so this never blocks on a restart.
+        ///
+        /// A restart is still offered when switching it on, because the level
+        /// override is not applied until well into App.OnStartup: engine init,
+        /// dictionary load and licence checks have already been written at the
+        /// normal level by then. That early window is exactly where "it starts
+        /// but nothing happens" reports come from, so for those the restart is
+        /// the difference between a useful bundle and a useless one.
+        /// </summary>
+        private void DetailedLogging_Changed(object sender, RoutedEventArgs e)
+        {
+            if (_suppressDetailedLoggingEvent) return;
+
+            bool enabled = DetailedLoggingCheckBox?.IsChecked == true;
+            try
+            {
+                GI_Subtitles.Common.Logger.SetDetailedLogging(enabled);
+            }
+            catch (Exception ex)
+            {
+                Logger.Log.Error("Diagnostics: could not change the log level.", ex);
+                ModernDialog.Error(this,
+                    L("Logs_DetailedLogging_FailedTitle", "Couldn't change logging"),
+                    L("Logs_DetailedLogging_FailedBody", "The logging level could not be changed."),
+                    ex.ToString());
+                return;
+            }
+
+            if (!enabled) return;
+
+            AppRestartPrompt.PromptAndRestart(
+                owner: this,
+                title: L("Logs_DetailedLogging_RestartTitle", "Detailed logging is on"),
+                body: L("Logs_DetailedLogging_RestartBody",
+                    "Restart Kaption to also record what happens while it starts up. " +
+                    "That part matters if your problem shows up as soon as Kaption opens."),
+                restartButtonText: L("Logs_DetailedLogging_RestartNow", "Restart now"),
+                laterButtonText: L("Logs_DetailedLogging_RestartLater", "Not now"));
+        }
+
+        /// <summary>
+        /// Builds a diagnostic bundle and shows the user where it landed, with
+        /// the support ID they should quote. Saving to disk rather than
+        /// uploading is deliberate: the moment someone needs this is often the
+        /// moment their network, licence or session is the broken thing.
+        /// </summary>
+        private async void ReportProblem_Click(object sender, RoutedEventArgs e)
+        {
+            if (ReportProblemButton == null) return;
+
+            // Frustrated users click twice. Building twice would just produce
+            // two bundles with different IDs and confuse the support thread.
+            ReportProblemButton.IsEnabled = false;
+            string originalLabel = ReportProblemButton.Content as string;
+            ReportProblemButton.Content = L("Logs_ReportProblem_Working", "Collecting…");
+
+            try
+            {
+                var result = await Services.Diagnostics.DiagnosticBundle.CreateAsync(null);
+
+                string body = string.Format(
+                    L("Logs_ReportProblem_DoneBody",
+                        "Your diagnostic file is ready.\n\nSupport ID: {0}\n\n" +
+                        "Send the file to us on Discord or at contact@kaption.one, and quote the support ID."),
+                    result.SupportId);
+
+                string details = result.FilePath
+                    + (result.Notes.Count > 0
+                        ? Environment.NewLine + Environment.NewLine + string.Join(Environment.NewLine, result.Notes)
+                        : string.Empty);
+
+                ModernDialog.Success(this,
+                    L("Logs_ReportProblem_DoneTitle", "Diagnostic file created"),
+                    body,
+                    details);
+
+                RevealInExplorer(result.FilePath);
+            }
+            catch (Exception ex)
+            {
+                Logger.Log.Error("Diagnostics: bundle creation failed.", ex);
+                ModernDialog.Error(this,
+                    L("Logs_ReportProblem_FailedTitle", "Couldn't create the diagnostic file"),
+                    L("Logs_ReportProblem_FailedBody",
+                        "Something went wrong while collecting the files. You can still send us your log file directly — use \"Open app log\" next to this button."),
+                    ex.ToString());
+            }
+            finally
+            {
+                ReportProblemButton.Content = originalLabel;
+                ReportProblemButton.IsEnabled = true;
+            }
+        }
+
+        /// <summary>Opens Explorer with the file selected.</summary>
+        private static void RevealInExplorer(string path)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(path) || !File.Exists(path)) return;
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = "explorer.exe",
+                    Arguments = "/select,\"" + path + "\"",
+                    UseShellExecute = true,
+                });
+            }
+            catch (Exception ex)
+            {
+                // Not worth surfacing — the dialog already showed the full path.
+                Logger.Log.Warn($"Diagnostics: could not open Explorer at {path}: {ex.Message}");
             }
         }
 
@@ -4671,8 +4925,13 @@ namespace GI_Subtitles.Views
                 string currentInput = Config.Get("Input", "EN") ?? "EN";
                 string currentOutput = Config.Get("Output", "PL") ?? "PL";
 
-                if (GamePillGenshin != null && GamePillStarRail != null)
-                    ApplyPillSelection(new[] { GamePillGenshin, GamePillStarRail }, currentGame);
+                // Filter nulls instead of all-or-nothing: one pill missing from
+                // the visual tree shouldn't stop the others from repainting.
+                var gamePills = new[] { GamePillGenshin, GamePillStarRail, GamePillZZZ }
+                    .Where(p => p != null)
+                    .ToArray();
+                if (gamePills.Length > 0)
+                    ApplyPillSelection(gamePills, currentGame);
 
                 if (InputPillEN != null && InputPillJP != null && InputPillCHS != null)
                     ApplyPillSelection(new[] { InputPillEN, InputPillJP, InputPillCHS }, currentInput);

@@ -76,11 +76,15 @@ namespace GI_Subtitles.Services.Data
         ///
         /// Order of operations (each step is a no-op when the file is already
         /// current, so repeated calls are cheap):
-        ///   1. Public input-language TextMap from GitHub (GameDataUpdateService).
+        ///   1. Public input-language TextMap from GitHub (GameDataUpdateService)
+        ///      — skipped for games with no upstream mirror, where the gamedata
+        ///      bundle in step 3 is the source and step 1's check is deferred
+        ///      until after it has run.
         ///   2. Public output-language TextMap from GitHub — only if the
         ///      language is mirrored upstream (DE/ES/FR/…, not PL).
         ///   3. Proprietary output-language <c>.gisub</c> from R2 — only for
-        ///      languages the backend serves (currently PL).
+        ///      languages the backend serves (currently PL) — then the gamedata
+        ///      bundle, which for ZZZ also carries TextMapEN.json.
         ///
         /// Returns a <see cref="GameDataBootstrapResult"/>; Ready=false when
         /// something was downloaded but the output-language TextMap is still
@@ -104,10 +108,39 @@ namespace GI_Subtitles.Services.Data
 
             GameDataPaths.EnsureGameDir(game);
 
-            // ── Step 1: input TextMap (always public, always GitHub) ─────
+            // ── Step 1: input TextMap ────────────────────────────────────
+            //
+            // Two sources exist, and which one applies is decided by
+            // GameDataUpdateService.IsUpstreamMirrored — the single predicate
+            // that also stops two writers ever racing for this file:
+            //
+            //   mirrored     → a public mirror is authoritative (Genshin, HSR).
+            //                  Fetch it here, and a still-missing file after
+            //                  the fetch is fatal: nothing later in this method
+            //                  can produce one.
+            //   not mirrored → the gamedata bundle carries it (ZZZ, whose
+            //                  dialogue ids are minted by
+            //                  tools/build-gamedata-zzz.cjs and exist in no
+            //                  upstream file). That bundle arrives in step 3,
+            //                  so failing here would guarantee we never get it
+            //                  — the exact "installs cleanly, resolves nothing"
+            //                  shape this pipeline is built to avoid.
+            //
+            // The post-step-3 re-check below is what makes the second branch
+            // safe: we still refuse to report Ready without the file, we just
+            // ask the question after the source that provides it has run.
+            bool inputMirrored = GameDataUpdateService.IsUpstreamMirrored(game, inputLang);
             progress?.Report((5, $"Checking input language ({inputLang})..."));
             bool haveInput = File.Exists(GameDataPaths.TextMapJson(game, inputLang));
-            if (!haveInput)
+
+            if (!inputMirrored)
+            {
+                Logger.Log.Info(
+                    $"Bootstrap: {game}/{inputLang.ToUpperInvariant()} has no upstream mirror — " +
+                    $"TextMap{inputLang.ToUpperInvariant()}.json ships inside the gamedata bundle " +
+                    (haveInput ? "(already installed)." : "(step 3 will install it)."));
+            }
+            else if (!haveInput)
             {
                 progress?.Report((10, $"Downloading {inputLang} language data..."));
                 Logger.Log.Info($"Bootstrap: input TextMap{inputLang.ToUpperInvariant()}.json missing — fetching from GitHub.");
@@ -129,7 +162,7 @@ namespace GI_Subtitles.Services.Data
                 Logger.Log.Debug($"Bootstrap: input TextMap{inputLang.ToUpperInvariant()}.json already present.");
             }
 
-            if (!File.Exists(GameDataPaths.TextMapJson(game, inputLang)))
+            if (inputMirrored && !File.Exists(GameDataPaths.TextMapJson(game, inputLang)))
             {
                 result.FailureReason = $"Could not obtain TextMap{inputLang.ToUpperInvariant()}.json from upstream.";
                 Logger.Log.Warn($"Bootstrap: {result.FailureReason}");
@@ -263,6 +296,34 @@ namespace GI_Subtitles.Services.Data
                 // Non-fatal. Prediction engine can still work off the
                 // legacy path. Log so we can trace bundle adoption.
                 Logger.Log.Warn($"Bootstrap: gamedata sync threw (non-fatal): {ex.Message}");
+            }
+
+            // ── Step 1 (deferred half): the bundle-carried input TextMap ──
+            //
+            // For a game with no upstream mirror, step 3 was the only source of
+            // TextMap<Input>.json. Ask now. Without this the method would
+            // happily report Ready with no way to resolve a single dialogue
+            // hash, and the only symptom would be subtitles that never appear.
+            if (!inputMirrored && !File.Exists(GameDataPaths.TextMapJson(game, inputLang)))
+            {
+                // Two very different causes land here and they need different
+                // instructions. A bundle carries exactly ONE source language —
+                // English, because EN is the key space the builder mints ids
+                // for — so if TextMapEN.json is sitting there, the bundle
+                // arrived fine and the user has simply picked a source language
+                // this game cannot offer. Pointing that user at the sync log
+                // sends them hunting for an outage that never happened.
+                bool bundleLanded = File.Exists(GameDataPaths.TextMapJson(game, "EN"));
+
+                result.FailureReason = bundleLanded
+                    ? $"{game} only has English source text — its dialogue ids are minted at build " +
+                      $"time and no {inputLang.ToUpperInvariant()} version exists. Set the source " +
+                      "language to English in Settings."
+                    : $"TextMap{inputLang.ToUpperInvariant()}.json for {game} ships inside the gamedata " +
+                      "bundle, and no bundle was installed. Check the gamedata sync log lines above " +
+                      "(no bundle published for this game, offline, or tier-gated).";
+                Logger.Log.Warn($"Bootstrap: {result.FailureReason}");
+                return result;
             }
 
             progress?.Report((100, "Language data ready."));

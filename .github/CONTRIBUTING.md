@@ -38,11 +38,34 @@ review.
 The folder names retain the historical `GI-Subtitles` prefix as a
 project-structure detail; the product is **Kaption**.
 
+## Per-game code
+
+Kaption supports three games: Genshin Impact, Honkai: Star Rail, and
+Zenless Zone Zero. Nearly all per-game behaviour is a single entry in
+`Services/Detection/GameRegionProfile.cs` — process name, window title,
+dialogue-region ratios, OCR pacing, and the vision knobs. Only two
+seams live elsewhere: `GameDialogueContextFactory` and
+`GameDataUpdateService.ResolveUpstream`.
+
+The one place the games genuinely diverge is **speaker-name
+detection**. Genshin and HSR draw speaker names in gold or cyan, so
+`Services/OCR/Classification/AccentColorTextBlockClassifier.cs` finds
+them by colour. ZZZ draws them in plain white, which leaves that check
+nothing to key on, so ZZZ uses `GeometryTextBlockClassifier.cs`
+instead — the speaker name is the short, narrow block on the top row.
+Which classifier runs is decided by the `UsesGeometryClassifier` flag
+on the profile, never by a game-name comparison. Please keep new
+per-game behaviour on that pattern: add a capability flag, don't add an
+`if (game == "…")`.
+
 ## What we are happy to accept
 
 - Bug fixes, with a reproducible scenario in the PR description.
 - Per-game OCR tuning tweaks — they land in `GameRegionProfile` /
-  `GameOcrTuning` without touching hot paths.
+  `GameOcrTuning` without touching hot paths. Zenless Zone Zero's pacing
+  (`OcrInterval` 60 ms, `StabilityWindow` 2) is currently borrowed from
+  Honkai: Star Rail and marked provisional in code, so a measured
+  replacement backed by a real ZZZ session is especially welcome.
 - New locales for the UI — add keys to
   `GI-Subtitles/Resources/Strings.en-US.xaml` first, then create or
   update the matching `Strings.<locale>.xaml`. Only English and Polish
@@ -74,8 +97,11 @@ dotnet build GI-Subtitles.sln -c Release
 dotnet test  GI-Test/GI-Test.csproj -c Debug
 ```
 
-Expected on a clean checkout: 188 pass, 2 pre-existing data-dependent
-fails (`DialoguePredictionTests`), 5 external-data skips.
+Expected on a clean checkout: exactly **2 failures**, both in
+`DialoguePredictionTests` — they need a real Genshin data bundle in
+`%APPDATA%` — and **4 skips** for test data that is not checked in.
+Everything else passes. The pass total keeps growing as tests are added,
+so it is deliberately not pinned here; a third failure is the signal.
 
 For a self-contained Release build that bundles the .NET 10 Desktop
 runtime (the shape end users get from the official installer):
@@ -147,12 +173,15 @@ committing.
 
 ## Translation packs
 
-The shipped translation packs (Genshin Impact PL, HSR PL, etc.) are
-produced by a private translation pipeline and shipped from our
-backend. If you want to contribute a translation for a language we do
-not yet ship, open an issue first — there is significant infrastructure
-on our side (LLM keys, multi-hour runs, publishing scripts) and we want
-to coordinate before you spend time.
+The shipped translation packs (Genshin Impact PL, HSR PL) are produced
+by a private translation pipeline and shipped from our backend. Zenless
+Zone Zero is wired up in the client but has **no published pack yet**,
+so ZZZ bug reports should be about capture, region, or speaker
+detection rather than translation quality. If you want to contribute a
+translation for a language we do not yet ship, open an issue first —
+there is significant infrastructure on our side (LLM keys, multi-hour
+runs, publishing scripts) and we want to coordinate before you spend
+time.
 
 ## Security
 

@@ -7,7 +7,7 @@
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/wojciechowskiapp/Kaption)
 [![License: AGPL-3.0 OR Commercial](https://img.shields.io/badge/license-AGPL--3.0%20OR%20Commercial-blue.svg)](./LICENSE)
 
-Kaption translates the dialogue in Hoyoverse games — **Genshin Impact** and **Honkai: Star Rail** — into your language in real time, on Windows. Everything runs locally on your machine: no streaming, no cloud OCR.
+Kaption translates Hoyoverse game dialogue into your language in real time, on Windows. Everything runs locally on your machine: no streaming, no cloud OCR.
 
 > 📥 **Get it for free at [kaption.one](https://kaption.one/#download)**
 
@@ -28,7 +28,13 @@ Kaption translates the dialogue in Hoyoverse games — **Genshin Impact** and **
 
 ## Supported games
 
-Genshin Impact and Honkai: Star Rail are tuned out of the box. The primary translation target is **Polish**. Other language pairs work whenever a translation pack exists; new locales can be added on the backend without a client update.
+| Game | Where it stands |
+|---|---|
+| **Genshin Impact** | Tuned out of the box. Polish translation pack published. |
+| **Honkai: Star Rail** | Tuned out of the box. Polish translation pack published. |
+| **Zenless Zone Zero** | The app knows ZZZ: it has its own dialogue region and can tell the speaker's name apart from the line in both the cinematic and the comic-panel style. **The translation pack isn't published yet**, though, so there is nothing for it to translate against until that ships. |
+
+The primary translation target is **Polish**. Other language pairs work whenever a translation pack exists; new locales can be added on the backend without a client update.
 
 ## Get it
 
@@ -59,7 +65,7 @@ dotnet build GI-Subtitles/GI-Subtitles.csproj -c Debug
 dotnet test  GI-Test/GI-Test.csproj            -c Debug
 ```
 
-Expected: 218 tests pass, 2 pre-existing data-dependent fails (`DialoguePredictionTests`), 5 external-data skips.
+Expected: exactly **2 failures**, both in `DialoguePredictionTests` — they need a real Genshin data bundle in `%APPDATA%` — plus **4 skips** for test data that isn't checked in. Everything else passes. The total climbs as tests are added, so it isn't pinned here; a third failure is the thing to look at.
 
 For a self-contained Release build that bundles the runtime (the shape end users get from the official installer):
 
@@ -102,7 +108,7 @@ Security issues: see [`.github/SECURITY.md`](./.github/SECURITY.md). Please don'
 
 Kaption started as a fork of [`qew21/Genshin-Subtitles`](https://github.com/qew21/Genshin-Subtitles) (Apache-2.0), the first OCR + TextMap overlay for Hoyoverse games. We've since rewritten the pipeline, matcher, networking, licensing, and UI, but the core idea (read dialogue off the screen with OCR, look it up in the game's TextMap, draw the translation over the top) started there. Thanks, qew21.
 
-Thanks to **[Dimbreath](https://www.patreon.com/c/dimbreath/posts)**, who maintains the community game-data repositories every dialogue line Kaption recognises gets matched against: [AnimeGameData2](https://gitlab.com/Dimbreath/animegamedata2) for Genshin and [turnbasedgamedata](https://gitlab.com/Dimbreath/turnbasedgamedata) for HSR. Nothing downstream of OCR works without those repos staying current with each patch. There's a longer public note at [kaption.one/credits](https://kaption.one/credits); if Dimbreath's work has ever helped you, support them directly.
+Thanks to **[Dimbreath](https://www.patreon.com/c/dimbreath/posts)**, who maintains the community game-data repositories every dialogue line Kaption recognises gets matched against: [AnimeGameData2](https://gitlab.com/Dimbreath/animegamedata2) for Genshin, [turnbasedgamedata](https://gitlab.com/Dimbreath/turnbasedgamedata) for HSR, and [ZenlessData](https://git.mero.moe/dimbreath/ZenlessData) for Zenless Zone Zero. Nothing downstream of OCR works without those repos staying current with each patch. There's a longer public note at [kaption.one/credits](https://kaption.one/credits); if Dimbreath's work has ever helped you, support them directly.
 
 Also built on PaddleOCR, ONNX Runtime, Velopack, Sentry, Lucene.Net, and OpenCV. Hoyoverse owns the game text we match against; translation packs are licensed compilations published for personal in-game use.
 

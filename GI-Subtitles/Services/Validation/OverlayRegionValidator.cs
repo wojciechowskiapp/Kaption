@@ -42,7 +42,9 @@ namespace GI_Subtitles.Services.Validation
         private const int DefaultMaxOverlayWidth = 900;
 
         // Fallback vertical offset if Config.GetPad is not used by the caller.
-        // Matches MainWindow's -140 default.
+        // Matches MainWindow's -140 default for the accent-classified games.
+        // ProjectOverlayRectUsingConfig resolves the per-game value instead —
+        // this const is only for callers that supply padV themselves.
         private const int DefaultPadVertical = -140;
 
         /// <summary>
@@ -239,7 +241,13 @@ namespace GI_Subtitles.Services.Validation
         {
             int maxH = Core.Config.Config.Get<int>("MaxOverlayHeight", 0);
             int maxW = Core.Config.Config.Get<int>("MaxOverlayWidth", DefaultMaxOverlayWidth);
-            int padV = Core.Config.Config.GetPad(DefaultPadVertical);
+            // Per-game pad default, matching MainWindow. If this projected the
+            // overlay from -140 while the overlay actually rendered from the
+            // game's own default, the overlap alert would fire on frames that
+            // are fine and stay silent on frames that are not — the exact drift
+            // this wrapper exists to prevent.
+            int padV = Core.Config.Config.GetPad(
+                Services.Detection.GameRegionProfile.ForCurrentGame().SubtitlePadVertical);
             int padH = Core.Config.Config.GetPadHorizontal(0);
             return ProjectOverlayRect(
                 captureRegionScreenPx, screenBoundsScreenPx, dpiScale,

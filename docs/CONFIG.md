@@ -34,16 +34,23 @@ The defaults here are tuned per game via `GameRegionProfile` and `GameOcrTuning`
 
 | Key | Default | What it does |
 |---|---|---|
-| `Game` | `"Genshin"` | Active game profile. Set to `"StarRail"` for HSR tuning. |
+| `Game` | `"Genshin"` | Active game profile: `"Genshin"`, `"StarRail"` (Honkai: Star Rail), or `"ZZZ"` (Zenless Zone Zero). Also names the per-game data folder — `%APPDATA%\Kaption\ZZZ\` and so on — and the folder is created with the case you write here, so use the exact spelling. |
 | `Input` | `"EN"` | OCR source language. Only `EN` and `JP` have PaddleOCR recognizers shipped. |
 | `Output` | `"PL"` | Primary translation language displayed on the overlay. |
 | `Output2` | `""` | Secondary translation language for dual-display mode. Empty means off. |
 | `ShowSecondLang` | `false` | Render the secondary language alongside the primary. |
-| `OcrInterval` | `100` | OCR polling interval in milliseconds. Lower = faster reaction, higher CPU. Per-game profiles can override: Genshin 100 ms, HSR 60 ms. |
-| `StabilityWindow` | `4` (or per-game) | Number of consecutive near-identical frames required before OCR triggers. Higher = fewer false triggers during typewriter text animation. |
+| `OcrInterval` | `100` | OCR polling interval in milliseconds. Lower = faster reaction, higher CPU. Setting it here overrides the per-game profile, and the result is clamped to 50–1000. Profile values: Genshin 100 ms, HSR 60 ms, ZZZ 60 ms. |
+| `StabilityWindow` | `4` (or per-game) | Number of consecutive near-identical frames required before OCR triggers. Higher = fewer false triggers during typewriter text animation. Profile values: Genshin 5, HSR 2, ZZZ 2. |
+
 | `UseSymSpell` | `true` | SymSpell fast-path for spelling-error correction. Off degrades to pure Levenshtein. |
 | `OcrWeightedDistance` | `true` | OCR-confusion-weighted edit distance (e.g. `l`↔`1` cost = 0.1). Off degrades to unweighted Levenshtein. |
-| `UseGpuOcr` | `true` | Route PaddleOCR through ONNX Runtime DirectML on the GPU. Falls back to CPU automatically if initialisation fails. |
+| `UseGpuOcr` | `true` | Route PaddleOCR through ONNX Runtime DirectML on the GPU. Falls back to CPU automatically if initialisation fails. Exposed as **Settings → General → Use GPU acceleration (DirectML)**. |
+| `OcrGpuQuarantine` | *(absent)* | Written by Kaption, not by you. `true` means DirectML was measured as unfit on this machine (warm-up over budget, or repeated live-frame stalls) and OCR loads on the CPU instead. Cleared by re-ticking the GPU checkbox, and ignored automatically after an app update. |
+| `OcrGpuQuarantineVersion` | *(absent)* | App version that recorded the quarantine. The quarantine only applies while this matches the running build, so every release gets one fresh GPU attempt. |
+| `OcrGpuQuarantineReason` | *(absent)* | Human-readable reason, mirrored into `app.log`. |
+| `OcrGpuQuarantineUtc` | *(absent)* | ISO-8601 UTC timestamp of the first engagement. |
+
+**ZZZ pacing is provisional.** `OcrInterval` 60 / `StabilityWindow` 2 for Zenless Zone Zero are HSR's numbers borrowed as a starting point, not measured against a live ZZZ session — the in-code marker sits at `GameRegionProfile.cs:298-304`. If ZZZ subtitles flicker or arrive mid-animation, these two keys are the first thing to try, and telling us what worked is genuinely useful.
 
 ## Overlay and layout
 
@@ -58,7 +65,7 @@ The defaults here are tuned per game via `GameRegionProfile` and `GameOcrTuning`
 | `MaxOverlayHeight` | `0` | Maximum overlay height in pixels. `0` = unconstrained. |
 | `MaxOverlayWidth` | `900` | Maximum overlay width in pixels. |
 | `AutoShrinkText` | `true` | Reduce font size automatically if text would overflow the max bounds. |
-| `Pad` | `[-175, 0]` | `[vertical, horizontal]` pixel offset applied when anchoring the overlay to the dialogue region. Negative vertical puts the overlay above the game text. |
+| `Pad` | per-game: `[-140, 0]` Genshin / HSR, `[-180, 0]` ZZZ | `[vertical, horizontal]` pixel offset applied when anchoring the overlay to the dialogue region. Negative vertical puts the overlay above the game text. The vertical default comes from the active game profile (`SubtitlePadVertical`), not from a fixed number — ZZZ needs the extra 40 px because its dialogue bodies run long enough to wrap to 4–5 lines at the default 900 px overlay width. |
 | `PlayerName` | `""` | Custom "Traveler" replacement inserted into dialogue templates. |
 
 ## Overlay cards

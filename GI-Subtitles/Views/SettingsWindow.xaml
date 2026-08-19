@@ -338,6 +338,7 @@
                             <ComboBox Name="GameSelector">
                                 <ComboBoxItem Content="Genshin Impact" Tag="Genshin" IsSelected="True"/>
                                 <ComboBoxItem Content="Honkai: Star Rail" Tag="StarRail"/>
+                                <ComboBoxItem Content="Zenless Zone Zero" Tag="ZZZ"/>
                             </ComboBox>
                             <!-- CHS removed — no Chinese PaddleOCR model ships with the app and
                                  selecting it silently falls back to the English recognizer (dead UX).
@@ -789,6 +790,20 @@
                                            Text="{DynamicResource Settings_OcrModel_V6_Description}"
                                            FontSize="11" Foreground="{StaticResource TextTertiaryBrush}"
                                            TextWrapping="Wrap" Margin="140,9,0,0"/>
+                                <!-- Session 37: UseGpuOcr was a Config.json-only key with no UI,
+                                     so a machine put on the CPU by the persistent GPU quarantine
+                                     had no way back except a new release. Ticking this box is the
+                                     user's "try my GPU again" and clears the quarantine. -->
+                                <CheckBox x:Name="UseGpuOcrCheckBox" Style="{StaticResource ModernCheckBox}"
+                                          Content="{DynamicResource Settings_OcrGpu_Checkbox}"
+                                          ToolTip="{DynamicResource Tip_Settings_OcrGpu}"
+                                          Margin="140,12,0,0"
+                                          Checked="UseGpuOcrCheckBox_Changed" Unchecked="UseGpuOcrCheckBox_Changed"/>
+                                <TextBlock x:Name="OcrGpuQuarantineHint"
+                                           Text="{DynamicResource Settings_OcrGpu_Quarantined}"
+                                           FontSize="11" Foreground="#D97706"
+                                           TextWrapping="Wrap" Margin="140,6,0,0"
+                                           Visibility="Collapsed"/>
                                 <TextBlock x:Name="OcrModelRestartHint"
                                            Text="{DynamicResource Settings_OcrModel_Restart}"
                                            FontSize="11" FontWeight="SemiBold"
@@ -1029,6 +1044,12 @@
                                     <Button x:Name="GamePillStarRail" Tag="StarRail"
                                             Style="{StaticResource SecondaryButton}"
                                             Content="Honkai: Star Rail"
+                                            Height="32" MinWidth="120" Padding="12,0" Margin="0,0,8,0"
+                                            Click="TranslationsGamePill_Click"
+                                            ToolTip="{DynamicResource Tip_Translations_Game}"/>
+                                    <Button x:Name="GamePillZZZ" Tag="ZZZ"
+                                            Style="{StaticResource SecondaryButton}"
+                                            Content="Zenless Zone Zero"
                                             Height="32" MinWidth="120" Padding="12,0"
                                             Click="TranslationsGamePill_Click"
                                             ToolTip="{DynamicResource Tip_Translations_Game}"/>
@@ -1524,7 +1545,18 @@
                         <Button Content="{DynamicResource Logs_OpenDialogueLog}" Style="{StaticResource SecondaryButton}"
                                 Click="OpenDialogueLogFolder_Click"
                                 ToolTip="{DynamicResource Tip_Logs_OpenDialogue}"
-                                MinWidth="140" Height="28" Margin="0,0,0,4"/>
+                                MinWidth="140" Height="28" Margin="0,0,8,4"/>
+                        <Button x:Name="ReportProblemButton" Content="{DynamicResource Logs_ReportProblem}"
+                                Style="{StaticResource PrimaryButton}"
+                                Click="ReportProblem_Click"
+                                ToolTip="{DynamicResource Tip_Logs_ReportProblem}"
+                                MinWidth="150" Height="28" Margin="0,0,12,4"/>
+                        <CheckBox x:Name="DetailedLoggingCheckBox"
+                                  Content="{DynamicResource Logs_DetailedLogging}"
+                                  ToolTip="{DynamicResource Tip_Logs_DetailedLogging}"
+                                  VerticalAlignment="Center" Margin="0,0,0,4"
+                                  Checked="DetailedLogging_Changed"
+                                  Unchecked="DetailedLogging_Changed"/>
                     </WrapPanel>
 
                     <!-- Log list (full height) -->

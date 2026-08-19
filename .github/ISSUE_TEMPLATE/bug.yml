@@ -46,8 +46,9 @@ body:
       options:
         - Genshin Impact
         - Honkai Star Rail
-        - Both / either
-        - Neither (Kaption-only issue)
+        - Zenless Zone Zero
+        - More than one game
+        - Not game-specific (Kaption itself)
     validations:
       required: true
 

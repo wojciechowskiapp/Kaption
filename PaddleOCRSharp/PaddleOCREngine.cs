@@ -724,13 +724,49 @@ namespace PaddleOCRSharp
         }
 
         /// <summary>
+        /// Detector heights (post-resize, post-PadTo32) that real capture
+        /// regions produce. <see cref="DetectTextRegions"/> scales the long edge
+        /// down to <see cref="DetMaxSize"/> (960) and then pads both edges to a
+        /// multiple of 32, so a 1262x277 or 1434x248 dialogue region never
+        /// reaches the model wider than 960 — only the height varies:
+        ///
+        ///   1296x204 (ratio 6.35) -> 960x151 -> pad -> 960x160
+        ///   1378x234 (ratio 5.89) -> 960x163 -> pad -> 960x192
+        ///   1262x277 (ratio 4.56) -> 960x211 -> pad -> 960x224
+        ///
+        /// The pre-2026-08 set was {64, 160}, which left 192 and 224 to compile
+        /// lazily on the first in-game dialogue — a multi-second stall on a slow
+        /// DirectML device even though warm-up had "passed". Feeding 960-wide
+        /// sources here means the shapes travel the exact production
+        /// resize/pad path rather than being asserted by hand.
+        /// </summary>
+        private static readonly int[] WarmUpDetectorHeights = { 64, 160, 192, 224 };
+
+        /// <summary>
+        /// Recognition width buckets from <see cref="GetRecognitionInputWidth"/>
+        /// that real dialogue lines land in. 320 is a name or a short line,
+        /// 1280-1600 a full-width sentence; the pre-2026-08 set skipped the
+        /// 640/960/1600 middle entirely.
+        /// </summary>
+        private static readonly int[] WarmUpRecognitionWidths = { 320, 640, 960, 1280, 1600 };
+
+        /// <summary>
         /// Executes representative detector and recognizer shapes before the
         /// application reports the engine as ready. ONNX Runtime's DirectML
         /// provider compiles device-specific kernels lazily, so doing this on
         /// the background engine-initialization task prevents the first real
         /// dialogue from paying that cost (or being killed by the live timeout).
+        ///
+        /// Every shape runs under one cumulative budget. The
+        /// CancellationTokenSource enforces the hard limit; we additionally
+        /// stop before starting a shape once the remaining budget is smaller
+        /// than the slowest shape observed so far, because aborting mid-Run
+        /// leaves the kernel half-compiled anyway.
         /// </summary>
-        public void WarmUp(TimeSpan timeout)
+        /// <returns>How long the warm-up actually took. Callers use this to
+        /// decide whether a provider that technically succeeded is still too
+        /// slow to be worth using.</returns>
+        public TimeSpan WarmUp(TimeSpan timeout)
         {
             if (timeout <= TimeSpan.Zero)
                 throw new ArgumentOutOfRangeException(nameof(timeout));
@@ -753,32 +789,64 @@ namespace PaddleOCRSharp
                     catch (ObjectDisposedException) { }
                 });
 
-                // Common post-resize detector shapes for narrow and taller
-                // dialogue regions. Blank images are intentional: the graph is
-                // compiled and validated without manufacturing OCR text.
-                foreach (int height in new[] { 64, 160 })
+                // Slowest single shape so far; the early-abort predictor.
+                long slowestShapeMs = 0;
+                int shapesWarmed = 0;
+                bool budgetExhausted = false;
+
+                bool HasBudgetForAnotherShape()
                 {
-                    token.ThrowIfCancellationRequested();
-                    using var detectorInput = new Mat(
-                        height, 960, MatType.CV_8UC3, Scalar.All(0));
-                    _ = DetectTextRegions(detectorInput, runOptions, token);
+                    if (slowestShapeMs <= 0) return true;
+                    long remainingMs = (long)timeout.TotalMilliseconds - timer.ElapsedMilliseconds;
+                    if (remainingMs > slowestShapeMs) return true;
+                    budgetExhausted = true;
+                    return false;
                 }
 
-                // Warm both the official base width and the common long-line
-                // bucket used by Genshin dialogue. Recognition remains batch=1,
-                // so this also matches the exact production tensor layout.
-                foreach (int width in new[] { 320, 1280 })
+                // Blank images are intentional: the graph is compiled and
+                // validated without manufacturing OCR text.
+                foreach (int height in WarmUpDetectorHeights)
                 {
                     token.ThrowIfCancellationRequested();
-                    using var recognitionInput = new Mat(
+                    if (!HasBudgetForAnotherShape()) break;
+                    long shapeStartMs = timer.ElapsedMilliseconds;
+                    using (var detectorInput = new Mat(
+                        height, 960, MatType.CV_8UC3, Scalar.All(0)))
+                    {
+                        _ = DetectTextRegions(detectorInput, runOptions, token);
+                    }
+                    slowestShapeMs = Math.Max(slowestShapeMs, timer.ElapsedMilliseconds - shapeStartMs);
+                    shapesWarmed++;
+                }
+
+                // Recognition remains batch=1, so this also matches the exact
+                // production tensor layout.
+                foreach (int width in WarmUpRecognitionWidths)
+                {
+                    token.ThrowIfCancellationRequested();
+                    if (!HasBudgetForAnotherShape()) break;
+                    long shapeStartMs = timer.ElapsedMilliseconds;
+                    using (var recognitionInput = new Mat(
                         RecImgHeight, width, MatType.CV_8UC3,
-                        new Scalar(127.5, 127.5, 127.5));
-                    _ = RecognizeText(new[] { recognitionInput }, runOptions, token);
+                        new Scalar(127.5, 127.5, 127.5)))
+                    {
+                        _ = RecognizeText(new[] { recognitionInput }, runOptions, token);
+                    }
+                    slowestShapeMs = Math.Max(slowestShapeMs, timer.ElapsedMilliseconds - shapeStartMs);
+                    shapesWarmed++;
                 }
 
+                timer.Stop();
+                int totalShapes = WarmUpDetectorHeights.Length + WarmUpRecognitionWidths.Length;
+                string budgetNote = budgetExhausted
+                    ? $" — stopped early, {timeout.TotalSeconds:F0}s budget would not fit another shape " +
+                      $"(slowest so far {slowestShapeMs}ms)"
+                    : string.Empty;
                 Logger.Log.Info(
                     $"OCR warm-up completed in {timer.ElapsedMilliseconds}ms " +
-                    $"(provider={ExecutionProvider}, model={ModelName}).");
+                    $"(provider={ExecutionProvider}, model={ModelName}, " +
+                    $"shapes={shapesWarmed}/{totalShapes}){budgetNote}.");
+                return timer.Elapsed;
             }
             catch (Exception ex) when (cts.IsCancellationRequested)
             {

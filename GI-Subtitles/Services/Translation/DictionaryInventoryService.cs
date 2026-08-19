@@ -75,14 +75,25 @@ namespace GI_Subtitles.Services.Translation
     /// </summary>
     public sealed partial class DictionaryInventoryService
     {
-        // Canonical game tags, matching Config["Game"] values. Adding a new
-        // game requires: (a) entry here, (b) matching ComboBoxItem in
-        // SettingsWindow.xaml, (c) backend file_versions rows.
-        private static readonly (string Tag, string Display)[] KnownGames =
+        // Canonical game tags, matching Config["Game"] values — derived from
+        // GameRegionProfile rather than duplicated here. Adding a new game is
+        // one entry in GameRegionProfile.ProfileList plus backend
+        // file_versions rows; this list and the Settings UI both follow.
+        //
+        // Built once into a field (not a computed property): ScanAsync walks
+        // this per game folder and the manifest/catalog loops used to scan it
+        // per row, so a re-allocating property would be a needless per-pack
+        // allocation on a path that already touches the filesystem.
+        private static readonly (string Tag, string Display)[] KnownGames = BuildKnownGames();
+
+        private static (string Tag, string Display)[] BuildKnownGames()
         {
-            ("Genshin", "Genshin Impact"),
-            ("StarRail", "Honkai: Star Rail"),
-        };
+            var profiles = Detection.GameRegionProfile.RegisteredProfiles;
+            var arr = new (string Tag, string Display)[profiles.Count];
+            for (int i = 0; i < profiles.Count; i++)
+                arr[i] = (profiles[i].GameId, profiles[i].DisplayName ?? profiles[i].GameId);
+            return arr;
+        }
 
         // Matches "Polski" / "English" / etc. for display. Ordered deliberately
         // — the list in the UI follows this order when we can't source
@@ -264,7 +275,7 @@ namespace GI_Subtitles.Services.Translation
                 if (!File.Exists(entry.LocalPath)) continue;
 
                 string gameTag = entry.Game;
-                string gameDisplay = KnownGames.FirstOrDefault(g => g.Tag.Equals(gameTag, StringComparison.OrdinalIgnoreCase)).Display ?? gameTag;
+                string gameDisplay = Detection.GameRegionProfile.DisplayNameOf(gameTag);
                 string lang = entry.Language?.ToUpperInvariant();
                 if (string.IsNullOrEmpty(lang)) continue;
 
@@ -304,7 +315,7 @@ namespace GI_Subtitles.Services.Translation
                     {
                         if (string.IsNullOrWhiteSpace(meta.Game) || string.IsNullOrWhiteSpace(meta.Language))
                             continue;
-                        string gameDisplay = KnownGames.FirstOrDefault(g => g.Tag.Equals(meta.Game, StringComparison.OrdinalIgnoreCase)).Display ?? meta.Game;
+                        string gameDisplay = Detection.GameRegionProfile.DisplayNameOf(meta.Game);
                         var pack = EnsurePack(byKey, meta.Game, gameDisplay, meta.Language);
 
                         pack.RemoteFileVersionId = meta.FileVersionId;
@@ -470,7 +481,7 @@ namespace GI_Subtitles.Services.Translation
             if (pack != null && pack.Source == TranslationPackSource.RemoteAvailable) return null;
 
             string langDisplay = BuildLanguageDisplay(configuredLang);
-            string gameDisplay = KnownGames.FirstOrDefault(g => g.Tag.Equals(configuredGame, StringComparison.OrdinalIgnoreCase)).Display ?? configuredGame;
+            string gameDisplay = Detection.GameRegionProfile.DisplayNameOf(configuredGame);
 
             // Remote pack exists but requires a higher tier — tell the user
             // exactly which tier.

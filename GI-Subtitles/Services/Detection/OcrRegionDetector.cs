@@ -75,13 +75,23 @@ namespace GI_Subtitles.Services.Detection
         /// <param name="frame">Full game window captured as an OpenCV Mat.</param>
         /// <param name="frameW">Frame width in pixels.</param>
         /// <param name="frameH">Frame height in pixels.</param>
+        /// <param name="vision">
+        /// Per-game layout assumptions. Omit to resolve from the currently
+        /// selected game — the width floors below were tuned on Genshin and Star
+        /// Rail, whose dialogue spans most of the screen, and over-widen badly on
+        /// a game that centres a narrow panel.
+        /// </param>
         /// <returns>Detection result with regions in frame-relative coordinates.</returns>
-        public static DetectedRegions DetectRegions(PaddleOCREngine engine, Mat frame, int frameW, int frameH)
+        public static DetectedRegions DetectRegions(
+            PaddleOCREngine engine, Mat frame, int frameW, int frameH,
+            GameRegionProfile vision = null)
         {
             if (engine == null)
                 throw new ArgumentNullException(nameof(engine));
             if (frame == null || frame.IsDisposed || frame.Empty())
                 throw new ArgumentException("Invalid frame Mat", nameof(frame));
+
+            vision = vision ?? GameRegionProfile.ForCurrentGame();
 
             var result = new DetectedRegions();
 
@@ -127,7 +137,9 @@ namespace GI_Subtitles.Services.Detection
             }
 
             // ── Step 3: Filter out likely game UI text ──
-            var contentBlocks = allBlocks.Where(b => !IsLikelyGameUI(b.Text)).ToList();
+            var contentBlocks = allBlocks
+                .Where(b => !IsLikelyGameUI(b.Text, vision.StrictRegionJunkFilter))
+                .ToList();
             if (contentBlocks.Count == 0)
             {
                 Logger.Log.Debug("Region detection: all blocks classified as game UI");
@@ -138,16 +150,16 @@ namespace GI_Subtitles.Services.Detection
                              $"(filtered {allBlocks.Count - contentBlocks.Count} UI blocks)");
 
             // ── Step 4: Split blocks by horizontal position ──
-            // Answers are RIGHT-aligned (centerX > 55%), dialogue is CENTER-aligned.
+            // Answers are RIGHT-aligned (centerX past the split), dialogue is CENTER-aligned.
             // Splitting BEFORE clustering prevents answer blocks from merging into the dialogue cluster.
-            double xSplitThreshold = frameW * 0.55;
+            double xSplitThreshold = frameW * vision.RegionSplitXFraction;
             var centerBlocks = contentBlocks.Where(b => b.CenterX <= xSplitThreshold).ToList();
             var rightBlocks = contentBlocks.Where(b => b.CenterX > xSplitThreshold).ToList();
 
             Logger.Log.Debug($"Region detection: {centerBlocks.Count} center blocks, {rightBlocks.Count} right blocks (split at x={xSplitThreshold:F0})");
 
             // ── Dialogue detection (from CENTER blocks only) ──
-            var dialogueRegion = DetectDialogueRegion(centerBlocks, frameW, frameH);
+            var dialogueRegion = DetectDialogueRegion(centerBlocks, frameW, frameH, vision);
             if (dialogueRegion != null)
             {
                 var dr = dialogueRegion.Value;
@@ -252,7 +264,8 @@ namespace GI_Subtitles.Services.Detection
         /// Detect the dialogue region by finding the largest vertical cluster of text
         /// blocks in the bottom portion of the frame.
         /// </summary>
-        private static Rectangle? DetectDialogueRegion(List<BlockRect> blocks, int frameW, int frameH)
+        private static Rectangle? DetectDialogueRegion(
+            List<BlockRect> blocks, int frameW, int frameH, GameRegionProfile vision)
         {
             // Step 4: Filter to blocks in the bottom 35% of the frame
             double bottomThreshold = frameH * 0.65;
@@ -317,8 +330,14 @@ namespace GI_Subtitles.Services.Detection
             // Step 9: Enforce minimum dimensions for worst-case dialogue
             // (3 lines of text + NPC name + role text). OCR may detect a small
             // 1-line sample, but the region must fit the largest possible dialogue.
-            // Dialogue in Genshin/Star Rail spans ~80% of screen width.
-            int minW = (int)(frameW * 0.70);
+            //
+            // The floor is per-game. Genshin and Star Rail spread dialogue across
+            // roughly 80% of screen width, so 0.70 is a safe expansion there. A
+            // game that centres a narrower panel — the measured Zenless comic
+            // style spans 50.5% — gets inflated by a fifth of the screen instead,
+            // which drags on-screen buttons and stream watermarks into the capture
+            // region. See GameRegionProfile.RegionMinWidthFraction.
+            int minW = (int)(frameW * vision.RegionMinWidthFraction);
             int minH = (int)(frameH * 0.14);
 
             if (finalW < minW)
@@ -587,10 +606,20 @@ namespace GI_Subtitles.Services.Detection
         /// - Very short strings (less than 2 non-whitespace chars)
         /// - Strings where digits outnumber or equal letters (HP bars, levels, timers)
         /// - Short strings (&lt;4 chars) containing any digit
+        ///
+        /// <para>With <paramref name="strict"/> the shared
+        /// <see cref="Services.OCR.Classification.OcrTextJunkFilter"/> is layered on
+        /// top, which additionally catches stream watermarks such as a bare handle
+        /// with a digit in it ("UBHEN92") — 5 letters against 2 digits, so the
+        /// digit-ratio rule below lets it through. Off by default: Genshin and
+        /// Star Rail region detection must stay exactly as it shipped.</para>
         /// </summary>
-        private static bool IsLikelyGameUI(string text)
+        private static bool IsLikelyGameUI(string text, bool strict = false)
         {
             if (string.IsNullOrEmpty(text))
+                return true;
+
+            if (strict && Services.OCR.Classification.OcrTextJunkFilter.IsJunk(text))
                 return true;
 
             string t = text.Trim();

@@ -16,7 +16,7 @@
 
     <sys:String x:Key="Game_Genshin" xmlns:sys="clr-namespace:System;assembly=mscorlib">Genshin Impact</sys:String>
     <sys:String x:Key="Game_StarRail" xmlns:sys="clr-namespace:System;assembly=mscorlib">Honkai: Star Rail</sys:String>
-    <sys:String x:Key="Game_zzz" xmlns:sys="clr-namespace:System;assembly=mscorlib">Zenless Zone Zero</sys:String>
+    <sys:String x:Key="Game_ZZZ" xmlns:sys="clr-namespace:System;assembly=mscorlib">Zenless Zone Zero</sys:String>
     <sys:String x:Key="Game_Wuthering" xmlns:sys="clr-namespace:System;assembly=mscorlib">Wuthering Waves</sys:String>
     <sys:String x:Key="Game_Endfield" xmlns:sys="clr-namespace:System;assembly=mscorlib">Endfield</sys:String>
     <sys:String x:Key="Game_BH3" xmlns:sys="clr-namespace:System;assembly=mscorlib">BH3</sys:String>
@@ -131,6 +131,9 @@
     <sys:String x:Key="Settings_OcrModel_V4_Description" xmlns:sys="clr-namespace:System;assembly=mscorlib">Poprzedni, lekki model. Wybierz go, jeśli V6 działa na tym komputerze nietypowo wolno albo niekompatybilnie.</sys:String>
     <sys:String x:Key="Settings_OcrModel_Restart" xmlns:sys="clr-namespace:System;assembly=mscorlib">Uruchom Kaption ponownie, aby zastosować nowy model OCR.</sys:String>
     <sys:String x:Key="Tip_Settings_OcrModel" xmlns:sys="clr-namespace:System;assembly=mscorlib">Zmienia lokalne modele ONNX używane do wykrywania i odczytywania dialogów z gry.</sys:String>
+    <sys:String x:Key="Settings_OcrGpu_Checkbox" xmlns:sys="clr-namespace:System;assembly=mscorlib">Używaj akceleracji GPU (DirectML)</sys:String>
+    <sys:String x:Key="Tip_Settings_OcrGpu" xmlns:sys="clr-namespace:System;assembly=mscorlib">Rozpoznaje tekst na karcie graficznej. Jeśli GPU okaże się za wolne albo niestabilne, Kaption sam przełączy się na procesor; zaznacz to pole ponownie, żeby dać GPU jeszcze jedną szansę.</sys:String>
+    <sys:String x:Key="Settings_OcrGpu_Quarantined" xmlns:sys="clr-namespace:System;assembly=mscorlib">Kaption rozpoznaje tekst na procesorze, bo karta graficzna była za wolna. Zaznacz pole ponownie, żeby spróbować z GPU.</sys:String>
 
     <!-- Dashboard Tab -->
     <sys:String x:Key="Tab_Dashboard" xmlns:sys="clr-namespace:System;assembly=mscorlib">Ogólne</sys:String>
@@ -365,6 +368,9 @@
     <sys:String x:Key="Update_Applying" xmlns:sys="clr-namespace:System;assembly=mscorlib">Stosowanie…</sys:String>
     <sys:String x:Key="Update_Balloon_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">Dostępna aktualizacja Kaption</sys:String>
     <sys:String x:Key="Update_Balloon_Body_Format" xmlns:sys="clr-namespace:System;assembly=mscorlib">Wersja {0} jest gotowa do instalacji. Kliknij, żeby otworzyć Ustawienia.</sys:String>
+    <!-- Powiadomienie w zasobniku, pokazywane raz przy przejściu OCR na CPU. -->
+    <sys:String x:Key="Notice_GpuFallback_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">Kaption przełączył OCR na tryb CPU</sys:String>
+    <sys:String x:Key="Notice_GpuFallback_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">Twoja karta graficzna była za wolna, żeby stabilnie rozpoznawać tekst, więc Kaption korzysta z procesora. Tłumaczenie działa dalej.</sys:String>
 
     <!-- Region overlay labels -->
     <sys:String x:Key="Overlay_DialogueRegion_Label" xmlns:sys="clr-namespace:System;assembly=mscorlib">Obszar dialogu</sys:String>
@@ -692,6 +698,23 @@
     <sys:String x:Key="Logs_Severity_Info" xmlns:sys="clr-namespace:System;assembly=mscorlib">Info</sys:String>
     <sys:String x:Key="Logs_Severity_Warn" xmlns:sys="clr-namespace:System;assembly=mscorlib">Ostrzeżenia</sys:String>
     <sys:String x:Key="Logs_Severity_Error" xmlns:sys="clr-namespace:System;assembly=mscorlib">Błędy</sys:String>
+
+    <!-- Diagnostyka: paczka logów dla wsparcia, jednym kliknięciem -->
+    <sys:String x:Key="Logs_ReportProblem" xmlns:sys="clr-namespace:System;assembly=mscorlib">Zgłoś problem</sys:String>
+    <sys:String x:Key="Tip_Logs_ReportProblem" xmlns:sys="clr-namespace:System;assembly=mscorlib">Pakuje logi i ustawienia do jednego pliku, który możesz nam wysłać.</sys:String>
+    <sys:String x:Key="Logs_ReportProblem_Working" xmlns:sys="clr-namespace:System;assembly=mscorlib">Zbieram…</sys:String>
+    <sys:String x:Key="Logs_ReportProblem_DoneTitle" xmlns:sys="clr-namespace:System;assembly=mscorlib">Plik diagnostyczny gotowy</sys:String>
+    <sys:String x:Key="Logs_ReportProblem_DoneBody" xmlns:sys="clr-namespace:System;assembly=mscorlib">Plik diagnostyczny jest gotowy.&#10;&#10;ID zgłoszenia: {0}&#10;&#10;Wyślij nam plik na Discordzie albo na contact@kaption.one i podaj to ID. Dane osobowe — nazwa użytkownika Windows i token logowania — zostały z pliku usunięte.</sys:String>
+    <sys:String x:Key="Logs_ReportProblem_FailedTitle" xmlns:sys="clr-namespace:System;assembly=mscorlib">Nie udało się utworzyć pliku</sys:String>
+    <sys:String x:Key="Logs_ReportProblem_FailedBody" xmlns:sys="clr-namespace:System;assembly=mscorlib">Coś poszło nie tak przy zbieraniu plików. Nadal możesz wysłać nam sam log — kliknij „Otwórz log aplikacji” obok.</sys:String>
+    <sys:String x:Key="Logs_DetailedLogging" xmlns:sys="clr-namespace:System;assembly=mscorlib">Szczegółowe logi</sys:String>
+    <sys:String x:Key="Tip_Logs_DetailedLogging" xmlns:sys="clr-namespace:System;assembly=mscorlib">Zapisuje znacznie więcej szczegółów. Włącz, jeśli poprosi o to wsparcie, i powtórz problem.</sys:String>
+    <sys:String x:Key="Logs_DetailedLogging_RestartTitle" xmlns:sys="clr-namespace:System;assembly=mscorlib">Szczegółowe logi włączone</sys:String>
+    <sys:String x:Key="Logs_DetailedLogging_RestartBody" xmlns:sys="clr-namespace:System;assembly=mscorlib">Już działają. Zrestartuj Kaption, żeby zapisać też to, co dzieje się przy starcie — warto, jeśli problem pojawia się zaraz po uruchomieniu.</sys:String>
+    <sys:String x:Key="Logs_DetailedLogging_RestartNow" xmlns:sys="clr-namespace:System;assembly=mscorlib">Zrestartuj teraz</sys:String>
+    <sys:String x:Key="Logs_DetailedLogging_RestartLater" xmlns:sys="clr-namespace:System;assembly=mscorlib">Nie teraz</sys:String>
+    <sys:String x:Key="Logs_DetailedLogging_FailedTitle" xmlns:sys="clr-namespace:System;assembly=mscorlib">Nie udało się zmienić logowania</sys:String>
+    <sys:String x:Key="Logs_DetailedLogging_FailedBody" xmlns:sys="clr-namespace:System;assembly=mscorlib">Nie udało się zmienić poziomu logów.</sys:String>
 
     <!-- Podpowiedzi po najechaniu kursorem — pełne pokrycie kontrolek interaktywnych.
          Konwencja: "Tip_<Obszar>_<Kontrolka>" -->

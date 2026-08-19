@@ -5,6 +5,16 @@
 //  upstream mirrors (Dimbreath/animegamedata2 for Genshin, Dimbreath's
 //  turnbasedgamedata GitLab for Honkai Star Rail).
 //
+//  The mirrors carry different language sets and different file-name shapes,
+//  so IsUpstreamMirrored and ResolveUpstream are both per-game.
+//
+//  Zenless Zone Zero has NO runtime mirror here on purpose. Its on-disk
+//  TextMapEN.json is minted by tools/build-gamedata-zzz.cjs and delivered as
+//  the gamedata bundle's `textmap_en` section (GamedataSyncService); the
+//  string-keyed file on git.mero.moe is a publish-time build input, not
+//  something this service may ever write into a game folder. See
+//  IsUpstreamMirrored for the full reasoning.
+//
 //  Why this exists:
 //    Input-side TextMaps (what the OCR reads + what we use to resolve
 //    dialogue hashes to English text) arrive from public game-data mirrors,
@@ -188,41 +198,81 @@ namespace GI_Subtitles.Services.Translation
         private static readonly string KaptionRoot = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Kaption");
 
-        /// <summary>
-        /// Whether the given (game, lang) pair has an upstream mirror we
-        /// can fetch from. Polish and any future Kaption-exclusive
-        /// translations return false — they're handled by
-        /// <see cref="DictionarySyncService"/>, not this service.
-        ///
-        /// Reference for the DimbreathBot-mirrored list: user confirmed
-        /// via GitHub listing on 2026-04-15. Non-mirrored langs must be
-        /// published through our own pipeline.
-        /// </summary>
-        public static bool IsUpstreamMirrored(string game, string lang)
-        {
-            if (string.IsNullOrEmpty(game) || string.IsNullOrEmpty(lang)) return false;
-            var upper = lang.ToUpperInvariant();
-            var mirrored = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        // Languages Dimbreath's GitLab mirrors carry for Genshin and Star Rail.
+        // User confirmed via directory listing on 2026-04-15. Polish is
+        // deliberately absent — it's Kaption-exclusive and DictionarySyncService
+        // owns that path.
+        private static readonly HashSet<string> MirroredDimbreath =
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase)
             {
                 "CHS", "CHT", "DE", "EN", "ES", "FR", "ID", "IT",
                 "JP", "KR", "PT", "RU", "TH", "TR", "VI",
             };
-            return mirrored.Contains(upper);
+
+        /// <summary>
+        /// Whether the given (game, lang) pair has an upstream mirror this
+        /// service may fetch into
+        /// <c>%APPDATA%\Kaption\&lt;Game&gt;\TextMap&lt;LANG&gt;.json</c>.
+        /// Polish and any future Kaption-exclusive translation return false —
+        /// they are handled by <see cref="DictionarySyncService"/>, not here.
+        ///
+        /// <para>This is the single routing predicate for "where does this
+        /// game's on-disk TextMap come from", and three call sites depend on
+        /// exactly that meaning: <see cref="ResolveUpstream"/> (returns null
+        /// when it is false, making <c>CheckOneAsync</c> a no-op),
+        /// <c>GameDataBootstrapService</c> step 1 (must not hard-fail on a
+        /// missing input TextMap that the gamedata bundle is going to supply),
+        /// and <c>GamedataSyncService</c>'s <c>textmap_en</c> section (which
+        /// must be the ONLY writer of TextMapEN.json for the games that carry
+        /// it).</para>
+        ///
+        /// <para><b>ZZZ returns false for every language, deliberately.</b>
+        /// ZenlessData does mirror 13 TextMaps, but they are keyed by
+        /// human-readable strings ("Main_Chat_Chapter01_3000024_01") while the
+        /// desktop reads <c>dialog_graph.h</c> as a <c>ulong</c>. Kaption's ZZZ
+        /// id space is therefore synthetic — minted by
+        /// <c>tools/build-gamedata-zzz.cjs</c> and delivered in the bundle's
+        /// <c>textmap_en</c> section — so a string-keyed upstream file dropped
+        /// into that folder would resolve zero hashes while looking perfectly
+        /// healthy. The upstream ZZZ TextMap is a BUILD INPUT
+        /// (<c>Kaption.PublishStudio/Profiles/ZenlessZoneZeroProfile.GetTranslationDownloads</c>
+        /// and <c>scripts/publish-gamedata.sh --textmap-base/--textmap-overwrite</c>
+        /// both pull it from Gitea at publish time), never a runtime
+        /// download.</para>
+        ///
+        /// <para>An unregistered game returns false, which matches what
+        /// <see cref="ResolveUpstream"/> already did for it.</para>
+        /// </summary>
+        public static bool IsUpstreamMirrored(string game, string lang)
+        {
+            if (string.IsNullOrEmpty(game) || string.IsNullOrEmpty(lang)) return false;
+
+            switch (game.ToLowerInvariant())
+            {
+                case "genshin":
+                case "starrail":
+                    return MirroredDimbreath.Contains(lang);
+                case "zzz":
+                    // Not an oversight, and not a claim about what ZenlessData
+                    // carries — see the remarks above.
+                    return false;
+                default:
+                    return false;
+            }
         }
 
         /// <summary>
         /// Resolve the upstream URL + source label for (game, lang).
-        /// Returns null when no upstream mirror is known (e.g. PL on
-        /// DimbreathBot — caller should skip this pair).
+        /// Returns null when no upstream mirror is known — PL on DimbreathBot,
+        /// or any ZZZ language (see <see cref="IsUpstreamMirrored"/>). Callers
+        /// skip the pair.
         /// </summary>
         public static (string url, string source) ResolveUpstream(string game, string lang)
         {
             if (!IsUpstreamMirrored(game, lang)) return (null, null);
 
-            // Game-data mirrors are the same ones SettingsWindow uses for
-            // the legacy "Download Data" button. Keep them in one place so
-            // we don't get url drift between this auto-check path and any
-            // manual re-download path someone adds later.
+            // Keep the URL shapes in one place so this auto-check path and any
+            // manual re-download path someone adds later cannot drift.
             switch ((game ?? string.Empty).ToLowerInvariant())
             {
                 case "genshin":
@@ -236,6 +286,12 @@ namespace GI_Subtitles.Services.Translation
                         "gitlab:Dimbreath/turnbasedgamedata"
                     );
                 default:
+                    // Unreachable for ZZZ: IsUpstreamMirrored already returned
+                    // false. There is no ZZZ arm on purpose — one would hand a
+                    // string-keyed TextMap to a numeric-keyed graph. If you
+                    // need the Gitea raw URL, it belongs in the publish
+                    // tooling, which is where the two callers that legitimately
+                    // want it already keep it.
                     return (null, null);
             }
         }
@@ -251,9 +307,11 @@ namespace GI_Subtitles.Services.Translation
             var result = new GameDataUpdateResult();
             if (string.IsNullOrWhiteSpace(game)) return result;
 
-            // Input language — always checked (no Kaption-side alternative
-            // for input, since the PaddleOCR recognizer + hash-resolution
-            // chain requires the mirror's canonical TextMap).
+            // Input language — checked whenever a mirror is the authoritative
+            // source for it, because the PaddleOCR recognizer + hash-resolution
+            // chain needs that mirror's canonical TextMap. CheckOneAsync
+            // no-ops (NotMirrored) for a game whose TextMap comes from the
+            // gamedata bundle instead, so there is exactly one writer per file.
             if (!string.IsNullOrWhiteSpace(inputLang))
                 result.Languages.Add(await CheckOneAsync(game, inputLang, ct, forceCheck).ConfigureAwait(false));
 

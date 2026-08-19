@@ -24,8 +24,10 @@
 //       and split into the five expected files. Each is saved via
 //       FileProtectionHelper.SaveProtectedJson so on-disk layout matches the
 //       legacy DialogGraphDownloader output exactly.
-//    5. Wipe the plaintext bundle temp file.
-//    6. Update manifest.
+//    5. If the bundle carries the OPTIONAL sixth section `textmap_en`, write it
+//       to TextMapEN.json as PLAINTEXT (see below).
+//    6. Wipe the plaintext bundle temp file.
+//    7. Update manifest.
 //
 //  Where the files go (same paths DialogueContextEngine.Load already reads):
 //    %APPDATA%\Kaption\<Game>\DialogGraph.gisub
@@ -33,7 +35,33 @@
 //    %APPDATA%\Kaption\<Game>\QuestInfo.gisub
 //    %APPDATA%\Kaption\<Game>\HashToDialogs.gisub
 //    %APPDATA%\Kaption\<Game>\TalkIndex.gisub
+//    %APPDATA%\Kaption\<Game>\TextMapEN.json    (only when `textmap_en` present)
 //    %APPDATA%\Kaption\gamedata-manifest.json   (state tracker)
+//
+//  ── The `textmap_en` section (added for Zenless Zone Zero) ──────────────────
+//
+//  Genshin and HSR key their TextMap by a uint64 xxhash, so `dialog_graph.h`
+//  IS that hash and the public upstream TextMapEN.json resolves it. ZZZ keys
+//  its upstream TextMap by human-readable strings
+//  ("Main_Chat_Chapter01_3000024_01") while DialogueContextBase reads `h` as a
+//  ulong, so tools/build-gamedata-zzz.cjs mints its own numeric ids — and the
+//  only map that can resolve them is the one that same build produced.
+//
+//  Rather than publish that map as a second R2 object with its own version
+//  number (two artifacts that must agree forever — the exact shape of bug the
+//  Small/Medium TextMap shard split keeps causing), the builder emits it as a
+//  section of the bundle. One object, one D1 row, one download, and the two
+//  halves cannot drift because they are the same file.
+//
+//  Two properties of this write are load-bearing:
+//    * PLAINTEXT, not SaveProtectedJson. DialogueContextBase.LoadCore reads
+//      textMapEnPath with File.Exists + File.OpenRead and never consults
+//      FileProtectionHelper for it. A .gisub here would be invisible.
+//    * SINGLE WRITER. For a game whose bundle carries this section,
+//      GameDataUpdateService.IsUpstreamMirrored must be false for every
+//      language, so nothing else ever writes TextMapEN.json for that game.
+//      GameDataBootstrapService relies on the same predicate to know it must
+//      not hard-fail on a missing TextMapEN before this sync has run.
 //
 //  Threading: caller invokes SyncAsync on a background Task — never blocks UI.
 // ─────────────────────────────────────────────────────────────────────────────
@@ -198,7 +226,7 @@ namespace GI_Subtitles.Services.Translation
             if (existing != null
                 && string.Equals(existing.Version, latest.Version, StringComparison.Ordinal)
                 && shaMatches
-                && LocalBundleIsComplete(game))
+                && LocalBundleIsComplete(game, existing.TextMapEnFromBundle))
             {
                 Logger.Log.Info(
                     $"GamedataSync: up-to-date — {game} v{latest.Version} " +
@@ -245,49 +273,131 @@ namespace GI_Subtitles.Services.Translation
                 $"GamedataSync: fetched {bundleBytes:N0} plaintext bytes in " +
                 $"{dlWatch.ElapsedMilliseconds} ms ({mbPerSec:0.#} MB/s). Splitting bundle...");
 
-            // Parse + split. We use JObject rather than a strongly-typed DTO
-            // so we don't have to know every map's value shape at compile
-            // time — each top-level key's value is shipped straight through
-            // to SaveProtectedJson, which re-serialises with Formatting.None.
+            // Parse + split — see InstallBundleFromFile.
             //
-            // The whole parse/split block is wrapped in try/finally with an
-            // unconditional TryDelete(tmpBundle). The bundle is briefly on
-            // disk as plaintext JSON between decrypt (DownloadEncryptedAsync)
-            // and per-section machine-bound re-encrypt (SaveProtectedJson),
-            // and we don't want a crash mid-split to leave that plaintext
-            // lying around — it'd defeat the point of the machine-bound
-            // re-encryption the rest of the pipeline does.
-            long splitMs = 0;
+            // The call is wrapped in try/finally with an unconditional
+            // TryDelete(tmpBundle). The bundle is briefly on disk as plaintext
+            // JSON between decrypt (DownloadEncryptedAsync) and per-section
+            // machine-bound re-encrypt (SaveProtectedJson), and we don't want a
+            // crash mid-split to leave that plaintext lying around — it'd
+            // defeat the point of the machine-bound re-encryption the rest of
+            // the pipeline does.
+            BundleInstallResult install;
+            try
+            {
+                install = InstallBundleFromFile(tmpBundle, game, _protector);
+            }
+            finally
+            {
+                TryDelete(tmpBundle);
+            }
+
+            if (!install.Success)
+            {
+                result.Failed = true;
+                result.Message = install.Message;
+                return result;
+            }
+
+            long splitMs = install.SplitMs;
+            bool textMapEnInstalled = install.TextMapEnInstalled;
+
+            manifest[key] = new GamedataManifestEntry
+            {
+                Game = game,
+                Version = latest.Version,
+                GamedataVersionId = latest.GamedataVersionId,
+                FileSha256 = latest.Sha256,
+                DownloadedAtUnix = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
+                FileSizeBytes = latest.Size,
+                TextMapEnFromBundle = textMapEnInstalled,
+            };
+            SaveManifest(manifest);
+
+            watch.Stop();
+            Logger.Log.Info(
+                $"GamedataSync: installed {game} v{latest.Version} — " +
+                $"split in {splitMs} ms, total {watch.ElapsedMilliseconds} ms" +
+                (textMapEnInstalled ? ", TextMapEN.json written from bundle." : "."));
+
+            result.Downloaded = true;
+            return result;
+        }
+
+        /// <summary>
+        /// Bundle key carrying the numeric-keyed EN TextMap that resolves
+        /// <c>dialog_graph.h</c>. Optional and ZZZ-only today — see the file
+        /// header. Kept as a constant so the builder, this service and
+        /// <c>tools/split-bundle-local.cjs</c> can be grepped as one unit.
+        /// </summary>
+        internal const string TextMapEnSection = "textmap_en";
+
+        /// <summary>Outcome of one <see cref="InstallBundleFromFile"/> call.</summary>
+        internal sealed class BundleInstallResult
+        {
+            public bool Success { get; internal set; }
+            public string Message { get; internal set; }
+            public long SplitMs { get; internal set; }
+            /// <summary>True when the bundle carried <see cref="TextMapEnSection"/>
+            /// and <c>TextMapEN.json</c> was written from it.</summary>
+            public bool TextMapEnInstalled { get; internal set; }
+        }
+
+        /// <summary>
+        /// Validate a plaintext bundle on disk and split it into the per-file
+        /// outputs <c>DialogueContextEngine.Load</c> reads. Does no network and
+        /// no manifest I/O, so tests can drive it directly with a hand-built
+        /// bundle — which is the only way to cover the "bundle installs, then
+        /// resolves nothing" failure mode without a live licence session.
+        ///
+        /// Leaves the game folder untouched on every rejection path.
+        ///
+        /// Static and protector-injected on purpose: a test needs neither a
+        /// <see cref="KaptionApiClient"/> nor a <see cref="LicenseService"/> to
+        /// exercise it.
+        /// </summary>
+        internal static BundleInstallResult InstallBundleFromFile(
+            string bundlePath, string game, FileProtectionHelper protector)
+        {
+            if (protector == null) throw new ArgumentNullException(nameof(protector));
+            var outcome = new BundleInstallResult();
+
+            GameDataPaths.EnsureGameDir(game);
+
+            // `textmap_en` is staged next to its destination and only moved
+            // into place after every gate passes. The section arrives BEFORE
+            // `extension.game` in the byte stream, so writing it eagerly would
+            // contaminate the game folder with a bundle we are about to reject.
+            string stagedTextMapEn = Path.Combine(
+                GameDataPaths.GameDir(game), "TextMapEN.json.bundle.tmp");
+            TryDelete(stagedTextMapEn);
+
             try
             {
                 JObject bundle;
                 try
                 {
-                    using (var sr = new StreamReader(tmpBundle, Encoding.UTF8))
-                    using (var jr = new JsonTextReader(sr))
-                    {
-                        bundle = JObject.Load(jr);
-                    }
+                    bundle = ReadBundleStagingTextMap(bundlePath, stagedTextMapEn, out bool hasTextMapEn);
+                    if (!hasTextMapEn) stagedTextMapEn = null;
                 }
                 catch (Exception ex)
                 {
                     Logger.Log.Error($"GamedataSync: bundle parse failed: {ex.Message}");
-                    result.Failed = true;
-                    result.Message = "Bundle parse failed — the download may be corrupt. Please retry.";
-                    return result;
+                    outcome.Message = "Bundle parse failed — the download may be corrupt. Please retry.";
+                    return outcome;
                 }
 
                 var bundleVersion = bundle.Value<int?>("bundle_version") ?? 0;
                 // v1: original Genshin-only format, no extension field.
                 // v2: adds `extension.game` so DialogueContextBase can gate
                 // load on matching game identity. Both write the same five
-                // split files; v2 additionally drops a BundleMeta.json sidecar.
+                // split files; v2 additionally drops a BundleMeta.json sidecar
+                // and may carry the optional `textmap_en` section.
                 if (bundleVersion != 1 && bundleVersion != 2)
                 {
                     Logger.Log.Warn($"GamedataSync: unknown bundle_version={bundleVersion}; refusing to install.");
-                    result.Failed = true;
-                    result.Message = "Bundle format is newer than this Kaption build supports. Update the app.";
-                    return result;
+                    outcome.Message = "Bundle format is newer than this Kaption build supports. Update the app.";
+                    return outcome;
                 }
 
                 // v2 game-identity gate: if the bundle declares a game, it
@@ -302,14 +412,15 @@ namespace GI_Subtitles.Services.Translation
                     Logger.Log.Error(
                         $"GamedataSync: bundle declares game=\"{bundleGame}\" but we " +
                         $"requested game=\"{game}\". Refusing to install.");
-                    result.Failed = true;
-                    result.Message = "Bundle is for a different game than requested. Please retry.";
-                    return result;
+                    outcome.Message = "Bundle is for a different game than requested. Please retry.";
+                    return outcome;
                 }
 
                 // Map bundle keys → on-disk filenames. All five must be
                 // present; if any is missing the build is broken and we
-                // shouldn't half-install it.
+                // shouldn't half-install it. `textmap_en` is deliberately NOT
+                // in this list: Genshin/HSR bundles and every v1 bundle
+                // legitimately omit it.
                 var expectedSections = new (string bundleKey, string jsonPath)[]
                 {
                     ("dialog_graph",    GameDataPaths.DialogGraphJson(game)),
@@ -323,9 +434,8 @@ namespace GI_Subtitles.Services.Translation
                     if (bundle[k] == null)
                     {
                         Logger.Log.Error($"GamedataSync: bundle missing required section '{k}'.");
-                        result.Failed = true;
-                        result.Message = $"Bundle is missing '{k}'. Retry or contact support.";
-                        return result;
+                        outcome.Message = $"Bundle is missing '{k}'. Retry or contact support.";
+                        return outcome;
                     }
                 }
 
@@ -339,7 +449,7 @@ namespace GI_Subtitles.Services.Translation
                         // Exactly what the legacy DialogGraphDownloader path
                         // does, so DialogueContextEngine.Load reads the
                         // result transparently.
-                        _protector.SaveProtectedJson(jsonPath, bundle[k]);
+                        protector.SaveProtectedJson(jsonPath, bundle[k]);
                     }
 
                     // v2 sidecar: persist { bundle_version, extension.game }
@@ -356,46 +466,150 @@ namespace GI_Subtitles.Services.Translation
                                 ["game"] = string.IsNullOrEmpty(bundleGame) ? game : bundleGame,
                             },
                         };
-                        _protector.SaveProtectedJson(GameDataPaths.BundleMetaJson(game), meta);
+                        protector.SaveProtectedJson(GameDataPaths.BundleMetaJson(game), meta);
+                    }
+
+                    // Optional sixth section — see the file header. Committed
+                    // LAST, after the five required files are on disk, so a
+                    // half-installed bundle never leaves a fresh TextMapEN
+                    // pointing at a stale graph.
+                    //
+                    // A bundle that HAD the section but couldn't land it fails
+                    // the whole install. Reporting success would stamp the
+                    // manifest, and the next launch would see a matching
+                    // version + sha and skip the re-download — leaving a graph
+                    // whose every hash resolves to nothing, permanently.
+                    if (stagedTextMapEn != null)
+                    {
+                        bool committed = CommitStagedTextMapEn(game, stagedTextMapEn);
+                        stagedTextMapEn = null; // ownership moved; don't delete in finally
+                        if (!committed)
+                        {
+                            outcome.Message =
+                                "Could not write TextMapEN.json from the bundle. Retry, or free up " +
+                                "disk space if that's the problem.";
+                            return outcome;
+                        }
+                        outcome.TextMapEnInstalled = true;
                     }
                 }
                 catch (Exception ex)
                 {
                     Logger.Log.Error($"GamedataSync: section write failed: {ex.Message}");
-                    result.Failed = true;
-                    result.Message = ex.Message;
-                    return result;
+                    outcome.Message = ex.Message;
+                    return outcome;
                 }
                 splitWatch.Stop();
-                splitMs = splitWatch.ElapsedMilliseconds;
+
+                outcome.SplitMs = splitWatch.ElapsedMilliseconds;
+                outcome.Success = true;
+                return outcome;
             }
             finally
             {
-                // Unconditional: plaintext bundle never lives past this call,
-                // including on failure paths. Matches the "re-encrypt machine-
-                // bound or nothing" invariant DictionarySync uses for
-                // translation packs.
-                TryDelete(tmpBundle);
+                // Only non-null here if we bailed before committing it.
+                if (stagedTextMapEn != null) TryDelete(stagedTextMapEn);
+            }
+        }
+
+        /// <summary>
+        /// Parse the bundle into a JObject, EXCEPT for
+        /// <see cref="TextMapEnSection"/>, which is streamed straight to
+        /// <paramref name="stagePath"/> without ever entering the DOM.
+        ///
+        /// That section is ~22 MB of flat string→string JSON for ZZZ; putting
+        /// it through <c>JObject.Load</c> would add roughly 100 MB of
+        /// transient JProperty/JValue heap to a startup-path operation for no
+        /// benefit, since its only destination is a file. Every other section
+        /// is read exactly as <c>JObject.Load</c> read it before, so
+        /// Genshin/HSR bundles behave identically.
+        /// </summary>
+        private static JObject ReadBundleStagingTextMap(
+            string bundlePath, string stagePath, out bool hasTextMapEn)
+        {
+            hasTextMapEn = false;
+            var bundle = new JObject();
+
+            using (var sr = new StreamReader(bundlePath, Encoding.UTF8))
+            using (var jr = new JsonTextReader(sr))
+            {
+                // TextMap values are arbitrary game dialogue. Newtonsoft's
+                // default DateParseHandling would rewrite anything that looks
+                // like a timestamp into a normalised DateTime on the way
+                // through, silently altering the text we key OCR matches on.
+                jr.DateParseHandling = DateParseHandling.None;
+
+                if (!jr.Read() || jr.TokenType != JsonToken.StartObject)
+                    throw new JsonReaderException("Bundle root is not a JSON object.");
+
+                while (jr.Read() && jr.TokenType == JsonToken.PropertyName)
+                {
+                    string name = (string)jr.Value;
+                    if (!jr.Read())
+                        throw new JsonReaderException($"Bundle truncated after property '{name}'.");
+
+                    if (string.Equals(name, TextMapEnSection, StringComparison.Ordinal))
+                    {
+                        Directory.CreateDirectory(Path.GetDirectoryName(stagePath));
+                        using (var sw = new StreamWriter(stagePath, false, new UTF8Encoding(false)))
+                        using (var jw = new JsonTextWriter(sw) { Formatting = Formatting.None })
+                        {
+                            // Copies the current token and all its children
+                            // straight from reader to writer; leaves the
+                            // reader on the section's closing token.
+                            jw.WriteToken(jr, writeChildren: true);
+                        }
+                        hasTextMapEn = true;
+                    }
+                    else
+                    {
+                        bundle[name] = JToken.ReadFrom(jr);
+                    }
+                }
             }
 
-            manifest[key] = new GamedataManifestEntry
+            return bundle;
+        }
+
+        /// <summary>
+        /// Move the staged TextMapEN into place and drop every cache derived
+        /// from the previous one. Returns false (and logs) on failure; the
+        /// caller then fails the whole install so the manifest is not stamped
+        /// and the next launch re-downloads.
+        /// </summary>
+        private static bool CommitStagedTextMapEn(string game, string stagePath)
+        {
+            string finalPath = GameDataPaths.TextMapJson(game, "EN");
+            try
             {
-                Game = game,
-                Version = latest.Version,
-                GamedataVersionId = latest.GamedataVersionId,
-                FileSha256 = latest.Sha256,
-                DownloadedAtUnix = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
-                FileSizeBytes = latest.Size,
-            };
-            SaveManifest(manifest);
+                if (File.Exists(finalPath)) File.Delete(finalPath);
+                File.Move(stagePath, finalPath);
 
-            watch.Stop();
-            Logger.Log.Info(
-                $"GamedataSync: installed {game} v{latest.Version} — " +
-                $"split in {splitMs} ms, total {watch.ElapsedMilliseconds} ms.");
+                // The sidecar belongs to the upstream-mirror path. Leaving a
+                // stale one behind would let a future mirrored fetch think it
+                // already has this content under an ETag that describes a
+                // completely different file.
+                TryDelete(GameDataPaths.TextMapMetaJson(game, "EN"));
 
-            result.Downloaded = true;
-            return result;
+                // Merged matcher caches and the serialized index were built
+                // against the previous EN corpus. Same sweep the upstream
+                // update path runs after it replaces a TextMap.
+                int invalidated = GameDataUpdateService.InvalidateDownstreamCaches(
+                    GameDataPaths.GameDir(game), "EN");
+
+                long bytes = new FileInfo(finalPath).Length;
+                Logger.Log.Info(
+                    $"GamedataSync: wrote {Path.GetFileName(finalPath)} from bundle section " +
+                    $"'{TextMapEnSection}' ({bytes:N0} bytes); invalidated {invalidated} cache file(s).");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Logger.Log.Error(
+                    $"GamedataSync: could not commit {TextMapEnSection} to {finalPath}: {ex.Message}");
+                TryDelete(stagePath);
+                return false;
+            }
         }
 
         /// <summary>
@@ -403,9 +617,18 @@ namespace GI_Subtitles.Services.Translation
         /// the game. If any is missing we need to redownload, even if the
         /// manifest says we already installed this version — user may have
         /// deleted files manually or disk may have gone bad.
+        ///
+        /// <paramref name="expectTextMapEn"/> comes from the manifest row and
+        /// extends the same reasoning to the bundle-carried TextMapEN: a user
+        /// who deletes it would otherwise be stuck with a graph whose every
+        /// hash resolves to nothing, and the manifest would happily say
+        /// "up-to-date" forever.
         /// </summary>
-        private bool LocalBundleIsComplete(string game)
+        private bool LocalBundleIsComplete(string game, bool expectTextMapEn)
         {
+            if (expectTextMapEn && !File.Exists(GameDataPaths.TextMapJson(game, "EN")))
+                return false;
+
             return _protector.FileExists(GameDataPaths.DialogGraphJson(game))
                 && _protector.FileExists(GameDataPaths.HashToDialogsJson(game))
                 && _protector.FileExists(GameDataPaths.NpcNamesJson(game))
@@ -490,6 +713,15 @@ namespace GI_Subtitles.Services.Translation
             public string FileSha256 { get; set; }
             public long DownloadedAtUnix { get; set; }
             public long FileSizeBytes { get; set; }
+
+            /// <summary>
+            /// True when this bundle carried the <c>textmap_en</c> section and
+            /// we wrote <c>TextMapEN.json</c> from it. Drives the completeness
+            /// check on subsequent launches. Absent (false) on manifests
+            /// written before the section existed and on Genshin/HSR, where
+            /// TextMapEN comes from the public mirror instead.
+            /// </summary>
+            public bool TextMapEnFromBundle { get; set; }
         }
     }
 }

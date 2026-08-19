@@ -70,10 +70,17 @@ namespace GI_Subtitles.Views
         private volatile bool _engineReady = false;
         private int _engineInitGeneration;
         private const int OcrInferenceTimeoutSeconds = 15;
-        private const int OcrTimeoutsBeforeRuntimeRecovery = 2;
-        private int _consecutiveOcrTimeouts;
+        // Consecutive-timeout and rolling-window triggers both live in the
+        // policy object so the escalation rule is testable without a window.
+        private readonly GI_Subtitles.Services.OCR.OcrRecoveryPolicy _ocrRecoveryPolicy =
+            new GI_Subtitles.Services.OCR.OcrRecoveryPolicy();
         private int _runtimeOcrRecoveryLevel;
         private int _runtimeOcrRecoveryInFlight;
+        // A stalled provider must not be handed the next frame immediately.
+        // Back-to-back 15s stalls kept a struggling DirectML device pinned at
+        // ~50% load with nothing to show for it, and they starve the recovery
+        // counters of wall-clock time to work with.
+        private static readonly TimeSpan OcrTimeoutBackoff = TimeSpan.FromSeconds(3);
         private const double ChangeThreshold = 0.01;
         private const int EmptyFrameRetryLimit = 2;
         private static readonly TimeSpan EmptyFrameRetryBackoff = TimeSpan.FromMilliseconds(500);
@@ -309,6 +316,19 @@ namespace GI_Subtitles.Views
         private IScreenCapture _captureBackend;
         private int _consecutiveDxgiNullFrames;
         private const int DxgiNullFramesBeforeFallback = 3;
+        // DXGI dies whenever the secure desktop takes over (Ctrl+Alt+Del, UAC,
+        // lock screen) and DuplicateOutput comes back 0x80070005. Before this,
+        // the GDI fallback was permanent for the rest of the session — and GDI
+        // is *also* dead on the secure desktop, so the app spent an hour
+        // logging invalid-handle errors five times a second with no way back.
+        // MinValue means "never fell back", which keeps machines that started
+        // on GDI (no DXGI support at all) from probing forever.
+        private DateTime _dxgiRetryAfterUtc = DateTime.MinValue;
+        private static readonly TimeSpan DxgiReinitRetryInterval = TimeSpan.FromSeconds(30);
+        private readonly ThrottledLogger _captureFailureLog =
+            new ThrottledLogger(TimeSpan.FromSeconds(60));
+        private readonly ThrottledLogger _ocrTickFailureLog =
+            new ThrottledLogger(TimeSpan.FromSeconds(60));
         private bool _wdaExcludeActive = false; // True only if SetWindowDisplayAffinity succeeded
 
         private volatile DetectedTextResult _lastDetectedText;
@@ -373,11 +393,51 @@ namespace GI_Subtitles.Views
         }
 
 
+        /// <summary>
+        /// Publishes the handful of facts a support conversation always starts
+        /// by asking for, so a diagnostic bundle answers them up front instead
+        /// of costing a round-trip. Each provider is called on a background
+        /// thread and individually guarded by the collector, so a subsystem
+        /// that is mid-initialisation degrades to one "(failed)" line rather
+        /// than sinking the bundle.
+        /// </summary>
+        private void RegisterDiagnosticState()
+        {
+            Services.Diagnostics.DiagnosticBundle.RegisterStateProvider(
+                "Engine status", () => data?.Engine.ToString() ?? "(settings window not ready)");
+
+            Services.Diagnostics.DiagnosticBundle.RegisterStateProvider(
+                "Dialogue region", () => DescribeRegion(notify?.Region));
+
+            Services.Diagnostics.DiagnosticBundle.RegisterStateProvider(
+                "Answer region", () => DescribeRegion(notify?.Region2));
+
+            Services.Diagnostics.DiagnosticBundle.RegisterStateProvider(
+                "Selected game", () => Config.Get<string>("Game", "(unset)"));
+
+            Services.Diagnostics.DiagnosticBundle.RegisterStateProvider(
+                "Target language", () => Config.Get<string>("TargetLanguage", "(unset)"));
+        }
+
+        /// <summary>
+        /// A region that was never chosen is the single most common cause of
+        /// "it does nothing", so say so in words rather than printing an empty
+        /// array the reader has to interpret.
+        /// </summary>
+        private static string DescribeRegion(string[] region)
+        {
+            if (region == null || region.Length < 4 || region[1] == "0")
+                return "not configured";
+            return string.Join(", ", region);
+        }
+
         private void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
             // Get the window handle
             IntPtr handle = new WindowInteropHelper(this).Handle;
             _mainWindowHandle = handle;
+
+            RegisterDiagnosticState();
             // Listen to window messages
             HwndSource source = HwndSource.FromHwnd(handle);
             source.AddHook(WndProc);
@@ -603,6 +663,14 @@ namespace GI_Subtitles.Views
                 {
                     try { Config.Set("UseGpuOcr", false); }
                     catch (Exception ex) { Logger.Log.Warn($"Retry-as-CPU: failed to persist UseGpuOcr=false: {ex.Message}"); }
+                }
+                else
+                {
+                    // Plain "Retry" is an explicit "try the GPU again", same as
+                    // re-ticking the GPU checkbox in Settings, so it doubles as
+                    // the quarantine reset. Covers the case where the engine
+                    // banner is up and Settings is the last place the user looks.
+                    GI_Subtitles.Services.OCR.OcrGpuQuarantine.Clear("user pressed Retry on the engine banner");
                 }
                 KickOffEngineInit();
             };
@@ -851,10 +919,11 @@ namespace GI_Subtitles.Views
                         return;
                     }
                     _engineReady = true;
-                    Interlocked.Exchange(ref _consecutiveOcrTimeouts, 0);
+                    _ocrRecoveryPolicy.Reset();
                     Interlocked.Exchange(ref _runtimeOcrRecoveryLevel, runtimeRecoveryLevel);
                     Interlocked.Exchange(ref _runtimeOcrRecoveryInFlight, 0);
                     Logger.Log.Debug("OCR engine loaded and ready");
+                    NotifyGpuQuarantineIfJustEngaged();
                     data.SetEngineStatus(SettingsWindow.EngineStatus.Ready);
                     // Dashboard refresh is redundant with the event handler
                     // (OnEngineStatusChanged calls UpdateDashboardStatus) but
@@ -883,6 +952,57 @@ namespace GI_Subtitles.Views
             });
         }
 
+        /// <summary>
+        /// Surfaces a single tray balloon the first time Kaption decides this
+        /// machine's GPU can't drive OCR. Silent afterwards — the quarantine
+        /// then simply persists across launches and the reason stays in
+        /// app.log. Called after every successful engine load; the
+        /// consume-once flag inside OcrGpuQuarantine keeps it to one balloon.
+        /// </summary>
+        private void NotifyGpuQuarantineIfJustEngaged()
+        {
+            if (!GI_Subtitles.Services.OCR.OcrGpuQuarantine.TryConsumeUserNotice())
+                return;
+
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                try
+                {
+                    notify?.ShowBalloonTip(
+                        LocalizedString("Notice_GpuFallback_Title", "Kaption switched OCR to CPU mode"),
+                        LocalizedString(
+                            "Notice_GpuFallback_Body",
+                            "Your GPU was too slow to run text recognition reliably, so Kaption is using the processor instead. Translation keeps working."));
+                }
+                catch (Exception ex)
+                {
+                    Logger.Log.Warn($"GPU-quarantine balloon failed: {ex.Message}");
+                }
+            }));
+        }
+
+        /// <summary>
+        /// Single accounting point for a live-frame OCR timeout: feed the
+        /// recovery policy, log both counters, and escalate when either
+        /// trigger fires. Both call sites in <see cref="TriggerOcrAsync"/> go
+        /// through here so the log and the decision can never disagree.
+        /// </summary>
+        private void RecordOcrTimeout(string executionProvider, string modelName)
+        {
+            var decision = _ocrRecoveryPolicy.RecordTimeout(DateTime.UtcNow);
+            Logger.Log.Warn(
+                $"OCR exceeded the {OcrInferenceTimeoutSeconds}s live-frame limit " +
+                $"(consecutive {decision.ConsecutiveTimeouts}/" +
+                $"{GI_Subtitles.Services.OCR.OcrRecoveryPolicy.ConsecutiveTimeoutsBeforeRecovery}, " +
+                $"{decision.TimeoutsInWindow}/" +
+                $"{GI_Subtitles.Services.OCR.OcrRecoveryPolicy.WindowedTimeoutsBeforeRecovery} in the last " +
+                $"{GI_Subtitles.Services.OCR.OcrRecoveryPolicy.RecoveryWindow.TotalSeconds:F0}s); " +
+                $"provider={executionProvider ?? "unknown"}, " +
+                $"model={modelName ?? "unknown"}.");
+            if (decision.ShouldRecover)
+                ScheduleOcrRuntimeRecovery();
+        }
+
         private static bool IsOcrTimeout(Exception error)
         {
             for (Exception current = error; current != null; current = current.InnerException)
@@ -895,9 +1015,16 @@ namespace GI_Subtitles.Views
 
         /// <summary>
         /// Runtime safety net for a provider which initializes successfully but
-        /// repeatedly stalls on real frames. Recovery is session-local: it does
-        /// not overwrite the user's GPU/model preference in Config, so the next
-        /// app launch can try a freshly warmed DirectML session again.
+        /// repeatedly stalls on real frames.
+        ///
+        /// Level 1 (GPU → CPU) now also writes a version-scoped quarantine to
+        /// Config so the next launch starts on the CPU instead of re-rolling
+        /// the DirectML dice. It was session-local until 2026-08-17, which is
+        /// precisely why a field user saw working subtitles in exactly one
+        /// session and a pegged GPU in every other. Level 2 (v6 → v4 on CPU)
+        /// stays session-local: the model preference is the user's own choice
+        /// and a CPU stall is far more likely to be transient machine load.
+        /// The user's <c>UseGpuOcr</c> value is never overwritten.
         /// </summary>
         private void ScheduleOcrRuntimeRecovery()
         {
@@ -933,6 +1060,12 @@ namespace GI_Subtitles.Views
                 return;
 
             Logger.Log.Warn(reason + ".");
+            if (nextLevel == 1)
+            {
+                GI_Subtitles.Services.OCR.OcrGpuQuarantine.Engage(
+                    $"DirectML stalled on live frames (model {current.ModelName ?? "unknown"}, " +
+                    $"{OcrInferenceTimeoutSeconds}s watchdog)");
+            }
             KickOffEngineInit(
                 forceCpuForSession: true,
                 profileOverride: profileOverride,
@@ -1172,7 +1305,7 @@ namespace GI_Subtitles.Views
                                     TriggerOcrAsync(frameMat.Clone(), target, answerTarget, null);
                                     passedToOcr = true;
                                 }
-                                else
+                                else if (debug)
                                 {
                                     Logger.Log.Debug("Skip OCR (fallback) due to min interval limit");
                                 }
@@ -1383,8 +1516,11 @@ namespace GI_Subtitles.Views
                                     TriggerOcrAsync(frameMat.Clone(), target, answerTarget, currentBinary.Clone());
                                     passedToOcr = true;
                                 }
-                                else
+                                else if (debug)
                                 {
+                                    // Fires on every 100 ms tick while an OCR pass is in flight,
+                                    // so it must stay behind the Debug flag: ungated it floods
+                                    // the in-memory ring buffer that feeds diagnostic bundles.
                                     Logger.Log.Debug("Subtitle changed/stable but skip OCR due to running or min interval limit");
                                 }
                             }
@@ -1459,7 +1595,17 @@ namespace GI_Subtitles.Views
                 }
                 catch (Exception ex)
                 {
-                    Logger.Log.Error(ex);
+                    // Per-tick catch-all. Throttled per distinct exception so a
+                    // stuck capture backend can't write a stack trace 5×/s for
+                    // an hour; a genuinely new failure still logs immediately.
+                    string key = ex.GetType().FullName + "|" + ex.Message;
+                    if (_ocrTickFailureLog.ShouldLog(key, out int suppressed))
+                    {
+                        if (suppressed > 0)
+                            Logger.Log.Error($"OCR tick failed{_ocrTickFailureLog.SuppressionSuffix(suppressed)}", ex);
+                        else
+                            Logger.Log.Error(ex);
+                    }
                 }
                 } // end using LatencyModeScope — restore default GC latency before releasing tick gate
                 Interlocked.Exchange(ref OCR_TIMER, 0);
@@ -1479,12 +1625,17 @@ namespace GI_Subtitles.Views
 
             // Base vertical position near the OCR region; precise Top/Height
             // will be adjusted later. Default matches the layout-engine
-            // PadVertical default below (-140) so a fresh install lands the
-            // overlay in the same spot whichever path renders it first. The
-            // old `Config.GetPad()` (no arg, default 0) caused the overlay
-            // to start at the raw OCR-region top until the user nudged the
-            // slider, which then wrote the -140 and re-rendered correctly.
-            double baseTop = Convert.ToInt16(notify.Region[1]) / Scale + Config.GetPad(-140);
+            // PadVertical default below so a fresh install lands the overlay
+            // in the same spot whichever path renders it first. The old
+            // `Config.GetPad()` (no arg, default 0) caused the overlay to
+            // start at the raw OCR-region top until the user nudged the
+            // slider, which then wrote the pad and re-rendered correctly.
+            //
+            // The default is per-game: -140 clears a Genshin dialogue panel
+            // but not the taller overlay that Zenless's long centred captions
+            // wrap to. See GameRegionProfile.SubtitlePadVertical.
+            double baseTop = Convert.ToInt16(notify.Region[1]) / Scale
+                + Config.GetPad(Services.Detection.GameRegionProfile.ForCurrentGame().SubtitlePadVertical);
 
             foreach (var screen in Screen.AllScreens)
             {
@@ -1569,7 +1720,9 @@ namespace GI_Subtitles.Views
                             Convert.ToInt16(notify.Region[3])
                         },
                         Scale = Scale,
-                        PadVertical = Config.GetPad(-140),
+                        // Per-game default; a user-set Pad still wins.
+                        PadVertical = Config.GetPad(
+                            Services.Detection.GameRegionProfile.ForCurrentGame().SubtitlePadVertical),
                         PadHorizontal = Config.GetPadHorizontal(0),
                         ScreenBounds = new System.Windows.Rect(
                             targetScreen.Bounds.Left / screenScale,
@@ -2295,6 +2448,11 @@ namespace GI_Subtitles.Views
                 throw new ArgumentException($"Region dimensions must be positive: width={width}, height={height}");
             }
 
+            // If a previous tick demoted us to GDI because DXGI died, probe
+            // whether the desktop came back before spending this tick on the
+            // slower (and, on a secure desktop, equally dead) path.
+            TryRestoreDxgiCapture();
+
             // Rent a destination from the pool, copy screen pixels into it. On backend
             // failure we either fall back to GDI (DXGI→GDI once) or rethrow — either way
             // the rented bitmap goes back to the pool first so we don't leak a bucket slot
@@ -2328,20 +2486,88 @@ namespace GI_Subtitles.Views
                 // If DXGI fails at runtime, fall back to GDI (same fallback semantics as before).
                 if (_captureBackend is DxgiScreenCapture dxgi)
                 {
-                    return SwitchCaptureToGdiAndRetry(x, y, width, height, ex.Message);
+                    // A region on another monitor is permanent for as long as
+                    // that region is configured, so it must NOT arm the 30s
+                    // DXGI re-probe — that would flap between backends forever
+                    // for every multi-monitor user.
+                    return SwitchCaptureToGdiAndRetry(
+                        x, y, width, height, ex.Message,
+                        allowDxgiRetry: !(ex is DxgiRegionOutsideOutputException));
                 }
-                Logger.Log.Error($"Capture failed: x={x}, y={y}, w={width}, h={height}: {ex.Message}");
+                // Throttled: on a secure desktop this fires on every tick
+                // (5×/s) for as long as the prompt is up, and the message is
+                // identical every time.
+                if (_captureFailureLog.ShouldLog(ex.Message, out int suppressed))
+                {
+                    Logger.Log.Error(
+                        $"Capture failed: x={x}, y={y}, w={width}, h={height}: {ex.Message}" +
+                        _captureFailureLog.SuppressionSuffix(suppressed));
+                }
                 throw;
             }
         }
 
+        /// <summary>
+        /// Re-probes DXGI at most every <see cref="DxgiReinitRetryInterval"/>
+        /// after a fallback so a transient loss (secure desktop, UAC prompt,
+        /// display-mode change) doesn't strand the session on GDI forever.
+        /// Runs on the OCR tick, i.e. the UI thread, same as every other
+        /// <c>_captureBackend</c> mutation.
+        /// </summary>
+        private void TryRestoreDxgiCapture()
+        {
+            if (_dxgiRetryAfterUtc == DateTime.MinValue) return;   // never fell back
+            if (!(_captureBackend is GdiScreenCapture)) return;    // already recovered
+            if (DateTime.UtcNow < _dxgiRetryAfterUtc) return;
+
+            // Re-arm before probing so a throwing constructor can't turn this
+            // into a per-tick retry.
+            _dxgiRetryAfterUtc = DateTime.UtcNow + DxgiReinitRetryInterval;
+
+            DxgiScreenCapture candidate = null;
+            try
+            {
+                candidate = new DxgiScreenCapture();
+                if (!candidate.IsAvailable)
+                {
+                    // The constructor already logged why (DuplicateOutput
+                    // 0x80070005 while the secure desktop owns the session, in
+                    // the common case). Two lines a minute, not five a second.
+                    candidate.Dispose();
+                    return;
+                }
+
+                IScreenCapture previous = _captureBackend;
+                _captureBackend = candidate;
+                candidate = null;
+                previous?.Dispose();
+                _consecutiveDxgiNullFrames = 0;
+                _dxgiRetryAfterUtc = DateTime.MinValue;
+                _captureFailureLog.ResetAll();
+                Logger.Log.Info("DXGI Desktop Duplication recovered; screen capture is back on the GPU path.");
+            }
+            catch (Exception ex)
+            {
+                candidate?.Dispose();
+                Logger.Log.Debug($"DXGI re-init attempt failed: {ex.Message}");
+            }
+        }
+
+        /// <param name="allowDxgiRetry">
+        /// False when the fallback cause is permanent for the current region
+        /// (capture rectangle on a monitor this backend cannot duplicate), so
+        /// <see cref="TryRestoreDxgiCapture"/> stays disarmed.
+        /// </param>
         private Bitmap SwitchCaptureToGdiAndRetry(
-            int x, int y, int width, int height, string reason)
+            int x, int y, int width, int height, string reason, bool allowDxgiRetry = true)
         {
             Logger.Log.Warn($"DXGI capture unavailable, falling back to GDI: {reason}");
             _captureBackend?.Dispose();
             _captureBackend = new GdiScreenCapture();
             _consecutiveDxgiNullFrames = 0;
+            _dxgiRetryAfterUtc = allowDxgiRetry
+                ? DateTime.UtcNow + DxgiReinitRetryInterval
+                : DateTime.MinValue;
 
             Bitmap fallbackRented = BitmapPool.Default.Rent(
                 width, height, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
@@ -3809,6 +4035,7 @@ namespace GI_Subtitles.Views
             bool clearAnswers = false;
             bool wasCacheHit = false;
             bool inferenceAttempted = false;
+            bool inferenceTimedOut = false;
             Exception inferenceError = null;
             var cts = new CancellationTokenSource(
                 TimeSpan.FromSeconds(OcrInferenceTimeoutSeconds));
@@ -3846,17 +4073,25 @@ namespace GI_Subtitles.Views
                             inferenceAttempted = true;
                             OCRResult ocrResult = data.engine.DetectTextFromMat(frameToProcess, cts.Token);
 
-                            // Color-based NPC name detection with position preservation
+                            // Speaker-name vs dialogue split. Which signal separates
+                            // them is per-game: Genshin and Star Rail print the name
+                            // in an accent colour, Zenless prints it in the same white
+                            // as the body and has to be split on layout geometry
+                            // instead. Resolving per tick is free — the factory hands
+                            // back shared stateless instances.
                             if (ocrResult.TextBlocks != null && ocrResult.TextBlocks.Count > 0)
                             {
-                                var detectedResult = ImageProcessor.ClassifyTextBlocksWithPositions(
+                                var classifier = Services.OCR.Classification.TextBlockClassifierFactory
+                                    .Create(Config.Get<string>("Game", "Genshin"));
+                                var detectedResult = classifier.Classify(
                                     frameToProcess, ocrResult.TextBlocks);
 
                                 detectedNpcName = detectedResult.NpcName;
                                 detectedText = detectedResult.DialogueText;
                                 detectedTextLayout = detectedResult;
 
-                                Logger.Log.Debug($"Color classification: NPC=\"{detectedNpcName}\", " +
+                                Logger.Log.Debug($"Text classification ({classifier.GetType().Name}): " +
+                                    $"NPC=\"{detectedNpcName}\", " +
                                     $"Dialogue=\"{detectedText}\", DialogueBlocks={detectedResult.DialogueBlocks.Count}");
                             }
                             else
@@ -3950,23 +4185,17 @@ namespace GI_Subtitles.Views
 
                             if (inferenceError != null)
                             {
-                                bool timedOut = cts.IsCancellationRequested || IsOcrTimeout(inferenceError);
-                                if (timedOut)
+                                inferenceTimedOut = cts.IsCancellationRequested || IsOcrTimeout(inferenceError);
+                                if (inferenceTimedOut)
                                 {
-                                    int timeoutCount = Interlocked.Increment(
-                                        ref _consecutiveOcrTimeouts);
-                                    Logger.Log.Warn(
-                                        $"OCR exceeded the {OcrInferenceTimeoutSeconds}s live-frame limit " +
-                                        $"({timeoutCount}/{OcrTimeoutsBeforeRuntimeRecovery}); " +
-                                        $"provider={data.engine?.ExecutionProvider ?? "unknown"}, " +
-                                        $"model={data.engine?.ModelName ?? "unknown"}.");
+                                    RecordOcrTimeout(
+                                        data.engine?.ExecutionProvider,
+                                        data.engine?.ModelName);
                                     Logger.Log.Debug(inferenceError);
-                                    if (timeoutCount >= OcrTimeoutsBeforeRuntimeRecovery)
-                                        ScheduleOcrRuntimeRecovery();
                                 }
                                 else
                                 {
-                                    Interlocked.Exchange(ref _consecutiveOcrTimeouts, 0);
+                                    _ocrRecoveryPolicy.RecordSuccess();
                                     Logger.Log.Error(inferenceError);
                                 }
                                 detectedText = string.Empty;
@@ -3975,7 +4204,7 @@ namespace GI_Subtitles.Views
                             }
                             else if (inferenceAttempted)
                             {
-                                Interlocked.Exchange(ref _consecutiveOcrTimeouts, 0);
+                                _ocrRecoveryPolicy.RecordSuccess();
                             }
 
                             ocrText = detectedText;
@@ -4041,6 +4270,14 @@ namespace GI_Subtitles.Views
                                 _nextOcrAttemptUtc = DateTime.UtcNow + EmptyFrameRetryBackoff;
                                 Logger.Log.Debug("OCR returned no usable text; scheduling a same-frame retry.");
                             }
+
+                            // Applied last, deliberately: a timeout leaves
+                            // detectedText empty, so the empty-frame branches
+                            // above would otherwise re-arm the 500ms retry (or
+                            // clear the backoff entirely) and hand the stalled
+                            // provider another frame half a second later.
+                            if (inferenceTimedOut)
+                                _nextOcrAttemptUtc = DateTime.UtcNow + OcrTimeoutBackoff;
                         }
 
                         UpdateWindowPosition();
@@ -4065,12 +4302,17 @@ namespace GI_Subtitles.Views
             }
             catch (OperationCanceledException)
             {
-                int timeoutCount = Interlocked.Increment(ref _consecutiveOcrTimeouts);
-                Logger.Log.Warn(
-                    $"OCR task exceeded the {OcrInferenceTimeoutSeconds}s live-frame limit " +
-                    $"({timeoutCount}/{OcrTimeoutsBeforeRuntimeRecovery}).");
-                if (timeoutCount >= OcrTimeoutsBeforeRuntimeRecovery)
-                    ScheduleOcrRuntimeRecovery();
+                // Reached when the whole Task.Run is cancelled rather than the
+                // inference itself (the inner catch funnels that case through
+                // inferenceError). Runs on whichever context TriggerOcrAsync was
+                // invoked from — the UI thread for the timer and hotkey paths —
+                // so the pipeline-state lock is what makes the backoff write
+                // safe either way.
+                RecordOcrTimeout(data?.engine?.ExecutionProvider, data?.engine?.ModelName);
+                lock (_ocrPipelineStateLock)
+                {
+                    _nextOcrAttemptUtc = DateTime.UtcNow + OcrTimeoutBackoff;
+                }
             }
             catch (Exception ex)
             {

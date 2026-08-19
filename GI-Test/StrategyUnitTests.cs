@@ -13,6 +13,8 @@
 
 using System;
 using System.Collections.Generic;
+using System.Reflection;
+using GI_Subtitles.Services.Detection;
 using GI_Subtitles.Services.Translation;
 using GI_Subtitles.Services.Translation.Strategies;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
@@ -184,6 +186,27 @@ namespace GI_Test
 
         // ─── GameDialogueContextFactory ─────────────────────────────────────
 
+        /// <summary>
+        /// Read the protected <c>ExpectedBundleGame</c> off a context.
+        ///
+        /// Reflection rather than widening production visibility: the property
+        /// is deliberately protected because only DialogueContextBase.Load is
+        /// supposed to consult it, and the cross-game bundle gate is the whole
+        /// point of the factory's fail-closed default arm. Without this, the
+        /// "distinct expected game" test below could only null-check — which is
+        /// exactly what it used to do, so it passed no matter what the factory
+        /// returned.
+        /// </summary>
+        private static string ExpectedBundleGameOf(IGameDialogueContext ctx)
+        {
+            var prop = typeof(DialogueContextBase).GetProperty(
+                "ExpectedBundleGame",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.IsNotNull(prop,
+                "DialogueContextBase.ExpectedBundleGame not found — renamed or made public? Update this helper.");
+            return (string)prop.GetValue(ctx);
+        }
+
         [TestMethod]
         public void Factory_GenshinAndStarRail_ReturnDistinctExpectedGame()
         {
@@ -195,6 +218,274 @@ namespace GI_Test
             Assert.IsNotNull(s);
             Assert.IsInstanceOfType(g, typeof(IGameDialogueContext));
             Assert.IsInstanceOfType(s, typeof(IGameDialogueContext));
+
+            // The actual contract the name promises: each context carries the
+            // lowercased wire id of its own game, so a Genshin bundle can never
+            // load into a Star Rail session.
+            Assert.AreEqual("genshin", ExpectedBundleGameOf(g));
+            Assert.AreEqual("starrail", ExpectedBundleGameOf(s));
+        }
+
+        [TestMethod]
+        public void Factory_Zzz_ReturnsContextExpectingZzzBundle()
+        {
+            // Config["Game"] holds "ZZZ"; the wire id is the lowercased form.
+            // Both spellings must land on the same passthrough arm — if "ZZZ"
+            // ever falls through to the fail-closed default it still returns a
+            // context, so only the expected-game value catches the mistake.
+            var upper = GameDialogueContextFactory.Create("ZZZ");
+            var lower = GameDialogueContextFactory.Create("zzz");
+            var padded = GameDialogueContextFactory.Create("  ZZZ  ");
+
+            Assert.IsNotNull(upper);
+            Assert.IsInstanceOfType(upper, typeof(IGameDialogueContext));
+            Assert.AreEqual("zzz", ExpectedBundleGameOf(upper));
+            Assert.AreEqual("zzz", ExpectedBundleGameOf(lower));
+            Assert.AreEqual("zzz", ExpectedBundleGameOf(padded));
+        }
+
+        /// <summary>
+        /// Read the private <c>_nameNorm</c> strategy off a context. Same
+        /// reasoning as <see cref="ExpectedBundleGameOf"/> — the field is
+        /// private by design, and the alternative to reflection is widening
+        /// production visibility purely so a test can look.
+        /// </summary>
+        private static INpcNameNormalizer NameNormalizerOf(IGameDialogueContext ctx)
+        {
+            var field = typeof(DialogueContextBase).GetField(
+                "_nameNorm",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.IsNotNull(field,
+                "DialogueContextBase._nameNorm not found — renamed? Update this helper.");
+            return (INpcNameNormalizer)field.GetValue(ctx);
+        }
+
+        [TestMethod]
+        public void Factory_Zzz_StripsSpeakerNameDecorationToTheCleanIndexKey()
+        {
+            // The whole point of wiring ZzzNameNormalizer in: PaddleOCR reads
+            // ZZZ's middot-flanked cinematic speaker "··Remielle··" as
+            // "-Remielle". If that reaches the name-to-role index un-stripped it
+            // matches nothing, and the failure is silent — no wrong name, just
+            // no hot-cache preload and no disambiguation tie-breaker.
+            var zzz = NameNormalizerOf(GameDialogueContextFactory.Create("ZZZ"));
+
+            Assert.AreEqual("remielle", zzz.NormalizeFull("-Remielle"));
+            Assert.AreEqual("remielle", zzz.NormalizeFull("··Remielle··"));
+            Assert.AreEqual("remielle", zzz.ExtractFirstName("-Remielle"));
+
+            // The property that actually matters: decorated and clean spellings
+            // have to land on the SAME index key.
+            Assert.AreEqual(zzz.NormalizeFull("Remielle"), zzz.NormalizeFull("-Remielle"),
+                "Decorated and clean speaker names must produce the same index key.");
+        }
+
+        [TestMethod]
+        public void Factory_GenshinAndStarRail_KeepTheDefaultNameNormalizer()
+        {
+            // The one way the ZZZ fix could regress the shipping games. Assert
+            // both the type and the behaviour: Genshin body/name text has always
+            // been passed through with leading punctuation intact, and changing
+            // that would move match keys for two live games.
+            foreach (var game in new[] { "Genshin", "StarRail" })
+            {
+                var n = NameNormalizerOf(GameDialogueContextFactory.Create(game));
+                Assert.IsInstanceOfType(n, typeof(TrimNameNormalizer),
+                    $"{game} must keep TrimNameNormalizer.");
+                Assert.AreEqual("-remielle", n.NormalizeFull("-Remielle"),
+                    $"{game} must NOT strip leading decoration.");
+                Assert.AreEqual("paimon", n.ExtractFirstName("Paimon, Emergency Food"));
+            }
+        }
+
+        [TestMethod]
+        public void Factory_EveryRegisteredGame_HasItsOwnExpectedBundleGame()
+        {
+            // Guards the registry against the failure mode that motivated the
+            // consolidation: a game registered in GameRegionProfile but never
+            // added to the factory's switch would silently take the
+            // fail-closed arm and lose dialogue prediction with no UI signal.
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var gameId in GameRegionProfile.RegisteredGameIds)
+            {
+                string expected = ExpectedBundleGameOf(GameDialogueContextFactory.Create(gameId));
+                Assert.AreEqual(gameId.ToLowerInvariant(), expected,
+                    $"Registered game '{gameId}' should expect its own lowercased wire id.");
+                Assert.IsTrue(seen.Add(expected),
+                    $"Duplicate expected bundle game '{expected}' — two profiles share a wire id.");
+            }
+            Assert.IsTrue(seen.Count >= 3, "Expected at least Genshin, StarRail and ZZZ to be registered.");
+        }
+
+        // ─── GameRegionProfile registry ─────────────────────────────────────
+
+        [TestMethod]
+        public void Registry_EveryProfile_HasIdDisplayNameAndDetectionHints()
+        {
+            foreach (var p in GameRegionProfile.RegisteredProfiles)
+            {
+                Assert.IsFalse(string.IsNullOrWhiteSpace(p.GameId), "GameId must be set.");
+                Assert.IsFalse(string.IsNullOrWhiteSpace(p.DisplayName),
+                    $"{p.GameId}: DisplayName drives every UI label — it can't be blank.");
+                Assert.IsNotNull(p.ProcessNames, $"{p.GameId}: ProcessNames must not be null.");
+                Assert.IsTrue(p.ProcessNames.Length > 0, $"{p.GameId}: needs at least one process name to detect.");
+                Assert.IsNotNull(p.WindowTitles, $"{p.GameId}: WindowTitles must not be null.");
+
+                // Region ratios must describe a box that fits on screen.
+                Assert.IsTrue(p.DialogueXPct >= 0 && p.DialogueXPct + p.DialogueWPct <= 1.0,
+                    $"{p.GameId}: dialogue box runs off the horizontal edge.");
+                Assert.IsTrue(p.DialogueYPct >= 0 && p.DialogueYPct + p.DialogueHPct <= 1.0,
+                    $"{p.GameId}: dialogue box runs off the vertical edge.");
+                Assert.IsTrue(p.DialogueWPct > 0 && p.DialogueHPct > 0,
+                    $"{p.GameId}: dialogue box has no area.");
+            }
+        }
+
+        [TestMethod]
+        public void Registry_DisplayNames_ResolveForShippingGamesAndFallBackForUnknown()
+        {
+            // The consolidation replaced three hardcoded display-name copies
+            // with this one lookup — if it regresses, the Dashboard and the
+            // Translations tab both start showing raw tags.
+            Assert.AreEqual("Genshin Impact", GameRegionProfile.DisplayNameOf("Genshin"));
+            Assert.AreEqual("Honkai: Star Rail", GameRegionProfile.DisplayNameOf("StarRail"));
+            Assert.AreEqual("Zenless Zone Zero", GameRegionProfile.DisplayNameOf("ZZZ"));
+
+            // Case-insensitive, so a hand-edited Config.json still renders.
+            Assert.AreEqual("Genshin Impact", GameRegionProfile.DisplayNameOf("genshin"));
+            Assert.AreEqual("Zenless Zone Zero", GameRegionProfile.DisplayNameOf("zzz"));
+
+            // Unknown tags fall back to themselves rather than to null or "".
+            Assert.AreEqual("Wuthering", GameRegionProfile.DisplayNameOf("Wuthering"));
+        }
+
+        [TestMethod]
+        public void Registry_ShippingGames_KeepTheInlinedVisionDefaults()
+        {
+            // GameVisionProfile was folded into this class. Its own test asserted
+            // these same numbers; keep asserting them here so the merge can't
+            // regress Genshin/StarRail. Unknown and empty ids must degrade to the
+            // accent defaults too — that's what the property initializers buy.
+            foreach (string game in new[] { "Genshin", "StarRail", "", null, "Unknown" })
+            {
+                var p = GameRegionProfile.Get(game);
+                string label = game ?? "(null)";
+                Assert.IsFalse(p.UsesGeometryClassifier, label);
+                Assert.IsFalse(p.StripsSpeakerNameDecoration, label);
+                Assert.AreEqual(-140, p.SubtitlePadVertical, label);
+                Assert.AreEqual(0.55, p.RegionSplitXFraction, 1e-9, label);
+                Assert.AreEqual(0.70, p.RegionMinWidthFraction, 1e-9, label);
+                Assert.IsFalse(p.StrictRegionJunkFilter, label);
+            }
+        }
+
+        [TestMethod]
+        public void Registry_Zzz_LiftsOverlayAndNarrowsRegionFloor()
+        {
+            var p = GameRegionProfile.Get("ZZZ");
+
+            Assert.IsTrue(p.UsesGeometryClassifier);
+            Assert.IsTrue(p.StripsSpeakerNameDecoration);
+            Assert.IsTrue(p.SubtitlePadVertical < -140,
+                "ZZZ captions wrap taller, so the overlay needs more clearance above the region.");
+            Assert.IsTrue(p.RegionMinWidthFraction < 0.70,
+                "A 0.70 floor over-widens the narrow comic panel and pulls in HUD/watermarks.");
+            Assert.IsTrue(p.StrictRegionJunkFilter);
+
+            // Deliberately left at the default — no ZZZ answer-choice frame has
+            // been measured, and a third guessed geometry constant doesn't ship.
+            Assert.AreEqual(0.55, p.RegionSplitXFraction, 1e-9);
+        }
+
+        [TestMethod]
+        public void Registry_ZzzAliases_ResolveToTheSameProfile()
+        {
+            // Tolerance inherited from the merged GameVisionProfile.IsZenless.
+            // A hand-edited Config.json is a real scenario, and silently
+            // reverting ZZZ to the Genshin accent path is a hard failure to
+            // diagnose from a bug report.
+            var canonical = GameRegionProfile.Get("ZZZ");
+            foreach (var spelling in new[]
+            {
+                "zzz", "ZZZ", "  ZZZ  ",
+                "Zenless", "zenless",
+                "ZenlessZoneZero", "zenlesszonezero",
+                "Zenless Zone Zero", "zenless zone zero",
+                "Zenless-Zone-Zero", "zenless-zone-zero",
+            })
+            {
+                Assert.AreSame(canonical, GameRegionProfile.Get(spelling),
+                    $"'{spelling}' should resolve to the ZZZ profile.");
+            }
+
+            // Aliases must not leak into the enumeration source — the UI would
+            // render a pill per spelling.
+            int zzzEntries = 0;
+            foreach (var id in GameRegionProfile.RegisteredGameIds)
+                if (GameRegionProfile.Get(id).GameId == "ZZZ") zzzEntries++;
+            Assert.AreEqual(1, zzzEntries, "ZZZ must appear exactly once in RegisteredGameIds.");
+        }
+
+        [TestMethod]
+        public void Registry_NameNormalizerFactory_TracksTheProfileFlag()
+        {
+            // The normalizer factory keys off StripsSpeakerNameDecoration rather
+            // than a game-id check, so this is the seam that has to stay honest.
+            Assert.IsInstanceOfType(NpcNameNormalizerFactory.Create("ZZZ"), typeof(ZzzNameNormalizer));
+            Assert.IsInstanceOfType(NpcNameNormalizerFactory.Create("Zenless"), typeof(ZzzNameNormalizer));
+            Assert.IsInstanceOfType(NpcNameNormalizerFactory.Create("Genshin"), typeof(TrimNameNormalizer));
+            Assert.IsInstanceOfType(NpcNameNormalizerFactory.Create("StarRail"), typeof(TrimNameNormalizer));
+            Assert.IsInstanceOfType(NpcNameNormalizerFactory.Create(null), typeof(TrimNameNormalizer));
+        }
+
+        [TestMethod]
+        public void Registry_ZzzProfile_CoversBothMeasuredDialogueLayouts()
+        {
+            // Pixel bounds measured off 1919x1079 captures (see the profile's
+            // comment). Style A cinematic: x 279..1622, name row at y 844.
+            // Style B comic: x 473..1443, name pill at y 781, body ends y 1001.
+            const double FrameW = 1919.0, FrameH = 1079.0;
+
+            var p = GameRegionProfile.Get("ZZZ");
+            Assert.AreEqual("ZZZ", p.GameId, "Get(\"ZZZ\") fell through to the generic fallback profile.");
+
+            double left = p.DialogueXPct, right = p.DialogueXPct + p.DialogueWPct;
+            double top = p.DialogueYPct, bottom = p.DialogueYPct + p.DialogueHPct;
+
+            Assert.IsTrue(left <= 279.0 / FrameW && right >= 1622.0 / FrameW,
+                "Region must span style A's wider body text.");
+            Assert.IsTrue(left <= 473.0 / FrameW && right >= 1443.0 / FrameW,
+                "Region must span style B's panel.");
+            Assert.IsTrue(top <= 844.0 / FrameH, "Region must start above style A's speaker row.");
+
+            // Bare coverage isn't enough at the top edge. Style B's name pill is
+            // the highest text either layout draws, and clipping it costs the
+            // geometry classifier the block it keys on — a failure that reads as
+            // "ZZZ speaker detection is broken" rather than "the region is a few
+            // pixels short". So assert real headroom, not just `top <= pill`.
+            // 20 px on the measurement frame is the floor; the shipped 0.70
+            // gives ~26 px. An earlier 0.72 draft gave ~4 px and would fail here.
+            const double MinTopMarginPx = 20.0;
+            double topMarginPx = 781.0 - top * FrameH;
+            Assert.IsTrue(topMarginPx >= MinTopMarginPx,
+                $"Only {topMarginPx:F0} px of headroom above style B's speaker pill — " +
+                $"need at least {MinTopMarginPx:F0} px so the pill can't be clipped.");
+
+            double bottomMarginPx = bottom * FrameH - 1001.0;
+            Assert.IsTrue(bottomMarginPx >= MinTopMarginPx,
+                $"Only {bottomMarginPx:F0} px below the last body line — need at least {MinTopMarginPx:F0} px.");
+
+            // The top edge was lowered by extending the height, deliberately
+            // leaving the bottom where it was. Pin that so a future ratio tweak
+            // has to be explicit about moving it.
+            Assert.AreEqual(0.97, bottom, 1e-6,
+                "Bottom edge moved — DialogueYPct + DialogueHPct should still be 0.97.");
+
+            // Region top doubles as the diagnostics harness crop top
+            // (ZenlessLayoutDiagnostics.BottomCropFraction = 0.30), which is what
+            // keeps harness measurements comparable to runtime captures.
+            Assert.AreEqual(0.70, top, 1e-6,
+                "Region top no longer matches the diagnostics harness bottom-30% crop.");
         }
 
         [TestMethod]

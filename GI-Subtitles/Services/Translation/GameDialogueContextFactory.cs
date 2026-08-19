@@ -35,7 +35,32 @@ namespace GI_Subtitles.Services.Translation
             {
                 case "genshin":
                 case "starrail":
-                    return new NormalizedDialogueContext(expectedGame: normalized);
+                // ZZZ joins the passthrough arm rather than getting its own
+                // context type: no divergence in the bundle schema has been
+                // proven yet, and a speculative ZzzDialogueContext with zero
+                // overrides would be dead weight. Split it out only when the
+                // extracted data actually needs different behaviour.
+                case "zzz":
+                    // The name normalizer is the one strategy that IS per-game
+                    // today. ZZZ's cinematic style prints the speaker flanked by
+                    // middots, which PaddleOCR reads as "-Remielle"; the default
+                    // TrimNameNormalizer splits only on {' ', ',', '.'}, so that
+                    // normalizes to "-remielle", misses every entry in the
+                    // name-to-role index, and silently costs ZZZ its hot-cache
+                    // preload and its disambiguation tie-breaker.
+                    //
+                    // Resolved through the factory for every game rather than
+                    // branching here: it hands back TrimNameNormalizer for
+                    // Genshin and Star Rail, which is byte-identical to the
+                    // base constructor's own `?? new TrimNameNormalizer()`
+                    // default. One code path, and game #4 needs no edit here.
+                    // The remaining three strategies stay null = "use default".
+                    return new NormalizedDialogueContext(
+                        expectedGame: normalized,
+                        nextResolver: null,
+                        questFmt: null,
+                        nameNorm: Strategies.NpcNameNormalizerFactory.Create(normalized),
+                        disambig: null);
 
                 default:
                     // Fail-closed: pass the unknown name as the expected
@@ -45,7 +70,7 @@ namespace GI_Subtitles.Services.Translation
                     Logger.Log.Error(
                         $"Unknown game '{game}' — using unrecognized identifier as expected bundle game; " +
                         "the bundle-meta gate will refuse any real bundle. " +
-                        "Fix Config[\"Game\"] to one of: genshin, starrail.");
+                        "Fix Config[\"Game\"] to one of: genshin, starrail, zzz.");
                     return new NormalizedDialogueContext(expectedGame: normalized);
             }
         }
