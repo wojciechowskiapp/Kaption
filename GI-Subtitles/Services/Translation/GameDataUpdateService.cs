@@ -60,11 +60,12 @@ using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Security.Cryptography;
+using System.Text.Json;
+using System.Text.Json.Nodes;
+using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
 using GI_Subtitles.Common;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
 
 namespace GI_Subtitles.Services.Translation
 {
@@ -112,35 +113,35 @@ namespace GI_Subtitles.Services.Translation
     }
 
     /// <summary>
-    /// On-disk shape of <c>TextMap&lt;Lang&gt;.meta.json</c>. Persisted via
-    /// Newtonsoft.Json for consistency with the rest of the app's config I/O.
+    /// On-disk shape of <c>TextMap&lt;Lang&gt;.meta.json</c>. Persisted as
+    /// JSON for consistency with the rest of the app's config I/O.
     /// Any shape change needs to stay backwards-compatible — a stale sidecar
     /// just means we'll hit upstream once unnecessarily, which is fine.
     /// </summary>
     public sealed class GameDataMetaSidecar
     {
-        [JsonProperty("source")]
+        [JsonPropertyName("source")]
         public string Source { get; set; } // e.g. "gitlab:Dimbreath/animegamedata2"
 
-        [JsonProperty("url")]
+        [JsonPropertyName("url")]
         public string Url { get; set; }
 
-        [JsonProperty("etag")]
+        [JsonPropertyName("etag")]
         public string Etag { get; set; }
 
-        [JsonProperty("last_modified_header")]
+        [JsonPropertyName("last_modified_header")]
         public string LastModifiedHeader { get; set; }
 
-        [JsonProperty("downloaded_at_unix")]
+        [JsonPropertyName("downloaded_at_unix")]
         public long DownloadedAtUnix { get; set; }
 
-        [JsonProperty("checked_at_unix")]
+        [JsonPropertyName("checked_at_unix")]
         public long CheckedAtUnix { get; set; }
 
-        [JsonProperty("file_sha256")]
+        [JsonPropertyName("file_sha256")]
         public string FileSha256 { get; set; }
 
-        [JsonProperty("file_size")]
+        [JsonPropertyName("file_size")]
         public long FileSize { get; set; }
     }
 
@@ -701,7 +702,7 @@ namespace GI_Subtitles.Services.Translation
             try
             {
                 if (!File.Exists(path)) return null;
-                return JsonConvert.DeserializeObject<GameDataMetaSidecar>(File.ReadAllText(path));
+                return JsonSerializer.Deserialize<GameDataMetaSidecar>(File.ReadAllText(path), JsonDefaults.Options);
             }
             catch (Exception ex)
             {
@@ -715,7 +716,7 @@ namespace GI_Subtitles.Services.Translation
             try
             {
                 var tmp = path + ".tmp";
-                File.WriteAllText(tmp, JsonConvert.SerializeObject(s, Formatting.Indented));
+                File.WriteAllText(tmp, JsonSerializer.Serialize(s, JsonDefaults.Indented));
                 if (File.Exists(path)) File.Delete(path);
                 File.Move(tmp, path);
             }
@@ -835,15 +836,20 @@ namespace GI_Subtitles.Services.Translation
                         // Merge: parse both, union entries (Medium wins on
                         // conflict since it holds the authoritative
                         // dialogue form), serialize combined back to
-                        // jsonPath. Using JToken-valued dict tolerates the
+                        // jsonPath. Using JsonNode-valued dict tolerates the
                         // Genshin "value":"..." wrapper and plain string
                         // shapes alike.
-                        string smallJson = File.ReadAllText(jsonPath);
-                        string mediumJson = File.ReadAllText(mediumTmp);
-                        var combined = JsonConvert.DeserializeObject<Dictionary<string, JToken>>(smallJson)
-                                       ?? new Dictionary<string, JToken>();
-                        var medium = JsonConvert.DeserializeObject<Dictionary<string, JToken>>(mediumJson)
-                                     ?? new Dictionary<string, JToken>();
+                        Dictionary<string, JsonNode> combined, medium;
+                        using (var smallStream = File.OpenRead(jsonPath))
+                        {
+                            combined = JsonSerializer.Deserialize<Dictionary<string, JsonNode>>(smallStream, JsonDefaults.Options)
+                                       ?? new Dictionary<string, JsonNode>();
+                        }
+                        using (var mediumStream = File.OpenRead(mediumTmp))
+                        {
+                            medium = JsonSerializer.Deserialize<Dictionary<string, JsonNode>>(mediumStream, JsonDefaults.Options)
+                                     ?? new Dictionary<string, JsonNode>();
+                        }
 
                         int added = 0, replaced = 0;
                         foreach (var kv in medium)
@@ -855,7 +861,10 @@ namespace GI_Subtitles.Services.Translation
 
                         // Atomic write: temp → swap.
                         string combinedTmp = jsonPath + ".combined.tmp";
-                        File.WriteAllText(combinedTmp, JsonConvert.SerializeObject(combined));
+                        using (var combinedStream = File.Create(combinedTmp))
+                        {
+                            JsonSerializer.Serialize(combinedStream, combined, JsonDefaults.Options);
+                        }
                         if (File.Exists(jsonPath)) File.Delete(jsonPath);
                         File.Move(combinedTmp, jsonPath);
                         TryDelete(mediumTmp);

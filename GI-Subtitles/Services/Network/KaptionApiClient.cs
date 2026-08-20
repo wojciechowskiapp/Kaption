@@ -9,7 +9,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using Newtonsoft.Json;
+using System.Text.Json;
 using GI_Subtitles.Common;
 using GI_Subtitles.Core.Config;
 
@@ -152,10 +152,6 @@ namespace GI_Subtitles.Services.Network
         private static readonly HttpClient _sharedHttpClient = CreateHttpClient(TimeSpan.FromSeconds(30));
         private static readonly HttpClient _downloadHttpClient = CreateHttpClient(Timeout.InfiniteTimeSpan);
 
-        private static readonly JsonSerializerSettings _requestSerializerSettings = new JsonSerializerSettings
-        {
-            NullValueHandling = NullValueHandling.Ignore,
-        };
 
         private readonly string _baseUrl;
 
@@ -829,7 +825,7 @@ namespace GI_Subtitles.Services.Network
         {
             string url = ResolveUrl(path);
             string json = body != null
-                ? JsonConvert.SerializeObject(body, _requestSerializerSettings)
+                ? JsonSerializer.Serialize(body, body.GetType(), JsonDefaults.IgnoreNulls)
                 : "{}";
             return SendAndParseAsync<T>(() =>
             {
@@ -954,7 +950,7 @@ namespace GI_Subtitles.Services.Network
 
                         try
                         {
-                            return JsonConvert.DeserializeObject<T>(responseText);
+                            return JsonSerializer.Deserialize<T>(responseText, JsonDefaults.Options);
                         }
                         catch (JsonException ex)
                         {
@@ -993,7 +989,7 @@ namespace GI_Subtitles.Services.Network
             ApiError parsed = null;
             if (!string.IsNullOrWhiteSpace(body))
             {
-                try { parsed = JsonConvert.DeserializeObject<ApiError>(body); }
+                try { parsed = JsonSerializer.Deserialize<ApiError>(body, JsonDefaults.Options); }
                 catch (JsonException) { /* not JSON — leave parsed=null and use status code only */ }
             }
 

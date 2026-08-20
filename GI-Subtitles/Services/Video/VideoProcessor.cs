@@ -5,7 +5,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Text;
-using Newtonsoft.Json;
+using System.Text.Json;
 using GI_Subtitles.Models;
 using GI_Subtitles.Common;
 using GI_Subtitles.Core.Config;
@@ -430,7 +430,7 @@ namespace GI_Subtitles.Services.Video
 
                 // Read region information
                 string json = File.ReadAllText(regionJsonPath, Encoding.UTF8);
-                var regionInfo = JsonConvert.DeserializeObject<RegionInfo>(json);
+                var regionInfo = JsonSerializer.Deserialize<RegionInfo>(json, JsonDefaults.Options);
 
                 if (regionInfo == null)
                 {

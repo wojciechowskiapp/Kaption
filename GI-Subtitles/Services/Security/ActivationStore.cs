@@ -2,7 +2,8 @@ using System;
 using System.IO;
 using System.Security.Cryptography;
 using System.Text;
-using Newtonsoft.Json;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using GI_Subtitles.Common;
 
 namespace GI_Subtitles.Services.Security
@@ -14,14 +15,14 @@ namespace GI_Subtitles.Services.Security
     /// </summary>
     public sealed class ActivationData
     {
-        [JsonProperty("user_id")]
+        [JsonPropertyName("user_id")]
         public string UserId { get; set; }
 
-        [JsonProperty("email")]
+        [JsonPropertyName("email")]
         public string Email { get; set; }
 
         /// <summary>Static base tier — permanent flags only. Use <see cref="EffectiveTier"/> to gate features.</summary>
-        [JsonProperty("tier")]
+        [JsonPropertyName("tier")]
         public string Tier { get; set; }
 
         /// <summary>
@@ -35,7 +36,7 @@ namespace GI_Subtitles.Services.Security
         /// downloads, cloud calls) MUST be gated server-side against
         /// the real effective tier in D1.
         /// </summary>
-        [JsonProperty("effective_tier")]
+        [JsonPropertyName("effective_tier")]
         public string EffectiveTier { get; set; }
 
         /// <summary>
@@ -43,7 +44,7 @@ namespace GI_Subtitles.Services.Security
         /// when no paid grant. Same caveat as <see cref="EffectiveTier"/>:
         /// display-only, not an authorization basis.
         /// </summary>
-        [JsonProperty("paid_until")]
+        [JsonPropertyName("paid_until")]
         public long? PaidUntilUnix { get; set; }
 
         /// <summary>Convenience: <see cref="PaidUntilUnix"/> as UTC DateTime, or null.</summary>
@@ -58,14 +59,14 @@ namespace GI_Subtitles.Services.Security
         public bool HasPaidLicense =>
             PaidUntilUtc.HasValue && PaidUntilUtc.Value > DateTime.UtcNow;
 
-        [JsonProperty("device_session_jwt")]
+        [JsonPropertyName("device_session_jwt")]
         public string DeviceSessionJwt { get; set; }
 
         /// <summary>
         /// Server-issued per-user key component. Used later (not yet) to derive
         /// encryption keys that bind ciphertexts to both the user AND the machine.
         /// </summary>
-        [JsonProperty("user_key_component")]
+        [JsonPropertyName("user_key_component")]
         public byte[] UserKeyComponent { get; set; }
 
         /// <summary>
@@ -77,18 +78,18 @@ namespace GI_Subtitles.Services.Security
         /// (or the /download endpoint without auth) yields encrypted bytes
         /// with no way to derive the key.
         /// </summary>
-        [JsonProperty("distribution_key")]
+        [JsonPropertyName("distribution_key")]
         public byte[] DistributionKey { get; set; }
 
-        [JsonProperty("activation_id")]
+        [JsonPropertyName("activation_id")]
         public string ActivationId { get; set; }
 
         /// <summary>Unix timestamp (seconds) when the server says this session expires.</summary>
-        [JsonProperty("expires_at")]
+        [JsonPropertyName("expires_at")]
         public long ExpiresAtUnix { get; set; }
 
         /// <summary>When we received this activation (local UTC clock).</summary>
-        [JsonProperty("stored_at")]
+        [JsonPropertyName("stored_at")]
         public DateTime StoredAtUtc { get; set; }
 
         /// <summary>Convenience: <see cref="ExpiresAtUnix"/> parsed as a UTC DateTime.</summary>
@@ -114,26 +115,26 @@ namespace GI_Subtitles.Services.Security
         /// transitively through <see cref="ActivationStore.Save"/>; never
         /// exists as plain JSON outside this object's lifetime.
         /// </summary>
-        [JsonProperty("device_file_protection_secret")]
+        [JsonPropertyName("device_file_protection_secret")]
         public byte[] DeviceFileProtectionSecret { get; set; }
 
         /// <summary>Unix timestamp (ms) when the server issued the secret.</summary>
-        [JsonProperty("device_file_protection_issued_at_ms")]
+        [JsonPropertyName("device_file_protection_issued_at_ms")]
         public long? DeviceFileProtectionIssuedAtUnixMs { get; set; }
 
         /// <summary>Unix timestamp (ms) when the secret expires and must be re-fetched.</summary>
-        [JsonProperty("device_file_protection_expires_at_ms")]
+        [JsonPropertyName("device_file_protection_expires_at_ms")]
         public long? DeviceFileProtectionExpiresAtUnixMs { get; set; }
 
         /// <summary>
         /// Scheme version. <c>1</c> = AES-256-CBC + HMAC-SHA256 + PBKDF2-SHA256.
         /// <c>0</c> means the desktop has never fetched a secret (legacy).
         /// </summary>
-        [JsonProperty("device_file_protection_scheme_version")]
+        [JsonPropertyName("device_file_protection_scheme_version")]
         public int DeviceFileProtectionSchemeVersion { get; set; }
 
         /// <summary>PBKDF2 iteration count to use when deriving keys from this secret.</summary>
-        [JsonProperty("device_file_protection_pbkdf2_iterations")]
+        [JsonPropertyName("device_file_protection_pbkdf2_iterations")]
         public int DeviceFileProtectionPbkdf2Iterations { get; set; }
 
         /// <summary>True when a non-expired server-issued secret is stored.</summary>
@@ -199,7 +200,7 @@ namespace GI_Subtitles.Services.Security
             {
                 try
                 {
-                    string json = JsonConvert.SerializeObject(data, Formatting.None);
+                    string json = JsonSerializer.Serialize(data, JsonDefaults.Options);
                     byte[] plaintext = Encoding.UTF8.GetBytes(json);
 
                     byte[] protectedBlob = ProtectedData.Protect(
@@ -292,7 +293,7 @@ namespace GI_Subtitles.Services.Security
                     }
 
                     string json = Encoding.UTF8.GetString(plaintext);
-                    var data = JsonConvert.DeserializeObject<ActivationData>(json);
+                    var data = JsonSerializer.Deserialize<ActivationData>(json, JsonDefaults.Options);
                     if (data == null || string.IsNullOrEmpty(data.DeviceSessionJwt))
                     {
                         Logger.Log.Warn("Activation blob decoded but contained no session token.");

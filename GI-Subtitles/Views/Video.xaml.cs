@@ -19,7 +19,7 @@ using System.Windows.Markup;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Shapes;
-using Newtonsoft.Json;
+using System.Text.Json;
 using GI_Subtitles.Models;
 using GI_Subtitles.Services.Video;
 using GI_Subtitles.Services.Translation;
@@ -908,7 +908,7 @@ namespace GI_Subtitles.Views
             };
 
             string jsonPath = GetJsonFilePath();
-            string json = JsonConvert.SerializeObject(regionInfo, Formatting.Indented);
+            string json = JsonSerializer.Serialize(regionInfo, JsonDefaults.Indented);
             File.WriteAllText(jsonPath, json, Encoding.UTF8);
         }
 
@@ -958,7 +958,7 @@ namespace GI_Subtitles.Views
         private void LoadRegionFromFile(string jsonPath, bool showMessage)
         {
             string json = File.ReadAllText(jsonPath, Encoding.UTF8);
-            var regionInfo = JsonConvert.DeserializeObject<RegionInfo>(json);
+            var regionInfo = JsonSerializer.Deserialize<RegionInfo>(json, JsonDefaults.Options);
 
             if (regionInfo == null)
             {

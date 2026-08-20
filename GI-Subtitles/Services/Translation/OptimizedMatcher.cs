@@ -55,29 +55,6 @@ namespace GI_Subtitles.Services.Translation
         private readonly FrozenDictionary<long, int[]> _ngramIndex;
         private readonly int[] _shortKeysIndices;
 
-        // Lazily built OriginalKey → slot-id index for the rare
-        // header-exact-lookup path (<see cref="FindMatchWithHeaderSeparated"/>).
-        // The previous design kept a full <c>Dictionary&lt;string,string&gt;</c>
-        // duplicate (ContentDict) resident for the life of the matcher —
-        // ~23 MB of hash-table overhead on a 488k-entry corpus, paid even
-        // by sessions that never dispatched a multi-line OCR result. We
-        // now pay that cost only on the first TryGetExactValue hit, and
-        // the slot-id map is ~30% smaller than the string→string equivalent
-        // (4-byte int payload vs. 8-byte string reference) because values
-        // are resolved through <see cref="_entries"/> directly.
-        //
-        // Thread-safe: built under a sync block; subsequent readers see a
-        // fully-populated snapshot via the volatile publish on the field.
-        //
-        // Net8 migration: FrozenDictionary<string,int> with StringComparer.Ordinal
-        // replaces the old Dictionary<string,int>. On 488k string keys, the
-        // frozen form saves ~5-10 MB (no Entry.next chain, compact _keys[]/
-        // _values[] arrays) and gives ~40% faster lookups on the
-        // header-exact-match fast path. Built once on first hit; subsequent
-        // calls do the zero-copy ref load.
-        private volatile FrozenDictionary<string, int> _origKeyToSlot;
-        private readonly object _origKeyToSlotLock = new object();
-
         // Mmap-backed mode (Phase 2, .kmx.gisub v3): `_reader` owns the
         // FST + compressed value pool; the matcher keeps ONLY the
         // normalized-key + original-key string arrays resident (≈40 MB
@@ -533,14 +510,8 @@ namespace GI_Subtitles.Services.Translation
                 int entryCount = reader.ReadInt32();
                 var entries = new Entry[entryCount];
 
-                // Previously built a Dictionary<string,string>(entryCount) here to
-                // back FindMatchWithHeaderSeparated's exact-lookup path. On a 488k
-                // entry corpus that was ~23 MB of hash-table overhead held for the
-                // life of the matcher, whether or not the session ever exercised
-                // the multi-line-header code path. The matcher now lazy-builds a
-                // slim origKey→slot Dictionary<string,int> on first header lookup
-                // (see _origKeyToSlot / EnsureOrigKeyToSlot) so the common case
-                // pays nothing.
+                // No origKey→value side index is built here. It existed only to
+                // translate speaker-name lines, which every caller discards.
 
                 progress?.Report((55, $"Loading {entryCount:N0} entries..."));
 
@@ -792,11 +763,8 @@ namespace GI_Subtitles.Services.Translation
             // We decompress the value at the same time so both structures end
             // up populated in a single pass.
             //
-            // No contentDict is built here — the header-exact-lookup path now
-            // lazy-builds its own slim Dictionary<string,int> on first call
-            // (see _origKeyToSlot). On a 488k-entry corpus that's ~23 MB of
-            // session-lifetime savings vs. materialising a full
-            // Dictionary<string,string> duplicate up front.
+            // No contentDict is built here — nothing reads exact origKey→value any
+            // more, so a 488k-entry duplicate of the corpus stays unallocated.
             foreach (var kv in reader.EnumerateKeys())
             {
                 int slot = kv.Value;
@@ -1109,86 +1077,6 @@ namespace GI_Subtitles.Services.Translation
         }
 
         /// <summary>
-        /// Look up an exact original key (as the dictionary would store it)
-        /// and return its value. Used by <see cref="FindMatchWithHeaderSeparated"/>
-        /// to resolve header lines that already come in as the exact corpus
-        /// key. Works in both mmap and heap-resident modes.
-        ///
-        /// In heap-resident mode the origKey→slot index is built lazily on
-        /// the first call and reused for the rest of the session (see
-        /// <see cref="_origKeyToSlot"/>). That defers a ~17 MB allocation
-        /// from load-time until it's actually needed, and skips it entirely
-        /// for sessions that never hit a multi-line OCR result.
-        /// </summary>
-        private bool TryGetExactValue(string origKey, out string value)
-        {
-            if (string.IsNullOrEmpty(origKey)) { value = null; return false; }
-
-            if (_reader != null)
-            {
-                // Mmap mode: use the FST + zstd decoder directly.
-                return _reader.TryGetValue(origKey, out value);
-            }
-
-            // Heap-resident mode: lazy origKey → slot index, then dereference.
-            var map = _origKeyToSlot;
-            if (map == null) map = EnsureOrigKeyToSlot();
-            if (map != null && map.TryGetValue(origKey, out int slot)
-                && slot >= 0 && slot < (_entries?.Length ?? 0))
-            {
-                value = _entries[slot].Value;
-                return value != null;
-            }
-
-            value = null;
-            return false;
-        }
-
-        /// <summary>
-        /// Build the <see cref="_origKeyToSlot"/> map the first time it's
-        /// needed. Double-checked lock guards against concurrent builds on
-        /// a cold matcher — the first caller pays the one-shot cost, the
-        /// rest spin briefly on the lock and then read the published map.
-        /// Returns null when there's no heap-resident entries array (mmap
-        /// mode callers already took the early return above).
-        /// </summary>
-        private FrozenDictionary<string, int> EnsureOrigKeyToSlot()
-        {
-            if (_entries == null) return null;
-
-            lock (_origKeyToSlotLock)
-            {
-                var existing = _origKeyToSlot;
-                if (existing != null) return existing;
-
-                // Build mutably first, then freeze: FrozenDictionary has no
-                // incremental-add API. On 488k keys the Dictionary build takes
-                // ~30-50 ms; freezing another ~40-150 ms. Still one-shot on
-                // the first header-exact-match call.
-                var builder = new Dictionary<string, int>(_entries.Length, StringComparer.Ordinal);
-                for (int i = 0; i < _entries.Length; i++)
-                {
-                    string k = _entries[i].OriginalKey;
-                    if (k != null)
-                    {
-                        // Last-writer-wins on the astronomically-rare duplicate
-                        // case. MatcherBlobWriter enforces uniqueness at build
-                        // time so this is defensive only.
-                        builder[k] = i;
-                    }
-                }
-
-                var frozen = builder.ToFrozenDictionary(StringComparer.Ordinal);
-
-                // Volatile publish. Readers that saw a null _origKeyToSlot
-                // above either observe the fully-populated map we publish
-                // here, or take the lock and observe the same.
-                _origKeyToSlot = frozen;
-                return frozen;
-            }
-        }
-
-        /// <summary>
         /// Accessor: normalized key for slot id. Branches once on mode.
         /// JIT inlines in both modes because the branch predicate is a
         /// readonly field set at construction time.
@@ -1216,6 +1104,92 @@ namespace GI_Subtitles.Services.Translation
         private string GetValue(int slot)
         {
             return _reader != null ? FetchValueMmap(slot) : _entries[slot].Value;
+        }
+
+        // Stage 1 scratch. FindClosestMatch runs on the WPF dispatcher for the OCR
+        // tick and on worker threads for the SRT/video and answer-region paths, so
+        // the scratch has to be per-thread rather than per-instance.
+        [ThreadStatic] private static HashSet<int> t_candidateSet;
+        [ThreadStatic] private static List<int[]> t_fallbackBuckets;
+        [ThreadStatic] private static HashSet<long> t_fallbackGramHashes;
+
+        private const int CandidateSetRetentionLimit = 16384;
+        private const int FallbackBudgetGramFactor = 4;
+
+        private static readonly Comparison<int[]> BucketBySizeAscending =
+            (a, b) => a.Length.CompareTo(b.Length);
+
+        /// <summary>
+        /// Hand back this thread's candidate set, cleared and ready to fill.
+        /// A set left oversized by one pathological input is dropped rather than
+        /// pinned for the life of the thread.
+        /// </summary>
+        private static HashSet<int> RentCandidateSet()
+        {
+            var set = t_candidateSet;
+            if (set == null || set.Count > CandidateSetRetentionLimit)
+            {
+                set = new HashSet<int>(1024);
+                t_candidateSet = set;
+                return set;
+            }
+
+            set.Clear();
+            return set;
+        }
+
+        /// <summary>
+        /// Last-resort candidate selection for inputs whose every n-gram lands in an
+        /// over-cap bucket. Admits the whole union while it fits inside
+        /// <paramref name="budget"/>, and otherwise the rarest buckets first.
+        /// </summary>
+        private void AddFallbackCandidates(
+            ReadOnlySpan<char> inputSpan, int inputLen, int step, int budget, HashSet<int> candidates)
+        {
+            var buckets = t_fallbackBuckets;
+            if (buckets == null) { buckets = new List<int[]>(64); t_fallbackBuckets = buckets; }
+            var seen = t_fallbackGramHashes;
+            if (seen == null) { seen = new HashSet<long>(64); t_fallbackGramHashes = seen; }
+
+            buckets.Clear();
+            seen.Clear();
+
+            long total = 0;
+            for (int i = 0; i <= inputLen - _ngramSize; i += step)
+            {
+                long hash = GetNgramHash(inputSpan.Slice(i, _ngramSize));
+                if (!seen.Add(hash)) continue;
+                if (_ngramIndex.TryGetValue(hash, out var ids))
+                {
+                    buckets.Add(ids);
+                    total += ids.Length;
+                }
+            }
+
+            if (buckets.Count == 0) return;
+
+            if (total <= budget)
+            {
+                for (int b = 0; b < buckets.Count; b++)
+                {
+                    foreach (var id in buckets[b]) candidates.Add(id);
+                }
+                return;
+            }
+
+            // A true match carries every one of the input's n-grams, so it sits in the
+            // rarest bucket just as surely as in the commonest one. Spending the budget
+            // on the rarest buckets therefore costs no recall and a lot less Stage 2.
+            buckets.Sort(BucketBySizeAscending);
+
+            int used = 0;
+            for (int b = 0; b < buckets.Count; b++)
+            {
+                int len = buckets[b].Length;
+                if (b > 0 && used + len > budget) break;
+                foreach (var id in buckets[b]) candidates.Add(id);
+                used += len;
+            }
         }
 
         public string FindClosestMatch(string input, out string Key)
@@ -1257,7 +1231,7 @@ namespace GI_Subtitles.Services.Translation
             }
 
             int inputLen = normInput.Length;
-            HashSet<int> candidates = new HashSet<int>();
+            HashSet<int> candidates = RentCandidateSet();
 
             // --- Stage 1: Candidate Selection (N-gram Pruning) ---
 
@@ -1293,14 +1267,8 @@ namespace GI_Subtitles.Services.Translation
 
                 if (!foundRareGram)
                 {
-                    for (int i = 0; i <= inputLen - _ngramSize; i += step)
-                    {
-                        long hash = GetNgramHash(inputSpan.Slice(i, _ngramSize));
-                        if (_ngramIndex.TryGetValue(hash, out var ids))
-                        {
-                            foreach (var id in ids) candidates.Add(id);
-                        }
-                    }
+                    AddFallbackCandidates(inputSpan, inputLen, step,
+                        maxCandidatesPerGram * FallbackBudgetGramFactor, candidates);
                 }
 
                 if (inputLen < 10)
@@ -1427,22 +1395,16 @@ namespace GI_Subtitles.Services.Translation
 
             if (bestIndex != -1)
             {
-                // Dynamic threshold: English needs more tolerance due to OCR noise
-                // OCR-weighted distance produces lower values for common confusions,
-                // so the threshold can be slightly tighter
-                double threshold;
-                if (_useOcrWeightedDistance && isEng)
-                {
-                    // With weighted distance, use the float value for more precise threshold check
-                    double weightedThreshold = Math.Max(4, inputLen * 0.35);
-                    if (globalBestWeightedDist <= weightedThreshold)
-                    {
-                        Key = GetOriginalKey(bestIndex);
-                        return GetValue(bestIndex);
-                    }
-                }
-
-                threshold = isEng ? Math.Max(5, inputLen * 0.4) : Math.Max(2, inputLen * 0.4);
+                // Dynamic threshold: English needs more tolerance due to OCR noise.
+                //
+                // A second, nominally stricter gate on globalBestWeightedDist
+                // (Math.Max(4, inputLen * 0.35)) used to run first. It could never
+                // reject anything this gate accepts — globalBestDistance is at most
+                // Ceiling(globalBestWeightedDist), and Ceiling(Max(4, 0.35L)) <=
+                // Max(5, 0.4L) at every length — so 0.4 has always been the real
+                // acceptance threshold. Reinstating a tighter weighted gate would
+                // reject matches the app accepts today.
+                double threshold = isEng ? Math.Max(5, inputLen * 0.4) : Math.Max(2, inputLen * 0.4);
                 if (globalBestDistance <= threshold)
                 {
                     Key = GetOriginalKey(bestIndex);
@@ -1557,6 +1519,12 @@ namespace GI_Subtitles.Services.Translation
             }
         }
 
+        /// <summary>
+        /// Split a multi-line OCR capture into speaker lines and body, and translate
+        /// the body. <see cref="MatchResult.Header"/> is always empty: the game draws
+        /// the speaker name itself, so every caller discards a translated header, and
+        /// producing one forced a 488k-key exact-lookup index to be built mid-session.
+        /// </summary>
         public MatchResult FindMatchWithHeaderSeparated(string ocrText, out string key)
         {
             key = "";
@@ -1595,22 +1563,8 @@ namespace GI_Subtitles.Services.Translation
                     maxIndex = 1;
                 }
             }
-            List<string> headers = new List<string>();
-            for (int i = 0; i < maxIndex; i++) headers.Add(lines[i]);
-
             string bodyText = string.Join(" ", lines.Skip(maxIndex));
 
-            string headerMatch = "";
-            foreach (string header in headers)
-            {
-                if (TryGetExactValue(header, out string headerValue)
-                    && !string.IsNullOrEmpty(headerValue)
-                    && !headerValue.Contains("test"))
-                {
-                    if (!string.IsNullOrEmpty(headerMatch)) headerMatch += " ";
-                    headerMatch += headerValue;
-                }
-            }
             string bodyMatch = FindClosestMatch(bodyText, out string bodyKey);
             if (string.IsNullOrEmpty(bodyMatch) && maxIndex > 1)
             {
@@ -1618,7 +1572,6 @@ namespace GI_Subtitles.Services.Translation
             }
             key = bodyKey;
             result.Content = bodyMatch;
-            result.Header = headerMatch;
             return result;
         }
 

@@ -14,10 +14,9 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.IO;
 using System.Threading.Tasks;
-using Newtonsoft.Json.Linq;
+using System.Text.Json.Nodes;
 using static System.Windows.Forms.VisualStyles.VisualStyleElement.Window;
 using System.Net.Http;
-using Newtonsoft.Json;
 using System.Windows.Forms;
 using static System.Windows.Forms.VisualStyles.VisualStyleElement.StartPanel;
 using System.Text.RegularExpressions;
@@ -277,6 +276,30 @@ namespace GI_Subtitles.Views
             else try { Dispatcher.BeginInvoke(new Action(Fire)); } catch (Exception ex) { Logger.Log.Warn($"EngineStatusChanged marshal failed: {ex.Message}"); }
         }
 
+        /// <summary>
+        /// Capture-region size for OCR warm-up, or null when no region is set
+        /// yet. DirectML compiles a fast path for only the first input shape a
+        /// session runs, so warming the shape this region actually produces is
+        /// what decides whether every later frame takes the fast or the slow
+        /// path. See .plan/research/OCR-DIRECTML-SHAPE-BUG.md.
+        /// </summary>
+        private static OpenCvSharp.Size? GetConfiguredCaptureSize()
+        {
+            try
+            {
+                string[] region = Config.Get<string>("Region", "")?.Split(',');
+                if (region == null || region.Length < 4) return null;
+                if (!int.TryParse(region[2], out int w) || w <= 0) return null;
+                if (!int.TryParse(region[3], out int h) || h <= 0) return null;
+                return new OpenCvSharp.Size(w, h);
+            }
+            catch (Exception ex)
+            {
+                Logger.Log.Warn($"Could not read capture region for OCR warm-up: {ex.Message}");
+                return null;
+            }
+        }
+
         public SettingsWindow(string version, INotifyIcon notify, double scale = 1)
         {
             _protectionHelper = new FileProtectionHelper(_protectionService);
@@ -493,9 +516,8 @@ namespace GI_Subtitles.Views
             _suppressSliderUpdate = false;
 
             // OCR Speed
-            OcrIntervalTextBox.Text = Services.Detection.GameOcrTuning.OcrIntervalMs().ToString();
+            SeedOcrPacingBoxes();
             UiRefreshTextBox.Text = Config.Get<int>("UiRefreshInterval", 150).ToString();
-            StabilityWindowTextBox.Text = Services.Detection.GameOcrTuning.StabilityWindow().ToString();
             InitializeOcrModelSelector();
 
             // Region: parse the string "x,y,w,h"
@@ -1015,6 +1037,11 @@ namespace GI_Subtitles.Views
                     }
                     DisplayLocalFileDates();
                     Config.Set("Game", newValue);
+
+                    // Pacing is per-game, and these boxes are seeded with the
+                    // RESOLVED value. Leaving the old game's number on screen
+                    // would let the next focus visit pin it globally.
+                    SeedOcrPacingBoxes();
 
                     // Prompt before the heavy CheckDataAsync rebuild — if the
                     // user picks Restart we skip the work that a fresh launch
@@ -1952,7 +1979,7 @@ namespace GI_Subtitles.Views
                 }
                 else
                 {
-                    JArray jsonArray = JArray.Parse(responseText);
+                    JsonArray jsonArray = JsonNode.Parse(responseText)?.AsArray();
                     if (jsonArray.Count > 0)
                     {
                         List<string> dateList = new List<string>();
@@ -2001,7 +2028,7 @@ namespace GI_Subtitles.Views
                 }
                 else
                 {
-                    JArray jsonArray = JArray.Parse(responseText);
+                    JsonArray jsonArray = JsonNode.Parse(responseText)?.AsArray();
                     if (jsonArray.Count > 0)
                     {
                         List<string> dateList = new List<string>();
@@ -2280,8 +2307,15 @@ namespace GI_Subtitles.Views
         /// A DirectML warm-up slower than this is treated as a failed warm-up
         /// even though it technically finished. See the comment at the call
         /// site for why "slow but successful" is not good enough.
+        ///
+        /// <para>Re-derived when warm-up dropped from 9 shape compiles (4
+        /// detector + 5 recognition) to 2. The old 10 s budget allowed ~1.1 s
+        /// per compile; holding that per-compile allowance gives ~2.2 s, and
+        /// 3 s keeps headroom for the first-call DirectML device init that the
+        /// detector shape now absorbs alone. Leaving it at 10 s would have let a
+        /// device 4.5x slower than the original bar pass the same gate.</para>
         /// </summary>
-        private static readonly TimeSpan GpuWarmUpBudget = TimeSpan.FromSeconds(10);
+        private static readonly TimeSpan GpuWarmUpBudget = TimeSpan.FromSeconds(3);
 
         public static PaddleOCREngine LoadEngine(
             string input,
@@ -2359,7 +2393,8 @@ namespace GI_Subtitles.Views
                     try
                     {
                         TimeSpan warmUpDuration = engine.WarmUp(
-                            TimeSpan.FromSeconds(engine.IsUsingGpu ? 30 : 45));
+                            TimeSpan.FromSeconds(engine.IsUsingGpu ? 30 : 45),
+                            GetConfiguredCaptureSize());
                         if (engine.IsUsingGpu && warmUpDuration > GpuWarmUpBudget)
                         {
                             gpuUnfitReason =
@@ -2391,7 +2426,7 @@ namespace GI_Subtitles.Views
                         engine = null;
                         parameters.use_gpu = false;
                         engine = new PaddleOCREngine(config, parameters);
-                        engine.WarmUp(TimeSpan.FromSeconds(45));
+                        engine.WarmUp(TimeSpan.FromSeconds(45), GetConfiguredCaptureSize());
                     }
 
                     Logger.Log.Info(
@@ -3976,16 +4011,16 @@ namespace GI_Subtitles.Views
 
         private void OcrIntervalTextBox_LostFocus(object sender, RoutedEventArgs e)
         {
-            if (int.TryParse(OcrIntervalTextBox.Text, out int val))
-            {
-                // 50 ms is the floor: at 20 FPS the OCR thread can just about
-                // keep up on a GPU-accelerated setup; anything lower starts
-                // dropping frames and wastes battery. Ceiling stays 1000 ms —
-                // beyond that the typewriter lag is user-visible.
-                val = Math.Max(50, Math.Min(1000, val));
-                OcrIntervalTextBox.Text = val.ToString();
-                Config.Set("OcrInterval", val);
-            }
+            // 50 ms is the floor: at 20 FPS the OCR thread can just about keep
+            // up on a GPU-accelerated setup; anything lower starts dropping
+            // frames and wastes battery. Ceiling stays 1000 ms — beyond that the
+            // typewriter lag is user-visible. Bounds come from GameOcrTuning so
+            // the box cannot accept a value the resolver would silently rewrite.
+            CommitOcrPacingBox(
+                OcrIntervalTextBox, "OcrInterval",
+                Services.Detection.GameOcrTuning.MinOcrIntervalMs,
+                Services.Detection.GameOcrTuning.MaxOcrIntervalMs,
+                ref _seededOcrInterval);
         }
 
         private void UiRefreshTextBox_LostFocus(object sender, RoutedEventArgs e)
@@ -4004,11 +4039,108 @@ namespace GI_Subtitles.Views
 
         private void StabilityWindowTextBox_LostFocus(object sender, RoutedEventArgs e)
         {
-            if (int.TryParse(StabilityWindowTextBox.Text, out int val))
+            CommitOcrPacingBox(
+                StabilityWindowTextBox, "StabilityWindow",
+                Services.Detection.GameOcrTuning.MinStabilityWindow,
+                Services.Detection.GameOcrTuning.MaxStabilityWindow,
+                ref _seededStabilityWindow);
+        }
+
+        // ── OCR pacing boxes ──────────────────────────────────────────────
+        //
+        // These two write Config keys that OUTRANK the per-game profile, for
+        // every game at once — GameOcrTuning consults Config.Has before it ever
+        // looks at GameRegionProfile, and Config is a single flat namespace with
+        // no game dimension. So a pinned OcrInterval tuned for Genshin also
+        // governs Star Rail and ZZZ.
+        //
+        // The boxes are seeded with the RESOLVED value, which means they show
+        // the profile default and cannot visually distinguish it from a pin.
+        // Combined with a LostFocus handler that wrote unconditionally, opening
+        // Settings, expanding Advanced, clicking into a box and clicking away
+        // WITHOUT TYPING was enough to freeze that game's default as a permanent
+        // global pin. Nothing surfaced it afterwards; the box looked identical.
+        //
+        // Hence: remember what was seeded, and persist only a real edit. A value
+        // the user restores to the resolved default removes the key instead of
+        // re-pinning it, so the profile takes over again — the same "defer to
+        // the game profile" position ConfigMigrations v1 and v2 encode.
+
+        private string _seededOcrInterval;
+        private string _seededStabilityWindow;
+
+        /// <summary>
+        /// Shows the currently resolved pacing and records it as the baseline
+        /// for edit detection. Called at construction and again on every game
+        /// switch, because the resolved value is per-game and a stale box is
+        /// what turns into a cross-game pin.
+        /// </summary>
+        private void SeedOcrPacingBoxes()
+        {
+            if (OcrIntervalTextBox != null)
             {
-                val = Math.Max(1, Math.Min(10, val));
-                StabilityWindowTextBox.Text = val.ToString();
-                Config.Set("StabilityWindow", val);
+                _seededOcrInterval = Services.Detection.GameOcrTuning.OcrIntervalMs()
+                    .ToString(System.Globalization.CultureInfo.InvariantCulture);
+                OcrIntervalTextBox.Text = _seededOcrInterval;
+            }
+
+            if (StabilityWindowTextBox != null)
+            {
+                _seededStabilityWindow = Services.Detection.GameOcrTuning.StabilityWindow()
+                    .ToString(System.Globalization.CultureInfo.InvariantCulture);
+                StabilityWindowTextBox.Text = _seededStabilityWindow;
+            }
+        }
+
+        private static void CommitOcrPacingBox(
+            System.Windows.Controls.TextBox box, string configKey, int min, int max, ref string seeded)
+        {
+            if (box == null) return;
+
+            if (!int.TryParse(box.Text, System.Globalization.NumberStyles.Integer,
+                              System.Globalization.CultureInfo.InvariantCulture, out int val))
+            {
+                box.Text = seeded;   // unparseable: restore, never persist
+                return;
+            }
+
+            val = Math.Max(min, Math.Min(max, val));
+            string text = val.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            box.Text = text;
+
+            if (text == seeded) return;   // focus visit with no edit — leave Config alone
+
+            int resolvedWithoutPin = ResolvedPacingWithoutPin(configKey);
+            if (val == resolvedWithoutPin)
+            {
+                // Back to what the profile recommends: drop the pin so future
+                // profile changes reach this user, rather than freezing today's
+                // number forever.
+                Config.Remove(configKey);
+                Logger.Log.Info($"OCR pacing: {configKey} set back to the per-game default ({val}); pin removed.");
+            }
+            else
+            {
+                Config.Set(configKey, val);
+                Logger.Log.Info($"OCR pacing: {configKey} pinned to {val} (overrides the per-game default for ALL games).");
+            }
+
+            seeded = text;
+        }
+
+        /// <summary>What the resolver would return for this knob if the user
+        /// had never pinned it — i.e. the per-game profile value.</summary>
+        private static int ResolvedPacingWithoutPin(string configKey)
+        {
+            var profile = Services.Detection.GameRegionProfile.Get(Config.Get<string>("Game", "Genshin"));
+            switch (configKey)
+            {
+                case "OcrInterval":
+                    return profile.OcrIntervalMs ?? Services.Detection.GameOcrTuning.DefaultOcrIntervalMs;
+                case "StabilityWindow":
+                    return profile.StabilityWindowFrames ?? Services.Detection.GameOcrTuning.DefaultStabilityWindow;
+                default:
+                    return int.MinValue;   // never equal to a clamped value
             }
         }
 
@@ -5003,6 +5135,7 @@ namespace GI_Subtitles.Views
 
             Config.Set("Game", tag);
             Game = tag; // keep the SettingsWindow's cached copy in sync for other handlers
+            SeedOcrPacingBoxes();   // per-game pacing — see the note on SeedOcrPacingBoxes
             Logger.Log.Info($"Translations: game switched to {tag}.");
 
             // Prompt immediately — if the user picks Restart, we skip the
@@ -5141,6 +5274,7 @@ namespace GI_Subtitles.Views
             {
                 Config.Set("Game", pack.Game);
                 Game = pack.Game;
+                SeedOcrPacingBoxes();   // per-game pacing — see SeedOcrPacingBoxes
                 Logger.Log.Info($"Translations: game switched to {pack.Game} via row click.");
             }
 

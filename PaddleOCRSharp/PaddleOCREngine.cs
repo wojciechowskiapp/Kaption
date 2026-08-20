@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Data.SqlClient;
 using System.Diagnostics;
@@ -26,6 +26,24 @@ namespace PaddleOCRSharp
     {
         private readonly InferenceSession _detSession;
         private readonly InferenceSession _recSession;
+
+        // One recognition session per input width.
+        //
+        // ONNX Runtime's DirectML provider compiles a fast path for exactly one
+        // input shape per session -- the first one executed -- and every other
+        // shape stays slow permanently. Measured on PP-OCRv6 Small: 640px costs
+        // 35.0ms on a session warmed at 320, but 4.7ms on its own session.
+        // Giving each width its own session is the only way to make more than
+        // one shape fast, and unlike padding to a common width it cannot change
+        // a single pixel of the input, so recognised text is unaffected.
+        //
+        // Capped because sessions are not free. Only populated on GPU; the CPU
+        // provider has no per-shape compile penalty, so pooling there would
+        // spend memory for nothing.
+        private readonly Dictionary<int, InferenceSession> _recPool =
+            new Dictionary<int, InferenceSession>();
+        private readonly string _recModelPath;
+        private bool _recPoolUsesDirectML;
         private readonly List<string> _labels;
         private readonly OCRParameter _parameter;
 
@@ -307,6 +325,8 @@ namespace PaddleOCRSharp
                     using var gpuOptions = CreateSessionOptions(parameter, useDirectML: true);
                     _detSession = new InferenceSession(config.det_infer, gpuOptions);
                     _recSession = new InferenceSession(config.rec_infer, gpuOptions);
+                    _recModelPath = config.rec_infer;
+                    _recPoolUsesDirectML = true;
                     IsUsingGpu = true;
                     ExecutionProvider = "DmlExecutionProvider";
                     Logger.Log.Info($"OCR engine initialized with DirectML GPU acceleration (device {parameter.gpu_id})");
@@ -337,6 +357,46 @@ namespace PaddleOCRSharp
                 IsUsingGpu = false;
                 ExecutionProvider = "CPUExecutionProvider";
                 Logger.Log.Info("OCR engine initialized with CPU execution provider (GPU disabled in settings)");
+            }
+        }
+
+        /// <summary>
+        /// Maximum recognition sessions kept alive, including the primary one.
+        /// Each additional session buys one more permanently-fast input width.
+        /// </summary>
+        private const int MaxRecognitionSessions = 3;
+
+        /// <summary>
+        /// Session whose DirectML fast path matches <paramref name="inputWidth"/>,
+        /// creating one on first use until the cap is reached. Falls back to the
+        /// primary session, which still produces identical output, just slower.
+        /// Callers must hold <see cref="_gate"/>.
+        /// </summary>
+        private InferenceSession GetRecognitionSession(int inputWidth)
+        {
+            if (!IsUsingGpu || _recModelPath == null) return _recSession;
+
+            if (_recPool.TryGetValue(inputWidth, out var pooled) && pooled != null)
+                return pooled;
+
+            if (_recPool.Count >= MaxRecognitionSessions) return _recSession;
+
+            try
+            {
+                using var options = CreateSessionOptions(_parameter, _recPoolUsesDirectML);
+                var created = new InferenceSession(_recModelPath, options);
+                _recPool[inputWidth] = created;
+                Logger.Log.Info(
+                    $"OCR recognition session added for width {inputWidth} " +
+                    $"({_recPool.Count}/{MaxRecognitionSessions} in use).");
+                return created;
+            }
+            catch (Exception ex)
+            {
+                Logger.Log.Warn(
+                    $"Could not create a recognition session for width {inputWidth}, " +
+                    $"using the primary session: {ex.Message}");
+                return _recSession;
             }
         }
 
@@ -680,6 +740,7 @@ namespace PaddleOCRSharp
                 contentWidth = Clamp(contentWidth, 16, RecognitionMaxWidth);
                 int inputWidth = GetRecognitionInputWidth(
                     channel3.Width, channel3.Height, RecImgHeight);
+                InferenceSession recSession = GetRecognitionSession(inputWidth);
                 using var padded = new Mat(
                     RecImgHeight,
                     inputWidth,
@@ -710,10 +771,10 @@ namespace PaddleOCRSharp
                 // Run recognition model
                 var inputs = new List<NamedOnnxValue>
                 {
-                    NamedOnnxValue.CreateFromTensor(_recSession.InputNames[0], inputTensor)
+                    NamedOnnxValue.CreateFromTensor(recSession.InputNames[0], inputTensor)
                 };
 
-                using var outputs = _recSession.Run(inputs, _recSession.OutputNames, runOptions);
+                using var outputs = recSession.Run(inputs, recSession.OutputNames, runOptions);
                 var output = outputs.First().AsTensor<float>();
 
                 // Decode text
@@ -724,31 +785,32 @@ namespace PaddleOCRSharp
         }
 
         /// <summary>
-        /// Detector heights (post-resize, post-PadTo32) that real capture
-        /// regions produce. <see cref="DetectTextRegions"/> scales the long edge
-        /// down to <see cref="DetMaxSize"/> (960) and then pads both edges to a
-        /// multiple of 32, so a 1262x277 or 1434x248 dialogue region never
-        /// reaches the model wider than 960 — only the height varies:
-        ///
-        ///   1296x204 (ratio 6.35) -> 960x151 -> pad -> 960x160
-        ///   1378x234 (ratio 5.89) -> 960x163 -> pad -> 960x192
-        ///   1262x277 (ratio 4.56) -> 960x211 -> pad -> 960x224
-        ///
-        /// The pre-2026-08 set was {64, 160}, which left 192 and 224 to compile
-        /// lazily on the first in-game dialogue — a multi-second stall on a slow
-        /// DirectML device even though warm-up had "passed". Feeding 960-wide
-        /// sources here means the shapes travel the exact production
-        /// resize/pad path rather than being asserted by hand.
+        /// Fallback detector input when the caller does not supply a capture
+        /// region. 960x224 is what a wide dialogue region produces: the long
+        /// edge is scaled to <see cref="DetMaxSize"/> (960) and both edges are
+        /// padded to a multiple of 32. Measured over 150 real Genshin frames,
+        /// 960x224 was the input shape for 100% of them.
         /// </summary>
-        private static readonly int[] WarmUpDetectorHeights = { 64, 160, 192, 224 };
+        private const int FallbackDetectorHeight = 224;
+        private const int FallbackDetectorWidth = 960;
 
         /// <summary>
-        /// Recognition width buckets from <see cref="GetRecognitionInputWidth"/>
-        /// that real dialogue lines land in. 320 is a name or a short line,
-        /// 1280-1600 a full-width sentence; the pre-2026-08 set skipped the
-        /// 640/960/1600 middle entirely.
+        /// The single recognition width to warm.
+        ///
+        /// <para>ONNX Runtime's DirectML provider gives a compiled fast path to
+        /// exactly ONE input shape per session — the first one executed — and
+        /// every other shape stays slow permanently, no matter how often it
+        /// runs. Warming further shapes therefore buys almost nothing while
+        /// spending warm-up budget that the GPU-fitness gate is measured
+        /// against.</para>
+        ///
+        /// <para>320 is the plurality bucket: measured over 434 real regions,
+        /// 320 accounted for 42.6%, ahead of 1600 (18.9%), 1280 (15.9%),
+        /// 640 (12.4%), 960 (9.2%) and 1920 (0.9%). No bucket dominates, so a
+        /// single slot cannot cover the corpus — see
+        /// .plan/research/OCR-DIRECTML-SHAPE-BUG.md before changing this.</para>
         /// </summary>
-        private static readonly int[] WarmUpRecognitionWidths = { 320, 640, 960, 1280, 1600 };
+        private const int WarmUpRecognitionWidth = 320;
 
         /// <summary>
         /// Executes representative detector and recognizer shapes before the
@@ -766,7 +828,16 @@ namespace PaddleOCRSharp
         /// <returns>How long the warm-up actually took. Callers use this to
         /// decide whether a provider that technically succeeded is still too
         /// slow to be worth using.</returns>
-        public TimeSpan WarmUp(TimeSpan timeout)
+        public TimeSpan WarmUp(TimeSpan timeout) => WarmUp(timeout, null);
+
+        /// <summary>
+        /// Warms the detector shape that <paramref name="captureRegion"/> will
+        /// actually produce, by pushing a blank frame of that exact size through
+        /// the real resize/pad path rather than asserting a height by hand.
+        /// Pass the configured capture region; null falls back to a wide
+        /// dialogue region.
+        /// </summary>
+        public TimeSpan WarmUp(TimeSpan timeout, CvSize? captureRegion)
         {
             if (timeout <= TimeSpan.Zero)
                 throw new ArgumentOutOfRangeException(nameof(timeout));
@@ -805,13 +876,21 @@ namespace PaddleOCRSharp
 
                 // Blank images are intentional: the graph is compiled and
                 // validated without manufacturing OCR text.
-                foreach (int height in WarmUpDetectorHeights)
+                int detWidth = FallbackDetectorWidth;
+                int detHeight = FallbackDetectorHeight;
+                if (captureRegion.HasValue &&
+                    captureRegion.Value.Width > 0 && captureRegion.Value.Height > 0)
+                {
+                    detWidth = captureRegion.Value.Width;
+                    detHeight = captureRegion.Value.Height;
+                }
+
+                if (HasBudgetForAnotherShape())
                 {
                     token.ThrowIfCancellationRequested();
-                    if (!HasBudgetForAnotherShape()) break;
                     long shapeStartMs = timer.ElapsedMilliseconds;
                     using (var detectorInput = new Mat(
-                        height, 960, MatType.CV_8UC3, Scalar.All(0)))
+                        detHeight, detWidth, MatType.CV_8UC3, Scalar.All(0)))
                     {
                         _ = DetectTextRegions(detectorInput, runOptions, token);
                     }
@@ -821,23 +900,28 @@ namespace PaddleOCRSharp
 
                 // Recognition remains batch=1, so this also matches the exact
                 // production tensor layout.
-                foreach (int width in WarmUpRecognitionWidths)
+                if (HasBudgetForAnotherShape())
                 {
                     token.ThrowIfCancellationRequested();
-                    if (!HasBudgetForAnotherShape()) break;
                     long shapeStartMs = timer.ElapsedMilliseconds;
                     using (var recognitionInput = new Mat(
-                        RecImgHeight, width, MatType.CV_8UC3,
+                        RecImgHeight, WarmUpRecognitionWidth, MatType.CV_8UC3,
                         new Scalar(127.5, 127.5, 127.5)))
                     {
                         _ = RecognizeText(new[] { recognitionInput }, runOptions, token);
                     }
+
+                    // The primary session's fast path is now bound to this width,
+                    // so claim the slot rather than letting a later lookup spend a
+                    // pool entry on a session that would be no faster.
+                    if (IsUsingGpu && !_recPool.ContainsKey(WarmUpRecognitionWidth))
+                        _recPool[WarmUpRecognitionWidth] = _recSession;
                     slowestShapeMs = Math.Max(slowestShapeMs, timer.ElapsedMilliseconds - shapeStartMs);
                     shapesWarmed++;
                 }
 
                 timer.Stop();
-                int totalShapes = WarmUpDetectorHeights.Length + WarmUpRecognitionWidths.Length;
+                const int totalShapes = 2;
                 string budgetNote = budgetExhausted
                     ? $" — stopped early, {timeout.TotalSeconds:F0}s budget would not fit another shape " +
                       $"(slowest so far {slowestShapeMs}ms)"
@@ -845,6 +929,7 @@ namespace PaddleOCRSharp
                 Logger.Log.Info(
                     $"OCR warm-up completed in {timer.ElapsedMilliseconds}ms " +
                     $"(provider={ExecutionProvider}, model={ModelName}, " +
+                    $"det={detWidth}x{detHeight}, rec={WarmUpRecognitionWidth}, " +
                     $"shapes={shapesWarmed}/{totalShapes}){budgetNote}.");
                 return timer.Elapsed;
             }
@@ -882,18 +967,41 @@ namespace PaddleOCRSharp
             var score = 0f;
             var validChars = 0;
 
+            // Tensor<float> has no (int,int,int) indexer, so output[0, n, i] binds to
+            // this[params int[]] and heap-allocates an int[3] for every element read.
+            // At labelCount 18709 that is ~120 MB of Gen0 garbage per recognised line.
+            // DenseTensor is row-major, so [0, n, i] == Buffer.Span[n * labelCount + i].
+            var dense = output as DenseTensor<float>;
+            var buffer = dense != null ? dense.Buffer.Span : default;
+
             for (var n = 0; n < charCount; n++)
             {
                 var maxIdx = 0;
                 var maxVal = float.MinValue;
 
-                for (var i = 0; i < labelCount; i++)
+                if (dense != null)
                 {
-                    var val = output[0, n, i];
-                    if (val > maxVal)
+                    var row = buffer.Slice(n * labelCount, labelCount);
+                    for (var i = 0; i < labelCount; i++)
                     {
-                        maxVal = val;
-                        maxIdx = i;
+                        var val = row[i];
+                        if (val > maxVal)
+                        {
+                            maxVal = val;
+                            maxIdx = i;
+                        }
+                    }
+                }
+                else
+                {
+                    for (var i = 0; i < labelCount; i++)
+                    {
+                        var val = output[0, n, i];
+                        if (val > maxVal)
+                        {
+                            maxVal = val;
+                            maxIdx = i;
+                        }
                     }
                 }
 
@@ -1120,6 +1228,14 @@ namespace PaddleOCRSharp
                 {
                     _detSession?.Dispose();
                     _recSession?.Dispose();
+                    foreach (var pooled in _recPool.Values)
+                    {
+                        if (!ReferenceEquals(pooled, _recSession))
+                        {
+                            try { pooled?.Dispose(); } catch { }
+                        }
+                    }
+                    _recPool.Clear();
                 }
                 else
                 {

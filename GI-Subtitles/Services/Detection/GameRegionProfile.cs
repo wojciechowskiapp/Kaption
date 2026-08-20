@@ -198,14 +198,51 @@ namespace GI_Subtitles.Services.Detection
                     AnswerYPct = 0.38,
                     AnswerWPct = 0.35,
                     AnswerHPct = 0.38,
-                    // Genshin pacing: slow typewriter. 100 ms tick + 5-frame window
-                    // = OCR waits ~500 ms for the line to finish typing. That wait
-                    // is THE reason we don't flicker on Genshin; don't lower it.
+                    // Genshin pacing: slow typewriter, measured over six recorded
+                    // scenes (benchmark/, 2026-08-20). Full record in
+                    // .plan/in-progress/OCR-PACING-TUNING.md.
+                    //
+                    // The 100 ms tick stays: at 50 ms the tail improves by only
+                    // ~50 ms while OCR runs rise 21%, a bad trade on the slower
+                    // GPUs the in-flight guard has to absorb.
+                    //
+                    // StabilityWindowFrames was measured to be INERT here - 2, 3
+                    // and 5 give identical latency, coverage and paint churn, and
+                    // differ only in whether a read is attributed to the window or
+                    // the eager path. Left at 5 because nothing argues for moving
+                    // it, not because 5 was chosen.
+                    //
+                    // StableFramesDefault 3 -> 2 pulls median first paint 150 ->
+                    // 100 ms at no measurable cost. 2 is also the gate floor
+                    // (OcrTriggerGate.MinStableFrames), so this is as low as the
+                    // knob goes.
+                    //
+                    // ForceOcrAfterSeconds 1.0 -> 0.25 is the real change: p90
+                    // first paint 1137 -> 372 ms with 24% more lines translated.
+                    // Simulated at 2x, 3x and 5x the recorded OCR cost the ranking
+                    // never inverts, and a 5x-slower machine at 0.25 still beats
+                    // the old 1.0 on a fast one.
+                    //
+                    // 0.25 is a local optimum, not a compromise: 0.35 is strictly
+                    // worse (p90 410 ms AND more churn), and 0.15 buys 73 ms more
+                    // tail for a jump in mid-typewriter re-reads.
+                    //
+                    // That residual churn (~20% of lines repaint once) is NOT a
+                    // pacing cost. All 25 of 25 observed repaints trace to
+                    // OptimizedMatcher scoring a truncated typewriter prefix at
+                    // distance 0 and taking the first key in scan order, so
+                    // "Yes, y" resolves to "Yes, you." before the line finishes.
+                    //
+                    // Fixing that unlocks a lower timeout — but NOT by editing this
+                    // number alone. At a 100 ms interval the gate compares elapsed
+                    // time with strict > on a tick boundary, so 0.15 and 0.1 are
+                    // the same setting; both first fire at 0.2 s. Reaching the
+                    // sweep's p90 200 ms point needs OcrIntervalMs at 50 too.
                     OcrIntervalMs        = 100,
                     StabilityWindowFrames = 5,
                     StableFramesChain     = 2,
-                    StableFramesDefault   = 3,
-                    ForceOcrAfterSeconds  = 1.0,
+                    StableFramesDefault   = 2,
+                    ForceOcrAfterSeconds  = 0.25,
                 },
                 new GameRegionProfile
                 {
@@ -221,18 +258,35 @@ namespace GI_Subtitles.Services.Detection
                     AnswerYPct = 0.38,
                     AnswerWPct = 0.38,
                     AnswerHPct = 0.30,
-                    // HSR pacing: no typewriter — text appears whole, and voice
-                    // lines rotate faster than Genshin. Sample hot (60 ms) with
-                    // a tight 2-frame stability window so we catch a line and
-                    // fire OCR before the scene advances. Force-OCR floor halved
-                    // because a "still-changing after 1 s" case on HSR usually
-                    // means we're mid-scene-transition, not waiting for a
-                    // typewriter to settle.
+                    // HSR pacing: text mostly appears whole and voice lines
+                    // rotate faster than Genshin, so reads can be eager. Measured
+                    // over starrail-natasha-clinic (benchmark/, 2026-08-20).
+                    //
+                    // OcrIntervalMs STAYS at 60. It was briefly changed to 50 on
+                    // the strength of a 100 ms comparison, which was the wrong
+                    // baseline: measured directly, 50 and 60 ms are within one
+                    // line of each other (45 vs 44 painted). The harness samples
+                    // at 20 fps, so both evaluate the gate on every frame and the
+                    // real cliff is at 80 ms, where the tick stride doubles and
+                    // coverage falls to 29. There is no evidence for 50 over 60,
+                    // so 60 stays.
+                    //
+                    // 0.5 -> 0.15 s is where Star Rail's win actually came from:
+                    // paint churn stays at exactly 1.00 paints per
+                    // line all the way down. With whole-line rendering there is no
+                    // truncated prefix to mis-resolve, so the effect that pins
+                    // Genshin at 0.25 is absent here. Stopped at 0.15 rather than
+                    // the 0.1 clamp floor because this is one scene and a step of
+                    // headroom is cheap.
+                    //
+                    // The previous comment here claimed HSR has "no typewriter".
+                    // The recorded scene shows mid-typewriter frames plainly.
+                    // Whole-line rendering is the common case, not the only one.
                     OcrIntervalMs        = 60,
                     StabilityWindowFrames = 2,
                     StableFramesChain     = 2,
                     StableFramesDefault   = 2,
-                    ForceOcrAfterSeconds  = 0.5,
+                    ForceOcrAfterSeconds  = 0.15,
                 },
                 new GameRegionProfile
                 {
@@ -295,18 +349,30 @@ namespace GI_Subtitles.Services.Detection
                     AnswerYPct = 0.38,
                     AnswerWPct = 0.38,
                     AnswerHPct = 0.30,
-                    // PROVISIONAL pacing — pending live measurement (task 3.10
-                    // in .plan/in-progress/ZZZ-SUPPORT.md). Starting from HSR's
-                    // shape rather than Genshin's because ZZZ's cinematic mode
-                    // renders whole lines with no typewriter animation, so the
-                    // 500 ms Genshin-style stability wait would just lose lines
-                    // to the next scene. Revisit once someone times real
-                    // dialogue cadence in-game.
+                    // No longer provisional, for the two knobs that changed:
+                    // measured over zzz-breakfast-amber-hall (benchmark/,
+                    // 2026-08-20), which covers both ZZZ dialogue layouts. Task
+                    // 3.10 in .plan/in-progress/ZZZ-SUPPORT.md is satisfied for
+                    // PACING. The answer-region ratios below are still inherited
+                    // from HSR and still unmeasured.
+                    //
+                    // 0.5 -> 0.15 s: p90 first paint 550 -> 200 ms, coverage up
+                    // from 10 lines to 14. OcrIntervalMs stays at 60 — measured
+                    // against 50 it is identical on every metric (same 58 reads,
+                    // same 14 lines, same churn), so there is nothing to buy.
+                    //
+                    // 0.15 is a measured knee, not a round number. Churn is flat
+                    // down to 0.15 (1.14 paints/line) then jumps to 1.33 at 0.1 -
+                    // ZZZ does animate some text, so it sits between HSR (no cost
+                    // at any value) and Genshin (cost from 0.35 down).
+                    //
+                    // One scene, ~14 lines: a solid direction and a soft
+                    // magnitude. A second ZZZ scene would firm it up.
                     OcrIntervalMs        = 60,
                     StabilityWindowFrames = 2,
                     StableFramesChain     = 2,
                     StableFramesDefault   = 2,
-                    ForceOcrAfterSeconds  = 0.5,
+                    ForceOcrAfterSeconds  = 0.15,
 
                     // ── Vision knobs. Only the departures from the accent
                     //    defaults are listed; the rest inherit via the property

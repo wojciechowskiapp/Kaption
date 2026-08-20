@@ -4,7 +4,7 @@ using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Linq;
-using Newtonsoft.Json;
+using System.Text.Json;
 using PaddleOCRSharp;
 using GI_Subtitles.Models;
 
@@ -89,7 +89,7 @@ namespace GI_Subtitles.Common
                 AverageDurationMs = Math.Round(averageDuration, 2)
             };
 
-            var contentJson = JsonConvert.SerializeObject(summary, Formatting.Indented);
+            var contentJson = JsonSerializer.Serialize(summary, JsonDefaults.Indented);
             File.WriteAllText("result.json", contentJson);
         }
     }

@@ -234,6 +234,79 @@ namespace GI_Test
             Assert.IsTrue(result.DialogueText.Contains("Not now."));
         }
 
+        /// <summary>
+        /// Measured on 800 recorded Genshin frames: the detected name box and the
+        /// first body box are separated by 1–6 px, so an edge-gap threshold is
+        /// decided by detector jitter and the speaker flickers in and out on
+        /// visually identical frames. Row centres are a stable line apart.
+        /// </summary>
+        [TestMethod]
+        public void NpcClassifier_HairlineGapBelowName_StillYieldsSpeaker()
+        {
+            using var frame = new Mat(260, 320, MatType.CV_8UC3, Scalar.Black);
+            Cv2.Rectangle(frame, new Rect(10, 100, 120, 58), new Scalar(40, 190, 255), -1);
+            Cv2.Rectangle(frame, new Rect(10, 161, 280, 46), Scalar.White, -1);
+
+            var result = ImageProcessor.ClassifyTextBlocksWithPositions(frame, new List<TextBlock>
+            {
+                Block("Paimon", 10, 100, 120, 58),
+                Block("What? How did you know we were coming?", 10, 161, 280, 46),
+            });
+
+            Assert.AreEqual("Paimon", result.NpcName,
+                "A 3 px gap is one line apart, not a highlight on the dialogue line.");
+            Assert.AreEqual(1, result.DialogueBlocks.Count);
+        }
+
+        /// <summary>
+        /// A choice menu renders above the dialogue box. It is not the body, so
+        /// it must neither suppress the speaker nor be absorbed into it — the
+        /// latter would delete it from the match input.
+        /// </summary>
+        [TestMethod]
+        public void NpcClassifier_ChoiceOptionAboveName_KeepsSpeakerAndKeepsOptionInBody()
+        {
+            using var frame = new Mat(260, 320, MatType.CV_8UC3, Scalar.Black);
+            Cv2.Rectangle(frame, new Rect(150, 10, 140, 30), Scalar.White, -1);
+            Cv2.Rectangle(frame, new Rect(10, 100, 120, 58), new Scalar(40, 190, 255), -1);
+            Cv2.Rectangle(frame, new Rect(10, 161, 280, 46), Scalar.White, -1);
+
+            var result = ImageProcessor.ClassifyTextBlocksWithPositions(frame, new List<TextBlock>
+            {
+                Block("Whichever one you're wearing", 150, 10, 140, 30),
+                Block("Ying'er", 10, 100, 120, 58),
+                Block("Relax... I know why you're here, and what you came for.", 10, 161, 280, 46),
+            });
+
+            Assert.AreEqual("Ying'er", result.NpcName);
+            StringAssert.Contains(result.DialogueText, "Whichever one you're wearing");
+            Assert.AreEqual(2, result.DialogueBlocks.Count);
+        }
+
+        /// <summary>
+        /// The role line sits between the speaker and the dialogue, and still
+        /// belongs to the speaker rather than the translated body.
+        /// </summary>
+        [TestMethod]
+        public void NpcRoleClassifier_WhiteRoleLineBelowName_IsReclassified()
+        {
+            using var frame = new Mat(320, 800, MatType.CV_8UC3, Scalar.Black);
+            Cv2.Rectangle(frame, new Rect(30, 20, 240, 55), new Scalar(40, 190, 255), -1);
+            Cv2.Rectangle(frame, new Rect(30, 100, 200, 30), Scalar.White, -1);
+            Cv2.Rectangle(frame, new Rect(30, 175, 700, 58), Scalar.White, -1);
+
+            var result = ImageProcessor.ClassifyTextBlocksWithPositions(frame, new List<TextBlock>
+            {
+                Block("Ying'er", 30, 20, 240, 55),
+                Block("Shop Assistant", 30, 100, 200, 30),
+                Block("Relax... I know why you're here, and what you came for.", 30, 175, 700, 58),
+            });
+
+            Assert.AreEqual(2, result.NpcBlocks.Count);
+            StringAssert.Contains(result.NpcName, "Shop Assistant");
+            Assert.AreEqual(1, result.DialogueBlocks.Count);
+        }
+
         [TestMethod]
         public void RobustFrameHash_DistinguishesDifferentNormalizedTextContent()
         {

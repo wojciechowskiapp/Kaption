@@ -349,7 +349,40 @@ namespace GI_Subtitles.Core.UI
                 if (!IsCommittableRect(rect)) return;
                 if (Convert.ToInt32(rect.Width) > 0 && Convert.ToInt32(rect.Height) > 0)
                 {
-                    Config.Config.Set("Region", $"{Convert.ToInt32(rect.TopLeft.X)},{Convert.ToInt32(rect.TopLeft.Y)},{Convert.ToInt32(rect.Width)},{Convert.ToInt32(rect.Height)}");
+                    int rawX = Convert.ToInt32(rect.TopLeft.X);
+                    int rawY = Convert.ToInt32(rect.TopLeft.Y);
+                    int rawW = Convert.ToInt32(rect.Width);
+                    int rawH = Convert.ToInt32(rect.Height);
+
+                    // Clip to the virtual desktop before storing. A drag that
+                    // ends even one pixel past the left or top edge produces a
+                    // negative coordinate, which DxgiScreenCapture rejects — and
+                    // the app then runs on the slower GDI fallback silently, on
+                    // every tick, until the region is drawn again. Physical
+                    // pixels on both sides: SystemInformation.VirtualScreen and
+                    // the picker agree on that space.
+                    var desktop = System.Windows.Forms.SystemInformation.VirtualScreen;
+                    if (!GI_Subtitles.Services.Validation.CaptureRegionBounds.TryClamp(
+                            rawX, rawY, rawW, rawH,
+                            desktop.Left, desktop.Top, desktop.Width, desktop.Height,
+                            out int x, out int y, out int w, out int h))
+                    {
+                        Logger.Log.Warn(
+                            $"ChooseRegion: selection {rawX},{rawY} {rawW}x{rawH} lies outside the desktop " +
+                            $"({desktop.Left},{desktop.Top} {desktop.Width}x{desktop.Height}) — not saved.");
+                        return;
+                    }
+
+                    if (GI_Subtitles.Services.Validation.CaptureRegionBounds.WasClamped(
+                            rawX, rawY, rawW, rawH, x, y, w, h))
+                    {
+                        Logger.Log.Warn(
+                            $"ChooseRegion: selection {rawX},{rawY} {rawW}x{rawH} ran off the desktop and was " +
+                            $"trimmed to {x},{y} {w}x{h}. Left unclamped this would have forced the slower " +
+                            "GDI capture path for every read.");
+                    }
+
+                    Config.Config.Set("Region", $"{x},{y},{w},{h}");
                     Region = Config.Config.Get<string>("Region").ToString().Split(',');
                 }
             }

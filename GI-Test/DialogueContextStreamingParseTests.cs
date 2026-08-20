@@ -1,4 +1,4 @@
-// ─────────────────────────────────────────────────────────────────────────────
+﻿// ─────────────────────────────────────────────────────────────────────────────
 //  DialogueContextStreamingParseTests.cs
 //  ---------------------------------------------------------------------------
 //  Perf + correctness tests for the round-1 streaming TextMapEN parse landed
@@ -70,7 +70,7 @@ namespace GI_Test
             Dictionary<string, string> oldDict;
             using (var ms = new MemoryStream(json, writable: false))
             {
-                oldDict = VoiceContentHelper.Test_LoadFlatJsonDictionary_Newtonsoft(
+                oldDict = NewtonsoftReferenceParser.LoadFlatJsonDictionary(
                     ms, flattenWrappedObjects: false);
             }
 
@@ -109,7 +109,7 @@ namespace GI_Test
             // JIT warmup — discard results, just get the codegen on both
             // paths hot so measurement isn't skewed by first-call costs.
             using (var ms = new MemoryStream(json, writable: false))
-                _ = VoiceContentHelper.Test_LoadFlatJsonDictionary_Newtonsoft(ms, false);
+                _ = NewtonsoftReferenceParser.LoadFlatJsonDictionary(ms, false);
             using (var ms = new MemoryStream(json, writable: false))
                 _ = VoiceContentHelper.StreamFlatJsonDictionary(ms, false, 0);
 
@@ -123,7 +123,7 @@ namespace GI_Test
             Dictionary<string, string> oldDict;
             using (var ms = new MemoryStream(json, writable: false))
             {
-                oldDict = VoiceContentHelper.Test_LoadFlatJsonDictionary_Newtonsoft(
+                oldDict = NewtonsoftReferenceParser.LoadFlatJsonDictionary(
                     ms, flattenWrappedObjects: false);
             }
             long oldAlloc = GC.GetAllocatedBytesForCurrentThread() - before;

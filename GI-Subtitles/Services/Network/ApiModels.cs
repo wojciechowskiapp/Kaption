@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-using Newtonsoft.Json;
+using System.Text.Json.Serialization;
 
 namespace GI_Subtitles.Services.Network
 {
@@ -17,13 +17,13 @@ namespace GI_Subtitles.Services.Network
     /// </summary>
     public readonly struct MachineFingerprintPayload
     {
-        [JsonProperty("cpu")]
+        [JsonPropertyName("cpu")]
         public string Cpu { get; }
 
-        [JsonProperty("mobo")]
+        [JsonPropertyName("mobo")]
         public string Mobo { get; }
 
-        [JsonProperty("disk")]
+        [JsonPropertyName("disk")]
         public string Disk { get; }
 
         public MachineFingerprintPayload(string cpu, string mobo, string disk)
@@ -44,14 +44,14 @@ namespace GI_Subtitles.Services.Network
     public sealed class ActivateRequest
     {
         /// <summary>The 60s device activation JWT received on the loopback callback.</summary>
-        [JsonProperty("activation_token")]
+        [JsonPropertyName("activation_token")]
         public string ActivationToken { get; }
 
         /// <summary>Per-component fingerprint tuple (cpu, mobo, disk).</summary>
-        [JsonProperty("fingerprint")]
+        [JsonPropertyName("fingerprint")]
         public MachineFingerprintPayload Fingerprint { get; }
 
-        [JsonProperty("device_name")]
+        [JsonPropertyName("device_name")]
         public string DeviceName { get; }
 
         public ActivateRequest(string activationToken, MachineFingerprintPayload fingerprint, string deviceName)
@@ -74,16 +74,24 @@ namespace GI_Subtitles.Services.Network
     /// </summary>
     public sealed class ActivationBlobPayload
     {
-        [JsonProperty("user_id", Order = 0)]
+        [JsonPropertyName("user_id")]
+        [JsonPropertyOrder(0)]
+        [JsonInclude]
         public string UserId { get; private set; }
 
-        [JsonProperty("activation_id", Order = 1)]
+        [JsonPropertyName("activation_id")]
+        [JsonPropertyOrder(1)]
+        [JsonInclude]
         public string ActivationId { get; private set; }
 
-        [JsonProperty("machine_fingerprint_hash", Order = 2)]
+        [JsonPropertyName("machine_fingerprint_hash")]
+        [JsonPropertyOrder(2)]
+        [JsonInclude]
         public string MachineFingerprintHash { get; private set; }
 
-        [JsonProperty("user_key_component_b64", Order = 3)]
+        [JsonPropertyName("user_key_component_b64")]
+        [JsonPropertyOrder(3)]
+        [JsonInclude]
         public string UserKeyComponentB64 { get; private set; }
 
         /// <summary>
@@ -93,10 +101,14 @@ namespace GI_Subtitles.Services.Network
         /// scraping the download endpoint without a valid session gets
         /// encrypted bytes with no way to derive the key.
         /// </summary>
-        [JsonProperty("distribution_key_b64", Order = 4)]
+        [JsonPropertyName("distribution_key_b64")]
+        [JsonPropertyOrder(4)]
+        [JsonInclude]
         public string DistributionKeyB64 { get; private set; }
 
-        [JsonProperty("expires_at", Order = 5)]
+        [JsonPropertyName("expires_at")]
+        [JsonPropertyOrder(5)]
+        [JsonInclude]
         public long ExpiresAt { get; private set; }
 
         /// <summary>Decode the distribution key into raw bytes. Returns null if missing/invalid.</summary>
@@ -115,31 +127,31 @@ namespace GI_Subtitles.Services.Network
     /// <summary>Public user shape nested in activation / /api/me responses.</summary>
     public sealed class UserPublic
     {
-        [JsonProperty("id")] public string Id { get; private set; }
-        [JsonProperty("email")] public string Email { get; private set; }
-        [JsonProperty("name")] public string Name { get; private set; }
-        [JsonProperty("avatar_url")] public string AvatarUrl { get; private set; }
-        [JsonProperty("provider")] public string Provider { get; private set; }
+        [JsonPropertyName("id")] [JsonInclude] public string Id { get; private set; }
+        [JsonPropertyName("email")] [JsonInclude] public string Email { get; private set; }
+        [JsonPropertyName("name")] [JsonInclude] public string Name { get; private set; }
+        [JsonPropertyName("avatar_url")] [JsonInclude] public string AvatarUrl { get; private set; }
+        [JsonPropertyName("provider")] [JsonInclude] public string Provider { get; private set; }
 
         /// <summary>Static base tier — permanent flags like admin/beta. Server
         /// default for new accounts is <c>free_beta</c>.</summary>
-        [JsonProperty("tier")] public string Tier { get; private set; }
+        [JsonPropertyName("tier")] [JsonInclude] public string Tier { get; private set; }
 
         /// <summary>
         /// Computed tier = max(<see cref="Tier"/>, highest active license grant).
         /// This is what UI should gate features on. Added in migration 003 to
         /// support sellable license plans (pro-30d / pro-180d).
         /// </summary>
-        [JsonProperty("effective_tier")] public string EffectiveTier { get; private set; }
+        [JsonPropertyName("effective_tier")] [JsonInclude] public string EffectiveTier { get; private set; }
 
         /// <summary>
         /// Unix-second expiry of the user's longest-running active license, or
         /// null when no grant is currently elevating the tier. UI renders this
         /// as "Pro (N days remaining)".
         /// </summary>
-        [JsonProperty("paid_until")] public long? PaidUntil { get; private set; }
+        [JsonPropertyName("paid_until")] [JsonInclude] public long? PaidUntil { get; private set; }
 
-        [JsonProperty("created_at")] public long CreatedAt { get; private set; }
+        [JsonPropertyName("created_at")] [JsonInclude] public long CreatedAt { get; private set; }
     }
 
     /// <summary>
@@ -150,31 +162,39 @@ namespace GI_Subtitles.Services.Network
     /// </summary>
     public sealed class ActivateResponse
     {
-        [JsonProperty("activation_id")]
+        [JsonPropertyName("activation_id")]
+        [JsonInclude]
         public string ActivationId { get; private set; }
 
         /// <summary>Long-lived (30d) Bearer JWT for future /api/license/* calls.</summary>
-        [JsonProperty("device_session_token")]
+        [JsonPropertyName("device_session_token")]
+        [JsonInclude]
         public string DeviceSessionToken { get; private set; }
 
-        [JsonProperty("device_session_expires_at")]
+        [JsonPropertyName("device_session_expires_at")]
+        [JsonInclude]
         public long DeviceSessionExpiresAt { get; private set; }
 
         /// <summary>The Ed25519-signed payload; verify before trusting.</summary>
-        [JsonProperty("activation_blob")]
+        [JsonPropertyName("activation_blob")]
+        [JsonInclude]
         public ActivationBlobPayload ActivationBlob { get; private set; }
 
         /// <summary>Base64 Ed25519 signature over JSON.stringify(activation_blob).</summary>
-        [JsonProperty("activation_blob_signature")]
+        [JsonPropertyName("activation_blob_signature")]
+        [JsonInclude]
         public string ActivationBlobSignature { get; private set; }
 
-        [JsonProperty("soft_expires_at")]
+        [JsonPropertyName("soft_expires_at")]
+        [JsonInclude]
         public long SoftExpiresAt { get; private set; }
 
-        [JsonProperty("hard_expires_at")]
+        [JsonPropertyName("hard_expires_at")]
+        [JsonInclude]
         public long HardExpiresAt { get; private set; }
 
-        [JsonProperty("user")]
+        [JsonPropertyName("user")]
+        [JsonInclude]
         public UserPublic User { get; private set; }
 
         /// <summary>Decode the user key component into raw bytes. Returns null if missing/invalid.</summary>
@@ -194,13 +214,14 @@ namespace GI_Subtitles.Services.Network
     /// Body of POST /api/license/heartbeat. The heartbeat used to be a bodyless
     /// POST; session 26 added an optional <c>active_seconds</c> so the server can
     /// credit the user's referrer with bonus-days for actual usage. The field is
-    /// only included in the wire payload when &gt;0 (see
-    /// <see cref="_requestSerializerSettings"/> null-skip). The server caps the
+    /// only included in the wire payload when &gt;0 (null-skipped by
+    /// <c>JsonDefaults.IgnoreNulls</c>). The server caps the
     /// value at 3600 per heartbeat.
     /// </summary>
     public sealed class HeartbeatRequest
     {
-        [JsonProperty("active_seconds", NullValueHandling = NullValueHandling.Ignore)]
+        [JsonPropertyName("active_seconds")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public int? ActiveSeconds { get; }
 
         public HeartbeatRequest(int? activeSeconds)
@@ -214,16 +235,20 @@ namespace GI_Subtitles.Services.Network
     /// </summary>
     public sealed class HeartbeatResponse
     {
-        [JsonProperty("ok")]
+        [JsonPropertyName("ok")]
+        [JsonInclude]
         public bool Ok { get; private set; }
 
-        [JsonProperty("last_heartbeat")]
+        [JsonPropertyName("last_heartbeat")]
+        [JsonInclude]
         public long LastHeartbeat { get; private set; }
 
-        [JsonProperty("soft_expires_at")]
+        [JsonPropertyName("soft_expires_at")]
+        [JsonInclude]
         public long SoftExpiresAt { get; private set; }
 
-        [JsonProperty("hard_expires_at")]
+        [JsonPropertyName("hard_expires_at")]
+        [JsonInclude]
         public long HardExpiresAt { get; private set; }
 
         /// <summary>
@@ -231,10 +256,12 @@ namespace GI_Subtitles.Services.Network
         /// license purchased mid-session lifts tier within the heartbeat
         /// interval without forcing a re-activation).
         /// </summary>
-        [JsonProperty("effective_tier")]
+        [JsonPropertyName("effective_tier")]
+        [JsonInclude]
         public string EffectiveTier { get; private set; }
 
-        [JsonProperty("paid_until")]
+        [JsonPropertyName("paid_until")]
+        [JsonInclude]
         public long? PaidUntil { get; private set; }
     }
 
@@ -248,35 +275,44 @@ namespace GI_Subtitles.Services.Network
     /// </summary>
     internal sealed class ApiListEnvelope<T>
     {
-        [JsonProperty("items")]
+        [JsonPropertyName("items")]
+        [JsonInclude]
         public IReadOnlyList<T> Items { get; private set; }
     }
 
     /// <summary>Catalog entry from GET /api/license/files.</summary>
     public sealed class FileMetadata
     {
-        [JsonProperty("id")]
+        [JsonPropertyName("id")]
+        [JsonInclude]
         public string FileVersionId { get; private set; }
 
-        [JsonProperty("game")]
+        [JsonPropertyName("game")]
+        [JsonInclude]
         public string Game { get; private set; }
 
-        [JsonProperty("language")]
+        [JsonPropertyName("language")]
+        [JsonInclude]
         public string Language { get; private set; }
 
-        [JsonProperty("version")]
+        [JsonPropertyName("version")]
+        [JsonInclude]
         public string Version { get; private set; }
 
-        [JsonProperty("file_size")]
+        [JsonPropertyName("file_size")]
+        [JsonInclude]
         public long Size { get; private set; }
 
-        [JsonProperty("file_sha256")]
+        [JsonPropertyName("file_sha256")]
+        [JsonInclude]
         public string Sha256 { get; private set; }
 
-        [JsonProperty("min_tier")]
+        [JsonPropertyName("min_tier")]
+        [JsonInclude]
         public string MinTier { get; private set; }
 
-        [JsonProperty("released_at")]
+        [JsonPropertyName("released_at")]
+        [JsonInclude]
         public long ReleasedAt { get; private set; }
     }
 
@@ -288,25 +324,32 @@ namespace GI_Subtitles.Services.Network
     /// </summary>
     public sealed class GamedataMetadata
     {
-        [JsonProperty("id")]
+        [JsonPropertyName("id")]
+        [JsonInclude]
         public string GamedataVersionId { get; private set; }
 
-        [JsonProperty("game")]
+        [JsonPropertyName("game")]
+        [JsonInclude]
         public string Game { get; private set; }
 
-        [JsonProperty("version")]
+        [JsonPropertyName("version")]
+        [JsonInclude]
         public string Version { get; private set; }
 
-        [JsonProperty("file_size")]
+        [JsonPropertyName("file_size")]
+        [JsonInclude]
         public long Size { get; private set; }
 
-        [JsonProperty("file_sha256")]
+        [JsonPropertyName("file_sha256")]
+        [JsonInclude]
         public string Sha256 { get; private set; }
 
-        [JsonProperty("min_tier")]
+        [JsonPropertyName("min_tier")]
+        [JsonInclude]
         public string MinTier { get; private set; }
 
-        [JsonProperty("released_at")]
+        [JsonPropertyName("released_at")]
+        [JsonInclude]
         public long ReleasedAt { get; private set; }
     }
 
@@ -318,50 +361,64 @@ namespace GI_Subtitles.Services.Network
     /// </summary>
     public sealed class AnnouncementPublic
     {
-        [JsonProperty("id")]
+        [JsonPropertyName("id")]
+        [JsonInclude]
         public string Id { get; private set; }
 
-        [JsonProperty("title")]
+        [JsonPropertyName("title")]
+        [JsonInclude]
         public string Title { get; private set; }
 
-        [JsonProperty("body")]
+        [JsonPropertyName("body")]
+        [JsonInclude]
         public string Body { get; private set; }
 
-        [JsonProperty("severity")]
+        [JsonPropertyName("severity")]
+        [JsonInclude]
         public string Severity { get; private set; }
 
-        [JsonProperty("link_url")]
+        [JsonPropertyName("link_url")]
+        [JsonInclude]
         public string LinkUrl { get; private set; }
 
-        [JsonProperty("link_label")]
+        [JsonPropertyName("link_label")]
+        [JsonInclude]
         public string LinkLabel { get; private set; }
 
-        [JsonProperty("starts_at")]
+        [JsonPropertyName("starts_at")]
+        [JsonInclude]
         public long StartsAt { get; private set; }
 
-        [JsonProperty("ends_at")]
+        [JsonPropertyName("ends_at")]
+        [JsonInclude]
         public long EndsAt { get; private set; }
     }
 
     /// <summary>Response from GET /api/app/version.</summary>
     public sealed class AppVersionInfo
     {
-        [JsonProperty("version")]
+        [JsonPropertyName("version")]
+        [JsonInclude]
         public string Version { get; private set; }
 
-        [JsonProperty("download_url")]
+        [JsonPropertyName("download_url")]
+        [JsonInclude]
         public string Url { get; private set; }
 
-        [JsonProperty("sha256")]
+        [JsonPropertyName("sha256")]
+        [JsonInclude]
         public string Sha256 { get; private set; }
 
-        [JsonProperty("release_notes_url")]
+        [JsonPropertyName("release_notes_url")]
+        [JsonInclude]
         public string ReleaseNotesUrl { get; private set; }
 
-        [JsonProperty("min_supported_version")]
+        [JsonPropertyName("min_supported_version")]
+        [JsonInclude]
         public string MinSupportedVersion { get; private set; }
 
-        [JsonProperty("published_at")]
+        [JsonPropertyName("published_at")]
+        [JsonInclude]
         public long PublishedAt { get; private set; }
     }
 
@@ -371,13 +428,13 @@ namespace GI_Subtitles.Services.Network
     /// </summary>
     public sealed class ApiError
     {
-        [JsonProperty("error")]
+        [JsonPropertyName("error")]
         public string Error { get; set; }
 
-        [JsonProperty("message")]
+        [JsonPropertyName("message")]
         public string Message { get; set; }
 
-        [JsonProperty("details")]
+        [JsonPropertyName("details")]
         public Dictionary<string, object> Details { get; set; }
 
         /// <summary>
@@ -405,15 +462,15 @@ namespace GI_Subtitles.Services.Network
     /// </summary>
     public sealed class FeedbackRequest
     {
-        [JsonProperty("message")]
+        [JsonPropertyName("message")]
         public string Message { get; }
 
         /// <summary>Always "desktop" from this client; the server accepts "web" too for future form reuse.</summary>
-        [JsonProperty("client_kind")]
+        [JsonPropertyName("client_kind")]
         public string ClientKind { get; }
 
         /// <summary>Application version string, e.g. <c>2.0.26040116</c>. Optional.</summary>
-        [JsonProperty("client_version")]
+        [JsonPropertyName("client_version")]
         public string ClientVersion { get; }
 
         public FeedbackRequest(string message, string clientVersion)
@@ -427,10 +484,10 @@ namespace GI_Subtitles.Services.Network
     /// <summary>Reply from POST /api/feedback on success.</summary>
     public sealed class FeedbackResponse
     {
-        [JsonProperty("ok")]
+        [JsonPropertyName("ok")]
         public bool Ok { get; set; }
 
-        [JsonProperty("id")]
+        [JsonPropertyName("id")]
         public string Id { get; set; }
     }
 
@@ -447,19 +504,19 @@ namespace GI_Subtitles.Services.Network
     public sealed class ReferralStats
     {
         /// <summary>Friends who followed the link and signed up.</summary>
-        [JsonProperty("invited")]
+        [JsonPropertyName("invited")]
         public int Invited { get; set; }
 
         /// <summary>Signed up but haven't cleared the activity bar yet.</summary>
-        [JsonProperty("pending")]
+        [JsonPropertyName("pending")]
         public int Pending { get; set; }
 
         /// <summary>Counted toward the 25 / 50 reward tiers.</summary>
-        [JsonProperty("active")]
+        [JsonPropertyName("active")]
         public int Active { get; set; }
 
         /// <summary>Flagged as self-referral / fraud — excluded from totals.</summary>
-        [JsonProperty("invalid")]
+        [JsonPropertyName("invalid")]
         public int Invalid { get; set; }
 
         /// <summary>
@@ -467,7 +524,7 @@ namespace GI_Subtitles.Services.Network
         /// the reward tiers; user can claim them as an extension instead of
         /// crystals, or stack them.
         /// </summary>
-        [JsonProperty("bonus_days_banked")]
+        [JsonPropertyName("bonus_days_banked")]
         public int BonusDaysBanked { get; set; }
     }
 
@@ -477,17 +534,17 @@ namespace GI_Subtitles.Services.Network
     /// </summary>
     public sealed class ReferralReward
     {
-        [JsonProperty("id")]
+        [JsonPropertyName("id")]
         public string Id { get; set; }
 
         /// <summary>"tier_25" or "tier_50". Other values reserved for future expansion.</summary>
-        [JsonProperty("reward_type")]
+        [JsonPropertyName("reward_type")]
         public string RewardType { get; set; }
 
-        [JsonProperty("amount_crystals_nominal")]
+        [JsonPropertyName("amount_crystals_nominal")]
         public int AmountCrystalsNominal { get; set; }
 
-        [JsonProperty("amount_value_cents")]
+        [JsonPropertyName("amount_value_cents")]
         public int AmountValueCents { get; set; }
 
         /// <summary>
@@ -495,26 +552,26 @@ namespace GI_Subtitles.Services.Network
         /// <c>delivered</c>, <c>rejected</c>. Callers render action buttons
         /// based on this exact value — treat unknown strings as read-only.
         /// </summary>
-        [JsonProperty("status")]
+        [JsonPropertyName("status")]
         public string Status { get; set; }
 
-        [JsonProperty("created_at")]
+        [JsonPropertyName("created_at")]
         public long CreatedAt { get; set; }
 
-        [JsonProperty("claimed_at")]
+        [JsonPropertyName("claimed_at")]
         public long? ClaimedAt { get; set; }
 
-        [JsonProperty("approved_at")]
+        [JsonPropertyName("approved_at")]
         public long? ApprovedAt { get; set; }
 
-        [JsonProperty("delivered_at")]
+        [JsonPropertyName("delivered_at")]
         public long? DeliveredAt { get; set; }
 
         /// <summary>
         /// Free-form message from the reviewing admin. Empty on the happy path;
         /// populated on rejection (reason) or approval (ETA / tracking info).
         /// </summary>
-        [JsonProperty("admin_notes")]
+        [JsonPropertyName("admin_notes")]
         public string AdminNotes { get; set; }
     }
 
@@ -530,20 +587,20 @@ namespace GI_Subtitles.Services.Network
     /// </summary>
     public sealed class ReferralInvitee
     {
-        [JsonProperty("id")]
+        [JsonPropertyName("id")]
         public string Id { get; set; }
 
-        [JsonProperty("email_hint")]
+        [JsonPropertyName("email_hint")]
         public string EmailHint { get; set; }
 
         /// <summary>"pending" | "active" | "invalid"</summary>
-        [JsonProperty("status")]
+        [JsonPropertyName("status")]
         public string Status { get; set; }
 
-        [JsonProperty("created_at")]
+        [JsonPropertyName("created_at")]
         public long CreatedAt { get; set; }
 
-        [JsonProperty("became_active_at")]
+        [JsonPropertyName("became_active_at")]
         public long? BecameActiveAt { get; set; }
 
         /// <summary>
@@ -551,13 +608,13 @@ namespace GI_Subtitles.Services.Network
         /// to active regardless of subsequent play. Equal to
         /// <see cref="CreatedAt"/> + 30 days.
         /// </summary>
-        [JsonProperty("activity_window_expires_at")]
+        [JsonPropertyName("activity_window_expires_at")]
         public long ActivityWindowExpiresAt { get; set; }
 
-        [JsonProperty("runtime_minutes")]
+        [JsonPropertyName("runtime_minutes")]
         public int RuntimeMinutes { get; set; }
 
-        [JsonProperty("active_day_count")]
+        [JsonPropertyName("active_day_count")]
         public int ActiveDayCount { get; set; }
 
         /// <summary>
@@ -566,7 +623,7 @@ namespace GI_Subtitles.Services.Network
         /// deliberately collapses the specific reason so the referrer can't
         /// argue with it; admin panel has the detail.
         /// </summary>
-        [JsonProperty("invalidation_hint")]
+        [JsonPropertyName("invalidation_hint")]
         public string InvalidationHint { get; set; }
     }
 
@@ -578,19 +635,19 @@ namespace GI_Subtitles.Services.Network
     /// </summary>
     public sealed class ReferralMeResponse
     {
-        [JsonProperty("code")]
+        [JsonPropertyName("code")]
         public string Code { get; set; }
 
-        [JsonProperty("share_url")]
+        [JsonPropertyName("share_url")]
         public string ShareUrl { get; set; }
 
-        [JsonProperty("stats")]
+        [JsonPropertyName("stats")]
         public ReferralStats Stats { get; set; }
 
-        [JsonProperty("rewards")]
+        [JsonPropertyName("rewards")]
         public List<ReferralReward> Rewards { get; set; }
 
-        [JsonProperty("invitees")]
+        [JsonPropertyName("invitees")]
         public List<ReferralInvitee> Invitees { get; set; }
 
         /// <summary>
@@ -599,7 +656,7 @@ namespace GI_Subtitles.Services.Network
         /// the v1 rollout. Consumers should prefer <see cref="ReferralStats.BonusDaysBanked"/>
         /// and fall back to this when stats is null.
         /// </summary>
-        [JsonProperty("bonus_days_banked")]
+        [JsonPropertyName("bonus_days_banked")]
         public int BonusDaysBanked { get; set; }
     }
 
@@ -610,7 +667,7 @@ namespace GI_Subtitles.Services.Network
     /// </summary>
     public sealed class AttributeReferralRequest
     {
-        [JsonProperty("code")]
+        [JsonPropertyName("code")]
         public string Code { get; }
 
         public AttributeReferralRequest(string code)
@@ -629,14 +686,14 @@ namespace GI_Subtitles.Services.Network
     public sealed class ClaimReferralRewardRequest
     {
         /// <summary>"paypal" | "amazon_gc" | "hoyolab_uid"</summary>
-        [JsonProperty("delivery_method")]
+        [JsonPropertyName("delivery_method")]
         public string DeliveryMethod { get; }
 
         /// <summary>
         /// PayPal / Amazon email, or HoYoLAB UID with region tag (e.g.
         /// "803912345 / NA"). Never logged client-side.
         /// </summary>
-        [JsonProperty("contact_info")]
+        [JsonPropertyName("contact_info")]
         public string ContactInfo { get; }
 
         public ClaimReferralRewardRequest(string deliveryMethod, string contactInfo)
@@ -653,10 +710,10 @@ namespace GI_Subtitles.Services.Network
     /// </summary>
     public sealed class ClaimReferralRewardResponse
     {
-        [JsonProperty("ok")]
+        [JsonPropertyName("ok")]
         public bool Ok { get; set; }
 
-        [JsonProperty("reward")]
+        [JsonPropertyName("reward")]
         public ReferralReward Reward { get; set; }
     }
 
@@ -682,24 +739,24 @@ namespace GI_Subtitles.Services.Network
     /// </summary>
     public sealed class FileProtectionKeyResponse
     {
-        [JsonProperty("device_secret_b64")]
+        [JsonPropertyName("device_secret_b64")]
         public string DeviceSecretB64 { get; set; }
 
-        [JsonProperty("issued_at")]
+        [JsonPropertyName("issued_at")]
         public string IssuedAt { get; set; }
 
-        [JsonProperty("expires_at")]
+        [JsonPropertyName("expires_at")]
         public string ExpiresAt { get; set; }
 
         /// <summary>Scheme version. Clients reject anything they don't recognise.</summary>
-        [JsonProperty("version")]
+        [JsonPropertyName("version")]
         public int Version { get; set; }
 
         /// <summary>Human-informational string. Clients key off <see cref="Version"/> only.</summary>
-        [JsonProperty("algorithm")]
+        [JsonPropertyName("algorithm")]
         public string Algorithm { get; set; }
 
-        [JsonProperty("pbkdf2_iterations")]
+        [JsonPropertyName("pbkdf2_iterations")]
         public int PbkdfIterations { get; set; }
     }
 }

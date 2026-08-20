@@ -6,7 +6,7 @@ using System.Threading;
 using GI_Subtitles.Common;
 using GI_Subtitles.Services.Security;
 using GI_Subtitles.Services.Translation.Strategies;
-using Newtonsoft.Json;
+using System.Text.Json;
 
 namespace GI_Subtitles.Services.Translation
 {
@@ -694,11 +694,10 @@ namespace GI_Subtitles.Services.Translation
         /// tolerate". Any parse exception bubbles up to
         /// <see cref="ValidateBundleMeta"/>'s fail-closed catch.
         ///
-        /// Uses <see cref="System.Text.Json.Utf8JsonReader"/> rather than a
-        /// Newtonsoft JObject DOM — the sidecar is small (sub-KB), but
-        /// avoiding a JObject allocation here eliminates a measurable
-        /// Newtonsoft warm-up cost on cold boots where BundleMeta.json is
-        /// the only JObject site hit before the big TextMapEN parse.
+        /// Uses <see cref="System.Text.Json.Utf8JsonReader"/> directly rather
+        /// than a document DOM — the sidecar is sub-KB, and avoiding the DOM
+        /// allocation keeps cold-boot cost off the path that runs before the
+        /// big TextMapEN parse.
         /// </summary>
         private static string ReadBundleMetaGame(string metaPath, FileProtectionHelper protectionHelper)
         {
@@ -882,18 +881,35 @@ namespace GI_Subtitles.Services.Translation
                 int chainMinPrefix = _immediateNextIds.Length == 1
                     ? ChainPrefixThresholdSingle
                     : ChainPrefixThresholdMulti;
+                //
+                // Length alone is not disambiguation when the graph branches: two
+                // successors of the same node routinely share a long opening.
+                // Requiring EXACTLY ONE candidate — the rule Tier 2 already applies —
+                // makes the answer follow the evidence rather than _chainCache
+                // insertion order, which is set by graph edge order and by which
+                // slots OnTextMatched happened to free.
                 if (normalizedInput.Length >= chainMinPrefix)
                 {
+                    HotCacheEntry? chainPrefixMatch = null;
+                    int chainMatchCount = 0;
+
                     foreach (var kvp in _chainCache)
                     {
                         if (kvp.Key.Length > normalizedInput.Length &&
                             kvp.Key.StartsWith(normalizedInput, StringComparison.Ordinal))
                         {
-                            matchedKey = kvp.Value.OriginalEnText;
-                            isPartialMatch = true;
-                            HotCacheHits++;
-                            return kvp.Value.Translation;
+                            chainMatchCount++;
+                            if (chainMatchCount == 1) chainPrefixMatch = kvp.Value;
+                            else break;
                         }
+                    }
+
+                    if (chainMatchCount == 1 && chainPrefixMatch.HasValue)
+                    {
+                        matchedKey = chainPrefixMatch.Value.OriginalEnText;
+                        isPartialMatch = true;
+                        HotCacheHits++;
+                        return chainPrefixMatch.Value.Translation;
                     }
                 }
 
@@ -1486,36 +1502,6 @@ namespace GI_Subtitles.Services.Translation
 
         // --- Private file loaders ---
 
-        /// <summary>
-        /// Read a signed 64-bit identifier (dialog id, talk id, quest id).
-        /// These stay within Int64 range — only TextMap hashes go wider.
-        /// </summary>
-        private static long ReadLong(JsonTextReader jr)
-        {
-            if (jr.Value is long l) return l;
-            if (jr.Value is int i) return i;
-            if (jr.Value is string s && long.TryParse(s, out var parsed))
-                return parsed;
-            return Convert.ToInt64(jr.Value);
-        }
-
-        /// <summary>
-        /// Read an unsigned 64-bit TextMap hash. HSR uses xxhash64 and
-        /// ~half of produced values exceed Int64.MaxValue — our Node
-        /// builder emits them as JSON strings (quoted) to preserve the
-        /// full 64-bit range through JSON.parse in the build tool and
-        /// Newtonsoft here.
-        /// </summary>
-        private static ulong ReadUInt64(JsonTextReader jr)
-        {
-            if (jr.Value is ulong ul) return ul;
-            if (jr.Value is long l) return unchecked((ulong)l);
-            if (jr.Value is int i) return unchecked((ulong)(long)i);
-            if (jr.Value is string s && ulong.TryParse(s, out var parsed))
-                return parsed;
-            return Convert.ToUInt64(jr.Value);
-        }
-
         private void LoadDialogGraph(string path,
             Dictionary<string, string> fullTextMap,
             FileProtectionHelper protectionHelper = null)
@@ -1524,8 +1510,8 @@ namespace GI_Subtitles.Services.Translation
             // String-table for RoleType and RoleId dedupe. The dialog graph
             // has ~200k nodes spanning only ~5-10 distinct RoleType values
             // ("NPC"/"PLAYER"/"BLACK_SCREEN"/…) and ~1-5k distinct RoleId
-            // values (one per NPC). Newtonsoft emits a fresh string for each
-            // scalar it reads, so without deduping we'd allocate ~200k
+            // values (one per NPC). The reader materialises a fresh string per
+            // scalar, so without deduping we'd allocate ~200k
             // RoleType strings and ~200k RoleId strings — ~5-8 MB of
             // redundant heap that a tiny interning map eliminates. Keyed by
             // StringComparer.Ordinal for predictable behaviour with game
@@ -1536,15 +1522,14 @@ namespace GI_Subtitles.Services.Translation
             using (var stream = protectionHelper != null
                 ? protectionHelper.OpenForReading(path)
                 : (Stream)File.OpenRead(path))
-            using (var reader = new StreamReader(stream))
-            using (var jsonReader = new JsonTextReader(reader))
+            using (var jsonReader = new Utf8StreamJsonReader(stream, leaveOpen: true))
             {
                 jsonReader.Read(); // StartObject
                 while (jsonReader.Read())
                 {
-                    if (jsonReader.TokenType == JsonToken.PropertyName)
+                    if (jsonReader.TokenType == JsonTokenType.PropertyName)
                     {
-                        string idStr = (string)jsonReader.Value;
+                        string idStr = jsonReader.GetString();
                         if (!long.TryParse(idStr, out long dialogId))
                         {
                             jsonReader.Skip();
@@ -1555,33 +1540,33 @@ namespace GI_Subtitles.Services.Translation
                         var node = new DialogNode();
                         var nextList = new List<long>();
 
-                        while (jsonReader.Read() && jsonReader.TokenType != JsonToken.EndObject)
+                        while (jsonReader.Read() && jsonReader.TokenType != JsonTokenType.EndObject)
                         {
-                            if (jsonReader.TokenType != JsonToken.PropertyName) continue;
-                            string prop = (string)jsonReader.Value;
+                            if (jsonReader.TokenType != JsonTokenType.PropertyName) continue;
+                            string prop = jsonReader.GetString();
                             jsonReader.Read();
 
                             switch (prop)
                             {
                                 case "h":
-                                    node.ContentHash = ReadUInt64(jsonReader);
+                                    node.ContentHash = jsonReader.GetUInt64();
                                     break;
                                 case "nh":
-                                    node.NameHash = ReadUInt64(jsonReader);
+                                    node.NameHash = jsonReader.GetUInt64();
                                     break;
                                 case "n":
-                                    if (jsonReader.TokenType == JsonToken.StartArray)
+                                    if (jsonReader.TokenType == JsonTokenType.StartArray)
                                     {
-                                        while (jsonReader.Read() && jsonReader.TokenType != JsonToken.EndArray)
+                                        while (jsonReader.Read() && jsonReader.TokenType != JsonTokenType.EndArray)
                                         {
-                                            if (jsonReader.Value != null)
-                                                nextList.Add(ReadLong(jsonReader));
+                                            if (jsonReader.HasValue)
+                                                nextList.Add(jsonReader.GetInt64());
                                         }
                                     }
                                     break;
                                 case "rt":
                                     {
-                                        string rt = (string)jsonReader.Value;
+                                        string rt = jsonReader.GetString();
                                         if (rt != null)
                                         {
                                             if (!roleTypeIntern.TryGetValue(rt, out var canonical))
@@ -1595,7 +1580,7 @@ namespace GI_Subtitles.Services.Translation
                                     break;
                                 case "ri":
                                     {
-                                        string ri = jsonReader.Value?.ToString();
+                                        string ri = jsonReader.GetString();
                                         if (ri != null)
                                         {
                                             if (!roleIdIntern.TryGetValue(ri, out var canonical))
@@ -1643,17 +1628,16 @@ namespace GI_Subtitles.Services.Translation
             using (var stream = protectionHelper != null
                 ? protectionHelper.OpenForReading(path)
                 : (Stream)File.OpenRead(path))
-            using (var reader = new StreamReader(stream))
-            using (var jsonReader = new JsonTextReader(reader))
+            using (var jsonReader = new Utf8StreamJsonReader(stream, leaveOpen: true))
             {
                 jsonReader.Read(); // StartObject
                 while (jsonReader.Read())
                 {
-                    if (jsonReader.TokenType == JsonToken.PropertyName)
+                    if (jsonReader.TokenType == JsonTokenType.PropertyName)
                     {
-                        string npcId = (string)jsonReader.Value;
+                        string npcId = jsonReader.GetString();
                         jsonReader.Read();
-                        ulong nameHash = ReadUInt64(jsonReader);
+                        ulong nameHash = jsonReader.GetUInt64();
                         // Name resolution against the full TextMap local —
                         // happens once at load time; only the resolved name
                         // string survives in _npcNames afterwards.
@@ -1672,15 +1656,14 @@ namespace GI_Subtitles.Services.Translation
             using (var stream = protectionHelper != null
                 ? protectionHelper.OpenForReading(path)
                 : (Stream)File.OpenRead(path))
-            using (var reader = new StreamReader(stream))
-            using (var jsonReader = new JsonTextReader(reader))
+            using (var jsonReader = new Utf8StreamJsonReader(stream, leaveOpen: true))
             {
                 jsonReader.Read(); // StartObject
                 while (jsonReader.Read())
                 {
-                    if (jsonReader.TokenType == JsonToken.PropertyName)
+                    if (jsonReader.TokenType == JsonTokenType.PropertyName)
                     {
-                        string idStr = (string)jsonReader.Value;
+                        string idStr = jsonReader.GetString();
                         if (!long.TryParse(idStr, out long talkId))
                         {
                             jsonReader.Skip();
@@ -1691,27 +1674,27 @@ namespace GI_Subtitles.Services.Translation
                         var node = new TalkNode();
                         var nextList = new List<long>();
 
-                        while (jsonReader.Read() && jsonReader.TokenType != JsonToken.EndObject)
+                        while (jsonReader.Read() && jsonReader.TokenType != JsonTokenType.EndObject)
                         {
-                            if (jsonReader.TokenType != JsonToken.PropertyName) continue;
-                            string prop = (string)jsonReader.Value;
+                            if (jsonReader.TokenType != JsonTokenType.PropertyName) continue;
+                            string prop = jsonReader.GetString();
                             jsonReader.Read();
 
                             switch (prop)
                             {
                                 case "init":
-                                    node.InitDialog = ReadLong(jsonReader);
+                                    node.InitDialog = jsonReader.GetInt64();
                                     break;
                                 case "quest":
-                                    node.QuestId = ReadLong(jsonReader);
+                                    node.QuestId = jsonReader.GetInt64();
                                     break;
                                 case "next":
-                                    if (jsonReader.TokenType == JsonToken.StartArray)
+                                    if (jsonReader.TokenType == JsonTokenType.StartArray)
                                     {
-                                        while (jsonReader.Read() && jsonReader.TokenType != JsonToken.EndArray)
+                                        while (jsonReader.Read() && jsonReader.TokenType != JsonTokenType.EndArray)
                                         {
-                                            if (jsonReader.Value != null)
-                                                nextList.Add(ReadLong(jsonReader));
+                                            if (jsonReader.HasValue)
+                                                nextList.Add(jsonReader.GetInt64());
                                         }
                                     }
                                     break;
@@ -1736,15 +1719,14 @@ namespace GI_Subtitles.Services.Translation
             using (var stream = protectionHelper != null
                 ? protectionHelper.OpenForReading(path)
                 : (Stream)File.OpenRead(path))
-            using (var reader = new StreamReader(stream))
-            using (var jsonReader = new JsonTextReader(reader))
+            using (var jsonReader = new Utf8StreamJsonReader(stream, leaveOpen: true))
             {
                 jsonReader.Read(); // StartObject
                 while (jsonReader.Read())
                 {
-                    if (jsonReader.TokenType == JsonToken.PropertyName)
+                    if (jsonReader.TokenType == JsonTokenType.PropertyName)
                     {
-                        string idStr = (string)jsonReader.Value;
+                        string idStr = jsonReader.GetString();
                         if (!long.TryParse(idStr, out long questId))
                         {
                             jsonReader.Skip();
@@ -1755,19 +1737,19 @@ namespace GI_Subtitles.Services.Translation
                         ulong titleHash = 0;
                         string questType = "";
 
-                        while (jsonReader.Read() && jsonReader.TokenType != JsonToken.EndObject)
+                        while (jsonReader.Read() && jsonReader.TokenType != JsonTokenType.EndObject)
                         {
-                            if (jsonReader.TokenType != JsonToken.PropertyName) continue;
-                            string prop = (string)jsonReader.Value;
+                            if (jsonReader.TokenType != JsonTokenType.PropertyName) continue;
+                            string prop = jsonReader.GetString();
                             jsonReader.Read();
 
                             switch (prop)
                             {
                                 case "title":
-                                    titleHash = ReadUInt64(jsonReader);
+                                    titleHash = jsonReader.GetUInt64();
                                     break;
                                 case "type":
-                                    questType = (string)jsonReader.Value ?? "";
+                                    questType = jsonReader.GetString() ?? "";
                                     break;
                                 default:
                                     jsonReader.Skip();
@@ -1894,6 +1876,12 @@ namespace GI_Subtitles.Services.Translation
             if (depth <= 0 || !_dialogGraph.TryGetValue(dialogId, out var node))
                 return;
 
+            // Also guarded per-successor below. Hoisted here because the loop is
+            // skipped entirely on terminal nodes, which is the path that reaches
+            // the talk transition — leaving that branch unguarded.
+            if (_chainCache.Count >= MAX_CHAIN_CACHE)
+                return;
+
             long[] nextIds = GetNextNodeIds(dialogId) ?? Array.Empty<long>();
             foreach (long nextId in nextIds)
             {
@@ -1939,7 +1927,12 @@ namespace GI_Subtitles.Services.Translation
                     {
                         if (_talkIndex.TryGetValue(nextTalkId, out var nextTalk))
                         {
-                            PopulateHotCache(nextTalk.InitDialog, translationDict, 1);
+                            // depth - 1, never a literal. Talk graphs contain cycles
+                            // (talk 1010046 <-> 1010043 in the Mondstadt prologue, and
+                            // 194 talks total sit in one), so a reset depth recurses
+                            // forever — an uncatchable StackOverflowException that kills
+                            // the process without writing a crash log.
+                            PopulateHotCache(nextTalk.InitDialog, translationDict, depth - 1);
                         }
                     }
                 }

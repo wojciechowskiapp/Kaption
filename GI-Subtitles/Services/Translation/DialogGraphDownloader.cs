@@ -4,10 +4,11 @@ using System.IO;
 using System.Net;
 using System.Net.Http;
 using System.Text;
+using System.Text.Json;
+using System.Text.Json.Nodes;
+using System.Threading.Tasks;
 using GI_Subtitles.Common;
 using GI_Subtitles.Services.Security;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
 
 namespace GI_Subtitles.Services.Translation
 {
@@ -184,9 +185,8 @@ namespace GI_Subtitles.Services.Translation
             {
                 progress?.Report((66, "Loading TextMapEN for name resolution..."));
                 using (var stream = File.OpenRead(textMapEnPath))
-                using (var reader = new StreamReader(stream))
                 {
-                    textMapEN = JsonConvert.DeserializeObject<Dictionary<string, string>>(reader.ReadToEnd());
+                    textMapEN = JsonSerializer.Deserialize<Dictionary<string, string>>(stream, JsonDefaults.Options);
                 }
             }
 
@@ -196,24 +196,19 @@ namespace GI_Subtitles.Services.Translation
             var hashToDialogs = new Dictionary<string, List<long>>();
 
             using (var stream = File.OpenRead(dialogPath))
-            using (var sr = new StreamReader(stream))
-            using (var jr = new JsonTextReader(sr))
             {
                 string idField = null;
-                jr.Read(); // StartArray
 
-                while (jr.Read())
+                foreach (var element in EnumerateArray(stream))
                 {
-                    if (jr.TokenType == JsonToken.StartObject)
+                    if (element is JsonObject entry)
                     {
-                        var entry = JObject.Load(jr);
-
                         // Detect dialog ID field on first entry
                         if (idField == null)
                         {
                             foreach (var candidate in DialogIdCandidates)
                             {
-                                if (entry[candidate] != null)
+                                if (entry.ContainsKey(candidate))
                                 {
                                     idField = candidate;
                                     break;
@@ -222,15 +217,17 @@ namespace GI_Subtitles.Services.Translation
                             // Fallback: find first int field > 0 that's not a known field
                             if (idField == null)
                             {
-                                foreach (var prop in entry.Properties())
+                                foreach (var prop in entry)
                                 {
-                                    if (prop.Value.Type == JTokenType.Integer &&
-                                        prop.Value.Value<long>() > 0 &&
-                                        prop.Name != "talkContentTextMapHash" &&
-                                        prop.Name != "talkTitleTextMapHash" &&
-                                        prop.Name != "talkRoleNameTextMapHash")
+                                    if (prop.Value is JsonValue candidateValue &&
+                                        candidateValue.GetValueKind() == JsonValueKind.Number &&
+                                        candidateValue.TryGetValue(out long candidateId) &&
+                                        candidateId > 0 &&
+                                        prop.Key != "talkContentTextMapHash" &&
+                                        prop.Key != "talkTitleTextMapHash" &&
+                                        prop.Key != "talkRoleNameTextMapHash")
                                     {
-                                        idField = prop.Name;
+                                        idField = prop.Key;
                                         break;
                                     }
                                 }
@@ -239,13 +236,13 @@ namespace GI_Subtitles.Services.Translation
                             Logger.Log.Info($"Dialog ID field detected: {idField}");
                         }
 
-                        long dialogId = entry.Value<long>(idField);
+                        long dialogId = GetLong(entry, idField);
                         if (dialogId == 0) continue;
 
-                        long contentHash = entry.Value<long>("talkContentTextMapHash");
-                        long nameHash = entry.Value<long>("talkRoleNameTextMapHash");
-                        var nextDialogs = entry["nextDialogs"] as JArray;
-                        var talkRole = entry["talkRole"] as JObject;
+                        long contentHash = GetLong(entry, "talkContentTextMapHash");
+                        long nameHash = GetLong(entry, "talkRoleNameTextMapHash");
+                        var nextDialogs = entry["nextDialogs"] as JsonArray;
+                        var talkRole = entry["talkRole"] as JsonObject;
 
                         var node = new Dictionary<string, object>();
                         if (contentHash != 0) node["h"] = contentHash;
@@ -255,14 +252,14 @@ namespace GI_Subtitles.Services.Translation
                         {
                             var nextList = new List<long>();
                             foreach (var n in nextDialogs)
-                                nextList.Add(n.Value<long>());
+                                nextList.Add(ToLong(n));
                             node["n"] = nextList;
                         }
 
                         if (talkRole != null)
                         {
-                            var roleType = talkRole.Value<string>("type");
-                            var roleId = talkRole.Value<string>("id");
+                            var roleType = GetString(talkRole, "type");
+                            var roleId = GetString(talkRole, "id");
                             if (!string.IsNullOrEmpty(roleType)) node["rt"] = roleType;
                             if (!string.IsNullOrEmpty(roleId)) node["ri"] = roleId;
                         }
@@ -292,17 +289,13 @@ namespace GI_Subtitles.Services.Translation
             if (File.Exists(npcPath))
             {
                 using (var stream = File.OpenRead(npcPath))
-                using (var sr = new StreamReader(stream))
-                using (var jr = new JsonTextReader(sr))
                 {
-                    jr.Read(); // StartArray
-                    while (jr.Read())
+                    foreach (var element in EnumerateArray(stream))
                     {
-                        if (jr.TokenType == JsonToken.StartObject)
+                        if (element is JsonObject entry)
                         {
-                            var entry = JObject.Load(jr);
-                            long id = entry.Value<long>("id");
-                            long nameHash = entry.Value<long>("nameTextMapHash");
+                            long id = GetLong(entry, "id");
+                            long nameHash = GetLong(entry, "nameTextMapHash");
                             if (id > 0 && nameHash > 0)
                                 npcNames[id.ToString()] = nameHash;
                         }
@@ -317,38 +310,34 @@ namespace GI_Subtitles.Services.Translation
             {
                 if (!File.Exists(talkPath)) continue;
                 using (var stream = File.OpenRead(talkPath))
-                using (var sr = new StreamReader(stream))
-                using (var jr = new JsonTextReader(sr))
                 {
-                    jr.Read(); // StartArray
-                    while (jr.Read())
+                    foreach (var element in EnumerateArray(stream))
                     {
-                        if (jr.TokenType == JsonToken.StartObject)
+                        if (element is JsonObject entry)
                         {
-                            var entry = JObject.Load(jr);
-                            long talkId = entry.Value<long>("id");
+                            long talkId = GetLong(entry, "id");
                             if (talkId == 0) continue;
 
                             var node = new Dictionary<string, object>();
-                            long initDialog = entry.Value<long>("initDialog");
+                            long initDialog = GetLong(entry, "initDialog");
                             if (initDialog != 0) node["init"] = initDialog;
 
-                            long questId = entry.Value<long>("questId");
+                            long questId = GetLong(entry, "questId");
                             if (questId != 0) node["quest"] = questId;
 
-                            var npcIdArr = entry["npcId"] as JArray;
+                            var npcIdArr = entry["npcId"] as JsonArray;
                             if (npcIdArr != null && npcIdArr.Count > 0)
                             {
                                 var npcList = new List<long>();
-                                foreach (var n in npcIdArr) npcList.Add(n.Value<long>());
+                                foreach (var n in npcIdArr) npcList.Add(ToLong(n));
                                 node["npc"] = npcList;
                             }
 
-                            var nextArr = entry["nextTalks"] as JArray;
+                            var nextArr = entry["nextTalks"] as JsonArray;
                             if (nextArr != null && nextArr.Count > 0)
                             {
                                 var nextList = new List<long>();
-                                foreach (var n in nextArr) nextList.Add(n.Value<long>());
+                                foreach (var n in nextArr) nextList.Add(ToLong(n));
                                 node["next"] = nextList;
                             }
 
@@ -364,22 +353,18 @@ namespace GI_Subtitles.Services.Translation
             if (File.Exists(questPath))
             {
                 using (var stream = File.OpenRead(questPath))
-                using (var sr = new StreamReader(stream))
-                using (var jr = new JsonTextReader(sr))
                 {
-                    jr.Read(); // StartArray
-                    while (jr.Read())
+                    foreach (var element in EnumerateArray(stream))
                     {
-                        if (jr.TokenType == JsonToken.StartObject)
+                        if (element is JsonObject entry)
                         {
-                            var entry = JObject.Load(jr);
-                            long id = entry.Value<long>("id");
+                            long id = GetLong(entry, "id");
                             if (id == 0) continue;
 
                             var node = new Dictionary<string, object>();
-                            long titleHash = entry.Value<long>("titleTextMapHash");
+                            long titleHash = GetLong(entry, "titleTextMapHash");
                             if (titleHash != 0) node["title"] = titleHash;
-                            string type = entry.Value<string>("type");
+                            string type = GetString(entry, "type");
                             if (!string.IsNullOrEmpty(type)) node["type"] = type;
 
                             questInfo[id.ToString()] = node;
@@ -415,14 +400,43 @@ namespace GI_Subtitles.Services.Translation
         private static void SaveCompactJson(string path, object data)
         {
             using (var stream = File.Create(path))
-            using (var writer = new StreamWriter(stream, Encoding.UTF8))
             {
-                var serializer = new JsonSerializer();
-                serializer.Formatting = Formatting.None;
-                serializer.Serialize(writer, data);
+                byte[] utf8Preamble = Encoding.UTF8.GetPreamble();
+                stream.Write(utf8Preamble, 0, utf8Preamble.Length);
+                JsonSerializer.Serialize(stream, data, JsonDefaults.Options);
             }
             var sizeMb = new FileInfo(path).Length / (1024.0 * 1024.0);
             Logger.Log.Info($"Saved {Path.GetFileName(path)}: {sizeMb:F1} MB");
+        }
+
+        // Yields one array element at a time so a 93 MB ExcelBin file never
+        // lands on the heap in one piece.
+        private static IEnumerable<JsonNode> EnumerateArray(Stream stream) =>
+            JsonSerializer.DeserializeAsyncEnumerable<JsonNode>(stream, JsonDefaults.Options)
+                          .ToBlockingEnumerable();
+
+        private static long ToLong(JsonNode node)
+        {
+            if (node is JsonValue value)
+            {
+                if (value.TryGetValue(out long asLong)) return asLong;
+                if (value.TryGetValue(out string asString) && long.TryParse(asString, out long parsed)) return parsed;
+                if (value.TryGetValue(out double asDouble)) return (long)asDouble;
+            }
+            return 0;
+        }
+
+        private static long GetLong(JsonObject obj, string key) =>
+            obj != null && obj.TryGetPropertyValue(key, out JsonNode node) && node != null
+                ? ToLong(node)
+                : 0;
+
+        private static string GetString(JsonObject obj, string key)
+        {
+            if (obj == null || !obj.TryGetPropertyValue(key, out JsonNode node) || node == null)
+                return null;
+            if (node is JsonValue value && value.TryGetValue(out string asString)) return asString;
+            return node.ToJsonString(JsonDefaults.Options);
         }
     }
 }

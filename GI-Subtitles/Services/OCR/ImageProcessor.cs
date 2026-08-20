@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Imaging;
@@ -8,8 +8,10 @@ using System.Text;
 using OpenCvSharp;
 using PaddleOCRSharp;
 using GI_Subtitles.Core.Cache;
+using GI_Subtitles.Core.Pooling;
 using GI_Subtitles.Models;
 using GI_Subtitles.Services.OCR.Classification;
+using Logger = GI_Subtitles.Common.Logger;
 
 namespace GI_Subtitles.Services.OCR
 {
@@ -18,6 +20,40 @@ namespace GI_Subtitles.Services.OCR
     /// </summary>
     public class ImageProcessor
     {
+        /// <summary>
+        /// Binarise a BGR frame so pixel-difference comparisons key on lit text
+        /// only. The 220 threshold is the app's capture contract: it is what
+        /// <see cref="BinaryFrameMetrics"/> ratios and every stability decision
+        /// are computed against, so the benchmark harness must use this exact
+        /// function rather than its own threshold.
+        /// </summary>
+        public static Mat PreprocessToBinary(Mat src)
+        {
+            if (src == null || src.Empty())
+            {
+                return null;
+            }
+
+            Mat gray = MatPool.Default.Rent(src.Rows, src.Cols, MatType.CV_8UC1);
+            Mat binary = new Mat();
+            try
+            {
+                Cv2.CvtColor(src, gray, ColorConversionCodes.BGR2GRAY);
+                Cv2.Threshold(gray, binary, 220, 255, ThresholdTypes.Binary);
+                return binary;
+            }
+            catch (Exception ex)
+            {
+                Logger.Log.Error($"PreprocessToBinary failed: {ex}");
+                binary?.Dispose();
+                return null;
+            }
+            finally
+            {
+                MatPool.Default.Return(gray);
+            }
+        }
+
         public static string ComputeRobustHash(OpenCvSharp.Mat srcMat)
         {
             if (srcMat == null) return string.Empty;

@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <!-- Target framework history:
@@ -191,7 +191,10 @@
 
   <ItemGroup>
     <!-- log4net 3.x: drops APIs deprecated since 2015 (we use none of them —
-         verified). Fixes GHSA-4f7c-pmjv-c25w (NU1902) that 2.0.17 carries. -->
+         verified). GHSA-4f7c-pmjv-c25w (NU1902) is fixed in 3.3.0 — NOT in 3.x
+         generally: OSV shows 3.0.0 and 3.2.0 still carry it. 3.3.2 is clear.
+         Corrected 2026-08-20; the previous wording implied any 3.x was safe and
+         would have made a downgrade look harmless. -->
     <PackageReference Include="log4net" Version="3.3.2" />
     <!-- FST-indexed matcher blob. Lucene.Net 4.8.0-beta00017 multi-targets
          netstandard2.0 + net6.0; runs cleanly on net8. Only the Fst
@@ -211,7 +214,6 @@
          Microsoft_AI_DirectML_SkipLibraryCopy=false property above
          re-enables .targets-based copy so we don't need a manual target. -->
     <PackageReference Include="Microsoft.AI.DirectML" Version="1.15.4" />
-    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
     <!-- Sentry 6.x: the "4.13.0 was last line with net462 support" comment
          was stale advice. Sentry 6.8.0 still ships a net462 TFM alongside
          net8/net9/netstandard2.0/2.1. The 5.0 class renames (User →

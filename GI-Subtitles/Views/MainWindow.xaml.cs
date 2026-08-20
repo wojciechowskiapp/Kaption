@@ -22,7 +22,6 @@ using System.Reflection;
 using System.Threading.Tasks;
 using System.Net;
 using System.Diagnostics;
-using Newtonsoft.Json;
 using System.Net.Http;
 using GI_Subtitles.Core.Cache;
 using GI_Subtitles.Core.Config;
@@ -128,12 +127,15 @@ namespace GI_Subtitles.Views
         // typewriter frames, producing wrong partial matches and visible text flicker.
         private readonly Queue<Mat> _stabilityBuffer = new Queue<Mat>();
         private static int StabilityWindowSize => GI_Subtitles.Services.Detection.GameOcrTuning.StabilityWindow();
-        // Consecutive stable frame counter for eager preview OCR
-        private int _consecutiveStableFrames = 0;
+        // The "should we OCR this frame?" state machine. Lives in
+        // Services/OCR/OcrTriggerGate.cs so that it has one implementation:
+        // benchmark/Kaption.Benchmark replays recorded frames through this same
+        // class, so a change here shows up in the benchmark numbers automatically
+        // instead of needing a copy kept in sync.
+        private readonly GI_Subtitles.Services.OCR.OcrTriggerGate _ocrGate =
+            new GI_Subtitles.Services.OCR.OcrTriggerGate(ChangeThreshold);
         // Track whether the currently displayed content came from a fully stable OCR
         private volatile bool _lastOcrWasFullyStable = false;
-        // Track when screen first diverged from last OCR frame (for forced re-check)
-        private DateTime _changedVsOcrSince = DateTime.MinValue;
         // Per-game via GameOcrTuning; see GameRegionProfile.ForceOcrAfterSeconds.
         // Read each tick so a mid-session game switch picks up the new value.
         private static double ForceOcrAfterChangeSeconds
@@ -156,17 +158,8 @@ namespace GI_Subtitles.Views
         // re-appears after a brief empty OCR frame
         string _recentContent = null;
         DateTime _recentContentTime = DateTime.MinValue;
-        private sealed class CachedTranslation
-        {
-            public string Result { get; init; }
-            public string Key { get; init; }
-            public string Header { get; init; }
-            public string Content { get; init; }
-        }
-
-        // One typed entry per OCR source. The old forward+reverse string map
-        // could collide when two source lines shared the same translation.
-        readonly LRUCache<string, CachedTranslation> resDict = new LRUCache<string, CachedTranslation>(100);
+        private readonly Services.Translation.SubtitleResolver _subtitleResolver =
+            new Services.Translation.SubtitleResolver(100);
         public System.Windows.Threading.DispatcherTimer OCRTimer = new System.Windows.Threading.DispatcherTimer();
         public System.Windows.Threading.DispatcherTimer UITimer = new System.Windows.Threading.DispatcherTimer();
         readonly bool debug = Config.Get<bool>("Debug", false);
@@ -590,8 +583,7 @@ namespace GI_Subtitles.Views
                     ResetOcrPipelineState(clearImageCaches: true);
                     UpdateWindowPosition();
                     ResetActiveOcrWindow();
-                    OCRTimer.Start();
-                    UITimer.Start();
+                    StartOcrTimers();
                     SystemSounds.Exclamation.Play();
                     SwitchIcon("kaption-running.ico");
                     // Show a "ready" placeholder so the box is visibly
@@ -1079,6 +1071,63 @@ namespace GI_Subtitles.Views
                 runtimeRecoveryLevel: nextLevel);
         }
 
+        // Memo for the foreground process name. See ResolveForegroundProcessName.
+        private IntPtr _fgCachedWindow = IntPtr.Zero;
+        private uint _fgCachedPid;
+        private string _fgCachedProcessName = string.Empty;
+
+        // Reused by GetForegroundTarget; the OCR tick is single-threaded on the
+        // WPF dispatcher, so one buffer is safe and saves a 256-char allocation
+        // on every tick.
+        private readonly StringBuilder _fgTitleBuffer = new StringBuilder(256);
+
+        /// <summary>
+        /// Foreground process name for <paramref name="pid"/>, memoized on
+        /// (<paramref name="hwnd"/>, <paramref name="pid"/>).
+        ///
+        /// <para><b>Why the memo matters more than it looks.</b>
+        /// <see cref="Process.GetProcessById"/> resolves through
+        /// <c>NtQuerySystemInformation(SystemProcessInformation)</c>, which
+        /// snapshots every process and every thread on the machine under kernel
+        /// scheduler locks — hundreds of processes, thousands of threads, a
+        /// query-then-fill retry, and a few hundred KB of returned data. It is
+        /// 0.5-3 ms. <see cref="GetForegroundTarget"/> is called on every timer
+        /// tick, BEFORE the re-entrancy gate, so it ran 10-17 times a second
+        /// regardless of whether OCR was even eligible — to answer a question
+        /// that changes when the user alt-tabs.</para>
+        ///
+        /// <para>Keyed on the window handle as well as the PID because a PID can
+        /// in principle be recycled; requiring both to be unchanged makes a
+        /// stale hit require handle reuse AND pid reuse simultaneously.</para>
+        /// </summary>
+        private string ResolveForegroundProcessName(IntPtr hwnd, uint pid)
+        {
+            if (pid == 0) return string.Empty;
+            if (hwnd == _fgCachedWindow && pid == _fgCachedPid) return _fgCachedProcessName;
+
+            string resolved = string.Empty;
+            try
+            {
+                using var process = Process.GetProcessById((int)pid);
+                resolved = process.ProcessName;
+            }
+            catch (Exception ex)
+            {
+                if (Logger.IsDebugEnabled)
+                {
+                    Logger.Log.Debug($"Foreground process lookup failed for PID {pid}: {ex.Message}");
+                }
+                // Cache the failure too. A PID we cannot open (elevated, or
+                // already exited) would otherwise re-pay the full snapshot cost
+                // on every subsequent tick for as long as it stays foreground.
+            }
+
+            _fgCachedWindow = hwnd;
+            _fgCachedPid = pid;
+            _fgCachedProcessName = resolved;
+            return resolved;
+        }
+
         private GI_Subtitles.Services.Detection.ForegroundTarget GetForegroundTarget()
         {
             try
@@ -1088,24 +1137,10 @@ namespace GI_Subtitles.Views
                     return GI_Subtitles.Services.Detection.ForegroundTarget.Other;
 
                 GetWindowThreadProcessId(fg, out uint fgPid);
-                var sb = new StringBuilder(256);
+                StringBuilder sb = _fgTitleBuffer;
+                sb.Clear();
                 GetWindowText(fg, sb, sb.Capacity);
-                string processName = string.Empty;
-                if (fgPid != 0)
-                {
-                    try
-                    {
-                        using var process = Process.GetProcessById((int)fgPid);
-                        processName = process.ProcessName;
-                    }
-                    catch (Exception ex)
-                    {
-                        if (Logger.IsDebugEnabled)
-                        {
-                            Logger.Log.Debug($"Foreground process lookup failed for PID {fgPid}: {ex.Message}");
-                        }
-                    }
-                }
+                string processName = ResolveForegroundProcessName(fg, fgPid);
 
                 string gameKey = Config.Get<string>("Game", Game ?? "Genshin");
                 var profile = GI_Subtitles.Services.Detection.GameRegionProfile.Get(gameKey);
@@ -1324,15 +1359,17 @@ namespace GI_Subtitles.Views
                         else
                         {
                             int currentForegroundPixels = Cv2.CountNonZero(currentBinary);
-                            // Check stability vs previous frame
-                            bool isStableVsPrev = true;
+                            // Change vs previous frame, as fed to OcrTriggerGate:
+                            //   null              = no previous frame yet (counts as stable)
+                            //   PositiveInfinity  = incomparable (size/channel change) => maximally changed
+                            double? changeVsPrevious = null;
                             if (_lastBinaryFrame != null)
                             {
 
                                 if (currentBinary.Size() != _lastBinaryFrame.Size() ||
             currentBinary.Channels() != _lastBinaryFrame.Channels())
                                 {
-                                    isStableVsPrev = false;
+                                    changeVsPrevious = double.PositiveInfinity;
                                     if (debug)
                                     {
                                         Logger.Log.Debug("Last binary frame size mismatch, reset cache");
@@ -1353,25 +1390,18 @@ namespace GI_Subtitles.Views
                                     {
                                         Logger.Log.Debug($"Subtitle changeRatio(prev)={changePrev:F4}");
                                     }
-                                    isStableVsPrev = changePrev <= ChangeThreshold;
+                                    changeVsPrevious = changePrev;
                                 }
 
                             }
 
-                            // Track consecutive stable frames for eager preview
-                            if (isStableVsPrev)
-                                _consecutiveStableFrames++;
-                            else
-                                _consecutiveStableFrames = 0;
-
-                            // Check change vs last OCR frame
-                            bool changedVsOcr = false;
+                            double? changeVsOcrBaseline = null;
                             if (_lastOcrBinaryFrame != null)
                             {
                                 if (currentBinary.Size() != _lastOcrBinaryFrame.Size() ||
             currentBinary.Channels() != _lastOcrBinaryFrame.Channels())
                                 {
-                                    changedVsOcr = true;
+                                    changeVsOcrBaseline = double.PositiveInfinity;
                                     if (debug)
                                     {
                                         Logger.Log.Debug("Last binary frame size mismatch, run ocr");
@@ -1394,7 +1424,7 @@ namespace GI_Subtitles.Views
                                         {
                                             Logger.Log.Debug($"Subtitle changeRatio(ocr)={changeOcr:F4}");
                                         }
-                                        changedVsOcr = changeOcr > ChangeThreshold;
+                                        changeVsOcrBaseline = changeOcr;
                                     }
                                     finally
                                     {
@@ -1402,26 +1432,18 @@ namespace GI_Subtitles.Views
                                     }
                                 }
                             }
-                            else
-                            {
-                                // No OCR baseline yet, force initial OCR when frame is stable
-                                changedVsOcr = true;
-                            }
 
-                            // Update previous-frame baseline for next cycle
                             if (_lastBinaryFrame != null)
                             {
                                 _lastBinaryFrame.Dispose();
                             }
                             _lastBinaryFrame = currentBinary.Clone();
 
-                            // Windowed stability check: compare current frame against a frame
-                            // from StabilityWindowSize ticks ago (~500ms). During typewriter
-                            // animation, characters accumulate over this window creating a
-                            // detectable difference (>1%), while single-frame diffs are too
-                            // small (~0.3% per character) to catch.
+                            // Windowed stability catches typewriter animation: characters
+                            // accumulate across the window even when single-frame diffs
+                            // (~0.3%/char) stay under the threshold.
                             _stabilityBuffer.Enqueue(currentBinary.Clone());
-                            bool isStableOverWindow = false;
+                            double? changeOverWindowRatio = null;
                             if (_stabilityBuffer.Count > StabilityWindowSize)
                             {
                                 Mat oldFrame = _stabilityBuffer.Dequeue();
@@ -1439,10 +1461,10 @@ namespace GI_Subtitles.Views
                                             currentForegroundPixels,
                                             Cv2.CountNonZero(oldFrame),
                                             windowDiff.Rows * windowDiff.Cols);
-                                        isStableOverWindow = changeOverWindow <= ChangeThreshold;
+                                        changeOverWindowRatio = changeOverWindow;
                                         if (debug)
                                         {
-                                            Logger.Log.Debug($"Stability window changeRatio={changeOverWindow:F4}, stable={isStableOverWindow}");
+                                            Logger.Log.Debug($"Stability window changeRatio={changeOverWindow:F4}");
                                         }
                                     }
                                     finally
@@ -1453,78 +1475,58 @@ namespace GI_Subtitles.Views
                                 oldFrame.Dispose();
                             }
 
-                            // Track how long the screen has diverged from the last OCR frame
-                            if (changedVsOcr)
+                            var gateDecision = _ocrGate.Evaluate(new GI_Subtitles.Services.OCR.OcrTriggerGate.Inputs
                             {
-                                if (_changedVsOcrSince == DateTime.MinValue)
-                                {
-                                    _changedVsOcrSince = DateTime.UtcNow;
+                                ChangeVsPrevious = changeVsPrevious,
+                                ChangeVsOcrBaseline = changeVsOcrBaseline,
+                                ChangeOverWindow = changeOverWindowRatio,
+                                HasSingleChainPrediction = data.ContextEngine?.IsLoaded == true
+                                    && data.ContextEngine.HasSingleChainPrediction,
+                                StableFramesChain = GI_Subtitles.Services.Detection.GameOcrTuning.StableFramesChain(),
+                                StableFramesDefault = GI_Subtitles.Services.Detection.GameOcrTuning.StableFramesDefault(),
+                                ForceOcrAfterSeconds = ForceOcrAfterChangeSeconds,
+                                NowUtc = DateTime.UtcNow,
+                            });
 
-                                    // Predictive pre-display: paint chain-predicted translation
-                                    // before OCR completes to cut perceived latency by 300-500ms.
-                                    // OFF BY DEFAULT: when the prediction disagrees with OCR (graph
-                                    // branches can be conditional on quest state, etc.), the user
-                                    // sees a visible text swap. Enable via Config("PredictivePreDisplay").
-                                    if (Config.Get("PredictivePreDisplay", false)
-                                        && data.ContextEngine?.IsLoaded == true
-                                        && data.ContextEngine.HasSingleChainPrediction)
+                            bool changedVsOcr = gateDecision.ChangedVsOcr;
+                            bool isStableOverWindow = gateDecision.StableOverWindow;
+                            bool forceOcr = gateDecision.Forced;
+
+                            if (gateDecision.ChangedVsOcrJustStarted
+                                && Config.Get("PredictivePreDisplay", false)
+                                && data.ContextEngine?.IsLoaded == true
+                                && data.ContextEngine.HasSingleChainPrediction)
+                            {
+                                var pred = data.ContextEngine.GetSingleChainPrediction();
+                                if (pred != null && !string.IsNullOrEmpty(pred.Value.Translation))
+                                {
+                                    _predictedContent = pred.Value.Translation;
+                                    if (Logger.IsDebugEnabled)
                                     {
-                                        var pred = data.ContextEngine.GetSingleChainPrediction();
-                                        if (pred != null && !string.IsNullOrEmpty(pred.Value.Translation))
-                                        {
-                                            _predictedContent = pred.Value.Translation;
-                                            if (Logger.IsDebugEnabled)
-                                            {
-                                                Logger.Log.Debug($"Predictive pre-display: \"{pred.Value.Translation}\"");
-                                            }
-                                        }
+                                        Logger.Log.Debug($"Predictive pre-display: \"{pred.Value.Translation}\"");
                                     }
                                 }
                             }
-                            else
+                            else if (!changedVsOcr)
                             {
-                                _changedVsOcrSince = DateTime.MinValue;
                                 _predictedContent = null;
                             }
 
-                            // Decide whether to run OCR:
-                            // 1) subtitle changed vs last OCR frame
-                            // 2) text stable over window OR N consecutive stable frames (eager preview)
-                            // 3) Force: screen changed for >1s but never stabilized
-                            //
-                            // Stable-frame threshold is configurable. Defaults:
-                            //   - Chain prediction active: 2 (was 1 — single-frame trigger at 100ms
-                            //     interval fires during typewriter pauses, causing partial-match flicker)
-                            //   - No chain prediction:     3 (preserves "eager preview" feel)
-                            // Hard floor of 2 frames prevents regressions even if a user sets these to 0/1.
-                            int stableFramesChain = Math.Max(2, GI_Subtitles.Services.Detection.GameOcrTuning.StableFramesChain());
-                            int stableFramesDefault = Math.Max(2, GI_Subtitles.Services.Detection.GameOcrTuning.StableFramesDefault());
-                            int stableFramesNeeded = (data.ContextEngine?.IsLoaded == true
-                                && data.ContextEngine.HasSingleChainPrediction)
-                                ? stableFramesChain
-                                : stableFramesDefault;
-                            bool readyForOcr = changedVsOcr && (isStableOverWindow || _consecutiveStableFrames >= stableFramesNeeded);
-
-                            bool forceOcr = !readyForOcr && changedVsOcr
-                                && _changedVsOcrSince > DateTime.MinValue
-                                && (DateTime.UtcNow - _changedVsOcrSince).TotalSeconds > ForceOcrAfterChangeSeconds;
-                            if (forceOcr)
-                            {
-                                readyForOcr = true;
-                            }
-
-                            if (readyForOcr)
+                            if (gateDecision.ReadyForOcr)
                             {
                                 if (!_isOcrRunning && IsOcrIntervalReady())
                                 {
-                                    _consecutiveStableFrames = 0;
+                                    _ocrGate.NotifyOcrStarted();
                                     _lastOcrWasFullyStable = isStableOverWindow;
 
-                                    Logger.Log.Debug(forceOcr
-                                        ? "Forced OCR re-check (screen changed >1.5s without stability)"
-                                        : isStableOverWindow
-                                            ? "Subtitle stable over window, start OCR"
-                                            : "Subtitle eager preview (4+ stable frames), start OCR");
+                                    if (Logger.IsDebugEnabled)
+                                    {
+                                        Logger.Log.Debug(forceOcr
+                                            ? $"Forced OCR re-check (screen changed >{ForceOcrAfterChangeSeconds:F1}s without stability)"
+                                            : isStableOverWindow
+                                                ? "Subtitle stable over window, start OCR"
+                                                : $"Subtitle eager preview ({gateDecision.StableFramesNeeded}+ stable frames), start OCR");
+                                    }
                                     SetWindowPos(new WindowInteropHelper(this).Handle, -1, 0, 0, 0, 0, 1 | 2);
                                     TriggerOcrAsync(frameMat.Clone(), target, answerTarget, currentBinary.Clone());
                                     passedToOcr = true;
@@ -1541,8 +1543,8 @@ namespace GI_Subtitles.Views
                             {
                                 // Clear stale subtitle when screen has changed but OCR hasn't run yet
                                 // This prevents the old translation from lingering during dialogue transitions
-                                if (changedVsOcr && _changedVsOcrSince > DateTime.MinValue
-                                    && (DateTime.UtcNow - _changedVsOcrSince).TotalSeconds > ClearStaleSubtitleSeconds
+                                if (changedVsOcr && _ocrGate.ChangedVsOcrSince > DateTime.MinValue
+                                    && (DateTime.UtcNow - _ocrGate.ChangedVsOcrSince).TotalSeconds > ClearStaleSubtitleSeconds
                                     && ocrText.Length > 1)
                                 {
                                     ocrText = "";
@@ -1843,168 +1845,12 @@ namespace GI_Subtitles.Views
 
                     if (ocrText.Length > 1 && !IsLikelyGameUI(ocrText))
                     {
-                        if (data.Matcher == null)
-                        {
-                            Logger.Log.Warn("Matcher not loaded yet, skipping translation");
-                        }
-                        else if (resDict.TryGetValue(ocrText, out CachedTranslation cached))
-                        {
-                            res = cached.Result;
-                            key = cached.Key;
-                            header = cached.Header;
-                            content = cached.Content;
-                        }
-                        else
-                        {
-                            // --- Pre-load: when NPC name is detected, pre-load ALL their dialogue ---
-                            // This happens BEFORE text matching so the hot cache is ready.
-                            // Wrapped defensively: a partial/updated translation dict (e.g. EN
-                            // TextMap updated for a new game version before PL catches up) could
-                            // expose edge cases in graph traversal. An exception here must not
-                            // abort the translation for the current line.
-                            if (!string.IsNullOrEmpty(_detectedNpcName) && data.ContextEngine?.IsLoaded == true)
-                            {
-                                try
-                                {
-                                    data.ContextEngine.PreloadForNpc(_detectedNpcName, data.contentDict);
-                                }
-                                catch (Exception preEx)
-                                {
-                                    Logger.Log.Error($"PreloadForNpc threw for \"{_detectedNpcName}\": {preEx}");
-                                }
-                            }
-
-                            // --- Stage 0: Hot cache prediction check ---
-                            // If DialogueContextEngine predicted this line, match is near-instant
-                            bool hotCacheHit = false;
-                            bool isPartialMatch = false;
-                            if (data.ContextEngine?.IsLoaded == true)
-                            {
-                                try
-                                {
-                                    string normalized = Services.Translation.OptimizedMatcher.NormalizeInput(ocrText, data.Matcher?.isEng ?? true);
-                                    string hotResult = data.ContextEngine.TryHotCacheMatch(normalized, out string hotKey, out isPartialMatch);
-                                    if (hotResult != null)
-                                    {
-                                        header = "";
-                                        content = hotResult;
-                                        key = hotKey;
-                                        hotCacheHit = true;
-                                        if (Logger.IsDebugEnabled)
-                                        {
-                                            Logger.Log.Debug($"HOT CACHE {(isPartialMatch ? "PREFIX" : "HIT")} for \"{ocrText}\": \"{content}\"");
-                                        }
-                                    }
-                                }
-                                catch (Exception hotEx)
-                                {
-                                    Logger.Log.Error($"TryHotCacheMatch threw for \"{ocrText}\": {hotEx}");
-                                    hotCacheHit = false;
-                                }
-                            }
-
-                            if (!hotCacheHit)
-                            {
-                                // Null-safe matcher calls: a game-version update that adds new EN
-                                // strings before the PL translation catches up means the matcher
-                                // may return null/empty for those lines. Treat null as "no match"
-                                // and fall through to the fallback path instead of letting a
-                                // later string.IsNullOrEmpty call mishandle it.
-                                if (!string.IsNullOrEmpty(_detectedNpcName))
-                                {
-                                    header = "";
-                                    try
-                                    {
-                                        content = data.Matcher.FindClosestMatch(ocrText, out key) ?? "";
-                                    }
-                                    catch (Exception matchEx)
-                                    {
-                                        Logger.Log.Error($"FindClosestMatch threw for \"{ocrText}\": {matchEx}");
-                                        content = "";
-                                        key = "";
-                                    }
-                                    if (Logger.IsDebugEnabled)
-                                    {
-                                        Logger.Log.Debug($"Color-detected NPC=\"{_detectedNpcName}\" (discarded), body match for \"{ocrText}\": content=\"{content}\"");
-                                    }
-                                }
-                                else
-                                {
-                                    // No color detection — use text-based header separation
-                                    // but discard the header (NPC name/role) since the game
-                                    // already displays it natively
-                                    try
-                                    {
-                                        var matchResult = data.Matcher.FindMatchWithHeaderSeparated(ocrText, out key);
-                                        header = "";
-                                        content = matchResult.Content ?? "";
-                                    }
-                                    catch (Exception matchEx)
-                                    {
-                                        Logger.Log.Error($"FindMatchWithHeaderSeparated threw for \"{ocrText}\": {matchEx}");
-                                        content = "";
-                                        key = "";
-                                    }
-                                }
-
-                            }
-
-                            // Guard against null key flowing into downstream string ops.
-                            if (key == null) key = "";
-
-                            res = string.IsNullOrEmpty(header) ? content : (header + "\n\n" + content);
-
-                            // Update dialogue context for next-line prediction.
-                            // Skip for partial matches (typewriter) — chain should only
-                            // advance when the full line is captured.
-                            //
-                            // Note: We intentionally do NOT populate _translatedAnswers from
-                            // graph predictions here. The dialogue graph's nextDialogIds can
-                            // include branches that are runtime-conditional (quest state, NPC
-                            // state, time of day), so painting them directly often showed
-                            // choices that weren't actually on screen — then OCR would
-                            // overwrite with the real choices, producing visible flicker and
-                            // a window-resize jump. Answer UI is now driven exclusively by
-                            // answer-region OCR (see TriggerOcrAsync + RunAnswerOnlyOcrAsync).
-                            // The graph predictions are still valuable — AnswerTranslationService
-                            // uses them as the highest-priority match source for OCR output
-                            // (see AnswerTranslationService.cs:54-63), so graph knowledge is
-                            // preserved but no longer drives the UI directly.
-                            //
-                            // Exception-safe context update. If the process dies between this
-                            // point and the next "Convert ocrResult" log line below, we know
-                            // the crash is inside OnTextMatched or downstream. No dedicated
-                            // exit-heartbeat — the existing "Convert ocrResult" debug log
-                            // serves as the implicit success marker (avoids doubling log volume).
-                            if (!string.IsNullOrEmpty(key) && !isPartialMatch &&
-                                data.ContextEngine?.IsLoaded == true)
-                            {
-                                try
-                                {
-                                    data.ContextEngine.OnTextMatched(key, _detectedNpcName, data.contentDict);
-                                }
-                                catch (Exception ctxEx)
-                                {
-                                    // ContextEngine corruption should NOT take down the app —
-                                    // log and continue. Worst case, chain prediction stops
-                                    // working for this line; next match re-syncs.
-                                    Logger.Log.Error($"OnTextMatched threw for key=\"{key}\" npc=\"{_detectedNpcName}\" (chain prediction may be degraded): {ctxEx}");
-                                }
-                            }
-
-                            if (Logger.IsDebugEnabled)
-                            {
-                                Logger.Log.Debug($"Convert ocrResult for {ocrText}: header={header}, content={content}, key={key}");
-                            }
-
-                            resDict[ocrText] = new CachedTranslation
-                            {
-                                Result = res,
-                                Key = key,
-                                Header = header,
-                                Content = content,
-                            };
-                        }
+                        var resolution = _subtitleResolver.Resolve(
+                            ocrText, _detectedNpcName, data.ContextEngine, data.Matcher, data.contentDict);
+                        res = resolution.Result ?? "";
+                        key = resolution.Key ?? "";
+                        header = resolution.Header ?? "";
+                        content = resolution.Content ?? "";
                     }
 
                     // If no translation found, check predictive pre-display
@@ -2698,8 +2544,7 @@ namespace GI_Subtitles.Views
                 while (_stabilityBuffer.Count > 0)
                     _stabilityBuffer.Dequeue()?.Dispose();
 
-                _consecutiveStableFrames = 0;
-                _changedVsOcrSince = DateTime.MinValue;
+                _ocrGate.Reset();
                 _lastOcrTime = DateTime.MinValue;
                 _nextOcrAttemptUtc = DateTime.MinValue;
                 _lastOcrWasFullyStable = false;
@@ -3180,6 +3025,28 @@ namespace GI_Subtitles.Views
         /// the overlay — which clears the flag automatically — or restart the
         /// app.</para>
         /// </summary>
+        /// <summary>
+        /// Starts both timers and records the pacing that will be used.
+        ///
+        /// <para>Exists because there are three start paths — the Dashboard
+        /// button, Ctrl+Shift+S, and the Setup Wizard — and the diagnostic was
+        /// first added to only one of them. It landed on the wizard, which runs
+        /// on a first launch and therefore on an install that cannot yet have a
+        /// stale Config pin: precisely the population that did NOT need it. The
+        /// returning users the log line was written for saw nothing.</para>
+        ///
+        /// <para>One line, at start, not per tick. "Subtitles feel slow" is
+        /// usually a pinned Config key suppressing the per-game profile for
+        /// every game at once, and nothing in the log used to say so. A fourth
+        /// start path added later inherits this by construction.</para>
+        /// </summary>
+        private void StartOcrTimers()
+        {
+            Logger.Log.Info(Services.Detection.GameOcrTuning.Describe());
+            OCRTimer.Start();
+            UITimer.Start();
+        }
+
         private bool TryGateOverlayNotInRegion()
         {
             try
@@ -3793,8 +3660,7 @@ namespace GI_Subtitles.Views
                     UpdateWindowPosition();
                     ShowReadyPlaceholderIfEmpty();
                     ResetActiveOcrWindow();
-                    OCRTimer.Start();
-                    UITimer.Start();
+                    StartOcrTimers();
                     System.Media.SystemSounds.Exclamation.Play();
                     SwitchIcon("kaption-running.ico");
                     data.UpdateDashboardStatus();
@@ -4302,7 +4168,7 @@ namespace GI_Subtitles.Views
                                 _lastOcrBinaryFrame?.Dispose();
                                 _lastOcrBinaryFrame = binaryBaseline;
                                 binaryBaseline = null;
-                                _changedVsOcrSince = DateTime.MinValue;
+                                _ocrGate.NotifyBaselineCommitted();
                                 _nextOcrAttemptUtc = DateTime.MinValue;
                             }
                             else if (retryFrame)
@@ -4482,39 +4348,8 @@ namespace GI_Subtitles.Views
             }
         }
 
-        /// <summary>
-        /// Preprocess the subtitle region image to binary image (only retain high-light/white pixels), used for stable pixel difference detection.
-        /// </summary>
-        /// <param name="src">Original Mat (BGR)</param>
-        /// <returns>Binary Mat; if failed, return null</returns>
         private Mat PreprocessToBinary(Mat src)
-        {
-            if (src == null || src.Empty())
-            {
-                return null;
-            }
-
-            // `binary` is handed back to the caller (cloned then disposed every tick) —
-            // leave as a plain allocation. `gray` is throwaway, so it goes through the pool.
-            Mat gray = MatPool.Default.Rent(src.Rows, src.Cols, MatType.CV_8UC1);
-            Mat binary = new Mat();
-            try
-            {
-                Cv2.CvtColor(src, gray, ColorConversionCodes.BGR2GRAY);
-                Cv2.Threshold(gray, binary, 220, 255, ThresholdTypes.Binary);
-                return binary;
-            }
-            catch (Exception ex)
-            {
-                Logger.Log.Error($"PreprocessToBinary failed: {ex}");
-                binary?.Dispose();
-                return null;
-            }
-            finally
-            {
-                MatPool.Default.Return(gray);
-            }
-        }
+            => GI_Subtitles.Services.OCR.ImageProcessor.PreprocessToBinary(src);
 
         private void Window_MouseDown(object sender, MouseButtonEventArgs e)
         {
@@ -4683,8 +4518,7 @@ namespace GI_Subtitles.Views
                         UpdateWindowPosition();
                         ShowReadyPlaceholderIfEmpty();
                         ResetActiveOcrWindow();
-                        OCRTimer.Start();
-                        UITimer.Start();
+                        StartOcrTimers();
                         SystemSounds.Exclamation.Play();
                         SwitchIcon("kaption-running.ico");
                     }

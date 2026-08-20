@@ -9,8 +9,6 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using GI_Subtitles.Services.Security;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
 
 namespace GI_Subtitles.Common
 {
@@ -1353,48 +1351,5 @@ namespace GI_Subtitles.Common
             bool flattenWrappedObjects) =>
             ReadFlatStringDictionaryFromJson(utf8Json, flattenWrappedObjects, 0);
 
-        /// <summary>
-        /// Test-only: Newtonsoft JObject.Load equivalent, kept so benchmarks
-        /// can diff old-vs-new parse behaviour against identical input.
-        /// </summary>
-        internal static Dictionary<string, string> Test_LoadFlatJsonDictionary_Newtonsoft(
-            Stream utf8Json,
-            bool flattenWrappedObjects)
-        {
-            using (var sr = new StreamReader(utf8Json, Encoding.UTF8, true, 4096, leaveOpen: true))
-            using (var jr = new Newtonsoft.Json.JsonTextReader(sr))
-            {
-                var tokenMap = Newtonsoft.Json.Linq.JObject.Load(jr);
-                var raw = new Dictionary<string, string>(tokenMap.Count, StringComparer.Ordinal);
-                foreach (var prop in tokenMap.Properties())
-                {
-                    string flat = FlattenDictValueLegacy(prop.Value, flattenWrappedObjects);
-                    if (flat != null)
-                        raw[prop.Name] = flat;
-                }
-                return raw;
-            }
-        }
-
-        private static string FlattenDictValueLegacy(JToken tok, bool flattenWrappedObjects)
-        {
-            if (tok == null) return null;
-            switch (tok.Type)
-            {
-                case JTokenType.String:
-                    return (string)tok;
-                case JTokenType.Null:
-                    return null;
-                case JTokenType.Object:
-                {
-                    if (!flattenWrappedObjects) return null;
-                    var o = (JObject)tok;
-                    var pick = o["value"] ?? o["text"] ?? o["str"];
-                    return pick?.Type == JTokenType.String ? (string)pick : null;
-                }
-                default:
-                    return null;
-            }
-        }
     }
 }

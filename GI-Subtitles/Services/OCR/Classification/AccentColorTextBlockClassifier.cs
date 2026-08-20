@@ -20,12 +20,14 @@ namespace GI_Subtitles.Services.OCR.Classification
     /// Both games' dialogue bodies are white, so their saturation is near zero
     /// and they never trip the gate.</para>
     ///
-    /// <para><b>This is a pure move.</b> The thresholds, the band-bottom rule,
-    /// the all-accent fallback and the role-text reclassification are unchanged
-    /// down to the constant. Genshin and Star Rail output must stay
-    /// byte-identical across this refactor — the four <c>NpcClassifier_*</c>
-    /// tests in <c>RuntimeRegressionTests</c> exist to prove exactly that, and
-    /// they still call through <c>ImageProcessor</c>'s shim.</para>
+    /// <para>The hue/saturation thresholds, the band-bottom rule, the all-accent
+    /// fallback and the role-text reclassification came across from
+    /// <c>ImageProcessor</c> unchanged. The one rule since revised is the
+    /// name-versus-highlight separation test, which compared box edges and so
+    /// dropped the speaker on 29% of a recorded Genshin scene; it now compares
+    /// row centres. The <c>NpcClassifier_*</c> tests in
+    /// <c>RuntimeRegressionTests</c> pin both behaviours and still call through
+    /// <c>ImageProcessor</c>'s shim.</para>
     /// </summary>
     public sealed class AccentColorTextBlockClassifier : ITextBlockClassifier
     {
@@ -77,20 +79,26 @@ namespace GI_Subtitles.Services.OCR.Classification
                 var topmost = coloured.OrderBy(candidate => candidate.Info.BoundingRect.Top).First();
                 float top = topmost.Info.BoundingRect.Top;
                 float topLineHeight = Math.Max(1f, topmost.Info.BoundingRect.Height);
-                float accentBottom = topmost.Info.BoundingRect.Bottom;
 
-                // A speaker name is a separate gold/cyan line above the white body.
-                // Accent highlighting on the same dialogue line must stay in the
-                // body. A lone accent line is kept as NPC-only so the bounded OCR
-                // retry can wait for typewriter text instead of matching a name
-                // as if it were dialogue.
+                // A speaker name is a gold/cyan line on its own row; accent
+                // highlighting *inside* a dialogue line must stay in the body.
+                // Row occupancy answers that, where the gap between the two boxes
+                // does not: Genshin's name and first body line leave 1–6 px
+                // between their detected boxes, so a gap threshold is decided by
+                // detector jitter, and any block above the name — a choice-menu
+                // option, a glyph hallucinated on the character art — is not the
+                // body being tested for. A lone accent line is kept as NPC-only so
+                // the bounded OCR retry can wait for typewriter text instead of
+                // matching a name as if it were dialogue.
                 bool isolatedNameOnly = candidates.Count == 1;
                 bool separatedFromBody = false;
                 if (nonColoured.Count > 0)
                 {
-                    float firstBodyTop = nonColoured.Min(candidate => candidate.Info.BoundingRect.Top);
-                    float requiredGap = Math.Max(2f, topLineHeight * 0.08f);
-                    separatedFromBody = firstBodyTop - accentBottom >= requiredGap;
+                    float accentCentre = OcrBlockGeometry.CentreY(topmost.Info);
+                    float requiredSeparation = Math.Max(2f, topLineHeight * 0.5f);
+                    separatedFromBody = nonColoured.All(candidate =>
+                        Math.Abs(OcrBlockGeometry.CentreY(candidate.Info) - accentCentre)
+                            >= requiredSeparation);
                 }
 
                 if (isolatedNameOnly || separatedFromBody)
@@ -153,11 +161,14 @@ namespace GI_Subtitles.Services.OCR.Classification
 
             if (sorted.Count < 2) return;
 
-            // Compute NPC name bottom edge and average height (for resolution-relative thresholds)
+            // Compute NPC name edges and average height (for resolution-relative thresholds)
+            float npcTop = float.MaxValue;
             float npcBottom = 0;
             float npcAvgHeight = 0;
             foreach (var npc in result.NpcBlocks)
             {
+                if (npc.BoundingRect.Top < npcTop)
+                    npcTop = npc.BoundingRect.Top;
                 if (npc.BoundingRect.Bottom > npcBottom)
                     npcBottom = npc.BoundingRect.Bottom;
                 npcAvgHeight += npc.BoundingRect.Height;
@@ -200,6 +211,13 @@ namespace GI_Subtitles.Services.OCR.Classification
             float aboveAvgHeight = aboveGap.Average(b => Math.Max(1f, b.BoundingRect.Height));
             float belowAvgHeight = belowGap.Average(b => Math.Max(1f, b.BoundingRect.Height));
             if (aboveAvgHeight > belowAvgHeight * 0.82f) return;
+
+            // Role text is printed between the speaker and the dialogue, so a
+            // block above the speaker is some other on-screen element — a choice
+            // option, a quest banner. Folding one of those into the name deletes
+            // it from the match input, which is worse than leaving it in the body.
+            if (npcTop < float.MaxValue &&
+                aboveGap.Any(block => OcrBlockGeometry.CentreY(block) <= npcTop)) return;
 
             // Above-gap blocks must be near the NPC name (scales with resolution:
             // 3x NPC name height, minimum 80px to handle low-res captures)

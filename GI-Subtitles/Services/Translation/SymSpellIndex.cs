@@ -168,11 +168,22 @@ namespace GI_Subtitles.Services.Translation
                 }
             }
 
-            // Phase 3: Freeze lists into arrays for read performance
+            // Phase 3: Sort, then freeze lists into arrays for read performance.
+            //
+            // The sort is what makes the matcher reproducible. Phase 1 fans out over
+            // Parallel.ForEach partitions and Phase 2 concatenates the partials in
+            // ConcurrentBag order, which reflects thread completion and differs on
+            // every build — even twice in one process. TryFindMatch keeps the FIRST
+            // candidate at the best distance, so an arbitrary posting order makes
+            // tie-breaks arbitrary, and one different pick early cascades into
+            // different chain state downstream. Entry indices are stable, so sorting
+            // ascending gives a canonical index at no runtime cost.
             var frozenIndex = new Dictionary<long, int[]>(tempIndex.Count);
             foreach (var kvp in tempIndex)
             {
-                frozenIndex[kvp.Key] = kvp.Value.ToArray();
+                var posting = kvp.Value;
+                if (posting.Count > 1) posting.Sort();
+                frozenIndex[kvp.Key] = posting.ToArray();
             }
 
             progress?.Report((75, $"SymSpell index ready ({frozenIndex.Count:N0} buckets)"));
@@ -327,8 +338,6 @@ namespace GI_Subtitles.Services.Translation
                 int lenDiff = Math.Abs(normalizedInput.Length - candidateKey.Length);
                 if (lenDiff > _maxEditDistance) continue;
 
-                // For prefix matching: compare input against the candidate's prefix
-                int compareLen = Math.Min(normalizedInput.Length, candidateKey.Length);
                 int dist;
 
                 if (normalizedInput.Length <= candidateKey.Length)
@@ -340,7 +349,10 @@ namespace GI_Subtitles.Services.Translation
                     }
                     else
                     {
-                        // Compare input against the same-length prefix of the candidate
+                        // Prefix semantics: the game types dialogue out one glyph at
+                        // a time, so a short input is a legitimate partial capture of
+                        // a longer key and the key's unseen tail is not evidence of a
+                        // mismatch.
                         dist = LevenshteinDistance(
                             normalizedInput, 0, normalizedInput.Length,
                             candidateKey, 0, normalizedInput.Length,
@@ -356,8 +368,13 @@ namespace GI_Subtitles.Services.Translation
                     }
                     else
                     {
+                        // The candidate is fully consumed here, so the input's trailing
+                        // characters are real divergence and must be charged. Truncating
+                        // the input to the candidate's length under-reported by up to
+                        // _maxEditDistance, which let Stage 0 return early on matches
+                        // that were twice as far away as the caller was told.
                         dist = LevenshteinDistance(
-                            normalizedInput, 0, candidateKey.Length,
+                            normalizedInput, 0, normalizedInput.Length,
                             candidateKey, 0, candidateKey.Length,
                             bestDistance);
                     }

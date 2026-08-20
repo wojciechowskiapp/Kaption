@@ -2,9 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
+using System.Text.Json;
 using System.Threading.Tasks;
 using GI_Subtitles.Common;
-using Newtonsoft.Json;
 
 namespace GI_Subtitles.Services.Security
 {
@@ -45,7 +45,7 @@ namespace GI_Subtitles.Services.Security
         /// <summary>
         /// Read a JSON file that may or may not be encrypted.
         /// If unencrypted, reads normally. If encrypted, decrypts to memory first.
-        /// Returns a Stream suitable for JsonTextReader.
+        /// Returns a Stream the caller can parse JSON from.
         /// Caller must dispose the returned stream.
         /// </summary>
         public Stream OpenForReading(string jsonPath)
@@ -83,33 +83,91 @@ namespace GI_Subtitles.Services.Security
             using (var stream = isEncrypted
                 ? (Stream)_protection.DecryptToStream(resolvedPath)
                 : File.OpenRead(resolvedPath))
-            using (var streamReader = new StreamReader(stream))
-            using (var jsonReader = new JsonTextReader(streamReader))
             {
                 long totalSize = stream.Length;
-                jsonReader.Read(); // Start object
-                while (jsonReader.Read())
-                {
-                    if (jsonReader.TokenType == JsonToken.PropertyName)
-                    {
-                        string key = (string)jsonReader.Value;
-                        jsonReader.Read();
-                        string value = (string)jsonReader.Value;
-                        dict[key] = value;
+                var buffer = new byte[64 * 1024];
+                int bytesInBuffer = 0;
+                bool isFinalBlock = false;
+                bool bomChecked = false;
+                var state = new JsonReaderState(DictionaryReaderOptions);
+                string pendingKey = null;
 
-                        if (progress != null && dict.Count % 5000 == 0)
+                while (!isFinalBlock)
+                {
+                    if (bytesInBuffer == buffer.Length)
+                        Array.Resize(ref buffer, buffer.Length * 2);
+
+                    int read = stream.Read(buffer, bytesInBuffer, buffer.Length - bytesInBuffer);
+                    isFinalBlock = read == 0;
+                    bytesInBuffer += read;
+
+                    if (!bomChecked && bytesInBuffer >= 3)
+                    {
+                        bomChecked = true;
+                        if (buffer[0] == 0xEF && buffer[1] == 0xBB && buffer[2] == 0xBF)
                         {
-                            long pos = stream.CanSeek ? stream.Position : 0;
-                            int pct = totalSize > 0
-                                ? (int)(progressMin + (pos * (double)(progressMax - progressMin) / totalSize))
-                                : progressMin;
-                            progress.Report((pct, $"Loading dictionary... {dict.Count:N0} entries"));
+                            Buffer.BlockCopy(buffer, 3, buffer, 0, bytesInBuffer - 3);
+                            bytesInBuffer -= 3;
                         }
                     }
+
+                    int consumed = ReadDictionarySegment(
+                        buffer, bytesInBuffer, isFinalBlock, ref state, ref pendingKey,
+                        dict, stream, totalSize, progress, progressMin, progressMax);
+
+                    if (consumed < bytesInBuffer)
+                        Buffer.BlockCopy(buffer, consumed, buffer, 0, bytesInBuffer - consumed);
+                    bytesInBuffer -= consumed;
                 }
             }
 
             return dict;
+        }
+
+        private static readonly JsonReaderOptions DictionaryReaderOptions = new JsonReaderOptions
+        {
+            CommentHandling = JsonCommentHandling.Skip,
+            AllowTrailingCommas = true,
+        };
+
+        private static int ReadDictionarySegment(
+            byte[] buffer, int length, bool isFinalBlock,
+            ref JsonReaderState state, ref string pendingKey,
+            Dictionary<string, string> dict, Stream stream, long totalSize,
+            IProgress<(int percent, string message)> progress, int progressMin, int progressMax)
+        {
+            var reader = new Utf8JsonReader(new ReadOnlySpan<byte>(buffer, 0, length), isFinalBlock, state);
+
+            while (reader.Read())
+            {
+                if (reader.TokenType == JsonTokenType.PropertyName)
+                {
+                    pendingKey = reader.GetString();
+                    continue;
+                }
+
+                if (pendingKey == null)
+                    continue;
+
+                if (reader.TokenType == JsonTokenType.StartObject || reader.TokenType == JsonTokenType.StartArray)
+                    dict[pendingKey] = null;
+                else
+                    dict[pendingKey] = reader.TokenType == JsonTokenType.Null ? null : reader.GetString();
+
+                pendingKey = null;
+
+                if (progress != null && dict.Count % 5000 == 0)
+                {
+                    long pos = stream.CanSeek ? stream.Position : 0;
+                    int pct = totalSize > 0
+                        ? (int)(progressMin + (pos * (double)(progressMax - progressMin) / totalSize))
+                        : progressMin;
+                    progress.Report((pct, $"Loading dictionary... {dict.Count:N0} entries"));
+                }
+            }
+
+            state = reader.CurrentState;
+            return (int)reader.BytesConsumed;
         }
 
         /// <summary>
@@ -119,7 +177,7 @@ namespace GI_Subtitles.Services.Security
         public void SaveDictionary(Dictionary<string, string> dict, string jsonPath,
             string outputLanguage)
         {
-            string json = JsonConvert.SerializeObject(dict, Formatting.None);
+            string json = JsonSerializer.Serialize(dict, JsonDefaults.Options);
             byte[] jsonBytes = Encoding.UTF8.GetBytes(json);
 
             if (LanguageClassification.ShouldProtectFile(jsonPath, outputLanguage))
@@ -145,7 +203,7 @@ namespace GI_Subtitles.Services.Security
         /// </summary>
         public void SaveProtectedJson(string jsonPath, object data)
         {
-            var json = JsonConvert.SerializeObject(data, Formatting.None);
+            var json = JsonSerializer.Serialize(data, data?.GetType() ?? typeof(object), JsonDefaults.Options);
             byte[] jsonBytes = Encoding.UTF8.GetBytes(json);
 
             string gisubPath = _protection.GetProtectedPath(jsonPath);

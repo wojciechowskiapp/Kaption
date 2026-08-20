@@ -2,7 +2,7 @@ using System;
 
 namespace GI_Subtitles.Services.OCR
 {
-    internal static class BinaryFrameMetrics
+    public static class BinaryFrameMetrics
     {
         private const int MinimumReferencePixels = 8192;
         private const int ForegroundScale = 5;
@@ -13,7 +13,7 @@ namespace GI_Subtitles.Services.OCR
         /// dilute the same changed glyphs below the trigger threshold. The 5x
         /// scale and absolute floor keep tiny antialias/noise changes stable.
         /// </summary>
-        internal static double NormalizedChangeRatio(
+        public static double NormalizedChangeRatio(
             int changedPixels,
             int currentForegroundPixels,
             int previousForegroundPixels,

@@ -44,13 +44,13 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using GI_Subtitles.Common;
 using GI_Subtitles.Services.Data;
 using GI_Subtitles.Services.Network;
 using GI_Subtitles.Services.Security;
-using Newtonsoft.Json;
 
 namespace GI_Subtitles.Services.Translation
 {
@@ -503,7 +503,7 @@ namespace GI_Subtitles.Services.Translation
                 try
                 {
                     string json = File.ReadAllText(ManifestPath);
-                    var loaded = JsonConvert.DeserializeObject<Dictionary<string, ManifestEntry>>(json);
+                    var loaded = JsonSerializer.Deserialize<Dictionary<string, ManifestEntry>>(json, JsonDefaults.Options);
                     return loaded ?? new Dictionary<string, ManifestEntry>(StringComparer.OrdinalIgnoreCase);
                 }
                 catch (Exception ex)
@@ -522,7 +522,7 @@ namespace GI_Subtitles.Services.Translation
                 {
                     GameDataPaths.EnsureRoot();
                     string tmp = ManifestPath + ".tmp";
-                    File.WriteAllText(tmp, JsonConvert.SerializeObject(manifest, Formatting.Indented));
+                    File.WriteAllText(tmp, JsonSerializer.Serialize(manifest, JsonDefaults.Indented));
                     if (File.Exists(ManifestPath)) File.Delete(ManifestPath);
                     File.Move(tmp, ManifestPath);
                 }
@@ -543,7 +543,7 @@ namespace GI_Subtitles.Services.Translation
             catch (UnauthorizedAccessException ex) { Logger.Log.Warn($"DictionarySync: access denied deleting {path}: {ex.Message}"); }
         }
 
-        /// <summary>Single row in <c>manifest.json</c>. Persisted via Newtonsoft.Json.</summary>
+        /// <summary>Single row in <c>manifest.json</c>. Persisted as JSON.</summary>
         public sealed class ManifestEntry
         {
             public string Game { get; set; }

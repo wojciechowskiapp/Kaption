@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -51,7 +51,7 @@ namespace GI_Test
 
         /// <summary>
         /// Round-trip: feed identical synthetic JSON through
-        /// * <see cref="VoiceContentHelper.Test_LoadFlatJsonDictionary_Newtonsoft"/>
+        /// * <see cref="NewtonsoftReferenceParser.LoadFlatJsonDictionary"/>
         ///   (the pre-perf-refactor implementation kept as a test shim)
         /// * <see cref="VoiceContentHelper.Test_StreamFlatJsonDictionary"/>
         ///   (the new STJ streaming implementation)
@@ -65,7 +65,7 @@ namespace GI_Test
             Dictionary<string, string> oldDict, newDict;
             using (var ms = new MemoryStream(json))
             {
-                oldDict = VoiceContentHelper.Test_LoadFlatJsonDictionary_Newtonsoft(
+                oldDict = NewtonsoftReferenceParser.LoadFlatJsonDictionary(
                     ms, flattenWrappedObjects: true);
             }
             using (var ms = new MemoryStream(json))
@@ -90,7 +90,7 @@ namespace GI_Test
             Dictionary<string, string> oldDict, newDict;
             using (var ms = new MemoryStream(json))
             {
-                oldDict = VoiceContentHelper.Test_LoadFlatJsonDictionary_Newtonsoft(
+                oldDict = NewtonsoftReferenceParser.LoadFlatJsonDictionary(
                     ms, flattenWrappedObjects: true);
             }
             using (var ms = new MemoryStream(json))
@@ -117,7 +117,7 @@ namespace GI_Test
             Dictionary<string, string> oldDict, newDict;
             using (var ms = new MemoryStream(json))
             {
-                oldDict = VoiceContentHelper.Test_LoadFlatJsonDictionary_Newtonsoft(
+                oldDict = NewtonsoftReferenceParser.LoadFlatJsonDictionary(
                     ms, flattenWrappedObjects: false);
             }
             using (var ms = new MemoryStream(json))
@@ -371,7 +371,7 @@ namespace GI_Test
         {
             using (var ms = new MemoryStream(json))
             {
-                var d = VoiceContentHelper.Test_LoadFlatJsonDictionary_Newtonsoft(
+                var d = NewtonsoftReferenceParser.LoadFlatJsonDictionary(
                     ms, flattenWrappedObjects: true);
                 return d.Count;
             }

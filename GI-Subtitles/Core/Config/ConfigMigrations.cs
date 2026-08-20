@@ -27,7 +27,7 @@ namespace GI_Subtitles.Core.Config
     public static class ConfigMigrations
     {
         /// <summary>Current migration tip. Bump when adding a new case.</summary>
-        private const int CurrentVersion = 3;
+        private const int CurrentVersion = 4;
 
         private const string VersionKey = "ConfigMigrationVersion";
 
@@ -94,8 +94,12 @@ namespace GI_Subtitles.Core.Config
                     Migration3_UiRefreshInterval_200_to_150();
                     return;
 
+                case 4:
+                    Migration4_ResetPacingToMeasuredProfiles();
+                    return;
+
                 // Future migrations go here:
-                //   case 4: Migration4_SomethingElse(); return;
+                //   case 5: Migration5_SomethingElse(); return;
 
                 default:
                     Logger.Log.Warn($"ConfigMigrations: unknown version {version} — nothing to apply.");
@@ -207,5 +211,74 @@ namespace GI_Subtitles.Core.Config
 
         internal static int? GetUiRefreshMigrationTarget(bool keyExists, int currentValue)
             => keyExists && currentValue == 200 ? 150 : null;
+
+        /// <summary>
+        /// The OCR pacing knobs, taken from the resolver that owns them rather
+        /// than re-listed here. All of them outrank <c>GameRegionProfile</c> for
+        /// EVERY game when present, so a knob added to
+        /// <c>GameOcrTuning.ConfigKeys</c> is cleared by the pacing reset for
+        /// free — a second hand-maintained copy would have gone stale silently
+        /// and left the new key pinned forever.
+        /// </summary>
+        internal static string[] PacingKeys =>
+            GI_Subtitles.Services.Detection.GameOcrTuning.ConfigKeys;
+
+        /// <summary>
+        /// Pacing reset (2026-08-20). Drops every pinned OCR pacing key so the
+        /// newly measured per-game profiles apply.
+        ///
+        /// <para><b>This one deliberately breaks the "only touch the stale
+        /// default" rule</b> that v1 and v2 followed, and the class docstring
+        /// recommends. Those migrations protected hand-tuned values because the
+        /// alternative was an unmeasured guess. That is no longer the case: the
+        /// pacing now comes from a benchmark over 4,700 recorded frames across
+        /// eight scenes and three games, validated against simulated hardware
+        /// from 1x to 5x slower. A value hand-tuned against the OLD pipeline was
+        /// tuned against different behaviour — OCR itself got 3.66x faster in
+        /// session 40, which moved every constraint the user was tuning around.
+        /// Keeping those pins would mean the people most likely to have tuned
+        /// for a slow pipeline are the only ones who never get the fix.</para>
+        ///
+        /// <para>Consequence worth stating plainly: this DISCARDS user
+        /// settings. It runs exactly once (the version gate), logs every key it
+        /// removed with its value so the choice is recoverable from app.log, and
+        /// the Settings > Advanced boxes can re-pin any of them. Removing rather
+        /// than rewriting is what restores the "never touched" state, so future
+        /// profile changes reach the user too.</para>
+        /// </summary>
+        private static void Migration4_ResetPacingToMeasuredProfiles()
+        {
+            var cleared = new System.Collections.Generic.List<string>();
+
+            foreach (string key in PacingKeys)
+            {
+                if (!Config.Has(key)) continue;
+
+                // Read as double, NOT string. All five keys hold JSON numbers,
+                // and Config.Get<string> on a number throws inside Deserialize,
+                // which Config.Get catches and reports via Logger.Log.Error —
+                // and the Sentry appender forwards Error to GlitchTip. Asking
+                // for the wrong type here would fire a crash-report event per
+                // key, per user, on upgrade, and still log "OcrInterval=?".
+                double value = Config.Get<double>(key, double.NaN);
+                cleared.Add(double.IsNaN(value)
+                    ? key
+                    : $"{key}={value.ToString("0.####", System.Globalization.CultureInfo.InvariantCulture)}");
+
+                Config.Remove(key);
+            }
+
+            if (cleared.Count == 0)
+            {
+                Logger.Log.Info(
+                    "ConfigMigrations v4: no pinned OCR pacing keys — measured per-game profiles already apply.");
+                return;
+            }
+
+            Logger.Log.Info(
+                $"ConfigMigrations v4: cleared {cleared.Count} pinned OCR pacing key(s) " +
+                $"[{string.Join(", ", cleared)}] so the measured per-game profiles apply. " +
+                "Re-pin in Settings > Advanced if a machine needs different pacing.");
+        }
     }
 }

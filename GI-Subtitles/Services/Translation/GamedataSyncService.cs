@@ -1,4 +1,4 @@
-// ─────────────────────────────────────────────────────────────────────────────
+﻿// ─────────────────────────────────────────────────────────────────────────────
 //  GamedataSyncService.cs
 //  ---------------------------------------------------------------------------
 //  Pulls the per-game "gamedata bundle" from the Kaption backend and splits it
@@ -69,17 +69,18 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
+using System.IO.MemoryMappedFiles;
 using System.Linq;
-using System.Text;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Threading;
 using System.Threading.Tasks;
 using GI_Subtitles.Common;
 using GI_Subtitles.Services.Data;
 using GI_Subtitles.Services.Network;
 using GI_Subtitles.Services.Security;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
 
 namespace GI_Subtitles.Services.Translation
 {
@@ -374,7 +375,7 @@ namespace GI_Subtitles.Services.Translation
 
             try
             {
-                JObject bundle;
+                JsonObject bundle;
                 try
                 {
                     bundle = ReadBundleStagingTextMap(bundlePath, stagedTextMapEn, out bool hasTextMapEn);
@@ -387,7 +388,7 @@ namespace GI_Subtitles.Services.Translation
                     return outcome;
                 }
 
-                var bundleVersion = bundle.Value<int?>("bundle_version") ?? 0;
+                var bundleVersion = ReadInt(bundle["bundle_version"]);
                 // v1: original Genshin-only format, no extension field.
                 // v2: adds `extension.game` so DialogueContextBase can gate
                 // load on matching game identity. Both write the same five
@@ -458,10 +459,10 @@ namespace GI_Subtitles.Services.Translation
                     // this — ValidateBundleMeta tolerates a missing file.
                     if (bundleVersion >= 2)
                     {
-                        var meta = new JObject
+                        var meta = new JsonObject
                         {
                             ["bundle_version"] = bundleVersion,
-                            ["extension"] = new JObject
+                            ["extension"] = new JsonObject
                             {
                                 ["game"] = string.IsNullOrEmpty(bundleGame) ? game : bundleGame,
                             },
@@ -513,62 +514,108 @@ namespace GI_Subtitles.Services.Translation
         }
 
         /// <summary>
-        /// Parse the bundle into a JObject, EXCEPT for
-        /// <see cref="TextMapEnSection"/>, which is streamed straight to
+        /// Parse the bundle into a JsonObject, EXCEPT for
+        /// <see cref="TextMapEnSection"/>, which is copied straight to
         /// <paramref name="stagePath"/> without ever entering the DOM.
         ///
         /// That section is ~22 MB of flat string→string JSON for ZZZ; putting
-        /// it through <c>JObject.Load</c> would add roughly 100 MB of
-        /// transient JProperty/JValue heap to a startup-path operation for no
-        /// benefit, since its only destination is a file. Every other section
-        /// is read exactly as <c>JObject.Load</c> read it before, so
-        /// Genshin/HSR bundles behave identically.
+        /// it through the node DOM would add roughly 100 MB of transient heap
+        /// to a startup-path operation for no benefit, since its only
+        /// destination is a file. Bundles are emitted minified, so the byte
+        /// range copied here is exactly what a compact re-serialization would
+        /// produce. Every other section is read as a node, so Genshin/HSR
+        /// bundles behave identically.
         /// </summary>
-        private static JObject ReadBundleStagingTextMap(
+        private static JsonObject ReadBundleStagingTextMap(
             string bundlePath, string stagePath, out bool hasTextMapEn)
         {
             hasTextMapEn = false;
-            var bundle = new JObject();
+            var bundle = new JsonObject();
 
-            using (var sr = new StreamReader(bundlePath, Encoding.UTF8))
-            using (var jr = new JsonTextReader(sr))
+            // Memory-mapped, not File.ReadAllBytes: ZZZ bundles are ~58 MB and
+            // Genshin ~26 MB, so buffering one would put a large-object array on
+            // the heap during a startup-path install. Mapping keeps the bytes in
+            // the OS page cache, which is the same reason AesCtrFileProtection
+            // maps rather than reads.
+            var fileInfo = new FileInfo(bundlePath);
+            if (fileInfo.Length == 0)
+                throw new JsonException($"Bundle '{bundlePath}' is empty.");
+            if (fileInfo.Length > int.MaxValue)
+                throw new JsonException($"Bundle '{bundlePath}' exceeds the 2 GB span limit.");
+
+            using (var mmf = MemoryMappedFile.CreateFromFile(
+                       bundlePath, FileMode.Open, null, 0, MemoryMappedFileAccess.Read))
+            using (var view = mmf.CreateViewAccessor(0, 0, MemoryMappedFileAccess.Read))
             {
-                // TextMap values are arbitrary game dialogue. Newtonsoft's
-                // default DateParseHandling would rewrite anything that looks
-                // like a timestamp into a normalised DateTime on the way
-                // through, silently altering the text we key OCR matches on.
-                jr.DateParseHandling = DateParseHandling.None;
-
-                if (!jr.Read() || jr.TokenType != JsonToken.StartObject)
-                    throw new JsonReaderException("Bundle root is not a JSON object.");
-
-                while (jr.Read() && jr.TokenType == JsonToken.PropertyName)
+                unsafe
                 {
-                    string name = (string)jr.Value;
-                    if (!jr.Read())
-                        throw new JsonReaderException($"Bundle truncated after property '{name}'.");
+                    byte* basePtr = null;
+                    view.SafeMemoryMappedViewHandle.AcquirePointer(ref basePtr);
+                    try
+                    {
+                        int length = (int)fileInfo.Length;
+                        var utf8 = new ReadOnlySpan<byte>(basePtr, length);
+                        int origin = length >= 3 && utf8[0] == 0xEF && utf8[1] == 0xBB && utf8[2] == 0xBF ? 3 : 0;
 
-                    if (string.Equals(name, TextMapEnSection, StringComparison.Ordinal))
-                    {
-                        Directory.CreateDirectory(Path.GetDirectoryName(stagePath));
-                        using (var sw = new StreamWriter(stagePath, false, new UTF8Encoding(false)))
-                        using (var jw = new JsonTextWriter(sw) { Formatting = Formatting.None })
+                        var reader = new Utf8JsonReader(utf8.Slice(origin), new JsonReaderOptions
                         {
-                            // Copies the current token and all its children
-                            // straight from reader to writer; leaves the
-                            // reader on the section's closing token.
-                            jw.WriteToken(jr, writeChildren: true);
+                            CommentHandling = JsonCommentHandling.Skip,
+                            AllowTrailingCommas = true,
+                        });
+
+                        if (!reader.Read() || reader.TokenType != JsonTokenType.StartObject)
+                            throw new JsonException("Bundle root is not a JSON object.");
+
+                        while (reader.Read() && reader.TokenType == JsonTokenType.PropertyName)
+                        {
+                            string name = reader.GetString();
+                            if (!reader.Read())
+                                throw new JsonException($"Bundle truncated after property '{name}'.");
+
+                            if (string.Equals(name, TextMapEnSection, StringComparison.Ordinal))
+                            {
+                                long valueStart = reader.TokenStartIndex;
+                                reader.Skip();
+                                long valueEnd = reader.BytesConsumed;
+
+                                Directory.CreateDirectory(Path.GetDirectoryName(stagePath));
+                                using (var fs = new FileStream(
+                                           stagePath, FileMode.Create, FileAccess.Write, FileShare.None))
+                                {
+                                    var section = utf8.Slice(
+                                        origin + (int)valueStart, (int)(valueEnd - valueStart));
+                                    fs.Write(section);
+                                }
+                                hasTextMapEn = true;
+                            }
+                            else
+                            {
+                                bundle[name] = JsonNode.Parse(ref reader);
+                            }
                         }
-                        hasTextMapEn = true;
                     }
-                    else
+                    finally
                     {
-                        bundle[name] = JToken.ReadFrom(jr);
+                        view.SafeMemoryMappedViewHandle.ReleasePointer();
                     }
                 }
             }
 
             return bundle;
+        }
+
+        private static int ReadInt(JsonNode node)
+        {
+            if (node is JsonValue value)
+            {
+                if (value.TryGetValue(out int asInt)) return asInt;
+                if (value.TryGetValue(out string asString) &&
+                    int.TryParse(asString, NumberStyles.Integer, CultureInfo.InvariantCulture, out int parsed))
+                {
+                    return parsed;
+                }
+            }
+            return 0;
         }
 
         /// <summary>
@@ -645,7 +692,7 @@ namespace GI_Subtitles.Services.Translation
                 try
                 {
                     string json = File.ReadAllText(ManifestPath);
-                    var loaded = JsonConvert.DeserializeObject<Dictionary<string, GamedataManifestEntry>>(json);
+                    var loaded = JsonSerializer.Deserialize<Dictionary<string, GamedataManifestEntry>>(json, JsonDefaults.Options);
                     return loaded ?? new Dictionary<string, GamedataManifestEntry>(StringComparer.OrdinalIgnoreCase);
                 }
                 catch (Exception ex)
@@ -664,7 +711,7 @@ namespace GI_Subtitles.Services.Translation
                 {
                     GameDataPaths.EnsureRoot();
                     string tmp = ManifestPath + ".tmp";
-                    File.WriteAllText(tmp, JsonConvert.SerializeObject(manifest, Formatting.Indented));
+                    File.WriteAllText(tmp, JsonSerializer.Serialize(manifest, JsonDefaults.Indented));
                     if (File.Exists(ManifestPath)) File.Delete(ManifestPath);
                     File.Move(tmp, ManifestPath);
                 }

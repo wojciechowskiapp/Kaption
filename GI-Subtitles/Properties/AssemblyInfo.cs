@@ -26,6 +26,7 @@ using System.Windows;
 // assembly is not strong-named; neither is this one, so the friend name
 // is just the short assembly name.
 [assembly: InternalsVisibleTo("GI-Test")]
+[assembly: InternalsVisibleTo("Kaption.Benchmark")]
 
 //若要开始生成可本地化的应用程序，请设置
 //.csproj 文件中的 <UICulture>CultureYouAreCodingWith</UICulture>

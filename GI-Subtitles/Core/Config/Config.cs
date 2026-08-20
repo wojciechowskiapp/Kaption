@@ -1,8 +1,9 @@
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Text.Json;
+using System.Text.Json.Nodes;
+using System.Text.Json.Serialization;
 using GI_Subtitles.Common;
 
 namespace GI_Subtitles.Core.Config
@@ -14,8 +15,24 @@ namespace GI_Subtitles.Core.Config
     {
         private static readonly string SettingsFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Kaption");
         private static readonly string SettingsFile = Path.Combine(SettingsFolder, "Config.json");
-        private static readonly Dictionary<string, JToken> _settings = new Dictionary<string, JToken>();
+        private static readonly Dictionary<string, JsonNode> _settings = new Dictionary<string, JsonNode>();
         private static readonly object _settingsLock = new object();
+
+        private static readonly JsonDocumentOptions ParseOptions = new JsonDocumentOptions
+        {
+            CommentHandling = JsonCommentHandling.Skip,
+            AllowTrailingCommas = true,
+        };
+
+        /// <summary>
+        /// Config.json is hand-editable, so a numeric setting may legitimately
+        /// arrive quoted; <see cref="JsonNumberHandling.AllowReadingFromString"/>
+        /// keeps those files loading.
+        /// </summary>
+        private static readonly JsonSerializerOptions ReadOptions = new JsonSerializerOptions(JsonDefaults.Options)
+        {
+            NumberHandling = JsonNumberHandling.AllowReadingFromString,
+        };
 
         static Config()
         {
@@ -38,14 +55,16 @@ namespace GI_Subtitles.Core.Config
             try
             {
                 var json = File.ReadAllText(file);
-                var jo = JObject.Parse(json);
+                if (!(JsonNode.Parse(json, documentOptions: ParseOptions) is JsonObject jo))
+                    throw new JsonException($"Config file is not a JSON object: {file}");
+
                 if (jo.Count > 0)
                 {
                     lock (_settingsLock)
                     {
-                        foreach (var prop in jo.Properties())
+                        foreach (var prop in jo)
                         {
-                            _settings[prop.Name] = prop.Value;
+                            _settings[prop.Key] = prop.Value?.DeepClone();
                         }
                     }
                 }
@@ -62,25 +81,25 @@ namespace GI_Subtitles.Core.Config
 
         public static void Save()
         {
-            JObject jo;
+            JsonObject jo;
             lock (_settingsLock)
             {
-                jo = new JObject();
+                jo = new JsonObject();
                 foreach (var kv in _settings)
                 {
-                    jo[kv.Key] = kv.Value;
+                    jo[kv.Key] = kv.Value?.DeepClone();
                 }
             }
-            File.WriteAllText(SettingsFile, jo.ToString(Formatting.Indented));
+            File.WriteAllText(SettingsFile, jo.ToJsonString(JsonDefaults.Indented));
         }
 
         public static T Get<T>(string key, T defaultValue = default)
         {
             lock (_settingsLock)
             {
-                if (_settings.TryGetValue(key, out var token))
+                if (_settings.TryGetValue(key, out var token) && token != null)
                 {
-                    try { return token.ToObject<T>(); }
+                    try { return token.Deserialize<T>(ReadOptions); }
                     catch (Exception ex) { Logger.Log.Error($"Config.Get<{typeof(T).Name}>(\"{key}\") failed: {ex.Message}"); }
                 }
             }
@@ -91,7 +110,7 @@ namespace GI_Subtitles.Core.Config
         {
             lock (_settingsLock)
             {
-                _settings[key] = JToken.FromObject(value);
+                _settings[key] = JsonSerializer.SerializeToNode(value, JsonDefaults.Options);
             }
             Save();
         }
@@ -129,13 +148,13 @@ namespace GI_Subtitles.Core.Config
         {
             lock (_settingsLock)
             {
-                if (_settings.TryGetValue("Pad", out var token))
+                if (_settings.TryGetValue("Pad", out var token) && token != null)
                 {
                     try
                     {
-                        if (token.Type == JTokenType.Array)
+                        if (token is JsonArray)
                         {
-                            var padArray = token.ToObject<int[]>();
+                            var padArray = token.Deserialize<int[]>(ReadOptions);
                             if (padArray != null && padArray.Length > 0)
                             {
                                 return padArray[0];
@@ -143,7 +162,7 @@ namespace GI_Subtitles.Core.Config
                         }
                         else
                         {
-                            return token.ToObject<int>();
+                            return token.Deserialize<int>(ReadOptions);
                         }
                     }
                     catch (Exception ex) { Logger.Log.Error($"Config.GetPad failed: {ex.Message}"); }
@@ -156,13 +175,13 @@ namespace GI_Subtitles.Core.Config
         {
             lock (_settingsLock)
             {
-                if (_settings.TryGetValue("Pad", out var token))
+                if (_settings.TryGetValue("Pad", out var token) && token != null)
                 {
                     try
                     {
-                        if (token.Type == JTokenType.Array)
+                        if (token is JsonArray)
                         {
-                            var padArray = token.ToObject<int[]>();
+                            var padArray = token.Deserialize<int[]>(ReadOptions);
                             if (padArray != null && padArray.Length > 1)
                             {
                                 return padArray[1];
