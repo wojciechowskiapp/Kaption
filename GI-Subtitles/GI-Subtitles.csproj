@@ -195,7 +195,7 @@
          generally: OSV shows 3.0.0 and 3.2.0 still carry it. 3.3.2 is clear.
          Corrected 2026-08-20; the previous wording implied any 3.x was safe and
          would have made a downgrade look harmless. -->
-    <PackageReference Include="log4net" Version="3.3.2" />
+    <PackageReference Include="log4net" Version="3.4.0" />
     <!-- FST-indexed matcher blob. Lucene.Net 4.8.0-beta00017 multi-targets
          netstandard2.0 + net6.0; runs cleanly on net8. Only the Fst
          subsystem is used — no IO/Directory dependencies. Apache-2.0. -->

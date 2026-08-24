@@ -50,7 +50,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="log4net" Version="3.3.2" />
+    <PackageReference Include="log4net" Version="3.4.0" />
     <!-- Microsoft.NET.Test.Sdk is required for `dotnet test` discovery on
          net8+ (MSTest alone doesn't surface the VSTest console host).
          Adds IsTestProject=true implicitly. -->
