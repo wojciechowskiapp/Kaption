@@ -199,7 +199,7 @@
     <!-- FST-indexed matcher blob. Lucene.Net 4.8.0-beta00017 multi-targets
          netstandard2.0 + net6.0; runs cleanly on net8. Only the Fst
          subsystem is used — no IO/Directory dependencies. Apache-2.0. -->
-    <PackageReference Include="Lucene.Net" Version="4.8.0-beta00017" />
+    <PackageReference Include="Lucene.Net" Version="4.8.0-beta00018" />
     <!-- ZstdSharp.Port 0.8.8 is pure-managed (no native DLL), targets
          netstandard2.0 + net5+, MIT, zstd 1.5.7 parity. Used for
          dictionary-trained per-value compression of the matcher's
