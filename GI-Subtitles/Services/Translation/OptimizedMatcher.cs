@@ -1106,6 +1106,13 @@ namespace GI_Subtitles.Services.Translation
             return _reader != null ? FetchValueMmap(slot) : _entries[slot].Value;
         }
 
+        // In mmap mode SymSpell's values[] is empty by design; the blob holds the value.
+        private string GetSymSpellValue(int slot)
+        {
+            string value = _symSpellIndex.GetValue(slot);
+            return string.IsNullOrEmpty(value) && _reader != null ? FetchValueMmap(slot) : value;
+        }
+
         // Stage 1 scratch. FindClosestMatch runs on the WPF dispatcher for the OCR
         // tick and on worker threads for the SRT/video and answer-region paths, so
         // the scratch has to be per-thread rather than per-instance.
@@ -1193,7 +1200,15 @@ namespace GI_Subtitles.Services.Translation
         }
 
         public string FindClosestMatch(string input, out string Key)
+            => FindClosestMatch(input, out Key, out _);
+
+        /// <summary>
+        /// Also reports when the input covers only part of the selected key.
+        /// Such matches may be previewed, but do not confirm dialogue progress.
+        /// </summary>
+        public string FindClosestMatch(string input, out string Key, out bool isPartialMatch)
         {
+            isPartialMatch = false;
             string normInput = NormalizeInput(input, isEng);
 
             if (string.IsNullOrEmpty(normInput))
@@ -1202,35 +1217,30 @@ namespace GI_Subtitles.Services.Translation
                 return "";
             }
 
-            // --- Stage 0: SymSpell Fast Path (EN only, edit distance <= 2) ---
-            // Catches exact matches with 1-2 OCR character errors in ~5us.
-            // In mmap mode SymSpellIndex.GetValue returns a null sentinel
-            // (the matcher holds the live values[] behind the reader), so
-            // we pull the value via FetchValueMmap whenever that happens.
-            if (_symSpellIndex != null && _symSpellIndex.IsReady)
-            {
-                if (_symSpellIndex.TryFindMatch(normInput, out int symIdx, out int symDist))
-                {
-                    // SymSpell found a match -- verify it's reasonable
-                    string symKey = _symSpellIndex.GetOriginalKey(symIdx);
-                    string symValue = _symSpellIndex.GetValue(symIdx);
-                    if (string.IsNullOrEmpty(symValue) && _reader != null)
-                    {
-                        // Mmap mode: values[] array inside SymSpell is empty
-                        // by design — go fetch the real value from the blob.
-                        symValue = FetchValueMmap(symIdx);
-                    }
+            int inputLen = normInput.Length;
 
-                    // For exact/near-exact matches (distance 0-2), return immediately
-                    if (symDist <= 2 && !string.IsNullOrEmpty(symValue))
+            // --- Stage 0: SymSpell Fast Path (EN only, edit distance <= 2) ---
+            // Only a complete line returns here. A prefix or fuzzy hit waits for the
+            // completion check below: SymSpell cannot see keys 3+ characters longer.
+            int symIdx = -1;
+            if (_symSpellIndex != null && _symSpellIndex.IsReady &&
+                _symSpellIndex.TryFindMatch(normInput, out int symHit, out int symDist) && symDist <= 2)
+            {
+                if (symDist == 0 && GetKeyLength(symHit) == inputLen)
+                {
+                    string exactValue = GetSymSpellValue(symHit);
+                    if (!string.IsNullOrEmpty(exactValue))
                     {
-                        Key = symKey;
-                        return symValue;
+                        Key = _symSpellIndex.GetOriginalKey(symHit);
+                        return exactValue;
                     }
+                }
+                else
+                {
+                    symIdx = symHit;
                 }
             }
 
-            int inputLen = normInput.Length;
             HashSet<int> candidates = RentCandidateSet();
 
             // --- Stage 1: Candidate Selection (N-gram Pruning) ---
@@ -1277,12 +1287,6 @@ namespace GI_Subtitles.Services.Translation
                 }
             }
 
-            if (candidates.Count == 0)
-            {
-                Key = "";
-                return "";
-            }
-
             // --- Stage 2: Exact Distance Calculation ---
 
             int globalBestDistance = int.MaxValue;
@@ -1297,6 +1301,55 @@ namespace GI_Subtitles.Services.Translation
             string[] normKeysArr = _normKeys;
             int[] keyLensArr = _keyLengths;
             Entry[] entriesArr = _entries;
+
+            // A complete key wins outright. A truncated typewriter frame resolves only
+            // when one distinct key continues it; every such key carries all of the
+            // input's n-grams, so the candidate set holds all of them.
+            int completion = -1;
+            bool ambiguous = false;
+            foreach (int id in candidates)
+            {
+                string normKey = mmap ? normKeysArr[id] : entriesArr[id].NormalizedKey;
+                if (normKey.Length == inputLen)
+                {
+                    if (string.Equals(normKey, normInput, StringComparison.Ordinal))
+                    {
+                        Key = GetOriginalKey(id);
+                        return GetValue(id);
+                    }
+                }
+                else if (!ambiguous && normKey.Length > inputLen &&
+                         normKey.StartsWith(normInput, StringComparison.Ordinal))
+                {
+                    if (completion < 0) completion = id;
+                    else if (!string.Equals(normKey, GetNormKey(completion), StringComparison.Ordinal)) ambiguous = true;
+                }
+            }
+
+            // Below one n-gram only short keys are candidates, so uniqueness is unprovable.
+            if (ambiguous || inputLen < _ngramSize)
+            {
+                Key = "";
+                return "";
+            }
+
+            if (completion >= 0)
+            {
+                Key = GetOriginalKey(completion);
+                isPartialMatch = true;
+                return GetValue(completion);
+            }
+
+            if (symIdx >= 0)
+            {
+                string symValue = GetSymSpellValue(symIdx);
+                if (!string.IsNullOrEmpty(symValue))
+                {
+                    Key = _symSpellIndex.GetOriginalKey(symIdx);
+                    isPartialMatch = GetKeyLength(symIdx) > inputLen;
+                    return symValue;
+                }
+            }
 
             foreach (int id in candidates)
             {
@@ -1316,14 +1369,11 @@ namespace GI_Subtitles.Services.Translation
 
                 int currentDistance;
 
-                // Prefix matching (handles typewriter effect -- OCR captures partial sentence)
+                // No key continues the input here (handled above), so a longer key is
+                // scored by substring containment or by distance over its prefix.
                 if (keyLen >= inputLen)
                 {
-                    if (normKey.StartsWith(normInput, StringComparison.Ordinal))
-                    {
-                        currentDistance = 0;
-                    }
-                    else if (inputLen > 10 && keyLen <= 150 && normKey.Contains(normInput))
+                    if (inputLen > 10 && keyLen <= 150 && normKey.Contains(normInput))
                     {
                         currentDistance = 0;
                     }
@@ -1408,6 +1458,7 @@ namespace GI_Subtitles.Services.Translation
                 if (globalBestDistance <= threshold)
                 {
                     Key = GetOriginalKey(bestIndex);
+                    isPartialMatch = (mmap ? keyLensArr[bestIndex] : entriesArr[bestIndex].Length) > inputLen;
                     return GetValue(bestIndex);
                 }
             }
@@ -1533,9 +1584,10 @@ namespace GI_Subtitles.Services.Translation
             if (string.IsNullOrEmpty(ocrText)) return result;
 
             string[] lines = ocrText.Split(new[] { '\n' }, StringSplitOptions.RemoveEmptyEntries);
+            if (lines.Length == 0) return result;
             if (lines.Length == 1)
             {
-                result.Content = FindClosestMatch(lines[0], out key);
+                result.Content = FindClosestMatch(lines[0], out key, out result.IsPartial);
                 return result;
             }
 
@@ -1565,13 +1617,14 @@ namespace GI_Subtitles.Services.Translation
             }
             string bodyText = string.Join(" ", lines.Skip(maxIndex));
 
-            string bodyMatch = FindClosestMatch(bodyText, out string bodyKey);
+            string bodyMatch = FindClosestMatch(bodyText, out string bodyKey, out bool isPartial);
             if (string.IsNullOrEmpty(bodyMatch) && maxIndex > 1)
             {
-                bodyMatch = FindClosestMatch(string.Join(" ", lines.Skip(1)), out bodyKey);
+                bodyMatch = FindClosestMatch(string.Join(" ", lines.Skip(1)), out bodyKey, out isPartial);
             }
             key = bodyKey;
             result.Content = bodyMatch;
+            result.IsPartial = isPartial;
             return result;
         }
 

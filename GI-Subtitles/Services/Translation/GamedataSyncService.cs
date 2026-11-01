@@ -121,8 +121,11 @@ namespace GI_Subtitles.Services.Translation
         /// <summary>
         /// Sync the gamedata bundle for one game. Returns a summary — success
         /// is <c>result.Downloaded || result.UpToDate</c>.
+        /// <paramref name="pairFileVersionId"/>: id of the installed translation
+        /// pack, so the server can return the bundle released with it.
         /// </summary>
-        public async Task<GamedataSyncResult> SyncAsync(string game, CancellationToken ct)
+        public async Task<GamedataSyncResult> SyncAsync(
+            string game, CancellationToken ct, string pairFileVersionId = null)
         {
             var result = new GamedataSyncResult();
             var watch = Stopwatch.StartNew();
@@ -157,7 +160,9 @@ namespace GI_Subtitles.Services.Translation
             IReadOnlyList<GamedataMetadata> remoteBundles;
             try
             {
-                remoteBundles = await _api.GetGamedataAsync(session.DeviceSessionJwt, game, ct)
+                if (!string.IsNullOrEmpty(pairFileVersionId))
+                    Logger.Log.Info($"GamedataSync: requesting the bundle paired with pack {pairFileVersionId}.");
+                remoteBundles = await _api.GetGamedataAsync(session.DeviceSessionJwt, game, ct, pairFileVersionId)
                     .ConfigureAwait(false);
             }
             catch (UnauthorizedException ex)

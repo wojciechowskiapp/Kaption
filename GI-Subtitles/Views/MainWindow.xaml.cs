@@ -452,7 +452,7 @@ namespace GI_Subtitles.Views
                 Logger.Log.Info("Using MaskOverlayAreas to exclude overlay from captures (WPF layered window)");
             }
 
-            _cachedFontSize = Config.Get<int>("Size", 22);
+            _cachedFontSize = Config.Get<int>("Size", SubtitleOverlayDefaults.FontSize);
 
             // Initialize screen capture: try DXGI (GPU, fast) first, fall back to GDI
             var dxgi = new DxgiScreenCapture();
@@ -683,7 +683,7 @@ namespace GI_Subtitles.Views
             OCRTimer.Tick += GetOCR;    // Delegate: method to execute
 
 
-            UITimer.Interval = TimeSpan.FromMilliseconds(Config.Get<int>("UiRefreshInterval", 150));
+            UITimer.Interval = TimeSpan.FromMilliseconds(Config.Get<int>("UiRefreshInterval", SubtitleOverlayDefaults.UiRefreshIntervalMs));
             UITimer.Tick += UpdateText;    // Delegate: method to execute
 
             // Wire OCR-active-seconds reporting to the heartbeat so the
@@ -713,14 +713,14 @@ namespace GI_Subtitles.Views
             }
 
             // Apply configurable subtitle background opacity (0-255, default 176 = #B0)
-            int bgOpacity = Config.Get<int>("SubtitleBgOpacity", 176);
+            int bgOpacity = Config.Get<int>("SubtitleBgOpacity", SubtitleOverlayDefaults.BackgroundOpacity);
             bgOpacity = Math.Max(0, Math.Min(255, bgOpacity));
             SubtitleBackground.Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb((byte)bgOpacity, 0, 0, 0));
 
             // P2: idle-hide timer — fade out subtitle after 1s of no new text
             _idleHideTimer = new System.Windows.Threading.DispatcherTimer
             {
-                Interval = TimeSpan.FromSeconds(1)
+                Interval = TimeSpan.FromSeconds(SubtitleOverlayDefaults.IdleHideSeconds)
             };
             _idleHideTimer.Tick += (s, args) =>
             {
@@ -737,7 +737,7 @@ namespace GI_Subtitles.Views
                     return;
                 }
 
-                var fadeOut = new System.Windows.Media.Animation.DoubleAnimation(1, 0, TimeSpan.FromMilliseconds(500));
+                var fadeOut = new System.Windows.Media.Animation.DoubleAnimation(1, 0, TimeSpan.FromMilliseconds(SubtitleOverlayDefaults.IdleFadeOutMs));
                 SubtitleBackground.BeginAnimation(OpacityProperty, fadeOut);
                 _subtitleVisible = false;
 
@@ -752,10 +752,11 @@ namespace GI_Subtitles.Views
 
                 // Reset dialogue prediction context when conversation ends
                 data?.ContextEngine?.Reset();
+                _subtitleResolver.ClearCache();
             };
 
             // Apply saved font family
-            string savedFont = Config.Get("FontFamily", "Segoe UI");
+            string savedFont = Config.Get("FontFamily", SubtitleOverlayDefaults.FontFamily);
             var fontFamily = new System.Windows.Media.FontFamily(savedFont);
             SubtitleText.FontFamily = fontFamily;
             HeaderText.FontFamily = fontFamily;
@@ -1268,11 +1269,6 @@ namespace GI_Subtitles.Views
                 try
                 {
                     Bitmap target;
-                    if (notify.Region[1] == "0")
-                    {
-                        notify.ChooseRegion();
-                    }
-
                     bool isRegion2Valid = notify.Region2 != null && notify.Region2.Length == 4 &&
                                          int.TryParse(notify.Region2[2], out int region2Width) && region2Width > 0 &&
                                          int.TryParse(notify.Region2[3], out int region2Height) && region2Height > 0;
@@ -1566,7 +1562,7 @@ namespace GI_Subtitles.Views
 
                         // Independent answer region polling: when dialogue is stable
                         // (not triggering full OCR) but answer region may have changed
-                        if (!passedToOcr && answerTarget != null && ocrText.Length > 1 && !IsLikelyGameUI(ocrText)
+                        if (!passedToOcr && answerTarget != null && ocrText.Length > 1 && !GameUiTextFilter.IsLikelyGameUI(ocrText)
                             && !_isAnswerOcrRunning && !_isOcrRunning
                             && (DateTime.UtcNow - _lastAnswerOcrTime).TotalMilliseconds > 400)
                         {
@@ -1717,7 +1713,7 @@ namespace GI_Subtitles.Views
                         targetScreen = Screen.PrimaryScreen;
 
                     double screenScale = GetScaleForScreen(targetScreen);
-                    int fontSize = Config.Get<int>("Size", 22);
+                    int fontSize = Config.Get<int>("Size", SubtitleOverlayDefaults.FontSize);
 
                     // Get detected text blocks for Embedded Illusion mode
                     var detectedBlocks = _lastDetectedText?.DialogueBlocks;
@@ -1744,10 +1740,10 @@ namespace GI_Subtitles.Views
                             targetScreen.Bounds.Top / screenScale,
                             targetScreen.Bounds.Width / screenScale,
                             targetScreen.Bounds.Height / screenScale),
-                        MaxHeight = Config.Get<int>("MaxOverlayHeight", 0),
-                        MaxWidth = Config.Get<int>("MaxOverlayWidth", 900),
-                        AutoShrinkText = Config.Get<bool>("AutoShrinkText", true),
-                        MinFontSize = 12,
+                        MaxHeight = Config.Get<int>("MaxOverlayHeight", SubtitleOverlayDefaults.MaxOverlayHeight),
+                        MaxWidth = Config.Get<int>("MaxOverlayWidth", SubtitleOverlayDefaults.MaxOverlayWidth),
+                        AutoShrinkText = Config.Get<bool>("AutoShrinkText", SubtitleOverlayDefaults.AutoShrinkText),
+                        MinFontSize = SubtitleOverlayDefaults.MinFontSize,
                         StrokeThickness = SubtitleText.StrokeThickness,
                         PixelsPerDip = VisualTreeHelper.GetDpi(this).PixelsPerDip,
                         DetectedBlocks = detectedBlocks
@@ -1843,7 +1839,7 @@ namespace GI_Subtitles.Views
                     string header = "";
                     string content = "";
 
-                    if (ocrText.Length > 1 && !IsLikelyGameUI(ocrText))
+                    if (ocrText.Length > 1 && !GameUiTextFilter.IsLikelyGameUI(ocrText))
                     {
                         var resolution = _subtitleResolver.Resolve(
                             ocrText, _detectedNpcName, data.ContextEngine, data.Matcher, data.contentDict);
@@ -1942,7 +1938,7 @@ namespace GI_Subtitles.Views
                             // Skip the fade-in animation to prevent visible blink.
                             bool isRecentRestore = !string.IsNullOrEmpty(content) &&
                                 content == _recentContent &&
-                                (DateTime.UtcNow - _recentContentTime).TotalSeconds < 3;
+                                (DateTime.UtcNow - _recentContentTime).TotalSeconds < SubtitleOverlayDefaults.RecentRestoreSeconds;
 
                             // If the previous frame painted a graph-based prediction and the current
                             // frame is the real OCR-confirmed translation, swap WITHOUT fade-in.
@@ -1956,7 +1952,7 @@ namespace GI_Subtitles.Views
                                 // Animate text change: quick fade in
                                 SubtitleText.Opacity = 0;
                                 SubtitleText.Text = content;
-                                var textFadeIn = new System.Windows.Media.Animation.DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(180));
+                                var textFadeIn = new System.Windows.Media.Animation.DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(SubtitleOverlayDefaults.TextFadeInMs));
                                 SubtitleText.BeginAnimation(OpacityProperty, textFadeIn);
                             }
                             else
@@ -2070,7 +2066,7 @@ namespace GI_Subtitles.Views
                             _lastContentChangeTime = DateTime.UtcNow;
                             SubtitleBackground.Visibility = Visibility.Visible;
                             SubtitleBackground.BeginAnimation(OpacityProperty, null);
-                            var fadeIn = new System.Windows.Media.Animation.DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(150));
+                            var fadeIn = new System.Windows.Media.Animation.DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(SubtitleOverlayDefaults.ContainerFadeInMs));
                             SubtitleBackground.BeginAnimation(OpacityProperty, fadeIn);
                             _subtitleVisible = true;
                         }
@@ -2102,113 +2098,6 @@ namespace GI_Subtitles.Views
             // so layout is automatic. Just trigger a height/position refresh.
             UpdateWindowHeightAndTop();
         }
-
-        /// <summary>
-        /// Filters out game UI text that OCR picks up but isn't dialogue.
-        /// Examples: "Lv.50", "5015/7380", "1:23", score numbers, menu labels.
-        /// Real dialogue has mostly alphabetical characters and is longer.
-        /// </summary>
-        /// <remarks>
-        /// The previous implementation did a naive <c>Contains()</c> against a flat list of
-        /// keywords that included common English words like "wish", "sword", "bow", "shop",
-        /// "mail", "character", "def", "atk". This caused valid dialogue such as
-        /// <c>"...I Wish I Could Get Back..."</c> to be silently classified as game UI —
-        /// the translation would be dropped, the idle-hide timer would arm, and the
-        /// subtitle would fade out mid-conversation until the player advanced the dialogue.
-        ///
-        /// The rewrite uses two lists with different match strategies:
-        ///   • <see cref="GameUIPhrases"/>   — unambiguous multi-word expressions that don't
-        ///     appear in normal speech (e.g. "base atk", "crit rate"). Safe to substring-match.
-        ///   • <see cref="GameUIWords"/>     — single words rare enough to not appear
-        ///     mid-sentence (e.g. "attributes", "polearm"). Word-boundary match, and only
-        ///     evaluated on short text so a long dialogue that happens to contain the word
-        ///     isn't flagged.
-        /// Overly-generic single words that previously caused false positives have been
-        /// removed from both lists entirely.
-        /// </remarks>
-        // Multi-word UI phrases — unambiguous menu/stat labels; substring-matched at any length.
-        private static readonly string[] GameUIPhrases = new[]
-        {
-            "base atk", "crit rate", "crit dmg", "energy recharge", "elemental mastery",
-            "adventurer handbook", "battle pass", "party setup", "co-op",
-        };
-
-        // Single-word UI keywords — matched only as whole tokens AND only when the overall
-        // text is short (see length gate below). Keep this list small and unambiguous.
-        private static readonly HashSet<string> GameUIWords = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-        {
-            "attributes", "constellation", "polearm", "claymore", "refinement",
-        };
-
-        // Max length at which short-word UI keywords are allowed to flag text.
-        // Real dialogue tends to exceed this; UI labels almost never do.
-        private const int GameUIWordGateLength = 40;
-
-        private static bool IsLikelyGameUI(string text)
-        {
-            if (string.IsNullOrEmpty(text)) return true;
-            string trimmed = text.Trim();
-            if (trimmed.Length < 4) return true;
-
-            // Count letter vs non-letter characters
-            int letters = 0;
-            int digits = 0;
-            foreach (char c in trimmed)
-            {
-                if (char.IsLetter(c)) letters++;
-                else if (char.IsDigit(c)) digits++;
-            }
-
-            // If more digits than letters, it's likely UI (HP, level, timer, score)
-            if (digits > 0 && digits >= letters) return true;
-
-            // Very short text with digits is likely UI ("Lv.50", "HP 100")
-            if (trimmed.Length < 10 && digits > 0) return true;
-
-            string lower = trimmed.ToLowerInvariant();
-
-            // Multi-word phrase check — safe at any length because these phrases
-            // don't occur in conversational English.
-            foreach (var phrase in GameUIPhrases)
-            {
-                if (lower.Contains(phrase)) return true;
-            }
-
-            // Single-word check — only fires on short text. A long sentence containing
-            // a keyword as a normal English word (e.g. "I wish I could...") won't trip
-            // this branch.
-            if (trimmed.Length <= GameUIWordGateLength)
-            {
-                if (ContainsGameUIWord(lower)) return true;
-            }
-
-            return false;
-        }
-
-        /// <summary>
-        /// Tokenize <paramref name="lowerText"/> on non-letter boundaries and return true
-        /// if any whole token matches an entry in <see cref="GameUIWords"/>. Whole-token
-        /// matching avoids false positives like "shoplifter" matching "shop".
-        /// </summary>
-        private static bool ContainsGameUIWord(string lowerText)
-        {
-            int i = 0;
-            int n = lowerText.Length;
-            while (i < n)
-            {
-                // Skip non-letters
-                while (i < n && !char.IsLetter(lowerText[i])) i++;
-                int start = i;
-                while (i < n && char.IsLetter(lowerText[i])) i++;
-                if (i > start)
-                {
-                    string token = lowerText.Substring(start, i - start);
-                    if (GameUIWords.Contains(token)) return true;
-                }
-            }
-            return false;
-        }
-
 
         /// <summary>
         /// Masks overlay window areas from a captured bitmap to prevent OCR from reading its own output.
@@ -2550,6 +2439,10 @@ namespace GI_Subtitles.Views
                 _lastOcrWasFullyStable = false;
                 _detectedNpcName = string.Empty;
                 _lastDetectedText = null;
+                ocrText = string.Empty;
+                _translatedAnswers = null;
+                _predictedContent = null;
+                _subtitleResolver.ClearCache();
                 _lastAnswerPixelSum = 0;
                 Interlocked.Exchange(ref failedCount, 0);
                 usingRegion2 = false;
@@ -4024,7 +3917,7 @@ namespace GI_Subtitles.Views
                         // --- Answer Region OCR (validates/supplements graph predictions) ---
                         // Skip answer OCR when dialogue text is game UI (menus, stats, etc.)
                         if (FeatureAnswerTranslationEnabled && answerTarget != null &&
-                            detectedText.Length > 1 && !IsLikelyGameUI(detectedText))
+                            detectedText.Length > 1 && !GameUiTextFilter.IsLikelyGameUI(detectedText))
                         {
                             try
                             {

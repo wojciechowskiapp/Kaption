@@ -299,12 +299,26 @@ namespace GI_Subtitles.Services.Translation
 
             int inputPrefixLen = Math.Min(normalizedInput.Length, _prefixLength);
 
-            // Generate delete variants of the input prefix
-            var candidates = new HashSet<int>();
-
-            // Check exact prefix hash first (distance 0)
+            // A complete normalized key outranks a typewriter prefix. Check
+            // the existing posting list before allocating fuzzy-search scratch;
+            // matching full lines is the common case once animation settles.
             long exactHash = HashSpan(normalizedInput, 0, inputPrefixLen);
-            if (_deleteIndex.TryGetValue(exactHash, out int[] exactEntries))
+            _deleteIndex.TryGetValue(exactHash, out int[] exactEntries);
+            if (exactEntries != null)
+            {
+                foreach (int idx in exactEntries)
+                {
+                    if (string.Equals(_normalizedKeys[idx], normalizedInput, StringComparison.Ordinal))
+                    {
+                        entryIndex = idx;
+                        editDistance = 0;
+                        return true;
+                    }
+                }
+            }
+
+            var candidates = new HashSet<int>();
+            if (exactEntries != null)
             {
                 foreach (int idx in exactEntries)
                     candidates.Add(idx);

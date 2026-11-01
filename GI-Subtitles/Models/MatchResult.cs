@@ -7,6 +7,7 @@ namespace GI_Subtitles.Models
     {
         public string Header;
         public string Content;
+        public bool IsPartial;
     }
 }
 

@@ -227,14 +227,12 @@ namespace GI_Subtitles.Services.Detection
                     // worse (p90 410 ms AND more churn), and 0.15 buys 73 ms more
                     // tail for a jump in mid-typewriter re-reads.
                     //
-                    // That residual churn (~20% of lines repaint once) is NOT a
-                    // pacing cost. All 25 of 25 observed repaints trace to
-                    // OptimizedMatcher scoring a truncated typewriter prefix at
-                    // distance 0 and taking the first key in scan order, so
-                    // "Yes, y" resolves to "Yes, you." before the line finishes.
+                    // The residual churn was mostly OptimizedMatcher resolving a
+                    // truncated prefix to an arbitrary key; fixed 2026-11-01 (17 -> 5
+                    // wrong paints). What remains is exact keys on truncated frames.
                     //
-                    // Fixing that unlocks a lower timeout — but NOT by editing this
-                    // number alone. At a 100 ms interval the gate compares elapsed
+                    // That no longer blocks a lower timeout, but this number alone
+                    // cannot buy one. At a 100 ms interval the gate compares elapsed
                     // time with strict > on a tick boundary, so 0.15 and 0.1 are
                     // the same setting; both first fire at 0.2 s. Reaching the
                     // sweep's p90 200 ms point needs OcrIntervalMs at 50 too.

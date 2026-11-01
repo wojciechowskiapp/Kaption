@@ -287,7 +287,10 @@ namespace GI_Subtitles.Services.Data
                     new KaptionApiClient(),
                     _license,
                     _protector);
-                var gamedataResult = await gamedataSync.SyncAsync(game, ct).ConfigureAwait(false);
+                // Pair with the pack DictionarySync installed, so a release promoted
+                // mid-startup can't hand us a bundle from a different version.
+                string pairId = DictionarySyncService.GetInstalledFileVersionId(game, outputLang);
+                var gamedataResult = await gamedataSync.SyncAsync(game, ct, pairId).ConfigureAwait(false);
                 result.GraphDownloaded = gamedataResult.Downloaded;
 
                 if (gamedataResult.Failed)

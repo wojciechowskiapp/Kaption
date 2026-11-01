@@ -99,6 +99,25 @@ namespace GI_Subtitles.Services.Translation
             return LoadManifest();
         }
 
+        /// <summary>
+        /// FileVersionId of the pack installed for (game, language), or null.
+        /// GamedataSync sends it as <c>?pair=</c> so the bundle matches the pack.
+        /// </summary>
+        public static string GetInstalledFileVersionId(string game, string language)
+            => FindFileVersionId(LoadManifest(), game, language);
+
+        internal static string FindFileVersionId(
+            IReadOnlyDictionary<string, ManifestEntry> manifest, string game, string language)
+        {
+            if (manifest == null || string.IsNullOrWhiteSpace(game) || string.IsNullOrWhiteSpace(language))
+                return null;
+            // Same shape as ManifestKey: server ids are lower-case.
+            string key = $"{game.ToLowerInvariant()}/{language.ToLowerInvariant()}";
+            return manifest.TryGetValue(key, out var entry) && !string.IsNullOrWhiteSpace(entry?.FileVersionId)
+                ? entry.FileVersionId
+                : null;
+        }
+
         private readonly KaptionApiClient _api;
         private readonly LicenseService _license;
         private readonly IFileProtectionService _protector;

@@ -542,17 +542,31 @@ namespace GI_Subtitles.Services.Network
         /// NpcNames / QuestInfo / HashToDialogs / TalkIndex used by the
         /// dialogue prediction engine. One per (game, version); no language
         /// dimension because the bundle references hash IDs, not text.
+        ///
+        /// <paramref name="pairFileVersionId"/> is the translation pack this
+        /// client installed; the server then answers with that pack's paired
+        /// bundle, so a release promoted between the two syncs can't mix
+        /// versions. Older servers ignore it.
         /// </summary>
         public async Task<IReadOnlyList<GamedataMetadata>> GetGamedataAsync(
-            string sessionJwt, string game, CancellationToken ct)
+            string sessionJwt, string game, CancellationToken ct, string pairFileVersionId = null)
         {
             if (string.IsNullOrEmpty(sessionJwt))
                 throw new ArgumentException("sessionJwt required", nameof(sessionJwt));
 
-            string url = $"/api/license/gamedata?game={Uri.EscapeDataString(game ?? string.Empty)}";
+            string url = BuildGamedataListUrl(game, pairFileVersionId);
             var envelope = await GetJsonAsync<ApiListEnvelope<GamedataMetadata>>(url, sessionJwt, ct)
                 .ConfigureAwait(false);
             return envelope?.Items ?? Array.Empty<GamedataMetadata>();
+        }
+
+        /// <summary>Relative URL for <see cref="GetGamedataAsync"/>; <c>pair</c> only when known.</summary>
+        internal static string BuildGamedataListUrl(string game, string pairFileVersionId)
+        {
+            string url = $"/api/license/gamedata?game={Uri.EscapeDataString(game ?? string.Empty)}";
+            if (!string.IsNullOrWhiteSpace(pairFileVersionId))
+                url += $"&pair={Uri.EscapeDataString(pairFileVersionId)}";
+            return url;
         }
 
         /// <summary>

@@ -101,42 +101,47 @@ namespace GI_Test
 
         // ── Claim 3: the !foundRareGram fallback ────────────────────────────────
 
+        // The queries below are prefixes. Exactly one key continues each of them,
+        // since a prefix continued by several keys is declined as ambiguous.
+
         [TestMethod]
         public void Fallback_AllGramsOverCap_UnionUnderBudget_StillMatches()
         {
-            // One n-gram, 2100 keys behind it: over the 2000 per-gram cap, so the
+            // One n-gram, 2101 keys behind it: over the 2000 per-gram cap, so the
             // primary pass contributes nothing and the fallback runs. The union fits
             // the budget, so every candidate is admitted exactly as before.
-            var dict = new Dictionary<string, string>(2100, StringComparer.Ordinal);
-            for (int i = 0; i < 2100; i++) dict["abcd" + i.ToString("D5")] = "PL:" + i;
+            var dict = new Dictionary<string, string>(2101, StringComparer.Ordinal);
+            for (int i = 0; i < 2100; i++) dict["zz abcd " + i.ToString("D5")] = "PL:" + i;
+            dict["abcd and the rest"] = "PL:unique";
 
             using (var matcher = new OptimizedMatcher(dict, "EN"))
             {
                 string value = matcher.FindClosestMatch("abcd", out string key);
 
-                Assert.IsFalse(string.IsNullOrEmpty(value),
+                Assert.AreEqual("PL:unique", value,
                     "The fallback must still produce a candidate when every gram is over cap.");
-                StringAssert.StartsWith(key, "abcd");
+                Assert.AreEqual("abcd and the rest", key);
             }
         }
 
         [TestMethod]
         public void Fallback_AllGramsOverCap_UnionOverBudget_StillMatches()
         {
-            // 32 distinct grams x 2100 keys is far over the fallback budget, so the
+            // 32 distinct grams x 2101 keys is far over the fallback budget, so the
             // rarest-first selection kicks in. The correct entry carries every gram in
             // the query, so it survives whichever buckets the budget admits.
             const string phrase = "the quick brown fox jumps over the lazy dog";
-            var dict = new Dictionary<string, string>(2100, StringComparer.Ordinal);
-            for (int i = 0; i < 2100; i++) dict[phrase + " " + i.ToString("D5")] = "PL:" + i;
+            var dict = new Dictionary<string, string>(2101, StringComparer.Ordinal);
+            for (int i = 0; i < 2100; i++) dict["so " + phrase + " " + i.ToString("D5")] = "PL:" + i;
+            dict[phrase + " twice"] = "PL:unique";
 
             using (var matcher = new OptimizedMatcher(dict, "EN"))
             {
                 string value = matcher.FindClosestMatch(phrase, out string key);
 
-                Assert.IsFalse(string.IsNullOrEmpty(value),
+                Assert.AreEqual("PL:unique", value,
                     "Budget-capped fallback dropped the whole candidate set.");
-                StringAssert.StartsWith(key, phrase);
+                Assert.AreEqual(phrase + " twice", key);
             }
         }
 
@@ -145,15 +150,16 @@ namespace GI_Test
         {
             // A lone bucket wider than the entire budget must still be admitted;
             // returning nothing would be worse than doing the work.
-            var dict = new Dictionary<string, string>(9000, StringComparer.Ordinal);
-            for (int i = 0; i < 9000; i++) dict["wxyz" + i.ToString("D5")] = "PL:" + i;
+            var dict = new Dictionary<string, string>(9001, StringComparer.Ordinal);
+            for (int i = 0; i < 9000; i++) dict["zz wxyz " + i.ToString("D5")] = "PL:" + i;
+            dict["wxyz is the only line that starts this way"] = "PL:unique";
 
             using (var matcher = new OptimizedMatcher(dict, "EN"))
             {
                 string value = matcher.FindClosestMatch("wxyz", out string key);
 
-                Assert.IsFalse(string.IsNullOrEmpty(value));
-                StringAssert.StartsWith(key, "wxyz");
+                Assert.AreEqual("PL:unique", value);
+                Assert.AreEqual("wxyz is the only line that starts this way", key);
             }
         }
 

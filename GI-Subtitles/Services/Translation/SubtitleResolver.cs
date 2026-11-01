@@ -54,17 +54,29 @@ namespace GI_Subtitles.Services.Translation
             public string Key;
             public string Header;
             public string Content;
-            public ResolutionSource Source;
         }
 
-        private readonly LRUCache<string, MemoEntry> _memo;
+        private readonly LRUCache<(string Text, string Npc), MemoEntry> _memo;
+        private OptimizedMatcher _memoMatcher;
+        private IGameDialogueContext _memoContext;
+        private Dictionary<string, string> _memoDictionary;
+        private string _lastConfirmedKey;
+        private string _lastConfirmedNpc;
 
         public SubtitleResolver(int memoCapacity = 100)
         {
-            _memo = new LRUCache<string, MemoEntry>(memoCapacity);
+            _memo = new LRUCache<(string Text, string Npc), MemoEntry>(memoCapacity);
         }
 
-        public void ClearCache() => _memo.Clear();
+        public void ClearCache()
+        {
+            _memo.Clear();
+            _memoMatcher = null;
+            _memoContext = null;
+            _memoDictionary = null;
+            _lastConfirmedKey = null;
+            _lastConfirmedNpc = null;
+        }
 
         public SubtitleResolution Resolve(
             string ocrText,
@@ -73,13 +85,27 @@ namespace GI_Subtitles.Services.Translation
             OptimizedMatcher matcher,
             Dictionary<string, string> contentDict)
         {
+            // A language/game/pack reload replaces these objects. Memoized text
+            // belongs to that translation stack, not to the lifetime of the UI.
+            if (!ReferenceEquals(matcher, _memoMatcher) ||
+                !ReferenceEquals(contextEngine, _memoContext) ||
+                !ReferenceEquals(contentDict, _memoDictionary))
+            {
+                ClearCache();
+                _memoMatcher = matcher;
+                _memoContext = contextEngine;
+                _memoDictionary = contentDict;
+            }
+
             if (matcher == null)
             {
                 Logger.Log.Warn("Matcher not loaded yet, skipping translation");
                 return default;
             }
 
-            if (_memo.TryGetValue(ocrText, out MemoEntry cached))
+            detectedNpcName ??= "";
+            var memoKey = (ocrText ?? "", detectedNpcName);
+            if (_memo.TryGetValue(memoKey, out MemoEntry cached) && !string.IsNullOrEmpty(cached.Content))
             {
                 return new SubtitleResolution
                 {
@@ -88,6 +114,7 @@ namespace GI_Subtitles.Services.Translation
                     Header = cached.Header,
                     Content = cached.Content,
                     Source = ResolutionSource.MemoCache,
+                    ChainAdvanced = ConfirmMatch(cached.Key, detectedNpcName, contextEngine, contentDict),
                 };
             }
 
@@ -107,6 +134,7 @@ namespace GI_Subtitles.Services.Translation
             string header = "";
             string content = "";
             bool isPartialMatch = false;
+            bool matcherFailed = false;
             var source = ResolutionSource.None;
 
             if (contextEngine?.IsLoaded == true)
@@ -134,6 +162,20 @@ namespace GI_Subtitles.Services.Translation
                 }
             }
 
+            // A previous global miss is still valid for this immutable matcher,
+            // but the hot cache above may have acquired new conversation data.
+            if (source != ResolutionSource.HotCache && cached != null)
+            {
+                return new SubtitleResolution
+                {
+                    Result = cached.Result,
+                    Key = cached.Key,
+                    Header = cached.Header,
+                    Content = cached.Content,
+                    Source = ResolutionSource.MemoCache,
+                };
+            }
+
             if (source != ResolutionSource.HotCache)
             {
                 if (!string.IsNullOrEmpty(detectedNpcName))
@@ -141,13 +183,14 @@ namespace GI_Subtitles.Services.Translation
                     header = "";
                     try
                     {
-                        content = matcher.FindClosestMatch(ocrText, out key) ?? "";
+                        content = matcher.FindClosestMatch(ocrText, out key, out isPartialMatch) ?? "";
                     }
                     catch (Exception matchEx)
                     {
                         Logger.Log.Error($"FindClosestMatch threw for \"{ocrText}\": {matchEx}");
                         content = "";
                         key = "";
+                        matcherFailed = true;
                     }
                     source = ResolutionSource.Matcher;
                     if (Logger.IsDebugEnabled)
@@ -162,12 +205,14 @@ namespace GI_Subtitles.Services.Translation
                         var matchResult = matcher.FindMatchWithHeaderSeparated(ocrText, out key);
                         header = "";
                         content = matchResult.Content ?? "";
+                        isPartialMatch = matchResult.IsPartial;
                     }
                     catch (Exception matchEx)
                     {
                         Logger.Log.Error($"FindMatchWithHeaderSeparated threw for \"{ocrText}\": {matchEx}");
                         content = "";
                         key = "";
+                        matcherFailed = true;
                     }
                     source = ResolutionSource.MatcherHeaderSeparated;
                 }
@@ -177,33 +222,27 @@ namespace GI_Subtitles.Services.Translation
 
             string res = string.IsNullOrEmpty(header) ? content : (header + "\n\n" + content);
 
-            bool chainAdvanced = false;
-            if (!string.IsNullOrEmpty(key) && !isPartialMatch && contextEngine?.IsLoaded == true)
-            {
-                try
-                {
-                    contextEngine.OnTextMatched(key, detectedNpcName, contentDict);
-                    chainAdvanced = true;
-                }
-                catch (Exception ctxEx)
-                {
-                    Logger.Log.Error($"OnTextMatched threw for key=\"{key}\" npc=\"{detectedNpcName}\" (chain prediction may be degraded): {ctxEx}");
-                }
-            }
+            bool chainAdvanced = !isPartialMatch &&
+                ConfirmMatch(key, detectedNpcName, contextEngine, contentDict);
 
             if (Logger.IsDebugEnabled)
             {
                 Logger.Log.Debug($"Convert ocrResult for {ocrText}: header={header}, content={content}, key={key}");
             }
 
-            _memo[ocrText] = new MemoEntry
+            // Predictions must be reconsidered against the live context. Cache
+            // successful full matches and global misses; retry failures. A miss
+            // is only consulted AFTER the hot cache on subsequent UI ticks.
+            if (!isPartialMatch && !matcherFailed)
             {
-                Result = res,
-                Key = key,
-                Header = header,
-                Content = content,
-                Source = source,
-            };
+                _memo[memoKey] = new MemoEntry
+                {
+                    Result = res,
+                    Key = key,
+                    Header = header,
+                    Content = content,
+                };
+            }
 
             return new SubtitleResolution
             {
@@ -215,6 +254,27 @@ namespace GI_Subtitles.Services.Translation
                 IsPartial = isPartialMatch,
                 ChainAdvanced = chainAdvanced,
             };
+        }
+
+        private bool ConfirmMatch(string key, string npc, IGameDialogueContext context,
+            Dictionary<string, string> dictionary)
+        {
+            if (string.IsNullOrEmpty(key) || context?.IsLoaded != true ||
+                (key == _lastConfirmedKey && npc == _lastConfirmedNpc))
+                return false;
+
+            try
+            {
+                context.OnTextMatched(key, npc, dictionary);
+                _lastConfirmedKey = key;
+                _lastConfirmedNpc = npc;
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Logger.Log.Error($"OnTextMatched threw for key=\"{key}\" npc=\"{npc}\" (chain prediction may be degraded): {ex}");
+                return false;
+            }
         }
     }
 }
