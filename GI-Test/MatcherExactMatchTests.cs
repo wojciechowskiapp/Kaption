@@ -9,7 +9,7 @@ namespace GI_Test
     [TestClass]
     public class MatcherExactMatchTests
     {
-        [DataTestMethod]
+        [TestMethod]
         [DataRow("abcdef", "abcdefg")]
         [DataRow("abcdefgh", "abcdefg")]
         public void SymSpell_CompleteLineWinsOverEitherPrefix(string distractor, string input)
@@ -38,7 +38,7 @@ namespace GI_Test
             Assert.AreEqual(0L, allocated, "An exact posting-list hit needs no candidate sets or deletion strings.");
         }
 
-        [DataTestMethod]
+        [TestMethod]
         [DataRow(false)]
         [DataRow(true)]
         public void Ngram_CompleteLineWinsOverLongerPrefix_InHeapAndMmap(bool mmap)

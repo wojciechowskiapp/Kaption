@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
     <sys:String x:Key="Tab_Language" xmlns:sys="clr-namespace:System;assembly=mscorlib">Pakiety językowe</sys:String>
@@ -122,18 +122,21 @@
     <sys:String x:Key="Config_OcrInterval" xmlns:sys="clr-namespace:System;assembly=mscorlib">Interwał skanowania (ms):</sys:String>
     <sys:String x:Key="Config_UiRefresh" xmlns:sys="clr-namespace:System;assembly=mscorlib">Odświeżanie UI (ms):</sys:String>
     <sys:String x:Key="Config_OcrSpeed_Hint" xmlns:sys="clr-namespace:System;assembly=mscorlib">Mniej = szybsze napisy, więcej = mniejsze obciążenie CPU</sys:String>
-    <sys:String x:Key="Settings_OcrModel_Card_Label" xmlns:sys="clr-namespace:System;assembly=mscorlib">Model OCR</sys:String>
+    <sys:String x:Key="Settings_OcrModel_Card_Label" xmlns:sys="clr-namespace:System;assembly=mscorlib">Model rozpoznawania tekstu</sys:String>
     <sys:String x:Key="Settings_OcrModel_Card_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">Wybierz, jak Kaption odczytuje dialogi z gry. Rekomendowany model lepiej rozpoznaje tekst ekranowy, a tryb zgodności zachowuje poprzedni, lżejszy silnik.</sys:String>
     <sys:String x:Key="Settings_OcrModel_Label" xmlns:sys="clr-namespace:System;assembly=mscorlib">Model rozpoznawania</sys:String>
-    <sys:String x:Key="Settings_OcrModel_V6" xmlns:sys="clr-namespace:System;assembly=mscorlib">PP-OCRv6 Small — rekomendowany</sys:String>
-    <sys:String x:Key="Settings_OcrModel_V4" xmlns:sys="clr-namespace:System;assembly=mscorlib">PP-OCRv4 Mobile — zgodność</sys:String>
+    <sys:String x:Key="Settings_OcrModel_V6" xmlns:sys="clr-namespace:System;assembly=mscorlib">Nowszy model — polecany</sys:String>
+    <sys:String x:Key="Settings_OcrModel_V4" xmlns:sys="clr-namespace:System;assembly=mscorlib">Starszy model — zgodność</sys:String>
     <sys:String x:Key="Settings_OcrModel_V6_Description" xmlns:sys="clr-namespace:System;assembly=mscorlib">Najlepszy balans dla współczesnych komputerów. Dokładniej czyta tekst ekranowy i obsługuje angielski oraz japoński jednym modelem. Jeśli nie wystartuje, aplikacja automatycznie wróci do V4.</sys:String>
     <sys:String x:Key="Settings_OcrModel_V4_Description" xmlns:sys="clr-namespace:System;assembly=mscorlib">Poprzedni, lekki model. Wybierz go, jeśli V6 działa na tym komputerze nietypowo wolno albo niekompatybilnie.</sys:String>
-    <sys:String x:Key="Settings_OcrModel_Restart" xmlns:sys="clr-namespace:System;assembly=mscorlib">Uruchom Kaption ponownie, aby zastosować nowy model OCR.</sys:String>
+    <sys:String x:Key="Settings_OcrModel_Restart" xmlns:sys="clr-namespace:System;assembly=mscorlib">Uruchom Kaption ponownie, żeby przełączyć model.</sys:String>
     <sys:String x:Key="Tip_Settings_OcrModel" xmlns:sys="clr-namespace:System;assembly=mscorlib">Zmienia lokalne modele ONNX używane do wykrywania i odczytywania dialogów z gry.</sys:String>
     <sys:String x:Key="Settings_OcrGpu_Checkbox" xmlns:sys="clr-namespace:System;assembly=mscorlib">Używaj akceleracji GPU (DirectML)</sys:String>
     <sys:String x:Key="Tip_Settings_OcrGpu" xmlns:sys="clr-namespace:System;assembly=mscorlib">Rozpoznaje tekst na karcie graficznej. Jeśli GPU okaże się za wolne albo niestabilne, Kaption sam przełączy się na procesor; zaznacz to pole ponownie, żeby dać GPU jeszcze jedną szansę.</sys:String>
     <sys:String x:Key="Settings_OcrGpu_Quarantined" xmlns:sys="clr-namespace:System;assembly=mscorlib">Kaption rozpoznaje tekst na procesorze, bo karta graficzna była za wolna. Zaznacz pole ponownie, żeby spróbować z GPU.</sys:String>
+    <sys:String x:Key="Dash_GpuQuarantined" xmlns:sys="clr-namespace:System;assembly=mscorlib">Działa na procesorze, bo karta graficzna była za wolna przy starcie. Zaznacz „Używaj akceleracji GPU” w zakładce Ogólne, żeby spróbować ponownie.</sys:String>
+    <sys:String x:Key="Dash_GpuUnavailable" xmlns:sys="clr-namespace:System;assembly=mscorlib">Działa na procesorze, bo nie udało się uruchomić karty graficznej do tłumaczenia. Zwykle pomaga aktualizacja sterownika karty, potem uruchom Kaption ponownie.</sys:String>
+    <sys:String x:Key="Dash_GpuRetryNextLaunch" xmlns:sys="clr-namespace:System;assembly=mscorlib">Tym razem działa na procesorze, bo karta graficzna była zajęta albo wolna przy starcie. Przy następnym uruchomieniu Kaption spróbuje znowu.</sys:String>
 
     <!-- Dashboard Tab -->
     <sys:String x:Key="Tab_Dashboard" xmlns:sys="clr-namespace:System;assembly=mscorlib">Ogólne</sys:String>
@@ -160,24 +163,24 @@
     <!-- TIGHT -->
     <sys:String x:Key="Dash_Status_Ready" xmlns:sys="clr-namespace:System;assembly=mscorlib">Gotowy</sys:String>
     <sys:String x:Key="Dash_Status_Loading" xmlns:sys="clr-namespace:System;assembly=mscorlib">Wczytywanie...</sys:String>
-    <sys:String x:Key="Dash_Status_EngineLoading" xmlns:sys="clr-namespace:System;assembly=mscorlib">Wczytywanie silnika OCR…</sys:String>
+    <sys:String x:Key="Dash_Status_EngineLoading" xmlns:sys="clr-namespace:System;assembly=mscorlib">Uruchamiam czytnik dialogów…</sys:String>
     <sys:String x:Key="Dash_Status_PreparingTranslations" xmlns:sys="clr-namespace:System;assembly=mscorlib">Przygotowywanie tłumaczeń…</sys:String>
     <sys:String x:Key="Dash_Status_TranslationDataMissing" xmlns:sys="clr-namespace:System;assembly=mscorlib">Brak danych tłumaczenia</sys:String>
     <sys:String x:Key="Dash_Status_RestartRequired" xmlns:sys="clr-namespace:System;assembly=mscorlib">Wybrano — wymagany restart</sys:String>
     <sys:String x:Key="Dash_Status_EngineFailed" xmlns:sys="clr-namespace:System;assembly=mscorlib">Tłumacz się nie wczytał</sys:String>
     <sys:String x:Key="Dash_EngineFailed_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">Tłumacz się nie wczytał</sys:String>
-    <sys:String x:Key="Dash_EngineFailed_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">Kaption nie uruchomił silnika OCR. Zwykle pomaga „Spróbuj ponownie"; jeśli tryb GPU wciąż się sypie, przełącz na CPU — wolniej, ale pewnie.</sys:String>
+    <sys:String x:Key="Dash_EngineFailed_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">Kaption nie uruchomił czytnika dialogów. Zwykle pomaga „Spróbuj ponownie”; jeśli karta graficzna dalej się sypie, przełącz na procesor — wolniej, ale pewnie.</sys:String>
     <sys:String x:Key="Dash_EngineFailed_Retry" xmlns:sys="clr-namespace:System;assembly=mscorlib">Spróbuj ponownie</sys:String>
-    <sys:String x:Key="Dash_EngineFailed_Retry_Tooltip" xmlns:sys="clr-namespace:System;assembly=mscorlib">Wczytaj silnik OCR jeszcze raz z bieżącymi ustawieniami.</sys:String>
+    <sys:String x:Key="Dash_EngineFailed_Retry_Tooltip" xmlns:sys="clr-namespace:System;assembly=mscorlib">Uruchom czytnik dialogów jeszcze raz z obecnymi ustawieniami.</sys:String>
     <sys:String x:Key="Dash_EngineFailed_CpuFallback" xmlns:sys="clr-namespace:System;assembly=mscorlib">Przełącz na CPU</sys:String>
-    <sys:String x:Key="Dash_EngineFailed_CpuFallback_Tooltip" xmlns:sys="clr-namespace:System;assembly=mscorlib">Wyłącz akcelerację GPU i spróbuj ponownie. OCR będzie wolniejszy, ale pomija ścieżkę DirectML.</sys:String>
+    <sys:String x:Key="Dash_EngineFailed_CpuFallback_Tooltip" xmlns:sys="clr-namespace:System;assembly=mscorlib">Wyłącz akcelerację GPU i spróbuj ponownie. Na procesorze czytanie jest wolniejsze, ale omija kartę graficzną.</sys:String>
     <sys:String x:Key="Dash_EngineFailed_UnknownDetails" xmlns:sys="clr-namespace:System;assembly=mscorlib">Nieznany błąd.</sys:String>
-    <sys:String x:Key="Overlay_EngineLoading" xmlns:sys="clr-namespace:System;assembly=mscorlib">Wczytywanie silnika OCR…</sys:String>
+    <sys:String x:Key="Overlay_EngineLoading" xmlns:sys="clr-namespace:System;assembly=mscorlib">Uruchamiam czytnik dialogów…</sys:String>
     <sys:String x:Key="Overlay_EngineFailed" xmlns:sys="clr-namespace:System;assembly=mscorlib">Tłumacz się nie wczytał — sprawdź Ustawienia.</sys:String>
     <sys:String x:Key="Dialog_EngineLoading_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">Tłumacz jeszcze się wczytuje</sys:String>
-    <sys:String x:Key="Dialog_EngineLoading_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">Daj mu chwilę — silnik OCR wciąż się rozgrzewa. Spróbuj kliknąć Start ponownie, gdy plakietka pod przyciskiem pokaże „Gotowy".</sys:String>
+    <sys:String x:Key="Dialog_EngineLoading_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">Daj mu chwilę — czytnik dialogów jeszcze się rozgrzewa. Kliknij Start ponownie, gdy plakietka pod przyciskiem pokaże „Gotowy”.</sys:String>
     <sys:String x:Key="Dialog_EngineFailed_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">Tłumacz się nie wczytał</sys:String>
-    <sys:String x:Key="Dialog_EngineFailed_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">Silnik OCR napotkał błąd przy starcie. Otwórz Pulpit i kliknij Spróbuj ponownie — baner u góry ma też opcję awaryjną, gdy ścieżka GPU wciąż się sypie.</sys:String>
+    <sys:String x:Key="Dialog_EngineFailed_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">Czytnik dialogów nie wystartował. Otwórz zakładkę Start i kliknij Spróbuj ponownie — baner u góry pozwala też przełączyć się na procesor, jeśli karta graficzna dalej się sypie.</sys:String>
     <!-- TIGHT -->
     <sys:String x:Key="Dash_Status_NotLoaded" xmlns:sys="clr-namespace:System;assembly=mscorlib">Nie wczytano</sys:String>
     <sys:String x:Key="Dash_Region_NotSet" xmlns:sys="clr-namespace:System;assembly=mscorlib">Nie ustawiono – kliknij „Wybierz obszar", aby wskazać miejsce</sys:String>
@@ -350,7 +353,7 @@
     <sys:String x:Key="Dialog_MatcherLoading_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">Kaption nadal przygotowuje tłumaczenia. Spróbuj ponownie za chwilę.</sys:String>
     <sys:String x:Key="Dialog_MatcherMissing_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">Wybrany pakiet tłumaczeń jest pusty albo go brakuje. Otwórz Tłumaczenia, pobierz pakiet i uruchom Kaption ponownie.</sys:String>
     <sys:String x:Key="Dialog_RestartTranslation_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">Uruchom ponownie, aby zastosować tłumaczenie</sys:String>
-    <sys:String x:Key="Dialog_RestartTranslation_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">Kaption musi uruchomić się ponownie, aby wczytać wybrany język OCR i indeks tłumaczeń. Do tego czasu uruchomiony tłumacz nadal korzysta z poprzedniego wyboru.</sys:String>
+    <sys:String x:Key="Dialog_RestartTranslation_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">Kaption musi uruchomić się ponownie, żeby wczytać wybrany język gry i indeks tłumaczeń. Do tego czasu tłumacz działa na poprzednim wyborze.</sys:String>
     <sys:String x:Key="Dialog_SignInOpenFailed_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">Nie udało się otworzyć logowania</sys:String>
     <sys:String x:Key="Dialog_SignInOpenFailed_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">Kaption nie otworzył okna logowania. Zamknij aplikację i uruchom ją ponownie.</sys:String>
     <sys:String x:Key="Dialog_RegionMissing_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">Brak obszaru przechwytywania</sys:String>
@@ -369,8 +372,8 @@
     <sys:String x:Key="Update_Balloon_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">Dostępna aktualizacja Kaption</sys:String>
     <sys:String x:Key="Update_Balloon_Body_Format" xmlns:sys="clr-namespace:System;assembly=mscorlib">Wersja {0} jest gotowa do instalacji. Kliknij, żeby otworzyć Ustawienia.</sys:String>
     <!-- Powiadomienie w zasobniku, pokazywane raz przy przejściu OCR na CPU. -->
-    <sys:String x:Key="Notice_GpuFallback_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">Kaption przełączył OCR na tryb CPU</sys:String>
-    <sys:String x:Key="Notice_GpuFallback_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">Twoja karta graficzna była za wolna, żeby stabilnie rozpoznawać tekst, więc Kaption korzysta z procesora. Tłumaczenie działa dalej.</sys:String>
+    <sys:String x:Key="Notice_GpuFallback_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">Kaption przełączył się na procesor</sys:String>
+    <sys:String x:Key="Notice_GpuFallback_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">Karta graficzna była za wolna, żeby stabilnie odczytywać dialogi, więc Kaption korzysta z procesora. Tłumaczenie działa dalej.</sys:String>
 
     <!-- Region overlay labels -->
     <sys:String x:Key="Overlay_DialogueRegion_Label" xmlns:sys="clr-namespace:System;assembly=mscorlib">Obszar dialogu</sys:String>
@@ -429,7 +432,7 @@
     <sys:String x:Key="Wizard_Step4_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">Porady i ustawienia</sys:String>
     <sys:String x:Key="Wizard_Step4_Subtitle" xmlns:sys="clr-namespace:System;assembly=mscorlib">Przydatne funkcje, które możesz dostosować</sys:String>
     <sys:String x:Key="Wizard_Referral_Heading" xmlns:sys="clr-namespace:System;assembly=mscorlib">ZAPROSIŁ CIĘ ZNAJOMY?</sys:String>
-    <sys:String x:Key="Wizard_Referral_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">Wklej jego kod, żeby oboje dostać bonus. Działa tylko przez pierwsze 7 dni od założenia konta.</sys:String>
+    <sys:String x:Key="Wizard_Referral_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">Wklej kod od znajomego, żeby zaliczyć mu polecenie. Działa tylko przez pierwsze 7 dni od założenia konta.</sys:String>
     <sys:String x:Key="Wizard_Referral_Skip" xmlns:sys="clr-namespace:System;assembly=mscorlib">Pomiń</sys:String>
     <sys:String x:Key="Wizard_Referral_Submit" xmlns:sys="clr-namespace:System;assembly=mscorlib">Zatwierdź</sys:String>
     <sys:String x:Key="Wizard_Referral_Submitting" xmlns:sys="clr-namespace:System;assembly=mscorlib">Wysyłanie…</sys:String>
@@ -517,7 +520,7 @@
     <sys:String x:Key="Referrals_LoadError_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">Nie udało się wczytać poleceń</sys:String>
     <sys:String x:Key="Referrals_TryAgain" xmlns:sys="clr-namespace:System;assembly=mscorlib">Spróbuj ponownie</sys:String>
     <sys:String x:Key="Referrals_Heading" xmlns:sys="clr-namespace:System;assembly=mscorlib">Zaproś znajomego, zgarnij nagrody</sys:String>
-    <sys:String x:Key="Referrals_Subheading" xmlns:sys="clr-namespace:System;assembly=mscorlib">Wyślij swój link. Gdy znajomi zaczną używać Kaption, dostajesz darmowe dni — plus primogemy przy 15 i 40 aktywnych znajomych.</sys:String>
+    <sys:String x:Key="Referrals_Subheading" xmlns:sys="clr-namespace:System;assembly=mscorlib">Wyślij swój link. Znajomi, którzy zostaną z Kaption, liczą się do dwóch nagród w primogemach: 1980 przy 15 aktywnych i 3280 przy 40.</sys:String>
     <sys:String x:Key="Referrals_Share_Primary" xmlns:sys="clr-namespace:System;assembly=mscorlib">Kopiuj i udostępnij</sys:String>
     <sys:String x:Key="Referrals_CodeLabel" xmlns:sys="clr-namespace:System;assembly=mscorlib">TWÓJ KOD POLECAJĄCY</sys:String>
     <sys:String x:Key="Referrals_CopyCode" xmlns:sys="clr-namespace:System;assembly=mscorlib">Kopiuj kod</sys:String>
@@ -529,14 +532,13 @@
     <sys:String x:Key="Referrals_OpenWeb_Automation" xmlns:sys="clr-namespace:System;assembly=mscorlib">Otwórz stronę poleceń w przeglądarce</sys:String>
     <sys:String x:Key="Referrals_Stat_Invited" xmlns:sys="clr-namespace:System;assembly=mscorlib">Zaproszeni</sys:String>
     <sys:String x:Key="Referrals_Stat_Active" xmlns:sys="clr-namespace:System;assembly=mscorlib">Aktywni znajomi</sys:String>
-    <sys:String x:Key="Referrals_Stat_BonusDays" xmlns:sys="clr-namespace:System;assembly=mscorlib">Darmowe dni</sys:String>
     <sys:String x:Key="Referrals_Stat_Pending" xmlns:sys="clr-namespace:System;assembly=mscorlib">Czekają</sys:String>
     <sys:String x:Key="Referrals_Stat_Pending_Tooltip" xmlns:sys="clr-namespace:System;assembly=mscorlib">Zarejestrowali się, ale jeszcze nie pograli wystarczająco — 2 godziny w ciągu 3 dni w pierwszym miesiącu.</sys:String>
     <sys:String x:Key="Referrals_TiersLabel" xmlns:sys="clr-namespace:System;assembly=mscorlib">PROGI NAGRÓD</sys:String>
     <sys:String x:Key="Referrals_Tier1_AmountPrefix" xmlns:sys="clr-namespace:System;assembly=mscorlib">1 980 primogemów </sys:String>
-    <sys:String x:Key="Referrals_Tier1_Suffix" xmlns:sys="clr-namespace:System;assembly=mscorlib"> (~30$) — 15 aktywnych poleceń</sys:String>
+    <sys:String x:Key="Referrals_Tier1_Suffix" xmlns:sys="clr-namespace:System;assembly=mscorlib"> (~30$) przy 15 aktywnych znajomych</sys:String>
     <sys:String x:Key="Referrals_Tier2_AmountPrefix" xmlns:sys="clr-namespace:System;assembly=mscorlib">3 280 primogemów </sys:String>
-    <sys:String x:Key="Referrals_Tier2_Suffix" xmlns:sys="clr-namespace:System;assembly=mscorlib"> — 40 aktywnych poleceń</sys:String>
+    <sys:String x:Key="Referrals_Tier2_Suffix" xmlns:sys="clr-namespace:System;assembly=mscorlib"> (~50$) przy 40 aktywnych znajomych</sys:String>
     <sys:String x:Key="Referrals_InviteesLabel" xmlns:sys="clr-namespace:System;assembly=mscorlib">ZAPROSZENI ZNAJOMI</sys:String>
     <sys:String x:Key="Referrals_InviteesNote" xmlns:sys="clr-namespace:System;assembly=mscorlib">Oczekujący znajomi muszą uzbierać 120 minut gry w ciągu 3 różnych dni w ciągu 30 dni od rejestracji, zanim zaczną liczyć się do progu.</sys:String>
     <sys:String x:Key="Referrals_Invitee_Pending" xmlns:sys="clr-namespace:System;assembly=mscorlib">OCZEKUJĄCY</sys:String>
@@ -544,13 +546,17 @@
     <sys:String x:Key="Referrals_Invitee_Flagged" xmlns:sys="clr-namespace:System;assembly=mscorlib">OZNACZONY</sys:String>
     <sys:String x:Key="Referrals_Invitee_FriendFallback" xmlns:sys="clr-namespace:System;assembly=mscorlib">znajomy</sys:String>
     <sys:String x:Key="Referrals_Invitee_Summary_Pending_Format" xmlns:sys="clr-namespace:System;assembly=mscorlib">{0} oczekujących</sys:String>
+    <sys:String x:Key="Referrals_Invitee_Summary_Pending_One_Format" xmlns:sys="clr-namespace:System;assembly=mscorlib">{0} oczekujący</sys:String>
     <sys:String x:Key="Referrals_Invitee_Summary_Active_Format" xmlns:sys="clr-namespace:System;assembly=mscorlib">{0} aktywnych</sys:String>
+    <sys:String x:Key="Referrals_Invitee_Summary_Active_One_Format" xmlns:sys="clr-namespace:System;assembly=mscorlib">{0} aktywny</sys:String>
     <sys:String x:Key="Referrals_Invitee_Summary_Flagged_Format" xmlns:sys="clr-namespace:System;assembly=mscorlib">{0} oznaczonych</sys:String>
+    <sys:String x:Key="Referrals_Invitee_Summary_Flagged_One_Format" xmlns:sys="clr-namespace:System;assembly=mscorlib">{0} oznaczony</sys:String>
     <sys:String x:Key="Referrals_Invitee_ActiveSince_Format" xmlns:sys="clr-namespace:System;assembly=mscorlib">Aktywny od {0} · rejestracja {1}</sys:String>
     <sys:String x:Key="Referrals_Invitee_ActiveNoDate_Format" xmlns:sys="clr-namespace:System;assembly=mscorlib">Aktywny · rejestracja {0}</sys:String>
     <sys:String x:Key="Referrals_Invitee_FlaggedLine_Format" xmlns:sys="clr-namespace:System;assembly=mscorlib">Oznaczono do ręcznej weryfikacji · rejestracja {0}</sys:String>
     <sys:String x:Key="Referrals_Invitee_WindowClosed_Format" xmlns:sys="clr-namespace:System;assembly=mscorlib">Rejestracja {0} · okno aktywności zamknięte</sys:String>
     <sys:String x:Key="Referrals_Invitee_DaysLeft_Format" xmlns:sys="clr-namespace:System;assembly=mscorlib">Rejestracja {0} · {1} dni do kwalifikacji</sys:String>
+    <sys:String x:Key="Referrals_Invitee_DaysLeft_One_Format" xmlns:sys="clr-namespace:System;assembly=mscorlib">Rejestracja {0} · {1} dzień do kwalifikacji</sys:String>
     <sys:String x:Key="Referrals_Invitee_Progress_Format" xmlns:sys="clr-namespace:System;assembly=mscorlib">{0} / {1} min
 {2} / {3} dni</sys:String>
     <sys:String x:Key="Referrals_Relative_JustNow" xmlns:sys="clr-namespace:System;assembly=mscorlib">przed chwilą</sys:String>
@@ -573,13 +579,13 @@
     <sys:String x:Key="Referrals_Reward_Action_SeeNote" xmlns:sys="clr-namespace:System;assembly=mscorlib">Zobacz notatkę</sys:String>
     <sys:String x:Key="Referrals_Reward_Action_Submitted" xmlns:sys="clr-namespace:System;assembly=mscorlib">Wysłane</sys:String>
     <sys:String x:Key="Referrals_Claim_Heading" xmlns:sys="clr-namespace:System;assembly=mscorlib">Odbierz nagrodę</sys:String>
-    <sys:String x:Key="Referrals_Claim_Summary_Format" xmlns:sys="clr-namespace:System;assembly=mscorlib">Odbierasz {0}. Zgłoszenia sprawdzamy ręcznie (zwykle w 48 h) i wyślemy Ci maila, gdy nagroda zostanie dostarczona.</sys:String>
+    <sys:String x:Key="Referrals_Claim_Summary_Format" xmlns:sys="clr-namespace:System;assembly=mscorlib">Odbierasz {0}. Każde zgłoszenie sprawdzamy ręcznie, wypłata do 72 godzin.</sys:String>
     <sys:String x:Key="Referrals_Claim_DeliveryPrompt" xmlns:sys="clr-namespace:System;assembly=mscorlib">Jak mamy ją dostarczyć?</sys:String>
     <sys:String x:Key="Referrals_Claim_Method_Hoyolab" xmlns:sys="clr-namespace:System;assembly=mscorlib">HoYoLAB UID (doładowanie bezpośrednie — najszybciej)</sys:String>
     <sys:String x:Key="Referrals_Claim_Method_PayPal" xmlns:sys="clr-namespace:System;assembly=mscorlib">PayPal (ekwiwalent gotówkowy)</sys:String>
     <sys:String x:Key="Referrals_Claim_Method_Amazon" xmlns:sys="clr-namespace:System;assembly=mscorlib">Karta podarunkowa Amazon</sys:String>
     <sys:String x:Key="Referrals_Claim_Uid_Label" xmlns:sys="clr-namespace:System;assembly=mscorlib">HoYoLAB UID</sys:String>
-    <sys:String x:Key="Referrals_Claim_Uid_Tooltip" xmlns:sys="clr-namespace:System;assembly=mscorlib">9-12-cyfrowy UID HoYoLAB / Genshin</sys:String>
+    <sys:String x:Key="Referrals_Claim_Uid_Tooltip" xmlns:sys="clr-namespace:System;assembly=mscorlib">Twój UID HoYoLAB: od 8 do 12 liter lub cyfr</sys:String>
     <sys:String x:Key="Referrals_Claim_Region_Label" xmlns:sys="clr-namespace:System;assembly=mscorlib">Region</sys:String>
     <sys:String x:Key="Referrals_Claim_Region_Americas" xmlns:sys="clr-namespace:System;assembly=mscorlib">Ameryki</sys:String>
     <sys:String x:Key="Referrals_Claim_Region_Europe" xmlns:sys="clr-namespace:System;assembly=mscorlib">Europa</sys:String>
@@ -591,16 +597,19 @@
     <sys:String x:Key="Referrals_Claim_Submit" xmlns:sys="clr-namespace:System;assembly=mscorlib">Wyślij zgłoszenie</sys:String>
     <sys:String x:Key="Referrals_Claim_Submitting" xmlns:sys="clr-namespace:System;assembly=mscorlib">Wysyłanie…</sys:String>
     <sys:String x:Key="Referrals_Claim_Error_NoReward" xmlns:sys="clr-namespace:System;assembly=mscorlib">Błąd wewnętrzny: nie wybrano nagrody.</sys:String>
-    <sys:String x:Key="Referrals_Claim_Error_InvalidUid" xmlns:sys="clr-namespace:System;assembly=mscorlib">UID HoYoLAB musi mieć od 9 do 12 cyfr.</sys:String>
+    <sys:String x:Key="Referrals_Claim_Error_InvalidUid" xmlns:sys="clr-namespace:System;assembly=mscorlib">UID ma od 8 do 12 znaków, same litery i cyfry.</sys:String>
+    <sys:String x:Key="Referrals_Claim_Error_InvalidRegion" xmlns:sys="clr-namespace:System;assembly=mscorlib">Wybierz region serwera.</sys:String>
     <sys:String x:Key="Referrals_Claim_Error_InvalidEmail" xmlns:sys="clr-namespace:System;assembly=mscorlib">Wpisz poprawny adres e-mail.</sys:String>
     <sys:String x:Key="Referrals_Claim_Error_NoMethod" xmlns:sys="clr-namespace:System;assembly=mscorlib">Wybierz sposób dostawy.</sys:String>
     <sys:String x:Key="Referrals_Claim_Error_Expired" xmlns:sys="clr-namespace:System;assembly=mscorlib">Twoja sesja wygasła. Zamknij to okno, zaloguj się ponownie i spróbuj jeszcze raz.</sys:String>
     <sys:String x:Key="Referrals_Claim_Error_AlreadyClaimed" xmlns:sys="clr-namespace:System;assembly=mscorlib">Ta nagroda została już odebrana.</sys:String>
+    <sys:String x:Key="Referrals_Claim_Error_NotFound" xmlns:sys="clr-namespace:System;assembly=mscorlib">Tej nagrody nie ma już na liście. Zamknij to okno i otwórz je ponownie.</sys:String>
     <sys:String x:Key="Referrals_Claim_Error_Forbidden" xmlns:sys="clr-namespace:System;assembly=mscorlib">Nie masz uprawnień, aby odebrać tę nagrodę.</sys:String>
     <sys:String x:Key="Referrals_Claim_Error_Rejected" xmlns:sys="clr-namespace:System;assembly=mscorlib">Serwer odrzucił zgłoszenie.</sys:String>
     <sys:String x:Key="Referrals_Claim_Error_Unreachable" xmlns:sys="clr-namespace:System;assembly=mscorlib">Nie udało się połączyć z serwerami Kaption. Sprawdź połączenie i spróbuj ponownie.</sys:String>
     <sys:String x:Key="Referrals_Claim_Error_Timeout" xmlns:sys="clr-namespace:System;assembly=mscorlib">Żądanie trwało zbyt długo. Spróbuj ponownie.</sys:String>
     <sys:String x:Key="Referrals_Claim_Error_Generic" xmlns:sys="clr-namespace:System;assembly=mscorlib">Coś poszło nie tak. Spróbuj ponownie.</sys:String>
+    <sys:String x:Key="Referrals_Error_RateLimited" xmlns:sys="clr-namespace:System;assembly=mscorlib">Za dużo prób naraz. Spróbuj za minutę.</sys:String>
     <sys:String x:Key="Referrals_Attribute_Label" xmlns:sys="clr-namespace:System;assembly=mscorlib">ZAPROSIŁ CIĘ ZNAJOMY?</sys:String>
     <sys:String x:Key="Referrals_Attribute_Explainer" xmlns:sys="clr-namespace:System;assembly=mscorlib">Jeśli znajomy wysłał Ci kod przy rejestracji, wklej go tutaj. Działa w ciągu 7 dni od utworzenia konta.</sys:String>
     <sys:String x:Key="Referrals_Attribute_Submit" xmlns:sys="clr-namespace:System;assembly=mscorlib">Wyślij</sys:String>
@@ -609,9 +618,9 @@
     <sys:String x:Key="Referrals_Attribute_Invalid" xmlns:sys="clr-namespace:System;assembly=mscorlib">Ten kod wygląda nieprawidłowo. Poproś znajomego, żeby wysłał go ponownie.</sys:String>
     <sys:String x:Key="Referrals_Attribute_NotSignedIn" xmlns:sys="clr-namespace:System;assembly=mscorlib">Musisz być zalogowany, aby podpiąć osobę polecającą.</sys:String>
     <sys:String x:Key="Referrals_Attribute_Expired" xmlns:sys="clr-namespace:System;assembly=mscorlib">Twoja sesja wygasła. Zamknij to okno, zaloguj się ponownie i spróbuj jeszcze raz.</sys:String>
-    <sys:String x:Key="Referrals_Attribute_SelfReferral" xmlns:sys="clr-namespace:System;assembly=mscorlib">Tego kodu nie da się podpiąć do Twojego konta.</sys:String>
-    <sys:String x:Key="Referrals_Attribute_Conflict" xmlns:sys="clr-namespace:System;assembly=mscorlib">Wygląda na to, że masz już przypisaną osobę polecającą albo ten kod został już użyty.</sys:String>
-    <sys:String x:Key="Referrals_Attribute_PastWindow" xmlns:sys="clr-namespace:System;assembly=mscorlib">Ten kod jest nieprawidłowy albo Twoje konto jest już po 7-dniowym oknie.</sys:String>
+    <sys:String x:Key="Referrals_Attribute_SelfReferral" xmlns:sys="clr-namespace:System;assembly=mscorlib">To Twój własny kod. Wklej kod od znajomego.</sys:String>
+    <sys:String x:Key="Referrals_Attribute_Conflict" xmlns:sys="clr-namespace:System;assembly=mscorlib">Twoje konto ma już przypisaną osobę polecającą.</sys:String>
+    <sys:String x:Key="Referrals_Attribute_PastWindow" xmlns:sys="clr-namespace:System;assembly=mscorlib">Kod można dodać tylko przez pierwsze 7 dni od założenia konta.</sys:String>
     <sys:String x:Key="Referrals_Attribute_Rejected" xmlns:sys="clr-namespace:System;assembly=mscorlib">Serwer odrzucił żądanie.</sys:String>
     <sys:String x:Key="Referrals_Attribute_Unreachable" xmlns:sys="clr-namespace:System;assembly=mscorlib">Nie udało się połączyć z serwerami Kaption. Sprawdź połączenie i spróbuj ponownie.</sys:String>
     <sys:String x:Key="Referrals_Attribute_Timeout" xmlns:sys="clr-namespace:System;assembly=mscorlib">Żądanie trwało zbyt długo. Spróbuj ponownie.</sys:String>
@@ -751,7 +760,7 @@
     <sys:String x:Key="Tip_Logs_OpenDialogue" xmlns:sys="clr-namespace:System;assembly=mscorlib">Otwórz historię dialogów (co Kaption rozpoznał i przetłumaczył).</sys:String>
 
     <sys:String x:Key="Tip_Community_Feedback" xmlns:sys="clr-namespace:System;assembly=mscorlib">Wyślij nam krótką wiadomość — bug, pomysł albo „dzięki". Doceniamy.</sys:String>
-    <sys:String x:Key="Tip_Community_Referrals" xmlns:sys="clr-namespace:System;assembly=mscorlib">Udostępnij swój link polecający i zbieraj kredyt, gdy znajomi założą konto.</sys:String>
+    <sys:String x:Key="Tip_Community_Referrals" xmlns:sys="clr-namespace:System;assembly=mscorlib">Udostępnij swój link. Znajomi, którzy zostaną z Kaption, liczą się do nagród w primogemach przy 15 i 40.</sys:String>
     <sys:String x:Key="Tip_Community_Discord" xmlns:sys="clr-namespace:System;assembly=mscorlib">Otwórz nasz Discord w przeglądarce.</sys:String>
     <sys:String x:Key="Tip_Community_X" xmlns:sys="clr-namespace:System;assembly=mscorlib">Otwórz naszą stronę X (Twitter) w przeglądarce.</sys:String>
     <sys:String x:Key="Tip_Community_Web" xmlns:sys="clr-namespace:System;assembly=mscorlib">Otwórz kaption.one w przeglądarce.</sys:String>
@@ -766,4 +775,119 @@
     <sys:String x:Key="Dialog_RestartGame_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">Zmieniasz grę z {0} na {1}. Kaption musi się zrestartować, żeby w pełni wczytać dane nowej gry — bez restartu część funkcji nie zadziała poprawnie. Zrestartować teraz?</sys:String>
     <sys:String x:Key="Dialog_RestartGame_Restart" xmlns:sys="clr-namespace:System;assembly=mscorlib">Zrestartuj teraz</sys:String>
     <sys:String x:Key="Dialog_RestartGame_Later" xmlns:sys="clr-namespace:System;assembly=mscorlib">Później</sys:String>
+    <sys:String x:Key="QuickTranslate_Tab_Translation" xmlns:sys="clr-namespace:System;assembly=mscorlib">Tłumaczenie</sys:String>
+    <sys:String x:Key="QuickTranslate_NoMatch" xmlns:sys="clr-namespace:System;assembly=mscorlib">Nie ma tego w słowniku. Poniżej oryginalny tekst.</sys:String>
+    <sys:String x:Key="QuickTranslate_NoText" xmlns:sys="clr-namespace:System;assembly=mscorlib">W zaznaczonym obszarze nie ma tekstu.</sys:String>
+    <sys:String x:Key="QuickTranslate_Tip_ShowOriginal" xmlns:sys="clr-namespace:System;assembly=mscorlib">Pokaż oryginał po angielsku</sys:String>
+    <sys:String x:Key="QuickTranslate_Tip_Copy" xmlns:sys="clr-namespace:System;assembly=mscorlib">Kopiuj do schowka</sys:String>
+    <sys:String x:Key="QuickTranslate_Tip_Pin" xmlns:sys="clr-namespace:System;assembly=mscorlib">Nie zamykaj</sys:String>
+    <sys:String x:Key="QuickTranslate_Tip_Close" xmlns:sys="clr-namespace:System;assembly=mscorlib">Zamknij</sys:String>
+    <sys:String x:Key="Hotkey_9006_Description" xmlns:sys="clr-namespace:System;assembly=mscorlib">Przetłumacz ponownie ostatni obszar</sys:String>
+    <sys:String x:Key="Hotkey_9006_Info" xmlns:sys="clr-namespace:System;assembly=mscorlib">Ponownie czyta ostatnio zaznaczony obszar, bez rysowania ramki. Przydaje się przy umiejętnościach: klikasz kolejną i wciskasz skrót.</sys:String>
+    <sys:String x:Key="Settings_QuickTranslate_Card_Label" xmlns:sys="clr-namespace:System;assembly=mscorlib">Okienko szybkiego tłumaczenia</sys:String>
+    <sys:String x:Key="Settings_QuickTranslate_Card_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">Jak długo szybkie tłumaczenie zostaje na ekranie. Najedź na nie kursorem, żeby wstrzymać odliczanie, albo przypnij je, żeby się nie zamykało.</sys:String>
+    <sys:String x:Key="Settings_QuickTranslate_Mode_Auto" xmlns:sys="clr-namespace:System;assembly=mscorlib">Automatycznie, zależnie od długości tekstu</sys:String>
+    <sys:String x:Key="Settings_QuickTranslate_Mode_Timed" xmlns:sys="clr-namespace:System;assembly=mscorlib">Po ustalonym czasie</sys:String>
+    <sys:String x:Key="Settings_QuickTranslate_Mode_Manual" xmlns:sys="clr-namespace:System;assembly=mscorlib">Dopiero gdy je zamknę</sys:String>
+    <sys:String x:Key="Settings_QuickTranslate_Seconds_Label" xmlns:sys="clr-namespace:System;assembly=mscorlib">Czas</sys:String>
+    <sys:String x:Key="Settings_QuickTranslate_Seconds_Unit" xmlns:sys="clr-namespace:System;assembly=mscorlib">s</sys:String>
+    <sys:String x:Key="Settings_QuickTranslate_FontSize_Label" xmlns:sys="clr-namespace:System;assembly=mscorlib">Rozmiar tekstu</sys:String>
+    <sys:String x:Key="Settings_QuickTranslate_Hint" xmlns:sys="clr-namespace:System;assembly=mscorlib">Wskazówka: skrót „Przetłumacz ponownie ostatni obszar” czyta to samo miejsce bez rysowania ramki. Zmienisz go w zakładce Skróty.</sys:String>
+    <sys:String x:Key="Tab_Characters" xmlns:sys="clr-namespace:System;assembly=mscorlib">Postacie</sys:String>
+    <sys:String x:Key="Char_Section_Skills" xmlns:sys="clr-namespace:System;assembly=mscorlib">Umiejętności</sys:String>
+    <sys:String x:Key="Char_Section_Build" xmlns:sys="clr-namespace:System;assembly=mscorlib">Build</sys:String>
+    <sys:String x:Key="Char_Tab_constellation" xmlns:sys="clr-namespace:System;assembly=mscorlib">Konstelacje</sys:String>
+    <sys:String x:Key="Char_Tab_eidolon" xmlns:sys="clr-namespace:System;assembly=mscorlib">Eidolony</sys:String>
+    <sys:String x:Key="Char_Tab_mindscape" xmlns:sys="clr-namespace:System;assembly=mscorlib">Mindscape</sys:String>
+    <sys:String x:Key="Char_Build_Official" xmlns:sys="clr-namespace:System;assembly=mscorlib">Z gry</sys:String>
+    <sys:String x:Key="Char_Build_None" xmlns:sys="clr-namespace:System;assembly=mscorlib">Gra nie podpowiada buildu dla tej postaci.</sys:String>
+    <sys:String x:Key="Char_AiBadge" xmlns:sys="clr-namespace:System;assembly=mscorlib">Propozycja AI</sys:String>
+    <sys:String x:Key="Char_Ai_Short" xmlns:sys="clr-namespace:System;assembly=mscorlib">AI</sys:String>
+    <sys:String x:Key="Char_AiSkills_Note" xmlns:sys="clr-namespace:System;assembly=mscorlib">Krótkie opisy napisało AI. Kliknij umiejętność, żeby zobaczyć tekst z gry.</sys:String>
+    <sys:String x:Key="Char_HowToPlay" xmlns:sys="clr-namespace:System;assembly=mscorlib">Jak grać</sys:String>
+    <sys:String x:Key="Char_Sets" xmlns:sys="clr-namespace:System;assembly=mscorlib">Zestawy</sys:String>
+    <sys:String x:Key="Char_Pieces_Tip" xmlns:sys="clr-namespace:System;assembly=mscorlib">Ile części założyć</sys:String>
+    <sys:String x:Key="Char_Or" xmlns:sys="clr-namespace:System;assembly=mscorlib">lub</sys:String>
+    <sys:String x:Key="Char_MainStats" xmlns:sys="clr-namespace:System;assembly=mscorlib">Main staty</sys:String>
+    <sys:String x:Key="Char_SubStats" xmlns:sys="clr-namespace:System;assembly=mscorlib">Substaty, od najważniejszych</sys:String>
+    <sys:String x:Key="Char_Weapons" xmlns:sys="clr-namespace:System;assembly=mscorlib">Broń</sys:String>
+    <sys:String x:Key="Char_Weapons_genshin" xmlns:sys="clr-namespace:System;assembly=mscorlib">Broń</sys:String>
+    <sys:String x:Key="Char_Weapons_starrail" xmlns:sys="clr-namespace:System;assembly=mscorlib">Stożki światła</sys:String>
+    <sys:String x:Key="Char_Weapons_zzz" xmlns:sys="clr-namespace:System;assembly=mscorlib">W-Engine</sys:String>
+    <sys:String x:Key="Char_Teammates" xmlns:sys="clr-namespace:System;assembly=mscorlib">Dobrze gra z</sys:String>
+    <sys:String x:Key="Char_Footer" xmlns:sys="clr-namespace:System;assembly=mscorlib">Dane z gry</sys:String>
+    <sys:String x:Key="Char_Provenance" xmlns:sys="clr-namespace:System;assembly=mscorlib">Umiejętności i polecane buildy pochodzą z plików gry. Tam, gdzie gra ich nie podaje, notatki i buildy pisze AI na podstawie tych danych i są oznaczone jako AI. Żadnych tier list.</sys:String>
+    <sys:String x:Key="Char_Kind_basic" xmlns:sys="clr-namespace:System;assembly=mscorlib">Atak</sys:String>
+    <sys:String x:Key="Char_Kind_skill" xmlns:sys="clr-namespace:System;assembly=mscorlib">Umiejętność</sys:String>
+    <sys:String x:Key="Char_Kind_ultimate" xmlns:sys="clr-namespace:System;assembly=mscorlib">Ult</sys:String>
+    <sys:String x:Key="Char_Kind_talent" xmlns:sys="clr-namespace:System;assembly=mscorlib">Talent</sys:String>
+    <sys:String x:Key="Char_Kind_technique" xmlns:sys="clr-namespace:System;assembly=mscorlib">Technika</sys:String>
+    <sys:String x:Key="Char_Kind_passive" xmlns:sys="clr-namespace:System;assembly=mscorlib">Pasywka</sys:String>
+    <sys:String x:Key="Char_Kind_constellation" xmlns:sys="clr-namespace:System;assembly=mscorlib">Konstelacja</sys:String>
+    <sys:String x:Key="Char_Kind_eidolon" xmlns:sys="clr-namespace:System;assembly=mscorlib">Eidolon</sys:String>
+    <sys:String x:Key="Char_Kind_mindscape" xmlns:sys="clr-namespace:System;assembly=mscorlib">Mindscape</sys:String>
+    <sys:String x:Key="Char_Kind_core" xmlns:sys="clr-namespace:System;assembly=mscorlib">Rdzeń</sys:String>
+    <sys:String x:Key="Char_Kind_dodge" xmlns:sys="clr-namespace:System;assembly=mscorlib">Unik</sys:String>
+    <sys:String x:Key="Char_Kind_assist" xmlns:sys="clr-namespace:System;assembly=mscorlib">Wsparcie</sys:String>
+    <sys:String x:Key="Char_Kind_chain" xmlns:sys="clr-namespace:System;assembly=mscorlib">Łańcuch</sys:String>
+    <sys:String x:Key="Char_Kind_special" xmlns:sys="clr-namespace:System;assembly=mscorlib">Specjalny</sys:String>
+    <sys:String x:Key="Char_Slot_sands" xmlns:sys="clr-namespace:System;assembly=mscorlib">Piaski</sys:String>
+    <sys:String x:Key="Char_Slot_goblet" xmlns:sys="clr-namespace:System;assembly=mscorlib">Puchar</sys:String>
+    <sys:String x:Key="Char_Slot_circlet" xmlns:sys="clr-namespace:System;assembly=mscorlib">Diadem</sys:String>
+    <sys:String x:Key="Char_Slot_body" xmlns:sys="clr-namespace:System;assembly=mscorlib">Tors</sys:String>
+    <sys:String x:Key="Char_Slot_feet" xmlns:sys="clr-namespace:System;assembly=mscorlib">Buty</sys:String>
+    <sys:String x:Key="Char_Slot_sphere" xmlns:sys="clr-namespace:System;assembly=mscorlib">Sfera planarna</sys:String>
+    <sys:String x:Key="Char_Slot_rope" xmlns:sys="clr-namespace:System;assembly=mscorlib">Lina</sys:String>
+    <sys:String x:Key="Char_Slot_disc4" xmlns:sys="clr-namespace:System;assembly=mscorlib">Dysk 4</sys:String>
+    <sys:String x:Key="Char_Slot_disc5" xmlns:sys="clr-namespace:System;assembly=mscorlib">Dysk 5</sys:String>
+    <sys:String x:Key="Char_Slot_disc6" xmlns:sys="clr-namespace:System;assembly=mscorlib">Dysk 6</sys:String>
+    <sys:String x:Key="Char_Search_Label" xmlns:sys="clr-namespace:System;assembly=mscorlib">Szukaj postaci</sys:String>
+    <sys:String x:Key="Char_Filter_Clear" xmlns:sys="clr-namespace:System;assembly=mscorlib">Pokaż wszystkich</sys:String>
+    <sys:String x:Key="Char_Empty_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">Nie ma jeszcze postaci</sys:String>
+    <sys:String x:Key="Char_Empty_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">Przyjdą z najbliższą aktualizacją danych gry. Zaktualizuj Kaption i uruchom go ponownie.</sys:String>
+    <sys:String x:Key="Char_Select_Hint" xmlns:sys="clr-namespace:System;assembly=mscorlib">Wybierz postać z listy.</sys:String>
+    <sys:String x:Key="Char_Page_Hint" xmlns:sys="clr-namespace:System;assembly=mscorlib">Ctrl+Q na ekranie umiejętności otworzy tę kartę w grze.</sys:String>
+    <sys:String x:Key="Char_Section_Tips" xmlns:sys="clr-namespace:System;assembly=mscorlib">Porady</sys:String>
+    <sys:String x:Key="Char_Tip_Set" xmlns:sys="clr-namespace:System;assembly=mscorlib">Najlepszy zestaw</sys:String>
+    <sys:String x:Key="Char_Tip_MainStats" xmlns:sys="clr-namespace:System;assembly=mscorlib">Główne staty</sys:String>
+    <sys:String x:Key="Char_Tip_Weapon" xmlns:sys="clr-namespace:System;assembly=mscorlib">Broń</sys:String>
+    <sys:String x:Key="Char_Tip_Weapon_genshin" xmlns:sys="clr-namespace:System;assembly=mscorlib">Broń</sys:String>
+    <sys:String x:Key="Char_Tip_Weapon_starrail" xmlns:sys="clr-namespace:System;assembly=mscorlib">Stożek światła</sys:String>
+    <sys:String x:Key="Char_Tip_Weapon_zzz" xmlns:sys="clr-namespace:System;assembly=mscorlib">W-Engine</sys:String>
+    <sys:String x:Key="Char_Tip_Leveling" xmlns:sys="clr-namespace:System;assembly=mscorlib">Ulepszaj najpierw</sys:String>
+    <sys:String x:Key="Char_Tip_WorthIt" xmlns:sys="clr-namespace:System;assembly=mscorlib">Warto mieć</sys:String>
+    <sys:String x:Key="Char_Tips_Guide" xmlns:sys="clr-namespace:System;assembly=mscorlib">Poradnik</sys:String>
+    <sys:String x:Key="Char_Tips_Materials_Asc" xmlns:sys="clr-namespace:System;assembly=mscorlib">Materiały na wznoszenie, do maksa</sys:String>
+    <sys:String x:Key="Char_Tips_Materials_Skills" xmlns:sys="clr-namespace:System;assembly=mscorlib">Materiały na umiejętności, wszystkie do maksa</sys:String>
+    <sys:String x:Key="Char_Tips_Links" xmlns:sys="clr-namespace:System;assembly=mscorlib">Czytaj dalej</sys:String>
+    <sys:String x:Key="Char_Tips_ReadMore" xmlns:sys="clr-namespace:System;assembly=mscorlib">Pełny przewodnik na kaption.one</sys:String>
+    <!-- Strona postaci: sekcje, w skrócie, drużyny, stany listy (W8, sesja 50) -->
+    <sys:String x:Key="Char_Nav_Glance" xmlns:sys="clr-namespace:System;assembly=mscorlib">W skrócie</sys:String>
+    <sys:String x:Key="Char_Nav_Teams" xmlns:sys="clr-namespace:System;assembly=mscorlib">Drużyny</sys:String>
+    <sys:String x:Key="Char_Nav_Materials" xmlns:sys="clr-namespace:System;assembly=mscorlib">Materiały</sys:String>
+    <sys:String x:Key="Char_Fact_Role" xmlns:sys="clr-namespace:System;assembly=mscorlib">Rola</sys:String>
+    <sys:String x:Key="Char_Fact_Signature" xmlns:sys="clr-namespace:System;assembly=mscorlib">Najważniejsza umiejętność</sys:String>
+    <sys:String x:Key="Char_Fact_LevelFirst" xmlns:sys="clr-namespace:System;assembly=mscorlib">Rozwijaj najpierw</sys:String>
+    <sys:String x:Key="Char_AiWritten" xmlns:sys="clr-namespace:System;assembly=mscorlib">Napisane przez AI na podstawie danych z gry</sys:String>
+    <sys:String x:Key="Char_Skills_NamesNote" xmlns:sys="clr-namespace:System;assembly=mscorlib">Nazwy umiejętności zostają po angielsku, tak jak w grze.</sys:String>
+    <sys:String x:Key="Char_TeamSource_official" xmlns:sys="clr-namespace:System;assembly=mscorlib">Oficjalna drużyna</sys:String>
+    <sys:String x:Key="Char_TeamSource_ai" xmlns:sys="clr-namespace:System;assembly=mscorlib">Propozycja AI</sys:String>
+    <sys:String x:Key="Char_TeamSource_Other" xmlns:sys="clr-namespace:System;assembly=mscorlib">Źródło:</sys:String>
+    <sys:String x:Key="Char_Teams_Fallback" xmlns:sys="clr-namespace:System;assembly=mscorlib">Gra podpowiada tych towarzyszy.</sys:String>
+    <sys:String x:Key="Char_Count_Format" xmlns:sys="clr-namespace:System;assembly=mscorlib">Postaci: {0}</sys:String>
+    <sys:String x:Key="Char_CountFiltered_Format" xmlns:sys="clr-namespace:System;assembly=mscorlib">{0} z {1}</sys:String>
+    <sys:String x:Key="Char_Loading" xmlns:sys="clr-namespace:System;assembly=mscorlib">Wczytuję postacie…</sys:String>
+    <sys:String x:Key="Char_Error_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">Nie udało się wczytać postaci</sys:String>
+    <sys:String x:Key="Char_Error_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">Nie da się odczytać danych postaci na tym komputerze. Spróbuj jeszcze raz, a jeśli dalej nie działa, zaktualizuj Kaption.</sys:String>
+    <sys:String x:Key="Char_Error_Retry" xmlns:sys="clr-namespace:System;assembly=mscorlib">Spróbuj ponownie</sys:String>
+    <sys:String x:Key="Char_NoResults_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">Nikt nie pasuje</sys:String>
+    <sys:String x:Key="Char_NoResults_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">Wpisz inne imię albo pokaż wszystkie żywioły.</sys:String>
+    <sys:String x:Key="Char_Search_Clear" xmlns:sys="clr-namespace:System;assembly=mscorlib">Wyczyść wyszukiwanie</sys:String>
+    <sys:String x:Key="Tab_Home" xmlns:sys="clr-namespace:System;assembly=mscorlib">Start</sys:String>
+    <sys:String x:Key="Dash_Footer_EngineLoading" xmlns:sys="clr-namespace:System;assembly=mscorlib">Uruchamiam czytnik…</sys:String>
+    <sys:String x:Key="Dash_Footer_DictLoading" xmlns:sys="clr-namespace:System;assembly=mscorlib">Wczytuję słownik…</sys:String>
+    <sys:String x:Key="Dash_Footer_DictReady_Format" xmlns:sys="clr-namespace:System;assembly=mscorlib">Słownik: {0:N0}</sys:String>
+    <sys:String x:Key="Char_AiTag" xmlns:sys="clr-namespace:System;assembly=mscorlib">AI · na podstawie danych z gry</sys:String>
+    <sys:String x:Key="Char_Untranslated" xmlns:sys="clr-namespace:System;assembly=mscorlib">Bez polskiego tłumaczenia</sys:String>
+    <sys:Boolean x:Key="Char_MarkUntranslated" xmlns:sys="clr-namespace:System;assembly=mscorlib">True</sys:Boolean>
 </ResourceDictionary>

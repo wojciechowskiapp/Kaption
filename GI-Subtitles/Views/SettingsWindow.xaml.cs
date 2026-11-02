@@ -573,6 +573,7 @@ namespace GI_Subtitles.Views
             EnableAnswerTranslationCheckBox.IsChecked = Config.Get("EnableAnswerTranslation", false);
             CrashReportingCheckBox.IsChecked = Config.Get("CrashReportingEnabled", false);
             PlayerNameTextBox.Text = Config.Get<string>("PlayerName", "");
+            InitializeQuickTranslateCard();
 
             // Initialize logs tab
             InitializeLogTab();
@@ -2303,19 +2304,8 @@ namespace GI_Subtitles.Views
             }
         }
 
-        /// <summary>
-        /// A DirectML warm-up slower than this is treated as a failed warm-up
-        /// even though it technically finished. See the comment at the call
-        /// site for why "slow but successful" is not good enough.
-        ///
-        /// <para>Re-derived when warm-up dropped from 9 shape compiles (4
-        /// detector + 5 recognition) to 2. The old 10 s budget allowed ~1.1 s
-        /// per compile; holding that per-compile allowance gives ~2.2 s, and
-        /// 3 s keeps headroom for the first-call DirectML device init that the
-        /// detector shape now absorbs alone. Leaving it at 10 s would have let a
-        /// device 4.5x slower than the original bar pass the same gate.</para>
-        /// </summary>
-        private static readonly TimeSpan GpuWarmUpBudget = TimeSpan.FromSeconds(3);
+        // OcrGpuFitness.WarmUpBudget (3 s) was re-derived when warm-up dropped from 9 shape
+        // compiles to 2: ~1.1 s per compile plus first-call DirectML device init.
 
         public static PaddleOCREngine LoadEngine(
             string input,
@@ -2395,12 +2385,23 @@ namespace GI_Subtitles.Views
                         TimeSpan warmUpDuration = engine.WarmUp(
                             TimeSpan.FromSeconds(engine.IsUsingGpu ? 30 : 45),
                             GetConfiguredCaptureSize());
-                        if (engine.IsUsingGpu && warmUpDuration > GpuWarmUpBudget)
+                        if (OcrGpuFitness.NeedsSteadyStateProbe(engine.IsUsingGpu, warmUpDuration))
                         {
-                            gpuUnfitReason =
-                                $"DirectML OCR warm-up succeeded but took " +
-                                $"{warmUpDuration.TotalSeconds:F1}s " +
-                                $"(budget {GpuWarmUpBudget.TotalSeconds:F0}s)";
+                            // One contended launch (a game loading) must not move a whole release to CPU.
+                            TimeSpan steady = engine.ProbeSteadyState(TimeSpan.FromSeconds(10), GetConfiguredCaptureSize());
+                            if (OcrGpuFitness.IsUnfit(warmUpDuration, steady))
+                            {
+                                gpuUnfitReason =
+                                    $"DirectML OCR warm-up took {warmUpDuration.TotalSeconds:F1}s " +
+                                    $"(budget {OcrGpuFitness.WarmUpBudget.TotalSeconds:F0}s) and a compiled pass still took " +
+                                    $"{steady.TotalMilliseconds:F0}ms (budget {OcrGpuFitness.SteadyStateBudget.TotalMilliseconds:F0}ms)";
+                            }
+                            else
+                            {
+                                Logger.Log.Warn(
+                                    $"DirectML OCR warm-up took {warmUpDuration.TotalSeconds:F1}s, but a compiled pass took " +
+                                    $"{steady.TotalMilliseconds:F0}ms: slow kernel compilation, not a slow GPU. Keeping the GPU.");
+                            }
                         }
                     }
                     catch (Exception warmupEx) when (engine.IsUsingGpu)
@@ -2412,22 +2413,26 @@ namespace GI_Subtitles.Views
 
                     if (gpuUnfitReason != null)
                     {
-                        // A slow warm-up is not a one-off startup cost. ONNX
-                        // Runtime's DirectML kernel cache lives in the process,
-                        // so the same compilation happens at every launch, and
-                        // again in-game for every tensor shape the warm-up did
-                        // not cover. A device that needs >10s for nine known
-                        // shapes will blow the 15s live-frame watchdog on the
-                        // tenth. CPU inference at ~300ms/frame is strictly
-                        // better than that gamble repeated at every start.
-                        Logger.Log.Warn($"{gpuUnfitReason}. Retrying {profile.ModelName} on CPU.");
-                        OcrGpuQuarantine.Engage(gpuUnfitReason);
+                        // Failed warm-up, or slow even on compiled shapes: CPU for this session. Only the
+                        // second such launch in a row for this version persists the quarantine.
+                        if (OcrGpuFitness.QuarantineAfterStrike(OcrGpuQuarantine.RecordStrike()))
+                        {
+                            Logger.Log.Warn($"{gpuUnfitReason}. Second launch in a row; retrying {profile.ModelName} on CPU.");
+                            OcrGpuQuarantine.Engage(gpuUnfitReason);
+                        }
+                        else
+                        {
+                            Logger.Log.Warn($"{gpuUnfitReason}. Using the CPU for this session; DirectML is retried at the next launch.");
+                        }
                         engine.Dispose();
                         engine = null;
                         parameters.use_gpu = false;
                         engine = new PaddleOCREngine(config, parameters);
                         engine.WarmUp(TimeSpan.FromSeconds(45), GetConfiguredCaptureSize());
                     }
+
+                    if (gpuUnfitReason == null && engine.IsUsingGpu)
+                        OcrGpuQuarantine.ClearStrikes();
 
                     Logger.Log.Info(
                         $"OCR engine loaded successfully — model: {engine.ModelName}, " +
@@ -3397,6 +3402,10 @@ namespace GI_Subtitles.Views
         /// missing key never surfaces as a WPF error glyph in the UI.
         /// Mirrors the same helper in SendFeedbackWindow / ReferralsWindow.
         /// </summary>
+        // Status colours come from the design tokens (AA contrast on white).
+        private System.Windows.Media.Brush StatusBrush(string key) =>
+            TryFindResource(key) as System.Windows.Media.Brush ?? System.Windows.Media.Brushes.Gray;
+
         private static string L(string key, string fallback)
             => System.Windows.Application.Current?.TryFindResource(key) as string ?? fallback;
 
@@ -3605,7 +3614,7 @@ namespace GI_Subtitles.Views
                         var fg = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0xD9, 0x77, 0x06));
                         DashOcrStatusBadge.Background = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0xFE, 0xF3, 0xC7));
                         DashOcrStatusText.Foreground = fg;
-                        DashOcrStatusText.Text = TryFindResource("Dash_Status_EngineLoading") as string ?? "Loading OCR engine…";
+                        DashOcrStatusText.Text = TryFindResource("Dash_Status_EngineLoading") as string ?? "Starting the dialogue reader…";
                         if (DashOcrStatusIcon != null) DashOcrStatusIcon.Foreground = fg;
                     }
                     else if (dictMissing)
@@ -3660,28 +3669,26 @@ namespace GI_Subtitles.Views
                     DashOcrDetailStatus.Text = ocrRunning
                         ? TryFindResource("Dash_Status_Running") as string ?? "Running"
                         : TryFindResource("Dash_Status_Stopped") as string ?? "Stopped";
-                    DashOcrDetailStatus.Foreground = new SolidColorBrush(ocrRunning
-                        ? System.Windows.Media.Color.FromRgb(0x05, 0x96, 0x69)
-                        : System.Windows.Media.Color.FromRgb(0xDC, 0x26, 0x26));
+                    DashOcrDetailStatus.Foreground = StatusBrush(ocrRunning ? "SuccessBrush" : "ErrorBrush");
                 }
 
-                // Engine status
+                // Engine status: says what is happening, not just "Loading".
                 if (DashEngineStatus != null)
                 {
                     if (engineFailed)
                     {
                         DashEngineStatus.Text = TryFindResource("Dash_Status_EngineFailed") as string ?? "Translator failed to load";
-                        DashEngineStatus.Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0xDC, 0x26, 0x26));
+                        DashEngineStatus.Foreground = StatusBrush("ErrorBrush");
                     }
                     else if (engineReady)
                     {
                         DashEngineStatus.Text = TryFindResource("Dash_Status_Ready") as string ?? "Ready";
-                        DashEngineStatus.Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x05, 0x96, 0x69));
+                        DashEngineStatus.Foreground = StatusBrush("SuccessBrush");
                     }
                     else
                     {
-                        DashEngineStatus.Text = TryFindResource("Dash_Status_Loading") as string ?? "Loading...";
-                        DashEngineStatus.Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0xD9, 0x77, 0x06));
+                        DashEngineStatus.Text = TryFindResource("Dash_Footer_EngineLoading") as string ?? "Starting the reader…";
+                        DashEngineStatus.Foreground = StatusBrush("WarnBrush");
                     }
                 }
 
@@ -3690,18 +3697,19 @@ namespace GI_Subtitles.Views
                 {
                     if (dictLoaded)
                     {
-                        DashDictStatus.Text = $"{contentDict.Count:N0} entries";
-                        DashDictStatus.Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x05, 0x96, 0x69));
+                        DashDictStatus.Text = string.Format(System.Globalization.CultureInfo.CurrentCulture,
+                            TryFindResource("Dash_Footer_DictReady_Format") as string ?? "{0:N0} entries", contentDict.Count);
+                        DashDictStatus.Foreground = StatusBrush("SuccessBrush");
                     }
                     else if (dictMissing)
                     {
                         DashDictStatus.Text = TryFindResource("Dash_Status_TranslationDataMissing") as string ?? "Translation data missing";
-                        DashDictStatus.Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0xDC, 0x26, 0x26));
+                        DashDictStatus.Foreground = StatusBrush("ErrorBrush");
                     }
                     else
                     {
-                        DashDictStatus.Text = TryFindResource("Dash_Status_Loading") as string ?? "Loading...";
-                        DashDictStatus.Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0xD9, 0x77, 0x06));
+                        DashDictStatus.Text = TryFindResource("Dash_Footer_DictLoading") as string ?? "Loading the dictionary…";
+                        DashDictStatus.Foreground = StatusBrush("WarnBrush");
                     }
                 }
 
@@ -4236,6 +4244,19 @@ namespace GI_Subtitles.Views
                     ? Visibility.Visible
                     : Visibility.Collapsed;
             }
+            if (DashGpuStatusNote != null)
+            {
+                OcrGpuStatus status = OcrGpuFitness.Status(
+                    Config.Get("UseGpuOcr", true), quarantined, Engine == EngineStatus.Ready, engine?.IsUsingGpu == true,
+                    OcrGpuQuarantine.StrikeThisSession);
+                DashGpuStatusNote.Text = status switch
+                {
+                    OcrGpuStatus.Unavailable => L("Dash_GpuUnavailable", "Running on the processor: the graphics card could not be started for translation. Updating the graphics driver usually fixes this; restart Kaption afterwards."),
+                    OcrGpuStatus.RetryNextLaunch => L("Dash_GpuRetryNextLaunch", "Running on the processor this time: the graphics card was busy or slow while Kaption started. It gets another try at the next launch."),
+                    _ => L("Dash_GpuQuarantined", "Running on the processor: the graphics card was too slow at startup. Tick “Use GPU acceleration” under General to try it again."),
+                };
+                DashGpuStatusNote.Visibility = status == OcrGpuStatus.Ok ? Visibility.Collapsed : Visibility.Visible;
+            }
         }
 
         /// <summary>
@@ -4254,6 +4275,8 @@ namespace GI_Subtitles.Views
             Logger.Log.Info($"UseGpuOcr changed to {enabled}; restart required to rebuild the OCR engine.");
             if (OcrGpuQuarantineHint != null)
                 OcrGpuQuarantineHint.Visibility = Visibility.Collapsed;
+            if (enabled && DashGpuStatusNote != null)
+                DashGpuStatusNote.Visibility = Visibility.Collapsed;
             if (OcrModelRestartHint != null)
                 OcrModelRestartHint.Visibility = Visibility.Visible;
         }

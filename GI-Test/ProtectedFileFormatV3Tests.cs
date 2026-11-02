@@ -138,7 +138,7 @@ namespace GI_Test
                 // Flip a bit in the nonce base (byte 8 is nonce[0]).
                 FlipByte(path, ProtectedFileFormatV3.NonceBaseOffset, 0x01);
 
-                Assert.ThrowsException<CryptographicException>(() =>
+                Assert.ThrowsExactly<CryptographicException>(() =>
                 {
                     using (var s = AesCtrFileProtection.OpenDecryptStream(path, Key(5), Key(6)))
                     { /* open alone triggers header verify */ }
@@ -162,7 +162,7 @@ namespace GI_Test
                 // Flip block-size field (byte at BlockSizeOffset = 24).
                 FlipByte(path, ProtectedFileFormatV3.BlockSizeOffset, 0x01);
 
-                Assert.ThrowsException<CryptographicException>(() =>
+                Assert.ThrowsExactly<CryptographicException>(() =>
                 {
                     using (var s = AesCtrFileProtection.OpenDecryptStream(path, Key(7), Key(8)))
                     { }
@@ -188,7 +188,7 @@ namespace GI_Test
                 long offset = ProtectedFileFormatV3.BlockFileOffset(1, ProtectedFileFormatV3.DefaultBlockSize);
                 FlipByte(path, (int)offset, 0x01);
 
-                Assert.ThrowsException<CryptographicException>(() =>
+                Assert.ThrowsExactly<CryptographicException>(() =>
                 {
                     using (var s = AesCtrFileProtection.OpenDecryptStream(path, Key(9), Key(10)))
                     {
@@ -220,7 +220,7 @@ namespace GI_Test
                 int tagOffset = ProtectedFileFormatV3.HeaderSize + ProtectedFileFormatV3.DefaultBlockSize + 5;
                 FlipByte(path, tagOffset, 0x01);
 
-                Assert.ThrowsException<CryptographicException>(() =>
+                Assert.ThrowsExactly<CryptographicException>(() =>
                 {
                     using (var s = AesCtrFileProtection.OpenDecryptStream(path, Key(11), Key(12)))
                     {
@@ -247,7 +247,7 @@ namespace GI_Test
                     ProtectedFileFormatV3.FileCategory.CustomTranslation,
                     Key(13), Key(14));
 
-                Assert.ThrowsException<CryptographicException>(() =>
+                Assert.ThrowsExactly<CryptographicException>(() =>
                 {
                     using (var s = AesCtrFileProtection.OpenDecryptStream(path, Key(13), Key(99)))
                     { }
@@ -272,7 +272,7 @@ namespace GI_Test
                 using (var fs = new FileStream(path, FileMode.Open, FileAccess.ReadWrite))
                     fs.SetLength(fs.Length - 10);
 
-                Assert.ThrowsException<InvalidDataException>(() =>
+                Assert.ThrowsExactly<InvalidDataException>(() =>
                 {
                     using (var s = AesCtrFileProtection.OpenDecryptStream(path, Key(15), Key(16)))
                     { }
@@ -438,7 +438,7 @@ namespace GI_Test
 
                 using (var dec = AesCtrFileProtection.OpenMmapDecryptor(path, Key(25), Key(26)))
                 {
-                    Assert.ThrowsException<ArgumentOutOfRangeException>(() =>
+                    Assert.ThrowsExactly<ArgumentOutOfRangeException>(() =>
                         dec.ReadPlaintext(50, new byte[100]));
                 }
             }

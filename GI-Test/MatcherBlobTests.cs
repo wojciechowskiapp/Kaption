@@ -110,7 +110,7 @@ namespace GI_Test
             // exercise the null-value / null-key rejection paths here.
             var corpus = new Dictionary<string, string> { ["a"] = null };
             var ms = new MemoryStream();
-            Assert.ThrowsException<ArgumentException>(() =>
+            Assert.ThrowsExactly<ArgumentException>(() =>
                 MatcherBlobWriter.Write(corpus, null, Meta(1), ms));
         }
 
@@ -148,7 +148,7 @@ namespace GI_Test
             byte[] bytes = ms.ToArray();
             bytes[0] = (byte)'X'; // corrupt magic
 
-            Assert.ThrowsException<InvalidDataException>(() =>
+            Assert.ThrowsExactly<InvalidDataException>(() =>
                 MatcherBlobReader.LoadFromStream(new MemoryStream(bytes)));
         }
 
@@ -162,7 +162,7 @@ namespace GI_Test
             // Flip a bit in an offset/length field (not the reserved/crc bytes).
             bytes[16] ^= 0x01;
 
-            Assert.ThrowsException<InvalidDataException>(() =>
+            Assert.ThrowsExactly<InvalidDataException>(() =>
                 MatcherBlobReader.LoadFromStream(new MemoryStream(bytes)));
         }
 
@@ -177,7 +177,7 @@ namespace GI_Test
             var truncated = new byte[bytes.Length - 8];
             Buffer.BlockCopy(bytes, 0, truncated, 0, truncated.Length);
 
-            Assert.ThrowsException<InvalidDataException>(() =>
+            Assert.ThrowsExactly<InvalidDataException>(() =>
                 MatcherBlobReader.LoadFromStream(new MemoryStream(truncated)));
         }
 

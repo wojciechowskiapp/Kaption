@@ -12,7 +12,7 @@ namespace GI_Test
         private const string Line = "The wind is picking up again.";
         private const string OtherLine = "We should return to the harbor.";
 
-        [DataTestMethod]
+        [TestMethod]
         [DataRow("The wind is picking", "Paimon")]
         [DataRow("Paimon\nThe wind is picking", "")]
         public void MatcherPrefix_IsDisplayedWithoutAdvancingTheChain(string input, string npc)

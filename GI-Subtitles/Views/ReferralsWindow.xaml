@@ -191,8 +191,6 @@
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="8"/>
                         <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="8"/>
-                        <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
 
                     <Border Grid.Column="0" Style="{StaticResource StatCard}">
@@ -217,18 +215,7 @@
                                        Margin="0,2,0,0"/>
                         </StackPanel>
                     </Border>
-                    <Border Grid.Column="4" Style="{StaticResource StatCard}">
-                        <StackPanel>
-                            <TextBlock Text="{DynamicResource Referrals_Stat_BonusDays}"
-                                       FontSize="10" FontWeight="Bold"
-                                       Foreground="{StaticResource TextTertiaryBrush}"/>
-                            <TextBlock x:Name="StatBonusDaysText" Text="0"
-                                       FontSize="19" FontWeight="SemiBold"
-                                       Foreground="{StaticResource AccentBrush}"
-                                       Margin="0,2,0,0"/>
-                        </StackPanel>
-                    </Border>
-                    <Border Grid.Column="6" Style="{StaticResource StatCard}"
+                    <Border Grid.Column="4" Style="{StaticResource StatCard}"
                             ToolTip="{DynamicResource Referrals_Stat_Pending_Tooltip}">
                         <StackPanel>
                             <TextBlock Text="{DynamicResource Referrals_Stat_Pending}"
@@ -457,10 +444,11 @@
                             <ComboBox x:Name="HoyolabRegionCombo" Grid.Row="1" Grid.Column="2"
                                       Height="32"
                                       SelectionChanged="HoyolabRegion_SelectionChanged">
-                                <ComboBoxItem Content="{DynamicResource Referrals_Claim_Region_Americas}" Tag="NA" IsSelected="True"/>
-                                <ComboBoxItem Content="{DynamicResource Referrals_Claim_Region_Europe}" Tag="EU"/>
-                                <ComboBoxItem Content="{DynamicResource Referrals_Claim_Region_Asia}" Tag="ASIA"/>
-                                <ComboBoxItem Content="{DynamicResource Referrals_Claim_Region_TW}" Tag="TW"/>
+                                <!-- Tags are the server's region values (backend/src/lib/referrals.ts HOYOLAB_REGIONS). -->
+                                <ComboBoxItem Content="{DynamicResource Referrals_Claim_Region_Americas}" Tag="na" IsSelected="True"/>
+                                <ComboBoxItem Content="{DynamicResource Referrals_Claim_Region_Europe}" Tag="eu"/>
+                                <ComboBoxItem Content="{DynamicResource Referrals_Claim_Region_Asia}" Tag="asia"/>
+                                <ComboBoxItem Content="{DynamicResource Referrals_Claim_Region_TW}" Tag="tw_hk_mo"/>
                             </ComboBox>
                         </Grid>
 

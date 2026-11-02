@@ -267,7 +267,7 @@ namespace GI_Test
         //  Junk filter
         // ══════════════════════════════════════════════════════════════
 
-        [DataTestMethod]
+        [TestMethod]
         [DataRow("UID: 1000290822.", true, "digit-dominant watermark")]
         [DataRow("UBHEN92", true, "single-token handle with digits")]
         [DataRow("×", true, "single glyph close button")]
@@ -287,7 +287,7 @@ namespace GI_Test
         //  Decoration stripping / name normalization
         // ══════════════════════════════════════════════════════════════
 
-        [DataTestMethod]
+        [TestMethod]
         [DataRow("-Remielle", "Remielle")]
         [DataRow("··Remielle··", "Remielle")]
         [DataRow("~ Von Lycaon ~", "Von Lycaon")]
@@ -344,7 +344,7 @@ namespace GI_Test
         //  Per-game selection
         // ══════════════════════════════════════════════════════════════
 
-        [DataTestMethod]
+        [TestMethod]
         [DataRow("zzz")]
         [DataRow("ZZZ")]
         [DataRow("Zenless")]
@@ -356,7 +356,7 @@ namespace GI_Test
                 TextBlockClassifierFactory.Create(game), typeof(GeometryTextBlockClassifier));
         }
 
-        [DataTestMethod]
+        [TestMethod]
         [DataRow("Genshin")]
         [DataRow("StarRail")]
         [DataRow("")]

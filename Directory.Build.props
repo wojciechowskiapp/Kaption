@@ -1,4 +1,8 @@
 <Project>
+  <PropertyGroup>
+    <!-- Newest C# for the SDK pinned in global.json (owner rule: newest language with the newest .NET). -->
+    <LangVersion>latest</LangVersion>
+  </PropertyGroup>
   <PropertyGroup Condition="'$(OS)' != 'Windows_NT'">
     <!--
       GitHub's automatic NuGet dependency submission restores the solution on

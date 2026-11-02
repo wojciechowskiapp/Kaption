@@ -6,6 +6,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -481,7 +482,12 @@ namespace GI_Subtitles.Services.Translation
             Stream input,
             IProgress<(int percent, string message)> progress = null)
         {
-            using (var reader = new BinaryReader(input, Encoding.UTF8, leaveOpen: true))
+            // CryptoStream pays a full read round trip per call and BinaryReader issues one per
+            // primitive: 9 s for the 354 MB Genshin cache. Not disposed: that would close the caller's stream.
+            Stream source = input is MemoryStream || input is BufferedStream
+                ? input
+                : new BufferedStream(input, 1 << 16);
+            using (var reader = new BinaryReader(source, Encoding.UTF8, leaveOpen: true))
             {
                 // Validate header
                 byte[] magic = reader.ReadBytes(4);
@@ -541,10 +547,7 @@ namespace GI_Subtitles.Services.Translation
                 // Short keys indices — exact-sized array, no List.
                 int shortKeysCount = reader.ReadInt32();
                 int[] shortKeysIndices = new int[shortKeysCount];
-                for (int i = 0; i < shortKeysCount; i++)
-                {
-                    shortKeysIndices[i] = reader.ReadInt32();
-                }
+                ReadInt32s(reader, shortKeysIndices);
 
                 progress?.Report((70, "Loading n-gram index..."));
 
@@ -560,10 +563,7 @@ namespace GI_Subtitles.Services.Translation
                     long hash = reader.ReadInt64();
                     int listCount = reader.ReadInt32();
                     int[] ids = new int[listCount];
-                    for (int i = 0; i < listCount; i++)
-                    {
-                        ids[i] = reader.ReadInt32();
-                    }
+                    ReadInt32s(reader, ids);
                     ngramIndex[hash] = ids;
 
                     if (progress != null && b % 100000 == 0 && b > 0)
@@ -613,6 +613,21 @@ namespace GI_Subtitles.Services.Translation
                 progress?.Report((98, "Search index loaded from cache"));
                 return matcher;
             }
+        }
+
+        /// <summary>
+        /// Fills <paramref name="target"/> with little-endian Int32s written by <see cref="BinaryWriter"/>.
+        /// BinaryReader never reads ahead, so a direct read on its base stream stays in sync.
+        /// </summary>
+        internal static void ReadInt32s(BinaryReader reader, int[] target)
+        {
+            if (target.Length == 0) return;
+            if (BitConverter.IsLittleEndian)
+            {
+                reader.BaseStream.ReadExactly(MemoryMarshal.AsBytes(target.AsSpan()));
+                return;
+            }
+            for (int i = 0; i < target.Length; i++) target[i] = reader.ReadInt32();
         }
 
         // --- KMX blob serialization (new zero-heap-tax format) ---------------
@@ -1091,6 +1106,12 @@ namespace GI_Subtitles.Services.Translation
             return _reader != null ? _keyLengths[slot] : _entries[slot].Length;
         }
 
+        /// <summary>The original (unnormalised) key of a slot, 0 to EntryCount - 1. Off the OCR path.</summary>
+        public string OriginalKeyAt(int slot) => slot >= 0 && slot < EntryCount ? GetOriginalKey(slot) : null;
+
+        /// <summary>The value of a slot, 0 to EntryCount - 1. Off the OCR path.</summary>
+        public string ValueAt(int slot) => slot >= 0 && slot < EntryCount ? GetValue(slot) : null;
+
         private string GetOriginalKey(int slot)
         {
             return _reader != null ? _origKeys[slot] : _entries[slot].OriginalKey;
@@ -1203,12 +1224,58 @@ namespace GI_Subtitles.Services.Translation
             => FindClosestMatch(input, out Key, out _);
 
         /// <summary>
+        /// Value of the entry whose original key is exactly <paramref name="key"/> (trimmed).
+        /// Keys that only normalize alike ("Eula?" for "Eula") never answer. Not for OCR text.
+        /// </summary>
+        public bool TryGetExactValue(string key, out string value)
+        {
+            value = null;
+            string want = key?.Trim();
+            if (string.IsNullOrEmpty(want)) return false;
+            string norm = NormalizeInput(want, isEng);
+            if (norm.Length == 0) return false;
+
+            // Every key normalizing to `norm` holds all of its n-grams, so the smallest bucket has them all.
+            IEnumerable<int> pool = _shortKeysIndices;
+            if (norm.Length >= _ngramSize)
+            {
+                int[] smallest = null;
+                var span = norm.AsSpan();
+                for (int i = 0; i <= norm.Length - _ngramSize; i++)
+                {
+                    if (!_ngramIndex.TryGetValue(GetNgramHash(span.Slice(i, _ngramSize)), out var ids)) return false;
+                    if (smallest == null || ids.Length < smallest.Length) smallest = ids;
+                }
+                pool = smallest ?? Array.Empty<int>();
+            }
+
+            foreach (int id in pool)
+            {
+                if (string.Equals(GetNormKey(id), norm, StringComparison.Ordinal) &&
+                    string.Equals(GetOriginalKey(id)?.Trim(), want, StringComparison.Ordinal))
+                {
+                    value = GetValue(id);
+                    return !string.IsNullOrEmpty(value);
+                }
+            }
+            return false;
+        }
+
+        /// <summary>
         /// Also reports when the input covers only part of the selected key.
         /// Such matches may be previewed, but do not confirm dialogue progress.
         /// </summary>
         public string FindClosestMatch(string input, out string Key, out bool isPartialMatch)
+            => FindClosestMatch(input, out Key, out isPartialMatch, out _);
+
+        /// <summary>
+        /// <paramref name="isAmbiguous"/>: no match because two or more distinct keys continue the
+        /// input. Reading more text can settle it, unlike "nothing matched".
+        /// </summary>
+        public string FindClosestMatch(string input, out string Key, out bool isPartialMatch, out bool isAmbiguous)
         {
             isPartialMatch = false;
+            isAmbiguous = false;
             string normInput = NormalizeInput(input, isEng);
 
             if (string.IsNullOrEmpty(normInput))
@@ -1329,6 +1396,7 @@ namespace GI_Subtitles.Services.Translation
             // Below one n-gram only short keys are candidates, so uniqueness is unprovable.
             if (ambiguous || inputLen < _ngramSize)
             {
+                isAmbiguous = ambiguous;
                 Key = "";
                 return "";
             }
@@ -1485,15 +1553,21 @@ namespace GI_Subtitles.Services.Translation
             Span<int> prev = sourceLen < 512 ? stackalloc int[sourceLen + 1] : new int[sourceLen + 1];
             Span<int> curr = sourceLen < 512 ? stackalloc int[sourceLen + 1] : new int[sourceLen + 1];
 
-            for (int i = 0; i <= sourceLen; i++) prev[i] = i;
+            // Same diagonal band as OcrWeightedDistance.Calculate: exact within the threshold.
+            int band = threshold >= sourceLen + targetLen ? sourceLen + targetLen : threshold;
+            int outside = band + 1;
+
+            for (int i = 0; i <= sourceLen; i++) prev[i] = i <= band ? i : outside;
 
             for (int j = 1; j <= targetLen; j++)
             {
-                curr[0] = j;
-                int minInRow = j;
+                int lo = Math.Max(1, j - band);
+                int hi = Math.Min(sourceLen, j + band);
+                curr[lo - 1] = lo == 1 ? j : outside;
+                int minInRow = curr[lo - 1];
                 char targetChar = target[j - 1];
 
-                for (int i = 1; i <= sourceLen; i++)
+                for (int i = lo; i <= hi; i++)
                 {
                     int cost = (source[i - 1] == targetChar) ? 0 : 1;
                     int d1 = curr[i - 1] + 1;
@@ -1506,6 +1580,7 @@ namespace GI_Subtitles.Services.Translation
                     curr[i] = dist;
                     if (dist < minInRow) minInRow = dist;
                 }
+                if (hi < sourceLen) curr[hi + 1] = outside;
 
                 if (minInRow > threshold) return threshold + 1;
                 var tempRow = prev; prev = curr; curr = tempRow;

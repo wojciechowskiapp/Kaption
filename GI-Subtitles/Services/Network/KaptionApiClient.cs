@@ -516,7 +516,7 @@ namespace GI_Subtitles.Services.Network
             string sessionJwt,
             string rewardId,
             string deliveryMethod,
-            string contactInfo,
+            ClaimContactInfo contactInfo,
             CancellationToken ct = default)
         {
             if (string.IsNullOrEmpty(sessionJwt))
@@ -525,8 +525,7 @@ namespace GI_Subtitles.Services.Network
                 throw new ArgumentException("rewardId required", nameof(rewardId));
             if (string.IsNullOrWhiteSpace(deliveryMethod))
                 throw new ArgumentException("deliveryMethod required", nameof(deliveryMethod));
-            if (string.IsNullOrWhiteSpace(contactInfo))
-                throw new ArgumentException("contactInfo required", nameof(contactInfo));
+            ArgumentNullException.ThrowIfNull(contactInfo);
 
             var body = new ClaimReferralRewardRequest(deliveryMethod, contactInfo);
             string path = $"/api/referrals/rewards/{Uri.EscapeDataString(rewardId)}/claim";

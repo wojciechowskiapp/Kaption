@@ -114,7 +114,7 @@ namespace GI_Test
         {
             var keys = new List<string> { "abc", "abc", "def" };
             var slots = new List<int> { 0, 1, 2 };
-            Assert.ThrowsException<ArgumentException>(() => FstKeyIndex.Build(keys, slots));
+            Assert.ThrowsExactly<ArgumentException>(() => FstKeyIndex.Build(keys, slots));
         }
 
         [TestMethod]
@@ -122,7 +122,7 @@ namespace GI_Test
         {
             var keys = new List<string> { "zoo", "abc" };
             var slots = new List<int> { 0, 1 };
-            Assert.ThrowsException<ArgumentException>(() => FstKeyIndex.Build(keys, slots));
+            Assert.ThrowsExactly<ArgumentException>(() => FstKeyIndex.Build(keys, slots));
         }
 
         [TestMethod]
@@ -130,13 +130,13 @@ namespace GI_Test
         {
             var keys = new List<string> { null };
             var slots = new List<int> { 0 };
-            Assert.ThrowsException<ArgumentException>(() => FstKeyIndex.Build(keys, slots));
+            Assert.ThrowsExactly<ArgumentException>(() => FstKeyIndex.Build(keys, slots));
         }
 
         [TestMethod]
         public void NegativeSlotId_Rejected()
         {
-            Assert.ThrowsException<ArgumentException>(() =>
+            Assert.ThrowsExactly<ArgumentException>(() =>
                 FstKeyIndex.Build(new[] { "ok" }, new[] { -1 }));
         }
 

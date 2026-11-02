@@ -123,7 +123,7 @@ namespace GI_Test
             var pool = new BitmapPool();
             pool.Dispose();
 
-            Assert.ThrowsException<ObjectDisposedException>(() => pool.Rent(8, 8));
+            Assert.ThrowsExactly<ObjectDisposedException>(() => pool.Rent(8, 8));
         }
 
         [TestMethod]
@@ -136,7 +136,7 @@ namespace GI_Test
             // Should not throw, and the bitmap should end up disposed.
             pool.Return(bmp);
 
-            Assert.ThrowsException<ArgumentException>(() =>
+            Assert.ThrowsExactly<ArgumentException>(() =>
             {
                 // Accessing a disposed Bitmap's properties throws ArgumentException.
                 var _ = bmp.Width;

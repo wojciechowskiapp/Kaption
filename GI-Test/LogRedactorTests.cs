@@ -51,7 +51,7 @@ namespace GI_Test
 
         // ── secret-shaped config values ────────────────────────────────────
 
-        [DataTestMethod]
+        [TestMethod]
         [DataRow("\"SentryDsn\": \"https://abc123@app.glitchtip.com/22273\"", "abc123")]
         [DataRow("\"ApiToken\": \"tok_live_9f8e7d6c\"", "tok_live_9f8e7d6c")]
         [DataRow("\"password\": \"hunter2\"", "hunter2")]
@@ -90,7 +90,7 @@ namespace GI_Test
 
         // ── Windows usernames ──────────────────────────────────────────────
 
-        [DataTestMethod]
+        [TestMethod]
         [DataRow(@"C:\Users\Crisey\AppData\Roaming\Kaption\app.log", "Crisey")]
         [DataRow(@"D:\Users\Jan Kowalski\Desktop\thing.txt", "Kowalski")]
         [DataRow(@"\\fileserver\Users\mwojciechowski\share", "mwojciechowski")]

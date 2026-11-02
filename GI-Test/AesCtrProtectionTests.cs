@@ -186,7 +186,7 @@ namespace GI_Test
         public void InvalidKeyLength_Throws()
         {
             var badKey = new byte[20];
-            Assert.ThrowsException<ArgumentException>(() =>
+            Assert.ThrowsExactly<ArgumentException>(() =>
                 AesCtrProtection.EncryptBlock(new byte[16], new byte[16], badKey, TestNonce(), 0));
         }
 
@@ -196,7 +196,7 @@ namespace GI_Test
         {
             var key = TestKey();
             var badNonce = new byte[8];
-            Assert.ThrowsException<ArgumentException>(() =>
+            Assert.ThrowsExactly<ArgumentException>(() =>
                 AesCtrProtection.EncryptBlock(new byte[16], new byte[16], key, badNonce, 0));
         }
 
@@ -206,7 +206,7 @@ namespace GI_Test
         {
             var key = TestKey();
             var nonce = TestNonce();
-            Assert.ThrowsException<ArgumentException>(() =>
+            Assert.ThrowsExactly<ArgumentException>(() =>
                 AesCtrProtection.EncryptBlock(new byte[32], new byte[16], key, nonce, 0));
         }
 

@@ -477,10 +477,7 @@ namespace GI_Subtitles.Services.Translation
                 long hash = reader.ReadInt64();
                 int arrLen = reader.ReadInt32();
                 int[] arr = new int[arrLen];
-                for (int i = 0; i < arrLen; i++)
-                {
-                    arr[i] = reader.ReadInt32();
-                }
+                OptimizedMatcher.ReadInt32s(reader, arr);
                 deleteIndex[hash] = arr;
             }
 

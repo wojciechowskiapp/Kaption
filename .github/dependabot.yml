@@ -16,6 +16,14 @@ updates:
     commit-message:
       prefix: "deps"
       include: scope
+    ignore:
+      # Must match the native onnxruntime.dll of Microsoft.ML.OnnxRuntime.DirectML (last release
+      # 1.24.4). A newer Managed builds clean, then every session fails: "API version [31] is not available".
+      - dependency-name: "Microsoft.ML.OnnxRuntime.Managed"
+        versions: [">= 1.25.0"]
+      # 1.x is an installer/update-feed migration for clients on 0.0.1298, not a routine bump.
+      - dependency-name: "Velopack"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: github-actions
     directory: /

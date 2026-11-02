@@ -13,6 +13,7 @@ using System.Windows.Media;
 using System.Windows.Navigation;
 using GI_Subtitles.Common;
 using GI_Subtitles.Services.Network;
+using GI_Subtitles.Services.Referrals;
 
 namespace GI_Subtitles.Views
 {
@@ -75,21 +76,8 @@ namespace GI_Subtitles.Views
         /// </summary>
         private static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(20);
 
-        // ── Client-side validation regex ────────────────────────────────────
-        //
-        // Deliberately loose — we want "looks like an email" / "looks like a UID"
-        // rather than a full RFC-compliant check. The server does the strict
-        // validation; we're catching obvious slips before a round trip.
-        //
-        // Net8: RegexOptions.Compiled → [GeneratedRegex] source generator.
-        // Cold (user-input path), but converted for AOT-readiness + consistency
-        // with the VoiceContentHelper + AnswerTranslationService patterns.
-        [GeneratedRegex(@"^[^\s@]+@[^\s@]+\.[^\s@]+$", RegexOptions.CultureInvariant)]
-        private static partial Regex EmailRegex();
-
-        [GeneratedRegex(@"^\d{9,12}$", RegexOptions.CultureInvariant)]
-        private static partial Regex HoyolabUidRegex();
-
+        // Loose shape check for a friend's code; the server resolves it. Claim fields are
+        // validated by ReferralRules, which mirrors the server's rules exactly.
         [GeneratedRegex(@"^[A-Z0-9]{3,12}(-[A-Z0-9]{3,12})?$", RegexOptions.CultureInvariant)]
         private static partial Regex ReferralCodeRegex();
 
@@ -214,12 +202,9 @@ namespace GI_Subtitles.Views
             int invited = resp.Stats?.Invited ?? 0;
             int active = resp.Stats?.Active ?? 0;
             int pending = resp.Stats?.Pending ?? 0;
-            // Prefer the stats-scoped field; the top-level mirror is legacy.
-            int bonusDays = resp.Stats?.BonusDaysBanked ?? resp.BonusDaysBanked;
 
             StatInvitedText.Text = invited.ToString("N0");
             StatActiveText.Text = active.ToString("N0");
-            StatBonusDaysText.Text = bonusDays.ToString("N0");
             StatPendingText.Text = pending.ToString("N0");
 
             Tier1Progress.Value = Math.Min(active, TierLowerFriends);
@@ -292,9 +277,9 @@ namespace GI_Subtitles.Views
         private static string FormatInviteesSubtitle(int pending, int active, int invalid)
         {
             var parts = new List<string>(3);
-            if (pending > 0)  parts.Add(LF("Referrals_Invitee_Summary_Pending_Format", "{0} pending", pending));
-            if (active > 0)   parts.Add(LF("Referrals_Invitee_Summary_Active_Format", "{0} active", active));
-            if (invalid > 0)  parts.Add(LF("Referrals_Invitee_Summary_Flagged_Format", "{0} flagged", invalid));
+            if (pending > 0)  parts.Add(LF(ReferralRules.CountKey("Referrals_Invitee_Summary_Pending_Format", pending), "{0} pending", pending));
+            if (active > 0)   parts.Add(LF(ReferralRules.CountKey("Referrals_Invitee_Summary_Active_Format", active), "{0} active", active));
+            if (invalid > 0)  parts.Add(LF(ReferralRules.CountKey("Referrals_Invitee_Summary_Flagged_Format", invalid), "{0} flagged", invalid));
             return parts.Count == 0 ? "" : string.Join(" · ", parts);
         }
 
@@ -439,7 +424,7 @@ namespace GI_Subtitles.Views
                 return LF("Referrals_Invitee_WindowClosed_Format", "Signed up {0} · activity window closed", signedUpRel);
             }
             int daysLeft = (int)Math.Max(1, Math.Ceiling(remaining / 86400.0));
-            return LF("Referrals_Invitee_DaysLeft_Format", "Signed up {0} · {1}d left to qualify", signedUpRel, daysLeft);
+            return LF(ReferralRules.CountKey("Referrals_Invitee_DaysLeft_Format", daysLeft), "Signed up {0} · {1}d left to qualify", signedUpRel, daysLeft);
         }
 
         /// <summary>
@@ -768,13 +753,12 @@ namespace GI_Subtitles.Views
             bool ok;
             if (RadioHoyolab.IsChecked == true)
             {
-                string uid = (HoyolabUidBox.Text ?? "").Trim();
-                ok = HoyolabUidRegex().IsMatch(uid);
+                ok = ReferralRules.IsValidUid((HoyolabUidBox.Text ?? "").Trim())
+                     && ReferralRules.IsValidRegion(SelectedRegionTag());
             }
             else
             {
-                string email = (EmailBox.Text ?? "").Trim();
-                ok = EmailRegex().IsMatch(email) && email.Length <= 200;
+                ok = ReferralRules.IsValidEmail((EmailBox.Text ?? "").Trim());
             }
             BtnSubmitClaim.IsEnabled = ok;
         }
@@ -788,9 +772,7 @@ namespace GI_Subtitles.Views
                 return;
             }
 
-            string deliveryMethod;
-            string contactInfo;
-            if (!BuildClaimPayload(out deliveryMethod, out contactInfo, out string validationError))
+            if (!BuildClaimPayload(out string deliveryMethod, out ClaimContactInfo contactInfo, out string validationError))
             {
                 ShowClaimError(validationError);
                 return;
@@ -844,17 +826,14 @@ namespace GI_Subtitles.Views
             {
                 ShowClaimError(L("Referrals_Claim_Error_Expired", "Your session has expired. Close this window, sign in, and retry."));
             }
-            catch (ForbiddenException ex)
+            catch (ForbiddenException)
             {
-                ShowClaimError(ex.Message ?? L("Referrals_Claim_Error_Forbidden", "You don't have permission to claim this reward."));
+                ShowClaimError(L("Referrals_Claim_Error_Forbidden", "You don't have permission to claim this reward."));
             }
             catch (ApiValidationException ex)
             {
-                int code = (int)ex.StatusCode;
-                if (code == 409)
-                    ShowClaimError(L("Referrals_Claim_Error_AlreadyClaimed", "This reward has already been claimed."));
-                else
-                    ShowClaimError(ex.Error?.Describe() ?? L("Referrals_Claim_Error_Rejected", "The server rejected the claim."));
+                ShowClaimError(L(ReferralRules.ClaimErrorKey((int)ex.StatusCode, ex.Error?.Error),
+                    "The server rejected the claim."));
             }
             catch (ApiUnavailableException)
             {
@@ -881,7 +860,7 @@ namespace GI_Subtitles.Views
         /// applying the same format rules the server enforces. Out-parameter
         /// pattern keeps the happy path clear.
         /// </summary>
-        private bool BuildClaimPayload(out string deliveryMethod, out string contactInfo, out string error)
+        private bool BuildClaimPayload(out string deliveryMethod, out ClaimContactInfo contactInfo, out string error)
         {
             deliveryMethod = null;
             contactInfo = null;
@@ -890,35 +869,41 @@ namespace GI_Subtitles.Views
             if (RadioHoyolab.IsChecked == true)
             {
                 string uid = (HoyolabUidBox.Text ?? "").Trim();
-                if (!HoyolabUidRegex().IsMatch(uid))
+                if (!ReferralRules.IsValidUid(uid))
                 {
-                    error = L("Referrals_Claim_Error_InvalidUid", "HoYoLAB UID must be 9 to 12 digits.");
+                    error = L("Referrals_Claim_Error_InvalidUid", "A UID has 8 to 12 letters or digits.");
                     return false;
                 }
-                string regionTag = "NA";
-                if (HoyolabRegionCombo.SelectedItem is ComboBoxItem item && item.Tag is string t)
-                    regionTag = t;
-                deliveryMethod = "hoyolab_uid";
-                contactInfo = $"{uid} / {regionTag}";
+                string region = SelectedRegionTag();
+                if (!ReferralRules.IsValidRegion(region))
+                {
+                    error = L("Referrals_Claim_Error_InvalidRegion", "Choose your server region.");
+                    return false;
+                }
+                deliveryMethod = ReferralRules.HoyolabUid;
+                contactInfo = ReferralRules.ContactForHoyolab(uid, region);
                 return true;
             }
 
             if (RadioPaypal.IsChecked == true || RadioAmazon.IsChecked == true)
             {
                 string email = (EmailBox.Text ?? "").Trim();
-                if (!EmailRegex().IsMatch(email) || email.Length > 200)
+                if (!ReferralRules.IsValidEmail(email))
                 {
                     error = L("Referrals_Claim_Error_InvalidEmail", "Please enter a valid email.");
                     return false;
                 }
-                deliveryMethod = RadioPaypal.IsChecked == true ? "paypal" : "amazon_gc";
-                contactInfo = email;
+                deliveryMethod = RadioPaypal.IsChecked == true ? ReferralRules.Paypal : ReferralRules.AmazonGiftCard;
+                contactInfo = ReferralRules.ContactForEmail(email);
                 return true;
             }
 
             error = L("Referrals_Claim_Error_NoMethod", "Please pick a delivery method.");
             return false;
         }
+
+        private string SelectedRegionTag() =>
+            HoyolabRegionCombo.SelectedItem is ComboBoxItem { Tag: string tag } ? tag : null;
 
         private void SetClaimSubmittingState(bool submitting)
         {
@@ -997,22 +982,15 @@ namespace GI_Subtitles.Views
             {
                 ShowAttributeStatus(L("Referrals_Attribute_Expired", "Your session expired. Close this window, sign in, and retry."), isError: true);
             }
-            catch (ForbiddenException ex)
+            catch (ForbiddenException)
             {
-                // 403 = self-referral or other access denial.
-                ShowAttributeStatus(ex.Message ?? L("Referrals_Attribute_SelfReferral", "That code can't be linked to your account."), isError: true);
+                // 403 is the origin check, never self-referral (that is a 400).
+                ShowAttributeStatus(L("Referrals_Attribute_Rejected", "The server rejected the request."), isError: true);
             }
             catch (ApiValidationException ex)
             {
-                int code2 = (int)ex.StatusCode;
-                string serverMsg = ex.Error?.Describe();
-                string msg = code2 switch
-                {
-                    409 => L("Referrals_Attribute_Conflict", "Looks like you're already linked to a referrer, or this code has already been used."),
-                    400 => serverMsg ?? L("Referrals_Attribute_PastWindow", "That code isn't valid, or your account is past the 7-day window."),
-                    _   => serverMsg ?? L("Referrals_Attribute_Rejected", "The server rejected the request."),
-                };
-                ShowAttributeStatus(msg, isError: true);
+                ShowAttributeStatus(L(ReferralRules.AttributionErrorKey((int)ex.StatusCode, ex.Error?.Error),
+                    "The server rejected the request."), isError: true);
             }
             catch (ApiUnavailableException)
             {

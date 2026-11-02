@@ -6,6 +6,8 @@
     <Application.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
+                <!-- Design tokens (colours, type, spacing, radii, focus, brand mark) for every window. -->
+                <ResourceDictionary Source="Themes/Tokens.xaml"/>
                 <!-- Default language resource (will be replaced at runtime) -->
                 <ResourceDictionary Source="pack://application:,,,/Resources/Strings.zh-CN.xaml"/>
             </ResourceDictionary.MergedDictionaries>

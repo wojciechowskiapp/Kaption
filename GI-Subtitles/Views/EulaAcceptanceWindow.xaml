@@ -7,7 +7,8 @@
         WindowStartupLocation="CenterScreen"
         WindowStyle="SingleBorderWindow"
         ResizeMode="NoResize"
-        Background="#F8F9FC"
+        Background="{DynamicResource BgBrush}"
+        UseLayoutRounding="True"
         Closing="Window_Closing">
 
     <!--
@@ -40,7 +41,7 @@
         <Border VerticalAlignment="Top" Height="100" Background="White"
                 BorderBrush="{StaticResource CardBorderBrush}" BorderThickness="0,0,0,1">
             <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
-                <Image Source="../Resources/kaption.ico" Width="40" Height="40" Margin="0,0,0,6"/>
+                <Image Source="{StaticResource KaptionMark}" Width="40" Height="40" Margin="0,0,0,6"/>
                 <TextBlock Text="{DynamicResource Eula_Heading}"
                            FontSize="18" FontWeight="SemiBold"
                            Foreground="{StaticResource TextBrush}"

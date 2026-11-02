@@ -30,7 +30,10 @@ using GI_Subtitles.Core.Runtime;
 using GI_Subtitles.Core.UI;
 using GI_Subtitles.Models;
 using GI_Subtitles.Services.OCR;
+using GI_Subtitles.Services.Characters;
+using GI_Subtitles.Services.QuickTranslate;
 using GI_Subtitles.Services.Translation;
+using System.Globalization;
 using GI_Subtitles.Common;
 using GI_Subtitles.Core.Screen;
 using GI_Subtitles.Services.Rendering;
@@ -213,6 +216,7 @@ namespace GI_Subtitles.Views
         private const int HOTKEY_ID_4 = 9003;
         private const int HOTKEY_ID_5 = 9004;
         private const int HOTKEY_ID_6 = 9005;
+        private const int HOTKEY_ID_7 = 9006;
         private const uint MOD_CTRL = 0x0002; // Ctrl key
         private const uint MOD_SHIFT = 0x0004; // Shift key
         private const uint VK_S = 0x53; // Virtual key code for S
@@ -290,8 +294,14 @@ namespace GI_Subtitles.Views
         private bool usingRegion2 = false;
 
         // Quick-translate independent popup
-        private System.Windows.Window _quickTranslatePopup;
-        private System.Windows.Threading.DispatcherTimer _quickTranslateTimer;
+        private QuickTranslatePopup _quickTranslatePopup;
+        // Character overview for the popup's second tab: one detector per loaded catalog.
+        private readonly object _detectorGate = new object();
+        private CharacterCatalog _detectorCatalog;
+        private CharacterDetector _detector;
+        private MatcherTranslationLookup _characterLookupField;
+        private MatcherTranslationLookup _characterLookup =>
+            _characterLookupField ?? (_characterLookupField = new MatcherTranslationLookup(() => data?.Matcher));
         // Single-flight guard: rapid Ctrl+Q presses were stacking translucent
         // Screenshot.GetRegion overlays (visible as "white screen") and racing
         // parallel OCR pipelines. A press while one is in flight is a no-op;
@@ -360,6 +370,10 @@ namespace GI_Subtitles.Views
         // P2: Auto-pause when game minimized
         [DllImport("user32.dll")]
         private static extern IntPtr GetForegroundWindow();
+        [DllImport("user32.dll")]
+        private static extern bool SetForegroundWindow(IntPtr hWnd);
+        [DllImport("user32.dll")]
+        private static extern bool IsWindow(IntPtr hWnd);
         [DllImport("user32.dll", CharSet = CharSet.Auto)]
         private static extern int GetWindowText(IntPtr hWnd, StringBuilder lpString, int nMaxCount);
         [DllImport("user32.dll")]
@@ -785,7 +799,7 @@ namespace GI_Subtitles.Views
             {
                 SubtitleText.Text = LocalizedString(
                     "Overlay_EngineLoading",
-                    "Loading OCR engine…");
+                    "Starting the dialogue reader…");
                 SubtitleBackground.Opacity = 0.7;
                 _subtitleVisible = true;
 
@@ -819,7 +833,7 @@ namespace GI_Subtitles.Views
                         {
                             SubtitleText.Text = LocalizedString(
                                 "Overlay_EngineLoading",
-                                "Loading OCR engine…");
+                                "Starting the dialogue reader…");
                             SubtitleBackground.Opacity = 0.7;
                             _subtitleVisible = true;
                         }
@@ -969,7 +983,7 @@ namespace GI_Subtitles.Views
                 try
                 {
                     notify?.ShowBalloonTip(
-                        LocalizedString("Notice_GpuFallback_Title", "Kaption switched OCR to CPU mode"),
+                        LocalizedString("Notice_GpuFallback_Title", "Kaption switched to the processor"),
                         LocalizedString(
                             "Notice_GpuFallback_Body",
                             "Your GPU was too slow to run text recognition reliably, so Kaption is using the processor instead. Translation keeps working."));
@@ -2122,13 +2136,11 @@ namespace GI_Subtitles.Views
                 }
 
                 // Quick-translate popup
-                if (_quickTranslatePopup != null && _quickTranslatePopup.IsVisible)
+                var quickPopup = _quickTranslatePopup;
+                if (quickPopup != null && quickPopup.IsVisible)
                 {
-                    int qX = (int)(_quickTranslatePopup.Left * Scale);
-                    int qY = (int)(_quickTranslatePopup.Top * Scale);
-                    int qW = (int)(_quickTranslatePopup.ActualWidth * Scale);
-                    int qH = (int)(_quickTranslatePopup.ActualHeight * Scale);
-                    overlayRects.Add(new System.Drawing.Rectangle(qX, qY, qW, qH));
+                    var qBounds = quickPopup.PhysicalBounds;
+                    if (!qBounds.IsEmpty) overlayRects.Add(qBounds);
                 }
 
                 var captureRect = new System.Drawing.Rectangle(captureX, captureY, captureW, captureH);
@@ -2677,7 +2689,7 @@ namespace GI_Subtitles.Views
                 GI_Subtitles.Views.ModernDialog.Error(
                     owner: this,
                     title: LocalizedString("Dialog_EngineFailed_Title", "Translator didn't load"),
-                    body: LocalizedString("Dialog_EngineFailed_Body", "The OCR engine hit an error starting up. Open Dashboard and click Retry — the banner at the top has a fallback option if the GPU path keeps failing."),
+                    body: LocalizedString("Dialog_EngineFailed_Body", "The dialogue reader hit an error while starting. Open the Home tab and click Retry; the banner at the top can also switch to the processor if the graphics card keeps failing."),
                     technicalDetails: err?.ToString());
                 return false;
             }
@@ -2686,7 +2698,7 @@ namespace GI_Subtitles.Views
             GI_Subtitles.Views.ModernDialog.Info(
                 owner: this,
                 title: LocalizedString("Dialog_EngineLoading_Title", "Translator still loading"),
-                body: LocalizedString("Dialog_EngineLoading_Body", "Give it a moment — the OCR engine is still warming up. Try Start again when the pill under the Start button shows Ready."));
+                body: LocalizedString("Dialog_EngineLoading_Body", "Give it a moment — the dialogue reader is still warming up. Click Start again when the badge under the button says Ready."));
             return false;
         }
 
@@ -3631,86 +3643,30 @@ namespace GI_Subtitles.Views
 
         private async Task QuickTranslateRegion()
         {
-            // Use the 5th gate so users who hit Ctrl+Q during cold-boot get the
-            // localized "engine loading" dialog instead of a silent no-op.
-            // See b42569d for the gate contract and the matching call sites
-            // in OnToggleOCR / ForceOcrTranslate / WndProc / Setup Wizard.
+            // Engine/matcher gates show a localized dialog instead of a silent no-op during
+            // cold boot. Ctrl+Q stays outside the 8-gate start contract (it never starts OCRTimer).
             if (!TryGateEngineReady()) return;
             if (!TryGateMatcherReady()) return;
 
-            // Reject re-entry while a picker/OCR is already in flight, and
-            // swallow auto-repeat inside a 300ms window. A press with no
-            // picker up but a stale popup still dismisses the popup below.
+            // Single-flight + 300 ms debounce: rapid presses used to stack pickers and race OCR runs.
             if (_quickTranslateBusy) return;
             if ((DateTime.UtcNow - _lastQuickTranslateUtc).TotalMilliseconds < 300) return;
             _lastQuickTranslateUtc = DateTime.UtcNow;
             _quickTranslateBusy = true;
 
-            CloseQuickTranslatePopup();
-
-            System.Drawing.Bitmap target = null;
-            OpenCvSharp.Mat frameMat = null;
             try
             {
-                // Let user draw a rectangle on screen
+                CloseQuickTranslatePopup();
+                IntPtr previousForeground = GetForegroundWindow();
                 var rect = Screenshot.Screenshot.GetRegion();
+                // The picker activated itself; give the game its focus back before reading.
+                RestoreForeground(previousForeground);
                 if (rect.Width <= 0 || rect.Height <= 0) return;
-
-                double regionCenterX = rect.TopLeft.X + rect.Width / 2;
-                double regionBottomY = rect.TopLeft.Y + rect.Height;
-
-                // Build a temporary region array from the selected rectangle
-                string[] tempRegion = new[]
-                {
-                    ((int)rect.TopLeft.X).ToString(),
-                    ((int)rect.TopLeft.Y).ToString(),
-                    ((int)rect.Width).ToString(),
-                    ((int)rect.Height).ToString()
-                };
-
-                // Capture the selected region (rented from BitmapPool.Default).
-                target = CaptureRegion(tempRegion);
-                if (target == null) return;
-
-                frameMat = target.ToMat();
-                if (frameMat == null || frameMat.Empty())
-                {
-                    return;
-                }
-
-                // Run OCR + matching on background thread (independent from main OCR loop)
-                string resultText = await Task.Run(() =>
-                {
-                    try
-                    {
-                        OCRResult ocrResult = data.engine.DetectTextFromMat(frameMat);
-                        string text = ocrResult?.Text ?? "";
-                        if (string.IsNullOrWhiteSpace(text)) return "";
-
-                        // Try to find translation
-                        string match = data.Matcher?.FindClosestMatch(text, out string key);
-                        string result = !string.IsNullOrEmpty(match) ? match : text;
-                        return result.Replace("\\n", "\n");
-                    }
-                    catch (Exception ex)
-                    {
-                        Logger.Log.Error($"QuickTranslate OCR error: {ex}");
-                        return "";
-                    }
-                    finally
-                    {
-                        frameMat?.Dispose();
-                        frameMat = null;
-                        // target rented from BitmapPool — Return, don't Dispose.
-                        ReleaseCapturedBitmap(target);
-                        target = null;
-                    }
-                });
-
-                if (!string.IsNullOrEmpty(resultText))
-                {
-                    ShowQuickTranslatePopup(resultText, regionCenterX / Scale, regionBottomY / Scale);
-                }
+                var selection = new System.Drawing.Rectangle(
+                    (int)Math.Round(rect.X), (int)Math.Round(rect.Y),
+                    (int)Math.Round(rect.Width), (int)Math.Round(rect.Height));
+                QuickTranslateArea.Save(selection);
+                await RunQuickTranslateAsync(selection);
             }
             catch (Exception ex)
             {
@@ -3718,86 +3674,218 @@ namespace GI_Subtitles.Views
             }
             finally
             {
-                frameMat?.Dispose();
-                ReleaseCapturedBitmap(target);
                 _quickTranslateBusy = false;
             }
         }
 
-        private void ShowQuickTranslatePopup(string text, double centerX, double bottomY)
+        /// <summary>Hotkey 9006: re-reads the last Ctrl+Q area without the picker; falls back to it.</summary>
+        private async Task RepeatQuickTranslateArea()
+        {
+            if (!QuickTranslateArea.TryLoad(out var area))
+            {
+                await QuickTranslateRegion();
+                return;
+            }
+            if (!TryGateEngineReady()) return;
+            if (!TryGateMatcherReady()) return;
+            if (_quickTranslateBusy) return;
+            if ((DateTime.UtcNow - _lastQuickTranslateUtc).TotalMilliseconds < 300) return;
+            _lastQuickTranslateUtc = DateTime.UtcNow;
+            _quickTranslateBusy = true;
+
+            try
+            {
+                CloseQuickTranslatePopup();
+                // No picker here, so focus never left the game.
+                await RunQuickTranslateAsync(area);
+            }
+            catch (Exception ex)
+            {
+                Logger.Log.Error($"RepeatQuickTranslateArea error: {ex}");
+            }
+            finally
+            {
+                _quickTranslateBusy = false;
+            }
+        }
+
+        /// <summary>Captures the area, reads it off the UI thread, and shows the popup.</summary>
+        private async Task RunQuickTranslateAsync(System.Drawing.Rectangle selection)
+        {
+            System.Drawing.Bitmap target = null;
+            OpenCvSharp.Mat frameMat = null;
+            try
+            {
+                string[] region =
+                {
+                    selection.X.ToString(CultureInfo.InvariantCulture),
+                    selection.Y.ToString(CultureInfo.InvariantCulture),
+                    selection.Width.ToString(CultureInfo.InvariantCulture),
+                    selection.Height.ToString(CultureInfo.InvariantCulture),
+                };
+                target = CaptureRegion(region); // rented from BitmapPool.Default
+                if (target == null) return;
+                frameMat = target.ToMat();
+                if (frameMat == null || frameMat.Empty()) return;
+
+                var engine = data.engine;
+                var matcher = data.Matcher;
+                var mat = frameMat;
+                var bitmap = target;
+                frameMat = null; // ownership moves to the worker, which releases both
+                target = null;
+                var (segments, lines) = await Task.Run(() => RecognizeQuickTranslate(engine, matcher, mat, bitmap));
+
+                ShowQuickTranslatePopup(segments, selection);
+                if (lines.Count > 0) _ = AttachCharacterOverviewAsync(_quickTranslatePopup, lines);
+            }
+            catch (Exception ex)
+            {
+                Logger.Log.Error($"QuickTranslate error: {ex}");
+            }
+            finally
+            {
+                frameMat?.Dispose();
+                ReleaseCapturedBitmap(target);
+            }
+        }
+
+        private (IReadOnlyList<QuickTranslateSegment> segments, IReadOnlyList<string> lines) RecognizeQuickTranslate(
+            PaddleOCREngine engine, OptimizedMatcher matcher, OpenCvSharp.Mat frame, System.Drawing.Bitmap captured)
+        {
+            var none = (Array.Empty<QuickTranslateSegment>(), (IReadOnlyList<string>)Array.Empty<string>());
+            try
+            {
+                if (engine == null) return none;
+                OCRResult ocr = engine.DetectTextFromMat(frame);
+                var lines = QuickTranslateSegmenter.OrderLines(
+                    (ocr?.TextBlocks ?? new List<PaddleOCRSharp.TextBlock>()).Select(ToQuickTranslateLine));
+                if (lines.Count == 0) return none;
+                if (matcher == null)
+                    return (new[] { QuickTranslateSegment.Unmatched(string.Join("\n", lines)) }, lines);
+
+                var clock = Stopwatch.StartNew();
+                var segments = QuickTranslateSegmenter.Segment(lines, QuickTranslateSegmenter.ProbeWith(matcher));
+                Logger.Log.Info($"QuickTranslate: {lines.Count} lines → {segments.Count} segments " +
+                                $"({segments.Count(s => s.IsMatched)} matched) in {clock.ElapsedMilliseconds} ms");
+                return (segments, lines);
+            }
+            catch (Exception ex)
+            {
+                Logger.Log.Error($"QuickTranslate OCR error: {ex}");
+                return none;
+            }
+            finally
+            {
+                frame?.Dispose();
+                ReleaseCapturedBitmap(captured); // pooled: return it, never Dispose
+            }
+        }
+
+        private static (string text, float top, float left, float height) ToQuickTranslateLine(PaddleOCRSharp.TextBlock block)
+        {
+            var points = block?.BoxPoints;
+            if (points == null || points.Length == 0) return (block?.Text, 0f, 0f, 0f);
+            float top = points.Min(p => p.Y);
+            return (block.Text, top, points.Min(p => p.X), points.Max(p => p.Y) - top);
+        }
+
+        /// <summary>
+        /// Recognises the character behind a skill panel and adds the Overview tab. Runs after the
+        /// popup is up, so the translation never waits on it; a closed or replaced popup is skipped.
+        /// </summary>
+        private async Task AttachCharacterOverviewAsync(QuickTranslatePopup popup, IReadOnlyList<string> lines)
+        {
+            if (popup == null) return;
+            try
+            {
+                string game = Config.Get("Game", Game) ?? Game;
+                var lookup = _characterLookup;
+                var icons = CharacterImageCache.ForGame(game);
+                // Disk checks and image decoding stay off the UI thread, which also paces the overlay.
+                var model = await Task.Run(async () =>
+                {
+                    var catalog = await CharacterCatalogService.GetAsync(game).ConfigureAwait(false);
+                    if (catalog.IsEmpty) return null;
+                    var record = DetectorFor(catalog).Detect(lines);
+                    if (record == null) return null;
+                    var m = CharacterOverviewBuilder.Build(record, catalog, lookup);
+                    CharacterIcons.ApplyCached(m, icons);
+                    CharacterOverviewViewModel.PrepareVisuals(m);
+                    return m;
+                });
+
+                if (model == null || !ReferenceEquals(popup, _quickTranslatePopup) || !popup.IsVisible) return;
+                Func<string> plain = () => model.ToPlainText(key => TryFindResource(key) as string);
+                popup.SetCharacter(new CharacterOverviewView(model), model.Name, plain);
+
+                // Images not on disk yet: render now, swap in the full view once they arrive.
+                if (await CharacterIcons.FetchMissingAsync(model, icons))
+                {
+                    await Task.Run(() => CharacterOverviewViewModel.PrepareVisuals(model));
+                    if (ReferenceEquals(popup, _quickTranslatePopup) && popup.IsVisible)
+                        popup.SetCharacter(new CharacterOverviewView(model), model.Name, plain);
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log.Warn($"Character overview not attached: {ex.Message}");
+            }
+        }
+
+        private CharacterDetector DetectorFor(CharacterCatalog catalog)
+        {
+            lock (_detectorGate)
+            {
+                if (!ReferenceEquals(_detectorCatalog, catalog))
+                {
+                    _detectorCatalog = catalog;
+                    _detector = new CharacterDetector(catalog);
+                }
+                return _detector;
+            }
+        }
+
+        private void ShowQuickTranslatePopup(IReadOnlyList<QuickTranslateSegment> segments, System.Drawing.Rectangle selection)
         {
             CloseQuickTranslatePopup();
-
-            var textBlock = new OutlinedTextBlock
+            try
             {
-                Text = text,
-                Foreground = System.Windows.Media.Brushes.White,
-                FontWeight = FontWeights.Bold,
-                FontSize = 15,
-                TextWrapping = TextWrapping.Wrap,
-                TextAlignment = TextAlignment.Center,
-                MaxTextWidth = 500,
-                StrokeBrush = System.Windows.Media.Brushes.Black,
-                StrokeThickness = 2
-            };
-
-            var border = new Border
-            {
-                Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb(0xB0, 0, 0, 0)),
-                CornerRadius = new CornerRadius(8),
-                Padding = new Thickness(16, 8, 16, 12),
-                Child = textBlock
-            };
-
-            _quickTranslatePopup = new System.Windows.Window
-            {
-                WindowStyle = WindowStyle.None,
-                AllowsTransparency = true,
-                Background = System.Windows.Media.Brushes.Transparent,
-                Topmost = true,
-                ShowInTaskbar = false,
-                SizeToContent = SizeToContent.WidthAndHeight,
-                Content = border
-            };
-
-            // Position below the selected region, centered
-            _quickTranslatePopup.Loaded += (s, e) =>
-            {
-                _quickTranslatePopup.Left = centerX - _quickTranslatePopup.ActualWidth / 2;
-                _quickTranslatePopup.Top = bottomY + 8;
-            };
-
-            // Click anywhere on popup to dismiss immediately
-            _quickTranslatePopup.MouseDown += (s, e) => CloseQuickTranslatePopup();
-
-            _quickTranslatePopup.Show();
-            // Exclude quick-translate popup from screen capture
-            var qtHandle = new WindowInteropHelper(_quickTranslatePopup).Handle;
-            TryExcludeFromCapture(qtHandle);
-
-            // Auto-close after 4 seconds with fade-out
-            _quickTranslateTimer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(4) };
-            _quickTranslateTimer.Tick += (s, e) =>
-            {
-                _quickTranslateTimer.Stop();
-                if (_quickTranslatePopup != null)
+                var popup = new QuickTranslatePopup(segments, QuickTranslateSettings.Load(), selection);
+                popup.Closed += (s, e) =>
                 {
-                    var fadeOut = new System.Windows.Media.Animation.DoubleAnimation(1, 0, TimeSpan.FromMilliseconds(500));
-                    fadeOut.Completed += (s2, e2) => CloseQuickTranslatePopup();
-                    _quickTranslatePopup.BeginAnimation(System.Windows.Window.OpacityProperty, fadeOut);
-                }
-            };
-            _quickTranslateTimer.Start();
+                    if (ReferenceEquals(_quickTranslatePopup, s)) _quickTranslatePopup = null;
+                };
+                _quickTranslatePopup = popup;
+                popup.Show();
+            }
+            catch (Exception ex)
+            {
+                Logger.Log.Error($"QuickTranslate popup failed: {ex}");
+                CloseQuickTranslatePopup();
+            }
         }
 
         private void CloseQuickTranslatePopup()
         {
-            _quickTranslateTimer?.Stop();
-            _quickTranslateTimer = null;
-            if (_quickTranslatePopup != null)
+            var popup = _quickTranslatePopup;
+            _quickTranslatePopup = null;
+            if (popup == null) return;
+            try { popup.CloseNow(); }
+            catch (Exception ex) { Logger.Log.Warn($"QuickTranslate popup close: {ex.Message}"); }
+        }
+
+        /// <summary>The region picker activates itself; hand focus back to the game afterwards.</summary>
+        private static void RestoreForeground(IntPtr hwnd)
+        {
+            if (hwnd == IntPtr.Zero) return;
+            try
             {
-                try { _quickTranslatePopup.Close(); } catch { }
-                _quickTranslatePopup = null;
+                if (IsWindow(hwnd)) SetForegroundWindow(hwnd);
+            }
+            catch (Exception ex)
+            {
+                if (Logger.IsDebugEnabled) Logger.Log.Debug($"RestoreForeground: {ex.Message}");
             }
         }
 
@@ -4352,6 +4440,7 @@ namespace GI_Subtitles.Views
             // ticks keeps shutdown snappy — we only wait on the current Run.
             try { OCRTimer?.Stop(); } catch { }
             try { UITimer?.Stop(); } catch { }
+            CloseQuickTranslatePopup();
             try { ResetOcrPipelineState(clearImageCaches: true); } catch { }
             try { _captureBackend?.Dispose(); } catch { }
             _captureBackend = null;
@@ -4473,6 +4562,13 @@ namespace GI_Subtitles.Views
                     // guard and exceptions are logged inside.
                     if (TryGateOcrStart())
                         _ = QuickTranslateRegion();
+                    handled = true;
+                }
+                else if (wParam.ToInt32() == HOTKEY_ID_7)
+                {
+                    // Repeat the last quick-translate area (Ctrl+Shift+Q).
+                    if (TryGateOcrStart())
+                        _ = RepeatQuickTranslateArea();
                     handled = true;
                 }
             }
@@ -5110,7 +5206,7 @@ namespace GI_Subtitles.Views
         /// Attempts to make a window invisible to screen capture APIs (Windows 10 2004+).
         /// Returns true if the API call succeeded.
         /// </summary>
-        private static bool TryExcludeFromCapture(IntPtr hWnd)
+        internal static bool TryExcludeFromCapture(IntPtr hWnd)
         {
             if (hWnd == IntPtr.Zero) return false;
             try

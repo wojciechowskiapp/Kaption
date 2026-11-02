@@ -690,17 +690,34 @@ namespace GI_Subtitles.Services.Network
         public string DeliveryMethod { get; }
 
         /// <summary>
-        /// PayPal / Amazon email, or HoYoLAB UID with region tag (e.g.
-        /// "803912345 / NA"). Never logged client-side.
+        /// <c>{email}</c> for PayPal / Amazon, <c>{uid, region}</c> for HoYoLAB. The server rejects a
+        /// plain string with <c>invalid_contact_info</c>. Never logged client-side.
         /// </summary>
         [JsonPropertyName("contact_info")]
-        public string ContactInfo { get; }
+        public ClaimContactInfo ContactInfo { get; }
 
-        public ClaimReferralRewardRequest(string deliveryMethod, string contactInfo)
+        public ClaimReferralRewardRequest(string deliveryMethod, ClaimContactInfo contactInfo)
         {
             DeliveryMethod = deliveryMethod ?? throw new ArgumentNullException(nameof(deliveryMethod));
             ContactInfo = contactInfo ?? throw new ArgumentNullException(nameof(contactInfo));
         }
+    }
+
+    /// <summary>
+    /// <c>contact_info</c> of a reward claim. Unset fields are left out of the JSON
+    /// (<see cref="GI_Subtitles.Common.JsonDefaults.IgnoreNulls"/>).
+    /// </summary>
+    public sealed class ClaimContactInfo
+    {
+        [JsonPropertyName("email")]
+        public string Email { get; init; }
+
+        [JsonPropertyName("uid")]
+        public string Uid { get; init; }
+
+        /// <summary>"na" | "eu" | "asia" | "tw_hk_mo"</summary>
+        [JsonPropertyName("region")]
+        public string Region { get; init; }
     }
 
     /// <summary>

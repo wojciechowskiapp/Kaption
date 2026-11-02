@@ -115,7 +115,7 @@ namespace GI_Test
             Assert.IsTrue(compact > 0.01, "A meaningful glyph change must cross the existing trigger threshold.");
         }
 
-        [DataTestMethod]
+        [TestMethod]
         [DataRow("0,0,1920,1080", true)]
         [DataRow("-1920,0,1920,1080", true)]
         [DataRow("0,0,0,1080", false)]

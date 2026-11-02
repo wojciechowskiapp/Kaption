@@ -7,7 +7,8 @@
         WindowStartupLocation="CenterScreen"
         WindowStyle="SingleBorderWindow"
         ResizeMode="NoResize"
-        Background="#F8F9FC">
+        Background="{DynamicResource BgBrush}"
+        UseLayoutRounding="True">
 
     <Window.Resources>
         <ResourceDictionary>
@@ -613,7 +614,7 @@
                                     <Border Grid.Column="0" Background="#F3F4F6"
                                             CornerRadius="4" Padding="8,4"
                                             HorizontalAlignment="Left">
-                                        <TextBlock Text="{DynamicResource Shortcut_BacktickLabel}" FontSize="12"
+                                        <TextBlock Text="Ctrl + 1" FontSize="12"
                                                    FontFamily="Consolas"
                                                    Foreground="{StaticResource TextBrush}"/>
                                     </Border>

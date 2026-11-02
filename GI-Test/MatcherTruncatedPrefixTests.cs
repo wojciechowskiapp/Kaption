@@ -77,7 +77,7 @@ namespace GI_Test
         }
 
         // genshin-vodyanitsa-banter painted "Tak, ty." for this frame, ~400 ms before the real line.
-        [DataTestMethod]
+        [TestMethod]
         [DataRow(false)]
         [DataRow(true)]
         public void AmbiguousTypewriterPrefix_IsDeclined(bool mmap)
@@ -96,7 +96,7 @@ namespace GI_Test
 
         // genshin-childe-marionette: Stage 0 accepted "Terho" at one edit while dozens of
         // keys start with the input exactly.
-        [DataTestMethod]
+        [TestMethod]
         [DataRow(false)]
         [DataRow(true)]
         public void AmbiguousPrefix_IsDeclined_EvenWithAShortKeyWithinTwoEdits(bool mmap)
@@ -107,7 +107,7 @@ namespace GI_Test
         }
 
         // genshin-jester-council: "It w" painted "Tak było!" before "It was... different this time."
-        [DataTestMethod]
+        [TestMethod]
         [DataRow(false)]
         [DataRow(true)]
         public void FragmentShorterThanOneNgram_OnlyMatchesExactly(bool mmap)
@@ -120,7 +120,7 @@ namespace GI_Test
             Assert.IsFalse(partial);
         }
 
-        [DataTestMethod]
+        [TestMethod]
         [DataRow(false)]
         [DataRow(true)]
         public void UniquePrefix_ResolvesAsPartial(bool mmap)
@@ -134,7 +134,7 @@ namespace GI_Test
             Assert.IsTrue(partial, "A prefix match previews the line but must not confirm it.");
         }
 
-        [DataTestMethod]
+        [TestMethod]
         [DataRow(false)]
         [DataRow(true)]
         public void ExactLine_StaysAuthoritative_WhenItIsAlsoAPrefixOfLongerLines(bool mmap)
@@ -147,7 +147,7 @@ namespace GI_Test
         }
 
         // genshin-childe-marionette painted "Zgadzam się." for two seconds of this line.
-        [DataTestMethod]
+        [TestMethod]
         [DataRow(false)]
         [DataRow(true)]
         public void PrefixCompletion_OutranksAShorterKeyTheInputStartsWith(bool mmap)
@@ -162,7 +162,7 @@ namespace GI_Test
         }
 
         // starrail-natasha-clinic: the region crops long lines at both ends (DialogueWPct 0.70).
-        [DataTestMethod]
+        [TestMethod]
         [DataRow(false)]
         [DataRow(true)]
         public void StarRailClippedLines_StillMatch(bool mmap)

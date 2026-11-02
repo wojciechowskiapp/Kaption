@@ -35,6 +35,13 @@ namespace GI_Subtitles.Services.OCR
         public const string VersionKey = "OcrGpuQuarantineVersion";
         public const string ReasonKey = "OcrGpuQuarantineReason";
         public const string TimestampKey = "OcrGpuQuarantineUtc";
+        public const string StrikesKey = "OcrGpuStrikes";
+        public const string StrikesVersionKey = "OcrGpuStrikesVersion";
+
+        private static int _strikeThisSession;
+
+        /// <summary>True after this process fell back to CPU on a strike that did not quarantine.</summary>
+        public static bool StrikeThisSession => Volatile.Read(ref _strikeThisSession) == 1;
 
         // Set on the first Engage of the process, consumed once by MainWindow
         // so the tray balloon fires exactly one time per session no matter how
@@ -139,6 +146,7 @@ namespace GI_Subtitles.Services.OCR
         {
             try
             {
+                ClearStrikes();
                 if (!Config.Has(FlagKey) && !Config.Has(VersionKey)) return;
                 ClearKeys();
                 Interlocked.Exchange(ref _pendingUserNotice, 0);
@@ -147,6 +155,45 @@ namespace GI_Subtitles.Services.OCR
             catch (Exception ex)
             {
                 Logger.Log.Warn($"Could not clear the GPU OCR quarantine: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Records a failed or unfit warm-up for the running version and returns how many came before it
+        /// (see <see cref="OcrGpuFitness.QuarantineAfterStrike"/>).
+        /// </summary>
+        public static int RecordStrike()
+        {
+            Interlocked.Exchange(ref _strikeThisSession, 1);
+            try
+            {
+                string version = CurrentAppVersion;
+                int before = string.Equals(Config.Get<string>(StrikesVersionKey, null), version, StringComparison.Ordinal)
+                    ? Config.Get(StrikesKey, 0)
+                    : 0;
+                Config.Set(StrikesKey, before + 1);
+                Config.Set(StrikesVersionKey, version);
+                return before;
+            }
+            catch (Exception ex)
+            {
+                Logger.Log.Warn($"Could not persist a GPU OCR strike: {ex.Message}");
+                return 0;
+            }
+        }
+
+        /// <summary>A warm-up that passed resets the count, so only consecutive strikes quarantine.</summary>
+        public static void ClearStrikes()
+        {
+            try
+            {
+                if (!Config.Has(StrikesKey) && !Config.Has(StrikesVersionKey)) return;
+                Config.Remove(StrikesKey);
+                Config.Remove(StrikesVersionKey);
+            }
+            catch (Exception ex)
+            {
+                Logger.Log.Warn($"Could not clear GPU OCR strikes: {ex.Message}");
             }
         }
 

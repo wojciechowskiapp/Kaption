@@ -1,0 +1,37 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System;assembly=mscorlib">
+    <!-- CharacterOverviewView palette for the dark Ctrl+Q popup, on the kaption.one ink ramp. Same keys as
+         CharacterPaletteLight.xaml; add a key to both. Char_Accent is replaced per game by the popup. -->
+    <ResourceDictionary.MergedDictionaries>
+        <ResourceDictionary Source="../Themes/Tokens.xaml"/>
+        <ResourceDictionary Source="../Themes/Chips.xaml"/>
+    </ResourceDictionary.MergedDictionaries>
+
+    <SolidColorBrush x:Key="Char_Surface" Color="#0B0D17"/>
+    <SolidColorBrush x:Key="Char_Fg" Color="#F3F4F6"/>
+    <SolidColorBrush x:Key="Char_FgMuted" Color="#B4BBC7"/>
+    <SolidColorBrush x:Key="Char_FgSubtle" Color="#9CA3AF"/>
+    <SolidColorBrush x:Key="Char_Accent" Color="#F2B84B"/>
+    <SolidColorBrush x:Key="Char_Brand" Color="#A5B4FC"/>
+    <SolidColorBrush x:Key="Char_CardBg" Color="#0F1220"/>
+    <SolidColorBrush x:Key="Char_Ring" Color="#26FFFFFF"/>
+    <SolidColorBrush x:Key="Char_RingStrong" Color="#4DFFFFFF"/>
+    <SolidColorBrush x:Key="Char_ChipBg" Color="#181C2A"/>
+    <SolidColorBrush x:Key="Char_Divider" Color="#1FFFFFFF"/>
+    <SolidColorBrush x:Key="Char_Hover" Color="#14FFFFFF"/>
+    <SolidColorBrush x:Key="Char_Selected" Color="#1FFFFFFF"/>
+    <SolidColorBrush x:Key="Char_Rarity5" Color="#F2C46D"/>
+    <SolidColorBrush x:Key="Char_Rarity4" Color="#C4A7F5"/>
+    <SolidColorBrush x:Key="Char_Skeleton" Color="#1AFFFFFF"/>
+
+    <!-- Layout of this host: narrow, and it never takes focus from the game. -->
+    <sys:Double x:Key="Char_HeroHeight">156</sys:Double>
+    <Thickness x:Key="Char_Gutter">16,0,16,0</Thickness>
+    <Thickness x:Key="Char_ContentPadding">16,0,16,20</Thickness>
+    <sys:Double x:Key="Char_ReadingWidth">520</sys:Double>
+    <sys:Double x:Key="Char_ContentMaxWidth">760</sys:Double>
+    <sys:Double x:Key="Char_ArtWidth">240</sys:Double>
+    <sys:Boolean x:Key="Char_Focusable">False</sys:Boolean>
+    <sys:Boolean x:Key="Char_IsDark">True</sys:Boolean>
+</ResourceDictionary>

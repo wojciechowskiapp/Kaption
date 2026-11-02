@@ -185,7 +185,7 @@ namespace GI_Test
         /// Genshin numbers, and why lowering the timeout below one tick period
         /// buys nothing without also lowering the interval.
         /// </summary>
-        [DataTestMethod]
+        [TestMethod]
         [DataRow(0.15, 0.2, "below one tick, so the 0.2 s tick is the first that exceeds it")]
         [DataRow(0.10, 0.2, "exactly one tick cannot fire on strict >, so it waits for the next")]
         [DataRow(0.05, 0.1, "half a tick is exceeded by the very first tick")]

@@ -8,7 +8,8 @@
         WindowStyle="SingleBorderWindow"
         ResizeMode="NoResize"
         ShowInTaskbar="False"
-        Background="#F8F9FC">
+        Background="{DynamicResource BgBrush}"
+        UseLayoutRounding="True">
 
     <Window.Resources>
         <ResourceDictionary>

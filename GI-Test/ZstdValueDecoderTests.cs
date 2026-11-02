@@ -97,7 +97,7 @@ namespace GI_Test
                 // ZstdSharp throws on destination-too-small. Accept any throw
                 // here so the test doesn't couple to a specific exception
                 // type the port might tweak across versions.
-                Assert.ThrowsException<ZstdException>(() =>
+                Assert.ThrowsExactly<ZstdException>(() =>
                     decoder.Decode(compressed, tooSmall));
             }
         }
@@ -148,9 +148,9 @@ namespace GI_Test
         [TestMethod]
         public void EmptyDictionary_Trainer_Rejected()
         {
-            Assert.ThrowsException<ArgumentException>(() =>
+            Assert.ThrowsExactly<ArgumentException>(() =>
                 ZstdDictionaryTrainer.Train(new List<byte[]>()));
-            Assert.ThrowsException<ArgumentException>(() =>
+            Assert.ThrowsExactly<ArgumentException>(() =>
                 ZstdDictionaryTrainer.TrainFromStrings(new string[0]));
         }
 

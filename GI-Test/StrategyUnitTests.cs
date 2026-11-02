@@ -308,11 +308,11 @@ namespace GI_Test
             var seen = new HashSet<string>(StringComparer.Ordinal);
             foreach (var gameId in GameRegionProfile.RegisteredGameIds)
             {
-                string expected = ExpectedBundleGameOf(GameDialogueContextFactory.Create(gameId));
-                Assert.AreEqual(gameId.ToLowerInvariant(), expected,
+                string bundleGame = ExpectedBundleGameOf(GameDialogueContextFactory.Create(gameId));
+                Assert.AreEqual(gameId.ToLowerInvariant(), bundleGame,
                     $"Registered game '{gameId}' should expect its own lowercased wire id.");
-                Assert.IsTrue(seen.Add(expected),
-                    $"Duplicate expected bundle game '{expected}' — two profiles share a wire id.");
+                Assert.IsTrue(seen.Add(bundleGame),
+                    $"Duplicate expected bundle game '{bundleGame}' — two profiles share a wire id.");
             }
             Assert.IsTrue(seen.Count >= 3, "Expected at least Genshin, StarRail and ZZZ to be registered.");
         }

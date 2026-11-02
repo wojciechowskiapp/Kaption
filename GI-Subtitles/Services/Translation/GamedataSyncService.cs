@@ -324,7 +324,10 @@ namespace GI_Subtitles.Services.Translation
             Logger.Log.Info(
                 $"GamedataSync: installed {game} v{latest.Version} — " +
                 $"split in {splitMs} ms, total {watch.ElapsedMilliseconds} ms" +
-                (textMapEnInstalled ? ", TextMapEN.json written from bundle." : "."));
+                (textMapEnInstalled ? ", TextMapEN.json written from bundle." : ".") +
+                (install.CharactersInstalled ? " Character data updated." : ""));
+            if (install.CharactersInstalled)
+                GI_Subtitles.Services.Characters.CharacterCatalogService.Invalidate(game);
 
             result.Downloaded = true;
             return result;
@@ -347,6 +350,8 @@ namespace GI_Subtitles.Services.Translation
             /// <summary>True when the bundle carried <see cref="TextMapEnSection"/>
             /// and <c>TextMapEN.json</c> was written from it.</summary>
             public bool TextMapEnInstalled { get; internal set; }
+            /// <summary>True when the bundle carried a `characters` section and it was written.</summary>
+            public bool CharactersInstalled { get; internal set; }
         }
 
         /// <summary>
@@ -473,6 +478,21 @@ namespace GI_Subtitles.Services.Translation
                             },
                         };
                         protector.SaveProtectedJson(GameDataPaths.BundleMetaJson(game), meta);
+                    }
+
+                    // Optional `characters` section (Characters page, Ctrl+Q overview). Not
+                    // needed for dialogue, so a failed write is logged, never fatal.
+                    if (bundle["characters"] is JsonObject characters)
+                    {
+                        try
+                        {
+                            protector.SaveProtectedJson(GameDataPaths.CharactersJson(game), characters);
+                            outcome.CharactersInstalled = true;
+                        }
+                        catch (Exception ex)
+                        {
+                            Logger.Log.Warn($"GamedataSync: characters section not written: {ex.Message}");
+                        }
                     }
 
                     // Optional sixth section — see the file header. Committed

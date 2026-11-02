@@ -334,7 +334,7 @@ namespace GI_Test
         /// ZenlessData genuinely does mirror 13 languages, so re-adding an arm
         /// here looks like a fix. It isn't — see IsUpstreamMirrored's remarks.
         /// </summary>
-        [DataTestMethod]
+        [TestMethod]
         [DataRow("EN")]
         [DataRow("CHS")]
         [DataRow("JP")]

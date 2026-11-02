@@ -198,11 +198,11 @@ namespace GI_Test
             pool.Dispose();
             Assert.AreEqual(0, pool.Count);
 
-            Assert.ThrowsException<ArgumentException>(() =>
+            Assert.ThrowsExactly<ArgumentException>(() =>
             {
                 var _ = a.Width; // disposed Bitmap throws ArgumentException on any property access
             });
-            Assert.ThrowsException<ArgumentException>(() =>
+            Assert.ThrowsExactly<ArgumentException>(() =>
             {
                 var _ = b.Width;
             });
@@ -217,7 +217,7 @@ namespace GI_Test
         {
             using (var gdi = new GdiScreenCapture())
             {
-                Assert.ThrowsException<ArgumentNullException>(() =>
+                Assert.ThrowsExactly<ArgumentNullException>(() =>
                     gdi.CaptureRegionInto(0, 0, 8, 8, null));
             }
         }
@@ -231,7 +231,7 @@ namespace GI_Test
             using (var gdi = new GdiScreenCapture())
             using (var tiny = new Bitmap(4, 4, PixelFormat.Format32bppArgb))
             {
-                Assert.ThrowsException<ArgumentException>(() =>
+                Assert.ThrowsExactly<ArgumentException>(() =>
                     gdi.CaptureRegionInto(0, 0, 64, 64, tiny));
             }
         }
@@ -246,7 +246,7 @@ namespace GI_Test
             using (var gdi = new GdiScreenCapture())
             using (var wrong = new Bitmap(16, 16, PixelFormat.Format24bppRgb))
             {
-                Assert.ThrowsException<ArgumentException>(() =>
+                Assert.ThrowsExactly<ArgumentException>(() =>
                     gdi.CaptureRegionInto(0, 0, 16, 16, wrong));
             }
         }

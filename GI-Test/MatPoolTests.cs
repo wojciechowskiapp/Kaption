@@ -173,8 +173,8 @@ namespace GI_Test
             var pool = new MatPool();
             pool.Dispose();
 
-            Assert.ThrowsException<ObjectDisposedException>(() => pool.Rent(8, 8, MatType.CV_8UC1));
-            Assert.ThrowsException<ObjectDisposedException>(() => pool.RentBlank());
+            Assert.ThrowsExactly<ObjectDisposedException>(() => pool.Rent(8, 8, MatType.CV_8UC1));
+            Assert.ThrowsExactly<ObjectDisposedException>(() => pool.RentBlank());
         }
 
         [TestMethod]

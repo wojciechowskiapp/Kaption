@@ -133,6 +133,10 @@ namespace GI_Subtitles.Services.Data
         public static string TalkIndexJson(string game) =>
             Path.Combine(GameDir(game), "TalkIndex.json");
 
+        /// <summary>Official character data from the optional `characters` bundle section (protected).</summary>
+        public static string CharactersJson(string game) =>
+            Path.Combine(GameDir(game), "Characters.json");
+
         /// <summary>
         /// Path to the BundleMeta sidecar emitted by GamedataSyncService when
         /// it installs a v2+ bundle. Carries bundle_version and extension.game

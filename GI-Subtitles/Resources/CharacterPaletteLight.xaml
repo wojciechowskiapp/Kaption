@@ -1,0 +1,37 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System;assembly=mscorlib">
+    <!-- CharacterOverviewView palette for the light Characters tab. Same keys as CharacterPaletteDark.xaml;
+         add a key to both. One theme per screen: the hero is light here, dark in the popup. -->
+    <ResourceDictionary.MergedDictionaries>
+        <ResourceDictionary Source="../Themes/Tokens.xaml"/>
+        <ResourceDictionary Source="../Themes/Chips.xaml"/>
+    </ResourceDictionary.MergedDictionaries>
+
+    <SolidColorBrush x:Key="Char_Surface" Color="#FFFFFF"/>
+    <SolidColorBrush x:Key="Char_Fg" Color="#111827"/>
+    <SolidColorBrush x:Key="Char_FgMuted" Color="#4B5563"/>
+    <SolidColorBrush x:Key="Char_FgSubtle" Color="#6B7280"/>
+    <SolidColorBrush x:Key="Char_Accent" Color="#B45309"/>
+    <SolidColorBrush x:Key="Char_Brand" Color="#4F46E5"/>
+    <SolidColorBrush x:Key="Char_CardBg" Color="#FFFFFF"/>
+    <SolidColorBrush x:Key="Char_Ring" Color="#E4E7EE"/>
+    <SolidColorBrush x:Key="Char_RingStrong" Color="#CDD3DD"/>
+    <SolidColorBrush x:Key="Char_ChipBg" Color="#F4F5F8"/>
+    <SolidColorBrush x:Key="Char_Divider" Color="#EBEEF3"/>
+    <SolidColorBrush x:Key="Char_Hover" Color="#F4F5F8"/>
+    <SolidColorBrush x:Key="Char_Selected" Color="#EEF0F4"/>
+    <SolidColorBrush x:Key="Char_Rarity5" Color="#C88A12"/>
+    <SolidColorBrush x:Key="Char_Rarity4" Color="#7C3AED"/>
+    <SolidColorBrush x:Key="Char_Skeleton" Color="#EBEEF3"/>
+
+    <!-- Layout of this host: the detail column of the Characters tab, keyboard reachable. -->
+    <sys:Double x:Key="Char_HeroHeight">200</sys:Double>
+    <Thickness x:Key="Char_Gutter">24,0,24,0</Thickness>
+    <Thickness x:Key="Char_ContentPadding">24,0,24,28</Thickness>
+    <sys:Double x:Key="Char_ReadingWidth">540</sys:Double>
+    <sys:Double x:Key="Char_ContentMaxWidth">880</sys:Double>
+    <sys:Double x:Key="Char_ArtWidth">420</sys:Double>
+    <sys:Boolean x:Key="Char_Focusable">True</sys:Boolean>
+    <sys:Boolean x:Key="Char_IsDark">False</sys:Boolean>
+</ResourceDictionary>

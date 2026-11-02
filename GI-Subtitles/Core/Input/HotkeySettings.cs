@@ -41,7 +41,7 @@ namespace GI_Subtitles.Core.Input
                 using (var reader = new StreamReader(_settingsPath))
                 {
                     var serializer = new XmlSerializer(typeof(HotkeySettings));
-                    return (HotkeySettings)serializer.Deserialize(reader);
+                    return MergeMissingDefaults((HotkeySettings)serializer.Deserialize(reader), GetDefaultSettings());
                 }
             }
             catch
@@ -50,6 +50,33 @@ namespace GI_Subtitles.Core.Input
                 return GetDefaultSettings();
             }
         }
+
+        /// <summary>
+        /// A file saved by an older build lacks hotkeys added since. Append those defaults,
+        /// unless the user already put another action on the same combination.
+        /// </summary>
+        public static HotkeySettings MergeMissingDefaults(HotkeySettings loaded, HotkeySettings defaults)
+        {
+            if (loaded?.Hotkeys == null) return defaults;
+            if (defaults?.Hotkeys == null) return loaded;
+
+            var merged = new HotkeySettings { Hotkeys = new List<HotkeyData>(loaded.Hotkeys) };
+            foreach (var d in defaults.Hotkeys)
+            {
+                if (merged.Hotkeys.Exists(h => h.Id == d.Id)) continue;
+                if (merged.Hotkeys.Exists(h => SameCombination(h, d)))
+                {
+                    Logger.Log.Info($"Hotkey {d.Id} not added: its default combination is already in use.");
+                    continue;
+                }
+                merged.Hotkeys.Add(d);
+            }
+            return merged;
+        }
+
+        private static bool SameCombination(HotkeyData a, HotkeyData b) =>
+            a.IsCtrl == b.IsCtrl && a.IsShift == b.IsShift && a.IsAlt == b.IsAlt &&
+            char.ToUpperInvariant(a.SelectedKey) == char.ToUpperInvariant(b.SelectedKey);
 
         public static void SaveSettings(HotkeySettings settings)
         {
@@ -85,7 +112,7 @@ namespace GI_Subtitles.Core.Input
             return fallback;
         }
 
-        private static HotkeySettings GetDefaultSettings()
+        internal static HotkeySettings GetDefaultSettings()
         {
             return new HotkeySettings
             {
@@ -126,6 +153,11 @@ namespace GI_Subtitles.Core.Input
                     {
                         Id = 9005, IsCtrl = true, IsShift = false, SelectedKey = 'Q',
                         Description = GetLocalizedString("Hotkey_9005_Description", "Quick translate selected area")
+                    },
+                    new HotkeyData
+                    {
+                        Id = 9006, IsCtrl = true, IsShift = true, SelectedKey = 'Q',
+                        Description = GetLocalizedString("Hotkey_9006_Description", "Translate the last area again")
                     }
                 }
             };

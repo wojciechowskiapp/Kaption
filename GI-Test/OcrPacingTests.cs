@@ -152,7 +152,7 @@ namespace GI_Test
         /// <c>sweep --axis ForceOcrAfterSeconds=...</c> and update the record in
         /// <c>.plan/in-progress/OCR-PACING-TUNING.md</c> with the new evidence.
         /// </summary>
-        [DataTestMethod]
+        [TestMethod]
         [DataRow("Genshin", 100, 5, 2, 2, 0.25, "types dialogue over 1-2 s, so a shorter force timeout re-reads mid-animation")]
         [DataRow("StarRail", 60, 2, 2, 2, 0.15, "mostly whole lines, so eager reads cost nothing; 50 vs 60 ms measured identical")]
         [DataRow("ZZZ", 60, 2, 2, 2, 0.15, "paint churn is flat to 0.15 then jumps at 0.1; 50 vs 60 ms measured identical")]

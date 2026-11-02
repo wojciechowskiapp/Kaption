@@ -136,15 +136,22 @@ namespace GI_Subtitles.Services.Translation
             Span<float> prev = sourceLen < 512 ? stackalloc float[sourceLen + 1] : new float[sourceLen + 1];
             Span<float> curr = sourceLen < 512 ? stackalloc float[sourceLen + 1] : new float[sourceLen + 1];
 
-            for (int i = 0; i <= sourceLen; i++) prev[i] = i;
+            // A cell more than `band` off the diagonal needs that many indels at cost 1, so it is
+            // already over the threshold: skipping it is exact for every result within the threshold.
+            int band = threshold >= sourceLen + targetLen ? sourceLen + targetLen : (int)threshold;
+            float outside = threshold + 1f;
+
+            for (int i = 0; i <= sourceLen; i++) prev[i] = i <= band ? i : outside;
 
             for (int j = 1; j <= targetLen; j++)
             {
-                curr[0] = j;
-                float minInRow = j;
+                int lo = Math.Max(1, j - band);
+                int hi = Math.Min(sourceLen, j + band);
+                curr[lo - 1] = lo == 1 ? j : outside;
+                float minInRow = curr[lo - 1];
                 char targetChar = target[j - 1];
 
-                for (int i = 1; i <= sourceLen; i++)
+                for (int i = lo; i <= hi; i++)
                 {
                     float subCost = GetSubstitutionCost(source[i - 1], targetChar);
                     float d1 = curr[i - 1] + 1.0f;      // insertion
@@ -157,6 +164,7 @@ namespace GI_Subtitles.Services.Translation
                     curr[i] = dist;
                     if (dist < minInRow) minInRow = dist;
                 }
+                if (hi < sourceLen) curr[hi + 1] = outside;
 
                 // Early termination: if all values in this row exceed threshold, abort
                 if (minInRow > threshold) return threshold + 1;

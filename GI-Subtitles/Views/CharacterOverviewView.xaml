@@ -1,0 +1,1024 @@
+<UserControl x:Class="GI_Subtitles.Views.CharacterOverviewView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:GI_Subtitles.Views"
+             Focusable="False" UseLayoutRounding="True">
+    <!-- DataContext: CharacterOverviewViewModel. One scrolling page in the site's order (hero, section tabs,
+         at a glance, build, skills, ranks, teams, materials, guide, links) with the tabs pinned once the
+         hero scrolls away. Colours, sizes and focusability come from the host palette
+         (Resources/CharacterPalette*.xaml), chips from Themes/Chips.xaml: one theme per screen. -->
+    <UserControl.Resources>
+        <local:EmptyToCollapsedConverter x:Key="EmptyCollapsed"/>
+        <local:InverseBoolToVisibilityConverter x:Key="InvBoolVis"/>
+        <local:IconImageConverter x:Key="IconImage"/>
+        <local:MissingIconConverter x:Key="MissingIcon"/>
+        <local:ScaleConverter x:Key="Scale"/>
+        <BooleanToVisibilityConverter x:Key="BoolVis"/>
+
+        <Style x:Key="Body" TargetType="TextBlock">
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="LineHeight" Value="21"/>
+            <Setter Property="Foreground" Value="{DynamicResource Char_Fg}"/>
+        </Style>
+        <Style x:Key="Muted" TargetType="TextBlock" BasedOn="{StaticResource Body}">
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="LineHeight" Value="19.5"/>
+            <Setter Property="Foreground" Value="{DynamicResource Char_FgMuted}"/>
+        </Style>
+        <!-- Article text: 1.5 line height, about 70 characters a line on any width. -->
+        <Style x:Key="Reading" TargetType="TextBlock" BasedOn="{StaticResource Body}">
+            <Setter Property="FontSize" Value="14.5"/>
+            <Setter Property="LineHeight" Value="22"/>
+            <Setter Property="MaxWidth" Value="{DynamicResource Char_ReadingWidth}"/>
+            <Setter Property="HorizontalAlignment" Value="Left"/>
+        </Style>
+        <!-- No LineHeight on trimmed multi-line text: WPF then puts the ellipsis on line 1. -->
+        <Style x:Key="Preview" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Foreground" Value="{DynamicResource Char_FgMuted}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+            <Setter Property="MaxHeight" Value="38"/>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsTeaser}" Value="True">
+                    <Setter Property="TextWrapping" Value="NoWrap"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="OneLine" TargetType="TextBlock" BasedOn="{StaticResource Muted}">
+            <Setter Property="TextWrapping" Value="NoWrap"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+        </Style>
+        <Style x:Key="SectionHeading" TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="{DynamicResource FontDisplay}"/>
+            <Setter Property="FontSize" Value="19"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource Char_Fg}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style x:Key="SectionHead" TargetType="DockPanel">
+            <Setter Property="Margin" Value="0,32,0,14"/>
+            <Setter Property="LastChildFill" Value="False"/>
+        </Style>
+        <Style x:Key="Label" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="12.5"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource Char_FgMuted}"/>
+            <Setter Property="Margin" Value="0,20,0,10"/>
+        </Style>
+        <Style x:Key="Numeral" TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="{DynamicResource FontDisplay}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style x:Key="Card" TargetType="Border">
+            <Setter Property="Background" Value="{DynamicResource Char_CardBg}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Char_Ring}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="12"/>
+            <Setter Property="Padding" Value="20,16"/>
+            <Setter Property="SnapsToDevicePixels" Value="True"/>
+        </Style>
+        <!-- The description has no Polish yet. -->
+        <Style x:Key="Untranslated" TargetType="TextBlock">
+            <Setter Property="Text" Value="{DynamicResource Char_Untranslated}"/>
+            <Setter Property="Tag" Value="{DynamicResource Char_MarkUntranslated}"/>
+            <Setter Property="FontSize" Value="11.5"/>
+            <Setter Property="FontStyle" Value="Italic"/>
+            <Setter Property="Foreground" Value="{DynamicResource Char_FgSubtle}"/>
+            <Setter Property="Margin" Value="0,6,0,0"/>
+            <Setter Property="Visibility" Value="Collapsed"/>
+            <Style.Triggers>
+                <!-- Marked only in a UI language that expects Polish here (Char_MarkUntranslated). -->
+                <MultiDataTrigger>
+                    <MultiDataTrigger.Conditions>
+                        <Condition Binding="{Binding ShowUntranslated}" Value="True"/>
+                        <Condition Binding="{Binding Tag, RelativeSource={RelativeSource Self}}" Value="True"/>
+                    </MultiDataTrigger.Conditions>
+                    <Setter Property="Visibility" Value="Visible"/>
+                </MultiDataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="RarityText" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource Char_FgMuted}"/>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding RarityTier}" Value="top">
+                    <Setter Property="Foreground" Value="{DynamicResource Char_Rarity5}"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding RarityTier}" Value="high">
+                    <Setter Property="Foreground" Value="{DynamicResource Char_Rarity4}"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="RankTile" TargetType="Border">
+            <Setter Property="BorderBrush" Value="{DynamicResource Char_FgMuted}"/>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding RarityTier}" Value="top">
+                    <Setter Property="BorderBrush" Value="{DynamicResource Char_Rarity5}"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding RarityTier}" Value="high">
+                    <Setter Property="BorderBrush" Value="{DynamicResource Char_Rarity4}"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- A card that opens in place; the whole card is the hit target. -->
+        <Style x:Key="CardToggle" TargetType="ToggleButton">
+            <Setter Property="Focusable" Value="{DynamicResource Char_Focusable}"/>
+            <Setter Property="FocusVisualStyle" Value="{DynamicResource FocusRing}"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Margin" Value="0,0,0,8"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToggleButton">
+                        <Border x:Name="Bd" Background="{DynamicResource Char_CardBg}" BorderBrush="{DynamicResource Char_Ring}"
+                                BorderThickness="1" CornerRadius="12" Padding="16,14" SnapsToDevicePixels="True">
+                            <ContentPresenter/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource Char_RingStrong}"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Cursor" Value="Arrow"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <!-- A plain row inside a card (weapons, guide sections). -->
+        <Style x:Key="Row" TargetType="ToggleButton">
+            <Setter Property="Focusable" Value="{DynamicResource Char_Focusable}"/>
+            <Setter Property="FocusVisualStyle" Value="{DynamicResource FocusRingInset}"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToggleButton">
+                        <Border x:Name="Bd" Background="Transparent" CornerRadius="8" Padding="10,10">
+                            <ContentPresenter/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource Char_Hover}"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Cursor" Value="Arrow"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="Chevron" TargetType="Path">
+            <Setter Property="Data" Value="M4,6 L8,10 L12,6"/>
+            <Setter Property="Width" Value="16"/>
+            <Setter Property="Height" Value="16"/>
+            <Setter Property="Stretch" Value="None"/>
+            <Setter Property="Stroke" Value="{DynamicResource Char_FgSubtle}"/>
+            <Setter Property="StrokeThickness" Value="1.5"/>
+            <Setter Property="StrokeStartLineCap" Value="Round"/>
+            <Setter Property="StrokeEndLineCap" Value="Round"/>
+            <Setter Property="StrokeLineJoin" Value="Round"/>
+            <Setter Property="VerticalAlignment" Value="Top"/>
+            <Setter Property="Margin" Value="10,2,0,0"/>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsExpanded}" Value="True">
+                    <Setter Property="Data" Value="M4,10 L8,6 L12,10"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding CanExpand}" Value="False">
+                    <Setter Property="Visibility" Value="Hidden"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- The AI label: one plain tag everywhere. Hosted in a ContentControl: a bare ContentPresenter takes its
+             empty Content as DataContext, so its Visibility binding would fail and the tag would always show. -->
+        <DataTemplate x:Key="AiTag">
+            <Border Style="{DynamicResource KTag}">
+                <StackPanel Orientation="Horizontal">
+                    <Path Data="M6,1 L7.2,4.8 L11,6 L7.2,7.2 L6,11 L4.8,7.2 L1,6 L4.8,4.8 Z" Width="12" Height="12" Stretch="None"
+                          Fill="{DynamicResource Char_FgSubtle}" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                    <TextBlock Text="{DynamicResource Char_AiTag}" Style="{DynamicResource KTagText}"/>
+                </StackPanel>
+            </Border>
+        </DataTemplate>
+
+        <!-- Game icons are white shapes: drawn in the element colour through their alpha, on a soft disc. -->
+        <DataTemplate x:Key="SkillIcon">
+            <Grid Width="40" Height="40">
+                <Ellipse Fill="{Binding DataContext.ElementWash, RelativeSource={RelativeSource AncestorType=UserControl}}"/>
+                <Path Data="{Binding Glyph}" Width="16" Height="16" Stretch="None" StrokeThickness="1.6"
+                      Stroke="{Binding DataContext.ElementText, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                      StrokeLineJoin="Round" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                      HorizontalAlignment="Center" VerticalAlignment="Center"
+                      Visibility="{Binding IconPath, Converter={StaticResource MissingIcon}, ConverterParameter={x:Static local:OverviewImageSizes.Skill}}"/>
+                <Rectangle Margin="6" Fill="{Binding DataContext.ElementText, RelativeSource={RelativeSource AncestorType=UserControl}}">
+                    <Rectangle.OpacityMask>
+                        <ImageBrush ImageSource="{Binding IconPath, Converter={StaticResource IconImage}, ConverterParameter={x:Static local:OverviewImageSizes.Skill}}"
+                                    Stretch="Uniform"/>
+                    </Rectangle.OpacityMask>
+                </Rectangle>
+            </Grid>
+        </DataTemplate>
+
+        <DataTemplate x:Key="MaterialChip">
+            <Border Style="{DynamicResource KChip}">
+                <StackPanel Orientation="Horizontal">
+                    <Grid Width="22" Height="22" Margin="0,0,8,0" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding Initial}" Style="{StaticResource Numeral}" FontSize="11"
+                                   Foreground="{DynamicResource Char_FgMuted}"
+                                   Visibility="{Binding IconPath, Converter={StaticResource MissingIcon}, ConverterParameter={x:Static local:OverviewImageSizes.Material}}"/>
+                        <Image Source="{Binding IconPath, Converter={StaticResource IconImage}, ConverterParameter={x:Static local:OverviewImageSizes.Material}}"
+                               Stretch="Uniform"/>
+                    </Grid>
+                    <TextBlock Text="{Binding Name}" FontSize="13" Foreground="{DynamicResource Char_Fg}" VerticalAlignment="Center"/>
+                    <TextBlock Text="{Binding CountText}" FontSize="13" FontWeight="SemiBold" Margin="6,0,0,0"
+                               Foreground="{DynamicResource Char_FgMuted}" VerticalAlignment="Center"/>
+                </StackPanel>
+            </Border>
+        </DataTemplate>
+
+        <DataTemplate x:Key="BlockTemplate">
+            <Grid Margin="0,0,0,10">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <Ellipse Width="5" Height="5" VerticalAlignment="Top" Margin="2,9,11,0"
+                         Fill="{Binding DataContext.ElementText, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                         Visibility="{Binding IsBullet, Converter={StaticResource BoolVis}}"/>
+                <TextBlock Grid.Column="1" Text="{Binding Text}" Style="{StaticResource Reading}"/>
+            </Grid>
+        </DataTemplate>
+
+        <!-- The section tabs, used twice: under the hero and pinned on top. -->
+        <DataTemplate x:Key="SectionTabs">
+            <ScrollViewer HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled" Focusable="False"
+                          PreviewMouseWheel="Tabs_PreviewMouseWheel">
+                <!-- A row wider than the page fades at the right edge instead of cutting a word. -->
+                <ScrollViewer.OpacityMask>
+                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                        <GradientStop Color="#FF000000" Offset="0.93"/>
+                        <GradientStop Color="#00000000" Offset="1"/>
+                    </LinearGradientBrush>
+                </ScrollViewer.OpacityMask>
+                <ItemsControl ItemsSource="{Binding Sections}" Focusable="False">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <RadioButton Style="{DynamicResource KSectionTab}" Tag="{Binding Key}" Click="SectionTab_Click"
+                                         IsChecked="{Binding IsActive, Mode=OneWay}">
+                                <TextBlock local:Loc.Key="{Binding LabelKey}"/>
+                            </RadioButton>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+        </DataTemplate>
+    </UserControl.Resources>
+
+    <Grid>
+        <ScrollViewer x:Name="Scroller" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+                      Focusable="False" ScrollChanged="Scroller_ScrollChanged">
+            <StackPanel>
+                <!-- ══ Hero: the page's own surface with a wash of the element; the art on the right ══ -->
+                <Grid x:Name="Hero" Height="{DynamicResource Char_HeroHeight}" ClipToBounds="True"
+                      Background="{DynamicResource Char_Surface}">
+                    <Rectangle Fill="{Binding HeroWash}"/>
+                    <!-- Splash: zoomed to the upper body, faded into the wash on its left edge. -->
+                    <Grid Width="{DynamicResource Char_ArtWidth}" HorizontalAlignment="Right" ClipToBounds="True"
+                          Visibility="{Binding HasSplash, Converter={StaticResource BoolVis}}">
+                        <!-- An ImageBrush, not an Image: it fills past the band and keeps the head at the top. -->
+                        <Rectangle VerticalAlignment="Top" Margin="0,-6,0,0" RenderOptions.BitmapScalingMode="HighQuality">
+                            <Rectangle.Height>
+                                <MultiBinding Converter="{StaticResource Scale}">
+                                    <Binding Path="Height" ElementName="Hero"/>
+                                    <Binding Path="HeroArtZoom"/>
+                                </MultiBinding>
+                            </Rectangle.Height>
+                            <Rectangle.Fill>
+                                <ImageBrush ImageSource="{Binding HeroArt}" Stretch="UniformToFill" AlignmentX="Center" AlignmentY="Top"/>
+                            </Rectangle.Fill>
+                            <Rectangle.OpacityMask>
+                                <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                                    <GradientStop Color="#00000000" Offset="0.08"/>
+                                    <GradientStop Color="#FF000000" Offset="0.42"/>
+                                </LinearGradientBrush>
+                            </Rectangle.OpacityMask>
+                        </Rectangle>
+                    </Grid>
+                    <!-- No splash: the portrait itself, large. -->
+                    <Image Source="{Binding HeroArt}" Stretch="Uniform" HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                           Margin="0,12,24,0" RenderOptions.BitmapScalingMode="HighQuality"
+                           Visibility="{Binding HasPortraitArt, Converter={StaticResource BoolVis}}">
+                        <Image.OpacityMask>
+                            <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                <GradientStop Color="#FF000000" Offset="0.75"/>
+                                <GradientStop Color="#00000000" Offset="1"/>
+                            </LinearGradientBrush>
+                        </Image.OpacityMask>
+                    </Image>
+                    <!-- No art at all: the initial, quietly. -->
+                    <TextBlock Text="{Binding Initial}" Style="{StaticResource Numeral}" FontSize="120" Opacity="0.18"
+                               HorizontalAlignment="Right" Margin="0,0,40,0" Foreground="{Binding ElementText}"
+                               Visibility="{Binding HasNoArt, Converter={StaticResource BoolVis}}"/>
+
+                    <StackPanel Margin="{DynamicResource Char_Gutter}" VerticalAlignment="Center" HorizontalAlignment="Left">
+                        <TextBlock Text="{Binding Name}" FontFamily="{DynamicResource FontDisplay}" FontSize="30" FontWeight="SemiBold"
+                                   Foreground="{DynamicResource Char_Fg}" TextTrimming="CharacterEllipsis"/>
+                        <TextBlock Text="{Binding NameGloss}" FontSize="12.5" Foreground="{DynamicResource Char_FgMuted}"
+                                   Visibility="{Binding NameGloss, Converter={StaticResource EmptyCollapsed}}"/>
+                        <WrapPanel Margin="0,10,0,0">
+                            <TextBlock Text="{Binding RarityText}" Style="{StaticResource RarityText}" FontSize="14"
+                                       VerticalAlignment="Center" Margin="0,0,12,6"
+                                       Visibility="{Binding ShowStars, Converter={StaticResource BoolVis}}"/>
+                            <Border Style="{StaticResource RankTile}" BorderThickness="1.5" CornerRadius="6" Width="26" Height="26"
+                                    Margin="0,0,10,6" Visibility="{Binding IsRank, Converter={StaticResource BoolVis}}">
+                                <TextBlock Text="{Binding RarityText}" Style="{StaticResource RarityText}" FontFamily="{DynamicResource FontDisplay}"
+                                           FontWeight="Bold" FontSize="14" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <Border Style="{DynamicResource KTag}" MinHeight="26" Margin="0,0,8,6" Background="{DynamicResource Char_Surface}"
+                                    Visibility="{Binding Element, Converter={StaticResource EmptyCollapsed}}">
+                                <StackPanel Orientation="Horizontal">
+                                    <Ellipse Width="8" Height="8" Fill="{Binding ElementFill}" VerticalAlignment="Center" Margin="0,0,7,0"/>
+                                    <TextBlock Text="{Binding Element}" FontSize="12.5" FontWeight="SemiBold" Foreground="{DynamicResource Char_Fg}"
+                                               VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </Border>
+                            <Border Style="{DynamicResource KTag}" MinHeight="26" Margin="0,0,8,6" Background="{DynamicResource Char_Surface}"
+                                    Visibility="{Binding WeaponType, Converter={StaticResource EmptyCollapsed}}">
+                                <TextBlock Text="{Binding WeaponType}" FontSize="12.5" Foreground="{DynamicResource Char_FgMuted}"
+                                           VerticalAlignment="Center"/>
+                            </Border>
+                        </WrapPanel>
+                        <TextBlock FontSize="11.5" Foreground="{DynamicResource Char_FgSubtle}" Margin="0,2,0,0"
+                                   Visibility="{Binding GameVersion, Converter={StaticResource EmptyCollapsed}}">
+                            <Run Text="{DynamicResource Char_Footer}"/><Run Text=" "/><Run Text="{Binding GameVersion, Mode=OneWay}"/>
+                        </TextBlock>
+                    </StackPanel>
+                </Grid>
+
+                <!-- ══ Section tabs (pinned copy below the scroll viewer) ══ -->
+                <Border x:Name="InlineTabs" BorderBrush="{DynamicResource Char_Ring}" BorderThickness="0,1,0,1"
+                        Background="{DynamicResource Char_Surface}" Padding="{DynamicResource Char_Gutter}"
+                        Visibility="{Binding Sections, Converter={StaticResource EmptyCollapsed}}">
+                    <ContentPresenter Content="{Binding}" ContentTemplate="{StaticResource SectionTabs}"/>
+                </Border>
+
+                <StackPanel Margin="{DynamicResource Char_ContentPadding}" MaxWidth="{DynamicResource Char_ContentMaxWidth}"
+                            HorizontalAlignment="Left">
+                    <!-- ══ At a glance ══ -->
+                    <StackPanel x:Name="Section_Glance" Visibility="{Binding HasGlance, Converter={StaticResource BoolVis}}">
+                        <!-- The AI tag sits by the heading, as in Build, so the summary starts at the card's top. -->
+                        <DockPanel Style="{StaticResource SectionHead}" Margin="0,24,0,14">
+                            <TextBlock Text="{DynamicResource Char_Nav_Glance}" Style="{StaticResource SectionHeading}"/>
+                            <ContentControl Focusable="False" IsTabStop="False" ContentTemplate="{StaticResource AiTag}" Margin="12,2,0,0"
+                                              Visibility="{Binding HasSummary, Converter={StaticResource BoolVis}}"/>
+                        </DockPanel>
+                        <Border Style="{StaticResource Card}" Margin="0,0,0,12"
+                                Visibility="{Binding HasSummaryOrArt, Converter={StaticResource BoolVis}}">
+                            <StackPanel>
+                                <WrapPanel>
+                                    <ItemsControl ItemsSource="{Binding Summary}" Focusable="False" Margin="0,0,20,0"
+                                                  MaxWidth="{DynamicResource Char_ReadingWidth}"
+                                                  ItemTemplate="{StaticResource BlockTemplate}"/>
+                                    <Border Width="{x:Static local:OverviewImageSizes.AmbienceWidth}" Height="{Binding AmbienceHeight}"
+                                            CornerRadius="10" Background="{DynamicResource Char_ChipBg}" Margin="0,2,0,8"
+                                            RenderOptions.BitmapScalingMode="HighQuality" ToolTip="{Binding AmbienceAlt}"
+                                            ToolTipService.IsEnabled="{Binding HasAmbienceAlt}"
+                                            Visibility="{Binding HasAmbience, Converter={StaticResource BoolVis}}">
+                                        <Border CornerRadius="10">
+                                            <Border.Background>
+                                                <ImageBrush ImageSource="{Binding Ambience}" Stretch="UniformToFill"/>
+                                            </Border.Background>
+                                        </Border>
+                                    </Border>
+                                </WrapPanel>
+                            </StackPanel>
+                        </Border>
+                        <ItemsControl ItemsSource="{Binding Facts}" Focusable="False">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <local:AdaptiveGrid MinColumnWidth="176" MaxColumns="3" ColumnGap="12" RowGap="12"/>
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Style="{StaticResource Card}" Padding="16,14">
+                                        <StackPanel>
+                                            <DockPanel>
+                                                <ContentControl Focusable="False" IsTabStop="False" DockPanel.Dock="Right" ContentTemplate="{StaticResource AiTag}"
+                                                                  Visibility="{Binding IsAi, Converter={StaticResource BoolVis}}"/>
+                                                <TextBlock local:Loc.Key="{Binding LabelKey}" FontSize="12" FontWeight="SemiBold"
+                                                           Foreground="{DynamicResource Char_FgMuted}" TextTrimming="CharacterEllipsis"
+                                                           VerticalAlignment="Center"/>
+                                            </DockPanel>
+                                            <DockPanel Margin="0,10,0,0">
+                                                <ContentPresenter DockPanel.Dock="Left" Content="{Binding}" ContentTemplate="{StaticResource SkillIcon}"
+                                                                  Margin="0,0,12,0" VerticalAlignment="Top"
+                                                                  Visibility="{Binding HasSkill, Converter={StaticResource BoolVis}}"/>
+                                                <TextBlock Text="{Binding Text}" Style="{StaticResource Body}" FontSize="14.5" FontWeight="SemiBold"
+                                                           VerticalAlignment="Center"/>
+                                            </DockPanel>
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+
+                    <!-- ══ Build: the checklist first, then the details ══ -->
+                    <StackPanel x:Name="Section_Build" Visibility="{Binding HasBuildSection, Converter={StaticResource BoolVis}}">
+                        <DockPanel Style="{StaticResource SectionHead}">
+                            <TextBlock Text="{DynamicResource Char_Section_Build}" Style="{StaticResource SectionHeading}"/>
+                            <Border Style="{DynamicResource KTag}" Margin="12,2,0,0"
+                                    Visibility="{Binding IsOfficialBuild, Converter={StaticResource BoolVis}}">
+                                <TextBlock Text="{DynamicResource Char_Build_Official}" Style="{DynamicResource KTagText}"/>
+                            </Border>
+                            <ContentControl Focusable="False" IsTabStop="False" ContentTemplate="{StaticResource AiTag}" Margin="12,2,0,0"
+                                              Visibility="{Binding IsAiBuild, Converter={StaticResource BoolVis}}"/>
+                        </DockPanel>
+                        <TextBlock Text="{Binding BuildNote}" Style="{StaticResource Muted}" Margin="0,0,0,12" MaxWidth="{DynamicResource Char_ReadingWidth}"
+                                   HorizontalAlignment="Left" Visibility="{Binding BuildNote, Converter={StaticResource EmptyCollapsed}}"/>
+                        <TextBlock Text="{DynamicResource Char_Build_None}" Style="{StaticResource Muted}" Margin="0,0,0,12"
+                                   Visibility="{Binding HasBuild, Converter={StaticResource InvBoolVis}}"/>
+
+                        <Border Style="{StaticResource Card}" Padding="20,10" Visibility="{Binding Tips, Converter={StaticResource EmptyCollapsed}}">
+                            <ItemsControl ItemsSource="{Binding Tips}" Focusable="False">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid Margin="0,8,0,8">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <!-- A checklist: a ring per item. -->
+                                            <Grid Width="32" Height="32" Margin="0,0,14,0" VerticalAlignment="Top">
+                                                <Ellipse Stroke="{DynamicResource Char_RingStrong}" StrokeThickness="1.5"
+                                                         Visibility="{Binding HasIconSlot, Converter={StaticResource InvBoolVis}}"/>
+                                                <Path Data="M4,8.5 L7,11.5 L12.5,5" Width="16" Height="16" Stretch="None"
+                                                      Stroke="{Binding DataContext.ElementText, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                      StrokeThickness="1.8" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
+                                                      HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                      Visibility="{Binding HasIconSlot, Converter={StaticResource InvBoolVis}}"/>
+                                                <Image Source="{Binding IconPath, Converter={StaticResource IconImage}, ConverterParameter={x:Static local:OverviewImageSizes.Tip}}"
+                                                       Stretch="Uniform" Visibility="{Binding HasIconSlot, Converter={StaticResource BoolVis}}"/>
+                                            </Grid>
+                                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                <TextBlock local:Loc.Key="{Binding LabelKey}" FontSize="12" FontWeight="SemiBold"
+                                                           Foreground="{DynamicResource Char_FgMuted}"/>
+                                                <TextBlock Text="{Binding Text}" Style="{StaticResource Body}" FontWeight="SemiBold" Margin="0,2,0,0"/>
+                                            </StackPanel>
+                                            <ContentControl Focusable="False" IsTabStop="False" Grid.Column="2" ContentTemplate="{StaticResource AiTag}" VerticalAlignment="Top"
+                                                              Margin="10,2,0,0" Visibility="{Binding ShowAiTag, Converter={StaticResource BoolVis}}"/>
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </Border>
+
+                        <!-- Sets: piece count, then the options (alternatives, or a 2+2 pair). A set opens its bonuses. -->
+                        <TextBlock Text="{DynamicResource Char_Sets}" Style="{StaticResource Label}"
+                                   Visibility="{Binding SetGroups, Converter={StaticResource EmptyCollapsed}}"/>
+                        <ItemsControl ItemsSource="{Binding SetGroups}" Focusable="False">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid Margin="0,0,0,4">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Border MinWidth="36" Height="32" CornerRadius="8" Padding="6,0" Margin="0,0,10,0"
+                                                VerticalAlignment="Top" BorderBrush="{DynamicResource Char_RingStrong}" BorderThickness="1"
+                                                ToolTip="{DynamicResource Char_Pieces_Tip}">
+                                            <TextBlock Text="{Binding PiecesText}" Style="{StaticResource Numeral}" FontSize="15"
+                                                       Foreground="{DynamicResource Char_Fg}"/>
+                                        </Border>
+                                        <StackPanel Grid.Column="1">
+                                            <ItemsControl ItemsSource="{Binding Options}" Focusable="False">
+                                                <ItemsControl.ItemsPanel>
+                                                    <ItemsPanelTemplate>
+                                                        <WrapPanel/>
+                                                    </ItemsPanelTemplate>
+                                                </ItemsControl.ItemsPanel>
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                                            <TextBlock Text="{DynamicResource Char_Or}" FontSize="12.5" Foreground="{DynamicResource Char_FgSubtle}"
+                                                                       VerticalAlignment="Center" Margin="0,0,8,0"
+                                                                       Visibility="{Binding ShowOr, Converter={StaticResource BoolVis}}"/>
+                                                            <TextBlock Text="+" FontSize="14" Foreground="{DynamicResource Char_FgSubtle}"
+                                                                       VerticalAlignment="Center" Margin="0,0,8,0"
+                                                                       Visibility="{Binding ShowPlus, Converter={StaticResource BoolVis}}"/>
+                                                            <ToggleButton Style="{DynamicResource KChipToggle}" IsChecked="{Binding IsExpanded, Mode=TwoWay}"
+                                                                          Margin="0,0,8,0">
+                                                                <ToggleButton.ToolTip>
+                                                                    <ToolTip>
+                                                                        <TextBlock Text="{Binding BonusesText}" MaxWidth="360" TextWrapping="Wrap"/>
+                                                                    </ToolTip>
+                                                                </ToggleButton.ToolTip>
+                                                                <StackPanel Orientation="Horizontal">
+                                                                    <Grid Width="24" Height="24" Margin="0,0,8,0">
+                                                                        <TextBlock Text="{Binding Initial}" Style="{StaticResource Numeral}" FontSize="12"
+                                                                                   FontFamily="Segoe UI" Foreground="{DynamicResource Char_FgMuted}"
+                                                                                   Visibility="{Binding IconPath, Converter={StaticResource MissingIcon}, ConverterParameter={x:Static local:OverviewImageSizes.Set}}"/>
+                                                                        <Image Source="{Binding IconPath, Converter={StaticResource IconImage}, ConverterParameter={x:Static local:OverviewImageSizes.Set}}"
+                                                                               Stretch="Uniform"/>
+                                                                    </Grid>
+                                                                    <TextBlock Text="{Binding Name}" FontSize="13" Foreground="{DynamicResource Char_Fg}"
+                                                                               VerticalAlignment="Center" TextWrapping="Wrap" MaxWidth="280"/>
+                                                                </StackPanel>
+                                                            </ToggleButton>
+                                                        </StackPanel>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                            <ItemsControl ItemsSource="{Binding Options}" Focusable="False">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <Border Style="{StaticResource Card}" Padding="16,12" Margin="0,0,0,8"
+                                                                Visibility="{Binding IsExpanded, Converter={StaticResource BoolVis}}">
+                                                            <StackPanel>
+                                                                <TextBlock Text="{Binding Name}" Style="{StaticResource Body}" FontWeight="SemiBold" FontSize="13.5"/>
+                                                                <ItemsControl ItemsSource="{Binding Bonuses}" Focusable="False">
+                                                                    <ItemsControl.ItemTemplate>
+                                                                        <DataTemplate>
+                                                                            <Grid Margin="0,8,0,0">
+                                                                                <Grid.ColumnDefinitions>
+                                                                                    <ColumnDefinition Width="24"/>
+                                                                                    <ColumnDefinition Width="*"/>
+                                                                                </Grid.ColumnDefinitions>
+                                                                                <TextBlock Text="{Binding Pieces}" Style="{StaticResource Numeral}" FontSize="14"
+                                                                                           HorizontalAlignment="Left" VerticalAlignment="Top"
+                                                                                           Foreground="{DynamicResource Char_Fg}"/>
+                                                                                <TextBlock Grid.Column="1" Text="{Binding Text}" Style="{StaticResource Muted}"/>
+                                                                            </Grid>
+                                                                        </DataTemplate>
+                                                                    </ItemsControl.ItemTemplate>
+                                                                </ItemsControl>
+                                                            </StackPanel>
+                                                        </Border>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </StackPanel>
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
+                        <TextBlock Text="{DynamicResource Char_MainStats}" Style="{StaticResource Label}"
+                                   Visibility="{Binding MainStats, Converter={StaticResource EmptyCollapsed}}"/>
+                        <ItemsControl ItemsSource="{Binding MainStats}" Focusable="False" Grid.IsSharedSizeScope="True">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid Margin="0,0,0,8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="Auto" SharedSizeGroup="Slot"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Border Width="32" Height="32" CornerRadius="8" BorderBrush="{DynamicResource Char_Ring}" BorderThickness="1"
+                                                VerticalAlignment="Top">
+                                            <Path Data="{Binding Icon}" Width="16" Height="16" Stretch="None"
+                                                  Stroke="{DynamicResource Char_Fg}" StrokeThickness="1.3" StrokeLineJoin="Round"
+                                                  StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                                                  HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        </Border>
+                                        <TextBlock Grid.Column="1" local:Loc.Key="{Binding SlotKey}" FontSize="13"
+                                                   Foreground="{DynamicResource Char_FgMuted}" VerticalAlignment="Top" Margin="12,7,16,0"/>
+                                        <TextBlock Grid.Column="2" FontSize="14" LineHeight="20" TextWrapping="Wrap" VerticalAlignment="Top" Margin="0,6,0,0">
+                                            <Run Text="{Binding Primary, Mode=OneWay}" FontWeight="SemiBold" Foreground="{DynamicResource Char_Fg}"/><Run
+                                                 Text="{Binding Alternatives, Mode=OneWay}" Foreground="{DynamicResource Char_FgMuted}"/>
+                                        </TextBlock>
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
+                        <TextBlock Text="{DynamicResource Char_SubStats}" Style="{StaticResource Label}"
+                                   Visibility="{Binding SubStats, Converter={StaticResource EmptyCollapsed}}"/>
+                        <ItemsControl ItemsSource="{Binding SubStats}" Focusable="False">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel/>
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Style="{DynamicResource KChip}" Padding="10,0,12,0">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="{Binding Rank}" Style="{StaticResource Numeral}" FontSize="14"
+                                                       Foreground="{DynamicResource Char_FgSubtle}"/>
+                                            <TextBlock Text="{Binding Name}" FontSize="13" Foreground="{DynamicResource Char_Fg}"
+                                                       VerticalAlignment="Center" Margin="8,0,0,0"/>
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
+                        <TextBlock local:Loc.Key="{Binding WeaponsKey}" Style="{StaticResource Label}"
+                                   Visibility="{Binding Weapons, Converter={StaticResource EmptyCollapsed}}"/>
+                        <Border Style="{StaticResource Card}" Padding="6" Visibility="{Binding Weapons, Converter={StaticResource EmptyCollapsed}}">
+                            <ItemsControl ItemsSource="{Binding Weapons}" Focusable="False">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <ToggleButton Style="{StaticResource Row}" IsChecked="{Binding IsExpanded, Mode=TwoWay}"
+                                                      IsEnabled="{Binding CanExpand}">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <Grid Width="40" Height="40" VerticalAlignment="Top" Margin="0,0,14,0">
+                                                    <Border CornerRadius="8" BorderBrush="{DynamicResource Char_Ring}" BorderThickness="1"/>
+                                                    <TextBlock Text="{Binding Initial}" Style="{StaticResource Numeral}" FontSize="15"
+                                                               FontFamily="Segoe UI" Foreground="{DynamicResource Char_FgMuted}"
+                                                               Visibility="{Binding IconPath, Converter={StaticResource MissingIcon}, ConverterParameter={x:Static local:OverviewImageSizes.Weapon}}"/>
+                                                    <Image Source="{Binding IconPath, Converter={StaticResource IconImage}, ConverterParameter={x:Static local:OverviewImageSizes.Weapon}}"
+                                                           Stretch="Uniform" Margin="2"/>
+                                                </Grid>
+                                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                    <TextBlock Text="{Binding Name}" Style="{StaticResource Body}" FontWeight="SemiBold"/>
+                                                    <DockPanel Margin="0,1,0,0">
+                                                        <TextBlock Text="{Binding RarityText}" Style="{StaticResource RarityText}" FontSize="11.5"
+                                                                   VerticalAlignment="Center" Margin="0,0,8,0"
+                                                                   Visibility="{Binding ShowStars, Converter={StaticResource BoolVis}}"/>
+                                                        <Border Style="{StaticResource RankTile}" BorderThickness="1.2" CornerRadius="4" Width="18" Height="18"
+                                                                Margin="0,0,8,0" Visibility="{Binding IsRank, Converter={StaticResource BoolVis}}">
+                                                            <TextBlock Text="{Binding RarityText}" Style="{StaticResource RarityText}"
+                                                                       FontFamily="{DynamicResource FontDisplay}" FontWeight="Bold" FontSize="11"
+                                                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                        </Border>
+                                                        <TextBlock Text="{Binding PassiveName}" Style="{StaticResource OneLine}" VerticalAlignment="Center"/>
+                                                    </DockPanel>
+                                                    <TextBlock Text="{Binding Passive}" Style="{StaticResource Muted}" Margin="0,6,0,2"
+                                                               Visibility="{Binding ShowPassive, Converter={StaticResource BoolVis}}"/>
+                                                </StackPanel>
+                                                <Path Grid.Column="2" Style="{StaticResource Chevron}"/>
+                                            </Grid>
+                                        </ToggleButton>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </Border>
+                    </StackPanel>
+
+                    <!-- Below the build lays out one frame later (see the code-behind). -->
+                    <StackPanel x:Name="LowerSections" Visibility="Collapsed">
+                        <!-- ══ Skills: the English name the game shows, the Polish under it ══ -->
+                        <StackPanel x:Name="Section_Skills" Visibility="{Binding HasSkills, Converter={StaticResource BoolVis}}">
+                            <DockPanel Style="{StaticResource SectionHead}" Margin="0,32,0,4">
+                                <TextBlock Text="{DynamicResource Char_Section_Skills}" Style="{StaticResource SectionHeading}"/>
+                            </DockPanel>
+                            <TextBlock Text="{DynamicResource Char_Skills_NamesNote}" Style="{StaticResource Muted}" Margin="0,0,0,14"/>
+                            <ItemsControl ItemsSource="{Binding Skills}" Focusable="False">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <ToggleButton Style="{StaticResource CardToggle}" IsChecked="{Binding IsExpanded, Mode=TwoWay}"
+                                                      IsEnabled="{Binding CanExpand}">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <ContentPresenter Content="{Binding}" ContentTemplate="{StaticResource SkillIcon}"
+                                                                  VerticalAlignment="Top" Margin="0,0,14,0"/>
+                                                <StackPanel Grid.Column="1">
+                                                    <DockPanel>
+                                                        <Border DockPanel.Dock="Right" Style="{DynamicResource KTag}" Margin="10,0,0,0"
+                                                                VerticalAlignment="Top">
+                                                            <TextBlock local:Loc.Key="{Binding KindKey}" Style="{DynamicResource KTagText}"/>
+                                                        </Border>
+                                                        <TextBlock Text="{Binding Title}" Style="{StaticResource Body}" FontSize="15" FontWeight="SemiBold"/>
+                                                    </DockPanel>
+                                                    <TextBlock Text="{Binding Subtitle}" FontSize="12.5" Foreground="{DynamicResource Char_FgSubtle}"
+                                                               Visibility="{Binding Subtitle, Converter={StaticResource EmptyCollapsed}}"/>
+                                                    <TextBlock Text="{Binding Preview}" Style="{StaticResource Preview}" Margin="0,8,0,0"
+                                                               Visibility="{Binding ShowPreview, Converter={StaticResource BoolVis}}"/>
+                                                    <TextBlock Text="{Binding Description}" Style="{StaticResource Reading}" FontSize="13.5" LineHeight="20.5"
+                                                               Foreground="{DynamicResource Char_FgMuted}" Margin="0,8,0,0"
+                                                               Visibility="{Binding ShowDescription, Converter={StaticResource BoolVis}}"/>
+                                                    <TextBlock Style="{StaticResource Untranslated}"/>
+                                                </StackPanel>
+                                                <Path Grid.Column="2" Style="{StaticResource Chevron}"/>
+                                            </Grid>
+                                        </ToggleButton>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+
+                        <!-- ══ Constellations / Eidolons / Mindscapes: a ladder ══ -->
+                        <StackPanel x:Name="Section_Ranks" Visibility="{Binding HasProgression, Converter={StaticResource BoolVis}}">
+                            <DockPanel Style="{StaticResource SectionHead}">
+                                <TextBlock local:Loc.Key="{Binding ProgressionKey}" Style="{StaticResource SectionHeading}"/>
+                            </DockPanel>
+                            <Border Style="{StaticResource Card}" Padding="8,8,8,8">
+                                <ItemsControl ItemsSource="{Binding Progression}" Focusable="False">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+                                                <!-- The rail: one line through the nodes, cut above the first and below the last. -->
+                                                <Grid Width="56">
+                                                    <Grid.RowDefinitions>
+                                                        <RowDefinition Height="10"/>
+                                                        <RowDefinition Height="40"/>
+                                                        <RowDefinition Height="*"/>
+                                                    </Grid.RowDefinitions>
+                                                    <Rectangle Width="2" Fill="{DynamicResource Char_Ring}">
+                                                        <Rectangle.Style>
+                                                            <Style TargetType="Rectangle">
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding IsFirst}" Value="True">
+                                                                        <Setter Property="Visibility" Value="Hidden"/>
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </Rectangle.Style>
+                                                    </Rectangle>
+                                                    <Rectangle Grid.Row="1" Grid.RowSpan="2" Width="2" Margin="0,20,0,0" Fill="{DynamicResource Char_Ring}">
+                                                        <Rectangle.Style>
+                                                            <Style TargetType="Rectangle">
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding IsLast}" Value="True">
+                                                                        <Setter Property="Visibility" Value="Hidden"/>
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </Rectangle.Style>
+                                                    </Rectangle>
+                                                    <Grid Grid.Row="1" Width="40" Height="40">
+                                                        <Ellipse Fill="{DynamicResource Char_Surface}"/>
+                                                        <Ellipse Fill="{Binding DataContext.ElementWash, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                                 Stroke="{Binding DataContext.ElementSoft, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                                 StrokeThickness="1"/>
+                                                        <TextBlock Text="{Binding Numeral}" Style="{StaticResource Numeral}" FontSize="13"
+                                                                   Foreground="{Binding DataContext.ElementText, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                                   Visibility="{Binding IconPath, Converter={StaticResource MissingIcon}, ConverterParameter={x:Static local:OverviewImageSizes.Rank}}"/>
+                                                        <Rectangle Margin="7" Fill="{Binding DataContext.ElementText, RelativeSource={RelativeSource AncestorType=UserControl}}">
+                                                            <Rectangle.OpacityMask>
+                                                                <ImageBrush ImageSource="{Binding IconPath, Converter={StaticResource IconImage}, ConverterParameter={x:Static local:OverviewImageSizes.Rank}}"
+                                                                            Stretch="Uniform"/>
+                                                            </Rectangle.OpacityMask>
+                                                        </Rectangle>
+                                                    </Grid>
+                                                </Grid>
+                                                <ToggleButton Grid.Column="1" Style="{StaticResource Row}" IsChecked="{Binding IsExpanded, Mode=TwoWay}"
+                                                              IsEnabled="{Binding CanExpand}" Margin="0,2,0,2">
+                                                    <Grid>
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*"/>
+                                                            <ColumnDefinition Width="Auto"/>
+                                                        </Grid.ColumnDefinitions>
+                                                        <StackPanel>
+                                                            <WrapPanel>
+                                                                <TextBlock Text="{Binding Numeral}" FontFamily="{DynamicResource FontDisplay}" FontSize="13.5"
+                                                                           FontWeight="SemiBold" Margin="0,1,10,0"
+                                                                           Foreground="{Binding DataContext.ElementText, RelativeSource={RelativeSource AncestorType=UserControl}}"/>
+                                                                <TextBlock Text="{Binding Title}" Style="{StaticResource Body}" FontSize="15" FontWeight="SemiBold"/>
+                                                            </WrapPanel>
+                                                            <TextBlock Text="{Binding Subtitle}" FontSize="12.5" Foreground="{DynamicResource Char_FgSubtle}"
+                                                                       Visibility="{Binding Subtitle, Converter={StaticResource EmptyCollapsed}}"/>
+                                                            <TextBlock Text="{Binding Preview}" Style="{StaticResource OneLine}" Margin="0,6,0,0"
+                                                                       Visibility="{Binding ShowPreview, Converter={StaticResource BoolVis}}"/>
+                                                            <TextBlock Text="{Binding Description}" Style="{StaticResource Reading}" FontSize="13.5" LineHeight="20.5"
+                                                                       Foreground="{DynamicResource Char_FgMuted}" Margin="0,6,0,2"
+                                                                       Visibility="{Binding IsExpanded, Converter={StaticResource BoolVis}}"/>
+                                                            <TextBlock Style="{StaticResource Untranslated}"/>
+                                                        </StackPanel>
+                                                        <Path Grid.Column="1" Style="{StaticResource Chevron}"/>
+                                                    </Grid>
+                                                </ToggleButton>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </Border>
+                        </StackPanel>
+
+                        <!-- ══ Teams ══ -->
+                        <StackPanel x:Name="Section_Teams" Visibility="{Binding HasTeams, Converter={StaticResource BoolVis}}">
+                            <DockPanel Style="{StaticResource SectionHead}">
+                                <TextBlock Text="{DynamicResource Char_Nav_Teams}" Style="{StaticResource SectionHeading}"/>
+                            </DockPanel>
+                            <ItemsControl ItemsSource="{Binding Teams}" Focusable="False"
+                                          Visibility="{Binding HasTeamCards, Converter={StaticResource BoolVis}}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <local:AdaptiveGrid MinColumnWidth="300" MaxColumns="2" ColumnGap="12" RowGap="12"/>
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border Style="{StaticResource Card}">
+                                            <StackPanel>
+                                                <DockPanel LastChildFill="True">
+                                                    <Grid DockPanel.Dock="Right" Margin="10,0,0,0" VerticalAlignment="Top">
+                                                        <Border Style="{DynamicResource KTag}" Visibility="{Binding IsOfficial, Converter={StaticResource BoolVis}}">
+                                                            <TextBlock Text="{DynamicResource Char_TeamSource_official}" Style="{DynamicResource KTagText}"/>
+                                                        </Border>
+                                                        <ContentControl Focusable="False" IsTabStop="False" ContentTemplate="{StaticResource AiTag}"
+                                                                          Visibility="{Binding IsAi, Converter={StaticResource BoolVis}}"/>
+                                                        <Border Style="{DynamicResource KTag}" Visibility="{Binding IsOtherSource, Converter={StaticResource BoolVis}}">
+                                                            <TextBlock Style="{DynamicResource KTagText}">
+                                                                <Run Text="{DynamicResource Char_TeamSource_Other}"/><Run Text=" "/><Run Text="{Binding Source, Mode=OneWay}"/>
+                                                            </TextBlock>
+                                                        </Border>
+                                                    </Grid>
+                                                    <TextBlock Text="{Binding Name}" Style="{StaticResource Body}" FontSize="15" FontWeight="SemiBold"
+                                                               VerticalAlignment="Center"/>
+                                                </DockPanel>
+                                                <ItemsControl ItemsSource="{Binding Members}" Focusable="False" Margin="0,14,0,0">
+                                                    <ItemsControl.ItemsPanel>
+                                                        <ItemsPanelTemplate>
+                                                            <UniformGrid Rows="1" Columns="4"/>
+                                                        </ItemsPanelTemplate>
+                                                    </ItemsControl.ItemsPanel>
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate>
+                                                            <StackPanel HorizontalAlignment="Center" Margin="2,0">
+                                                                <Grid Width="52" Height="52" HorizontalAlignment="Center">
+                                                                    <Ellipse Fill="{DynamicResource Char_ChipBg}" Stroke="{DynamicResource Char_Ring}" StrokeThickness="1"/>
+                                                                    <TextBlock Text="{Binding Initial}" Style="{StaticResource Numeral}" FontSize="17"
+                                                                               Foreground="{DynamicResource Char_FgMuted}"
+                                                                               Visibility="{Binding IconPath, Converter={StaticResource MissingIcon}, ConverterParameter={x:Static local:OverviewImageSizes.Member}}"/>
+                                                                    <Ellipse Margin="1">
+                                                                        <Ellipse.Fill>
+                                                                            <ImageBrush ImageSource="{Binding IconPath, Converter={StaticResource IconImage}, ConverterParameter={x:Static local:OverviewImageSizes.Member}}"
+                                                                                        Stretch="UniformToFill"/>
+                                                                        </Ellipse.Fill>
+                                                                    </Ellipse>
+                                                                </Grid>
+                                                                <TextBlock Text="{Binding Name}" FontSize="12.5" FontWeight="SemiBold" Foreground="{DynamicResource Char_Fg}"
+                                                                           TextAlignment="Center" TextWrapping="Wrap" Margin="0,8,0,0"/>
+                                                                <TextBlock Text="{Binding Role}" FontSize="11.5" Foreground="{DynamicResource Char_FgMuted}"
+                                                                           TextAlignment="Center" TextWrapping="Wrap"
+                                                                           Visibility="{Binding Role, Converter={StaticResource EmptyCollapsed}}"/>
+                                                            </StackPanel>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                                <TextBlock Text="{Binding Why}" Style="{StaticResource Muted}" Margin="0,14,0,0"
+                                                           Visibility="{Binding Why, Converter={StaticResource EmptyCollapsed}}"/>
+                                            </StackPanel>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <!-- No comps yet: the game's own teammates. -->
+                            <StackPanel Visibility="{Binding ShowTeammates, Converter={StaticResource BoolVis}}">
+                                <TextBlock Text="{DynamicResource Char_Teams_Fallback}" Style="{StaticResource Muted}" Margin="0,0,0,12"/>
+                                <ItemsControl ItemsSource="{Binding TeammateCards}" Focusable="False">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <WrapPanel/>
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Style="{DynamicResource KChip}" MinHeight="40" Padding="4,4,14,4">
+                                                <StackPanel Orientation="Horizontal">
+                                                    <Grid Width="30" Height="30" Margin="0,0,10,0">
+                                                        <Ellipse Fill="{DynamicResource Char_Surface}"/>
+                                                        <TextBlock Text="{Binding Initial}" Style="{StaticResource Numeral}" FontSize="12"
+                                                                   Foreground="{DynamicResource Char_FgMuted}"
+                                                                   Visibility="{Binding IconPath, Converter={StaticResource MissingIcon}, ConverterParameter={x:Static local:OverviewImageSizes.Member}}"/>
+                                                        <Ellipse>
+                                                            <Ellipse.Fill>
+                                                                <ImageBrush ImageSource="{Binding IconPath, Converter={StaticResource IconImage}, ConverterParameter={x:Static local:OverviewImageSizes.Member}}"
+                                                                            Stretch="UniformToFill"/>
+                                                            </Ellipse.Fill>
+                                                        </Ellipse>
+                                                    </Grid>
+                                                    <TextBlock Text="{Binding Name}" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource Char_Fg}"
+                                                               VerticalAlignment="Center"/>
+                                                </StackPanel>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </StackPanel>
+
+                        <!-- ══ Materials ══ -->
+                        <StackPanel x:Name="Section_Materials" Visibility="{Binding HasMaterials, Converter={StaticResource BoolVis}}">
+                            <DockPanel Style="{StaticResource SectionHead}" Margin="0,32,0,0">
+                                <TextBlock Text="{DynamicResource Char_Nav_Materials}" Style="{StaticResource SectionHeading}"/>
+                            </DockPanel>
+                            <TextBlock Text="{DynamicResource Char_Tips_Materials_Asc}" Style="{StaticResource Label}" Margin="0,14,0,10"
+                                       Visibility="{Binding MaterialsAscension, Converter={StaticResource EmptyCollapsed}}"/>
+                            <ItemsControl ItemsSource="{Binding MaterialsAscension}" Focusable="False" ItemTemplate="{StaticResource MaterialChip}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                            </ItemsControl>
+                            <TextBlock Text="{DynamicResource Char_Tips_Materials_Skills}" Style="{StaticResource Label}" Margin="0,12,0,10"
+                                       Visibility="{Binding MaterialsSkills, Converter={StaticResource EmptyCollapsed}}"/>
+                            <ItemsControl ItemsSource="{Binding MaterialsSkills}" Focusable="False" ItemTemplate="{StaticResource MaterialChip}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                            </ItemsControl>
+                        </StackPanel>
+
+                        <!-- ══ The rest of the guide, as an article ══ -->
+                        <StackPanel x:Name="Section_Guide" Visibility="{Binding HasGuide, Converter={StaticResource BoolVis}}">
+                            <DockPanel Style="{StaticResource SectionHead}">
+                                <TextBlock Text="{DynamicResource Char_Tips_Guide}" Style="{StaticResource SectionHeading}"/>
+                                <ContentControl Focusable="False" IsTabStop="False" ContentTemplate="{StaticResource AiTag}" Margin="12,2,0,0"/>
+                            </DockPanel>
+                            <Border Style="{StaticResource Card}" Padding="8">
+                                <ItemsControl ItemsSource="{Binding Guide}" Focusable="False">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <StackPanel>
+                                                <ToggleButton Style="{StaticResource Row}" IsChecked="{Binding IsExpanded, Mode=TwoWay}">
+                                                    <DockPanel>
+                                                        <Path DockPanel.Dock="Right" Style="{StaticResource Chevron}" Margin="10,2,0,0"/>
+                                                        <TextBlock Text="{Binding Heading}" FontFamily="{DynamicResource FontDisplay}" FontSize="16"
+                                                                   FontWeight="SemiBold" Foreground="{DynamicResource Char_Fg}" TextWrapping="Wrap"/>
+                                                    </DockPanel>
+                                                </ToggleButton>
+                                                <ItemsControl ItemsSource="{Binding Blocks}" Focusable="False" Margin="10,2,10,10"
+                                                              ItemTemplate="{StaticResource BlockTemplate}"
+                                                              Visibility="{Binding IsExpanded, Converter={StaticResource BoolVis}}"/>
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </Border>
+                        </StackPanel>
+
+                        <!-- ══ Where to read more: our page first, then the sites ══ -->
+                        <StackPanel x:Name="Section_Links" Visibility="{Binding HasLinks, Converter={StaticResource BoolVis}}">
+                            <DockPanel Style="{StaticResource SectionHead}">
+                                <TextBlock Text="{DynamicResource Char_Tips_Links}" Style="{StaticResource SectionHeading}"/>
+                            </DockPanel>
+                            <WrapPanel>
+                                <Button Style="{DynamicResource KPrimaryLinkButton}" Tag="{Binding PageUrl}" Click="Link_Click"
+                                        Visibility="{Binding HasPageUrl, Converter={StaticResource BoolVis}}">
+                                    <StackPanel Orientation="Horizontal">
+                                        <Image Source="{DynamicResource KaptionMark}" Width="16" Height="16" Margin="0,0,8,0"/>
+                                        <TextBlock Text="{DynamicResource Char_Tips_ReadMore}" VerticalAlignment="Center"/>
+                                        <Path Data="M5,3 H13 V11 M13,3 L4,12" Width="16" Height="16" Stretch="None" Margin="8,1,0,0"
+                                              Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.5"
+                                              StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
+                                              VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </Button>
+                                <ItemsControl ItemsSource="{Binding Links}" Focusable="False">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Button Style="{DynamicResource KLinkButton}" Tag="{Binding Url}" Click="Link_Click">
+                                                <StackPanel Orientation="Horizontal">
+                                                    <Grid Width="16" Height="16" Margin="0,0,8,0">
+                                                        <Path Data="M14,8 A6,6 0 1 1 2,8 A6,6 0 1 1 14,8 Z M2,8 H14 M8,2 C5.5,4.5 5.5,11.5 8,14 M8,2 C10.5,4.5 10.5,11.5 8,14"
+                                                              Width="16" Height="16" Stretch="None" Stroke="{DynamicResource Char_FgSubtle}" StrokeThickness="1.2"
+                                                              Visibility="{Binding IconPath, Converter={StaticResource MissingIcon}, ConverterParameter=16}"/>
+                                                        <Image Source="{Binding IconPath, Converter={StaticResource IconImage}, ConverterParameter=16}"
+                                                               Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality"/>
+                                                    </Grid>
+                                                    <TextBlock Text="{Binding Label}" VerticalAlignment="Center"/>
+                                                </StackPanel>
+                                            </Button>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </WrapPanel>
+                        </StackPanel>
+                    </StackPanel>
+
+                    <TextBlock FontSize="11.5" Margin="0,32,0,0" TextWrapping="Wrap" Foreground="{DynamicResource Char_FgSubtle}"
+                               MaxWidth="{DynamicResource Char_ReadingWidth}" HorizontalAlignment="Left"
+                               Text="{DynamicResource Char_Provenance}"/>
+                </StackPanel>
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- The same tabs, pinned while the hero is scrolled away. -->
+        <Border x:Name="PinnedTabs" VerticalAlignment="Top" Visibility="Collapsed" Margin="0,0,10,0"
+                BorderBrush="{DynamicResource Char_Ring}" BorderThickness="0,0,0,1"
+                Background="{DynamicResource Char_Surface}" Padding="{DynamicResource Char_Gutter}">
+            <ContentPresenter Content="{Binding}" ContentTemplate="{StaticResource SectionTabs}"/>
+        </Border>
+    </Grid>
+</UserControl>

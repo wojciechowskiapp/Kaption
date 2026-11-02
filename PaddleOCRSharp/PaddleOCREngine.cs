@@ -876,14 +876,7 @@ namespace PaddleOCRSharp
 
                 // Blank images are intentional: the graph is compiled and
                 // validated without manufacturing OCR text.
-                int detWidth = FallbackDetectorWidth;
-                int detHeight = FallbackDetectorHeight;
-                if (captureRegion.HasValue &&
-                    captureRegion.Value.Width > 0 && captureRegion.Value.Height > 0)
-                {
-                    detWidth = captureRegion.Value.Width;
-                    detHeight = captureRegion.Value.Height;
-                }
+                (int detWidth, int detHeight) = WarmUpDetectorShape(captureRegion);
 
                 if (HasBudgetForAnotherShape())
                 {
@@ -939,6 +932,66 @@ namespace PaddleOCRSharp
                     $"OCR warm-up exceeded {timeout.TotalSeconds:F0}s " +
                     $"(provider={ExecutionProvider}, model={ModelName}).",
                     ex);
+            }
+            finally
+            {
+                _gate.Release();
+            }
+        }
+
+        private static (int Width, int Height) WarmUpDetectorShape(CvSize? captureRegion) =>
+            captureRegion is { Width: > 0, Height: > 0 } region
+                ? (region.Width, region.Height)
+                : (FallbackDetectorWidth, FallbackDetectorHeight);
+
+        /// <summary>
+        /// Times one detector + recogniser pass over the shapes <see cref="WarmUp(TimeSpan, CvSize?)"/>
+        /// compiled. Warm-up time is mostly DirectML kernel compilation; this is what a frame costs.
+        /// </summary>
+        public TimeSpan ProbeSteadyState(TimeSpan timeout, CvSize? captureRegion)
+        {
+            if (timeout <= TimeSpan.Zero)
+                throw new ArgumentOutOfRangeException(nameof(timeout));
+            if (_disposed)
+                throw new ObjectDisposedException(nameof(PaddleOCREngine));
+
+            using var cts = new CancellationTokenSource(timeout);
+            CancellationToken token = cts.Token;
+            _gate.Wait(token);
+            try
+            {
+                if (_disposed)
+                    throw new ObjectDisposedException(nameof(PaddleOCREngine));
+
+                using var runOptions = new RunOptions();
+                using var cancellationRegistration = token.Register(() =>
+                {
+                    try { runOptions.Terminate = true; }
+                    catch (ObjectDisposedException) { }
+                });
+
+                (int detWidth, int detHeight) = WarmUpDetectorShape(captureRegion);
+                var timer = Stopwatch.StartNew();
+                using (var detectorInput = new Mat(detHeight, detWidth, MatType.CV_8UC3, Scalar.All(0)))
+                {
+                    _ = DetectTextRegions(detectorInput, runOptions, token);
+                }
+                using (var recognitionInput = new Mat(
+                    RecImgHeight, WarmUpRecognitionWidth, MatType.CV_8UC3, new Scalar(127.5, 127.5, 127.5)))
+                {
+                    _ = RecognizeText(new[] { recognitionInput }, runOptions, token);
+                }
+                timer.Stop();
+
+                Logger.Log.Info(
+                    $"OCR steady-state probe: {timer.ElapsedMilliseconds}ms " +
+                    $"(provider={ExecutionProvider}, det={detWidth}x{detHeight}, rec={WarmUpRecognitionWidth}).");
+                return timer.Elapsed;
+            }
+            catch (Exception ex) when (cts.IsCancellationRequested)
+            {
+                throw new TimeoutException(
+                    $"OCR steady-state probe exceeded {timeout.TotalSeconds:F0}s (provider={ExecutionProvider}).", ex);
             }
             finally
             {
