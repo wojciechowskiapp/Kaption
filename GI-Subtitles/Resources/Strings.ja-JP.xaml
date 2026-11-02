@@ -1,5 +1,42 @@
 ﻿<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <!-- ═══ W26 2.6 refinement: subtitle look, Start, status bar (keys added in session 50) ═══ -->
+    <sys:String x:Key="look_Lead" xmlns:sys="clr-namespace:System;assembly=mscorlib">ゲーム内でのポーランド語字幕の見え方です。プレビューでドラッグすると位置を変えられます。</sys:String>
+    <sys:String x:Key="look_Preview_Hint" xmlns:sys="clr-namespace:System;assembly=mscorlib">字幕をドラッグするか、矢印キーで動かします。Shiftを押すと大きく動きます。</sys:String>
+    <sys:String x:Key="look_Preview_Help" xmlns:sys="clr-namespace:System;assembly=mscorlib">字幕のプレビュー。ドラッグするか矢印キーで字幕を動かせます。</sys:String>
+    <sys:String x:Key="look_Presets_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">スタイル</sys:String>
+    <sys:String x:Key="look_Preset_Classic" xmlns:sys="clr-namespace:System;assembly=mscorlib">クラシック</sys:String>
+    <sys:String x:Key="look_Preset_Classic_Hint" xmlns:sys="clr-namespace:System;assembly=mscorlib">従来どおり、輪郭はやわらかく</sys:String>
+    <sys:String x:Key="look_Preset_Contrast" xmlns:sys="clr-namespace:System;assembly=mscorlib">コントラスト</sys:String>
+    <sys:String x:Key="look_Preset_Contrast_Hint" xmlns:sys="clr-namespace:System;assembly=mscorlib">太い輪郭と暗い背景</sys:String>
+    <sys:String x:Key="look_Preset_Cinema" xmlns:sys="clr-namespace:System;assembly=mscorlib">シネマ</sys:String>
+    <sys:String x:Key="look_Preset_Cinema_Hint" xmlns:sys="clr-namespace:System;assembly=mscorlib">大きめの文字を下寄せ中央に</sys:String>
+    <sys:String x:Key="look_Reset" xmlns:sys="clr-namespace:System;assembly=mscorlib">既定に戻す</sys:String>
+    <sys:String x:Key="look_Reset_Tip" xmlns:sys="clr-namespace:System;assembly=mscorlib">サイズ、位置、見た目を初期設定に戻します。</sys:String>
+    <sys:String x:Key="look_Size_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">サイズと位置</sys:String>
+    <sys:String x:Key="look_Size" xmlns:sys="clr-namespace:System;assembly=mscorlib">サイズ</sys:String>
+    <sys:String x:Key="look_Vertical" xmlns:sys="clr-namespace:System;assembly=mscorlib">上下</sys:String>
+    <sys:String x:Key="look_Horizontal" xmlns:sys="clr-namespace:System;assembly=mscorlib">左右</sys:String>
+    <sys:String x:Key="look_Move_Hint" xmlns:sys="clr-namespace:System;assembly=mscorlib">字幕はここでもゲーム内でもドラッグで動かせます。</sys:String>
+    <sys:String x:Key="look_Exact_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">正確な値</sys:String>
+    <sys:String x:Key="look_Limits_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">字幕の上限</sys:String>
+    <sys:String x:Key="look_MaxHeight" xmlns:sys="clr-namespace:System;assembly=mscorlib">最大の高さ</sys:String>
+    <sys:String x:Key="look_MaxWidth" xmlns:sys="clr-namespace:System;assembly=mscorlib">最大の幅</sys:String>
+    <sys:String x:Key="look_Auto" xmlns:sys="clr-namespace:System;assembly=mscorlib">自動</sys:String>
+    <sys:String x:Key="look_Face_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">書体と背景</sys:String>
+    <sys:String x:Key="look_Font_Default" xmlns:sys="clr-namespace:System;assembly=mscorlib">Source Sans 3（既定）</sys:String>
+    <sys:String x:Key="look_AutoDarken" xmlns:sys="clr-namespace:System;assembly=mscorlib">明るい場面では背景を暗く</sys:String>
+    <sys:String x:Key="look_AutoDarken_Hint" xmlns:sys="clr-namespace:System;assembly=mscorlib">字幕の後ろが雪や空のときは、読みやすいように背景が暗くなります。</sys:String>
+    <sys:String x:Key="look_Sample_Speaker" xmlns:sys="clr-namespace:System;assembly=mscorlib">Paimon</sys:String>
+    <sys:String x:Key="look_Sample_Line" xmlns:sys="clr-namespace:System;assembly=mscorlib">Ej, poczekaj! Paimon też chce zobaczyć, co jest za tą bramą.</sys:String>
+    <sys:String x:Key="look_Sample_Short" xmlns:sys="clr-namespace:System;assembly=mscorlib">Ej, poczekaj!</sys:String>
+    <sys:String x:Key="look_Sample_StarRail_Speaker" xmlns:sys="clr-namespace:System;assembly=mscorlib">March 7th</sys:String>
+    <sys:String x:Key="look_Sample_StarRail_Line" xmlns:sys="clr-namespace:System;assembly=mscorlib">Hej, poczekaj! Zrobię nam jeszcze jedno zdjęcie.</sys:String>
+    <sys:String x:Key="look_Sample_ZZZ_Speaker" xmlns:sys="clr-namespace:System;assembly=mscorlib">Belle</sys:String>
+    <sys:String x:Key="look_Sample_ZZZ_Line" xmlns:sys="clr-namespace:System;assembly=mscorlib">Wise, poczekaj! Coś tu jest nie tak.</sys:String>
+    <sys:String x:Key="look_Qt_Preview_Name" xmlns:sys="clr-namespace:System;assembly=mscorlib">クイック翻訳ウィンドウのプレビュー</sys:String>
+    <sys:String x:Key="look_Qt_Preview_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">クイック翻訳</sys:String>
+    <sys:String x:Key="look_Qt_Preview_Line" xmlns:sys="clr-namespace:System;assembly=mscorlib">Zlecenia? Och, wiem, masz na myśli bogatych ludzi, którzy chcą przeżyć przygodę.</sys:String>
     <sys:String x:Key="Tab_Language" xmlns:sys="clr-namespace:System;assembly=mscorlib">言語パック管理</sys:String>
     <sys:String x:Key="Tab_Hotkeys" xmlns:sys="clr-namespace:System;assembly=mscorlib">ホットキー</sys:String>
     <sys:String x:Key="Tab_Help" xmlns:sys="clr-namespace:System;assembly=mscorlib">助ける</sys:String>
@@ -10,6 +47,31 @@
     <sys:String x:Key="Select_Game" xmlns:sys="clr-namespace:System;assembly=mscorlib">ゲーム：</sys:String>
     <sys:String x:Key="Recognize_Lang" xmlns:sys="clr-namespace:System;assembly=mscorlib">入力言語：</sys:String>
     <sys:String x:Key="Output_Lang" xmlns:sys="clr-namespace:System;assembly=mscorlib">出力言語：</sys:String>
+    <sys:String x:Key="start_Diag_Adapter_Format" xmlns:sys="clr-namespace:System;assembly=mscorlib">グラフィックカード: {0}</sys:String>
+    <sys:String x:Key="start_Packs_All" xmlns:sys="clr-namespace:System;assembly=mscorlib">すべてのパック</sys:String>
+    <sys:String x:Key="look_TrueSize" xmlns:sys="clr-namespace:System;assembly=mscorlib">等倍プレビュー</sys:String>
+    <sys:String x:Key="look_TrueSize_Tip" xmlns:sys="clr-namespace:System;assembly=mscorlib">ゲーム内ではこの大きさで表示されます。</sys:String>
+    <sys:String x:Key="look_Frame_Game_Format" xmlns:sys="clr-namespace:System;assembly=mscorlib">ゲームウィンドウ · {0}×{1}</sys:String>
+    <sys:String x:Key="Char_PlaysIn_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">ほかのチームでも活躍</sys:String>
+    <sys:String x:Key="Char_PlaysIn_More" xmlns:sys="clr-namespace:System;assembly=mscorlib">さらに表示</sys:String>
+    <sys:String x:Key="Char_PlaysIn_Open" xmlns:sys="clr-namespace:System;assembly=mscorlib">このキャラクターのページを開く</sys:String>
+    <sys:String x:Key="bar_More" xmlns:sys="clr-namespace:System;assembly=mscorlib">その他</sys:String>
+    <sys:String x:Key="bar_More_About" xmlns:sys="clr-namespace:System;assembly=mscorlib">このアプリについて</sys:String>
+    <sys:String x:Key="bar_More_Report" xmlns:sys="clr-namespace:System;assembly=mscorlib">問題を報告</sys:String>
+    <sys:String x:Key="bar_More_Web" xmlns:sys="clr-namespace:System;assembly=mscorlib">kaption.one を開く</sys:String>
+    <sys:String x:Key="bar_More_Language" xmlns:sys="clr-namespace:System;assembly=mscorlib">言語</sys:String>
+    <sys:String x:Key="onb_How_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">しくみ</sys:String>
+    <sys:String x:Key="onb_How_1" xmlns:sys="clr-namespace:System;assembly=mscorlib">ゲームがセリフを表示</sys:String>
+    <sys:String x:Key="onb_How_2" xmlns:sys="clr-namespace:System;assembly=mscorlib">Kaption が画面から読み取る</sys:String>
+    <sys:String x:Key="onb_How_3" xmlns:sys="clr-namespace:System;assembly=mscorlib">その上にポーランド語の字幕を表示</sys:String>
+    <sys:String x:Key="state_Char_NoResults" xmlns:sys="clr-namespace:System;assembly=mscorlib">一致するキャラクターがいません。</sys:String>
+    <sys:String x:Key="state_Char_Empty" xmlns:sys="clr-namespace:System;assembly=mscorlib">キャラクターは次のゲームデータ更新で追加されます。</sys:String>
+    <sys:String x:Key="state_Char_Error" xmlns:sys="clr-namespace:System;assembly=mscorlib">キャラクターデータを読み込めませんでした。</sys:String>
+    <sys:String x:Key="state_CheckAgain" xmlns:sys="clr-namespace:System;assembly=mscorlib">もう一度確認</sys:String>
+    <sys:String x:Key="state_Packs_Empty" xmlns:sys="clr-namespace:System;assembly=mscorlib">字幕パックはまだありません。</sys:String>
+    <sys:String x:Key="state_Logs_Empty" xmlns:sys="clr-namespace:System;assembly=mscorlib">翻訳を始めるとログが表示されます。</sys:String>
+    <sys:String x:Key="state_OpenAppLog" xmlns:sys="clr-namespace:System;assembly=mscorlib">アプリのログを開く</sys:String>
+    <sys:String x:Key="state_ScanFailed" xmlns:sys="clr-namespace:System;assembly=mscorlib">パックを確認できませんでした。詳細はログにあります。</sys:String>
 
     <sys:String x:Key="Game_Genshin" xmlns:sys="clr-namespace:System;assembly=mscorlib">原神</sys:String>
     <sys:String x:Key="Game_StarRail" xmlns:sys="clr-namespace:System;assembly=mscorlib">崩壊：スターレイル</sys:String>
@@ -103,8 +165,8 @@
     <sys:String x:Key="Settings_OcrModel_Card_Label" xmlns:sys="clr-namespace:System;assembly=mscorlib">OCRモデル</sys:String>
     <sys:String x:Key="Settings_OcrModel_Card_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">ゲーム内の会話を読み取る方法を選択します。推奨モデルは画面テキストの精度が高く、互換モデルは以前の軽量エンジンです。</sys:String>
     <sys:String x:Key="Settings_OcrModel_Label" xmlns:sys="clr-namespace:System;assembly=mscorlib">認識モデル</sys:String>
-    <sys:String x:Key="Settings_OcrModel_V6" xmlns:sys="clr-namespace:System;assembly=mscorlib">PP-OCRv6 Small — 推奨</sys:String>
-    <sys:String x:Key="Settings_OcrModel_V4" xmlns:sys="clr-namespace:System;assembly=mscorlib">PP-OCRv4 Mobile — 互換性</sys:String>
+    <sys:String x:Key="Settings_OcrModel_V6" xmlns:sys="clr-namespace:System;assembly=mscorlib">PP-OCRv6 Small（推奨）</sys:String>
+    <sys:String x:Key="Settings_OcrModel_V4" xmlns:sys="clr-namespace:System;assembly=mscorlib">PP-OCRv4 Mobile（互換性）</sys:String>
     <sys:String x:Key="Settings_OcrModel_V6_Description" xmlns:sys="clr-namespace:System;assembly=mscorlib">最新PC向けの精度と速度の最良バランスです。画面テキストに強く、英語と日本語を1つのモデルで認識します。読み込めない場合はV4へ自動的に戻ります。</sys:String>
     <sys:String x:Key="Settings_OcrModel_V4_Description" xmlns:sys="clr-namespace:System;assembly=mscorlib">以前の軽量モデルです。このPCでV6が極端に遅い、または互換性がない場合に使用してください。</sys:String>
     <sys:String x:Key="Settings_OcrModel_Restart" xmlns:sys="clr-namespace:System;assembly=mscorlib">新しいOCRモデルを適用するにはKaptionを再起動してください。</sys:String>
@@ -143,11 +205,16 @@
     <sys:String x:Key="Log_Filter_All" xmlns:sys="clr-namespace:System;assembly=mscorlib">すべてのレベル</sys:String>
     <sys:String x:Key="Dash_Status_PreparingTranslations" xmlns:sys="clr-namespace:System;assembly=mscorlib">翻訳を準備中…</sys:String>
     <sys:String x:Key="Dash_Status_TranslationDataMissing" xmlns:sys="clr-namespace:System;assembly=mscorlib">翻訳データがありません</sys:String>
-    <sys:String x:Key="Dash_Status_RestartRequired" xmlns:sys="clr-namespace:System;assembly=mscorlib">選択済み — 再起動が必要です</sys:String>
+    <sys:String x:Key="Dash_Status_RestartRequired" xmlns:sys="clr-namespace:System;assembly=mscorlib">選択済み。再起動が必要です</sys:String>
     <sys:String x:Key="Dialog_MatcherLoading_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">Kaption は翻訳を準備中です。しばらくしてからもう一度お試しください。</sys:String>
     <sys:String x:Key="Dialog_MatcherMissing_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">選択した翻訳パックが見つからないか空です。翻訳画面でダウンロードしてから、Kaption を再起動してください。</sys:String>
     <sys:String x:Key="Dialog_RestartTranslation_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">翻訳を適用するため再起動</sys:String>
     <sys:String x:Key="Dialog_RestartTranslation_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">選択した OCR 言語と翻訳インデックスを読み込むには Kaption の再起動が必要です。再起動するまでは以前の設定が使われます。</sys:String>
     <sys:String x:Key="Dialog_GameDataUpdated_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">翻訳データを更新しました</sys:String>
     <sys:String x:Key="Dialog_GameDataUpdated_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">新しい言語データを読み込み、翻訳インデックスを再構築するには Kaption を再起動してください。</sys:String>
+    <!-- Character page link: the site has Polish and English pages, so Japanese opens the English one. -->
+    <sys:String x:Key="Char_Tips_ReadMore" xmlns:sys="clr-namespace:System;assembly=mscorlib">kaption.one の完全ガイド</sys:String>
+    <sys:String x:Key="Char_Tips_MoreOnSite" xmlns:sys="clr-namespace:System;assembly=mscorlib">kaption.one で詳しく見る</sys:String>
+    <sys:String x:Key="Char_SiteLocale" xmlns:sys="clr-namespace:System;assembly=mscorlib">en</sys:String>
+    <sys:String x:Key="Char_SubStats" xmlns:sys="clr-namespace:System;assembly=mscorlib">サブステータス</sys:String>
 </ResourceDictionary>

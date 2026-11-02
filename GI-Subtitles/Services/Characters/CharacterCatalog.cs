@@ -60,6 +60,9 @@ namespace GI_Subtitles.Services.Characters
         public int Width { get; set; }
         public int Height { get; set; }
         public AiLocalized Alt { get; set; } = AiLocalized.Empty;
+        /// <summary>Where a crop keeps the picture's subject ("focal": {x, y}, each 0 to 1); null when the data has none.</summary>
+        public double? FocalX { get; set; }
+        public double? FocalY { get; set; }
     }
 
     /// <summary>A team comp. <see cref="Source"/> is an open label: official, ai, or a future provider.</summary>
@@ -181,6 +184,14 @@ namespace GI_Subtitles.Services.Characters
         /// <summary>Official skill-upgrade priority as indices into Skills; empty when the game has none.</summary>
         public IReadOnlyList<int> Leveling { get; set; } = Array.Empty<int>();
         public IReadOnlyList<ExternalLink> Links { get; set; } = Array.Empty<ExternalLink>();
+        /// <summary>The site's slug when the bundle carries one ("slug"), else "": then the app derives it.</summary>
+        public string Slug { get; set; } = "";
+        /// <summary>The character's kaption.one page when the bundle carries one ("page_url"), else "".</summary>
+        public string PageUrl { get; set; } = "";
+        /// <summary>Release day ("release_date", yyyy-MM-dd) when the bundle carries it, else "".</summary>
+        public string ReleaseDate { get; set; } = "";
+        /// <summary>The game version the character arrived in ("release_version", "5.4"), else "".</summary>
+        public string ReleaseVersion { get; set; } = "";
         /// <summary>Distinct kit variants in order of appearance; empty for a plain record.</summary>
         public IReadOnlyList<string> Variants =>
             Skills.Select(s => s.Variant).Where(v => !string.IsNullOrEmpty(v)).Distinct().ToList();
@@ -390,6 +401,12 @@ namespace GI_Subtitles.Services.Characters
                 Materials = Safe(() => ReadMaterials(e)),
                 Leveling = Ints(e, "leveling"),
                 Links = ReadLinks(e),
+                // Optional and tolerant: kept only when the site itself would accept them.
+                Slug = CharacterPageLink.IsValidSlug(Str(e, "slug")) ? Str(e, "slug") : "",
+                PageUrl = new[] { Str(e, "page_url"), Str(e, "pageUrl") }.FirstOrDefault(CharacterPageLink.IsSitePage) ?? "",
+                ReleaseDate = ReleaseDay(Str(e, "release_date")),
+                ReleaseVersion = System.Text.RegularExpressions.Regex.IsMatch(Str(e, "release_version"), @"^\d{1,2}(\.\d{1,2}){0,2}$")
+                    ? Str(e, "release_version") : "",
             };
         }
 
@@ -416,8 +433,24 @@ namespace GI_Subtitles.Services.Characters
             if (!a.TryGetProperty("image", out var i) || i.ValueKind != JsonValueKind.Object) return null;
             string url = Str(i, "url");
             if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) || uri.Scheme != Uri.UriSchemeHttps) return null;
-            return new AiImage { Url = uri.AbsoluteUri, Width = Math.Max(0, Int(i, "w")), Height = Math.Max(0, Int(i, "h")), Alt = Localized(i, "alt") };
+            var image = new AiImage { Url = uri.AbsoluteUri, Width = Math.Max(0, Int(i, "w")), Height = Math.Max(0, Int(i, "h")), Alt = Localized(i, "alt") };
+            // The focal point counts only whole and in range; anything else leaves the crop centred.
+            if (i.TryGetProperty("focal", out var f) && f.ValueKind == JsonValueKind.Object &&
+                Unit(f, "x") is double x && Unit(f, "y") is double y)
+            {
+                image.FocalX = x;
+                image.FocalY = y;
+            }
+            return image;
         }
+
+        private static double? Unit(JsonElement e, string name) =>
+            e.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.Number && v.TryGetDouble(out double d) &&
+            d >= 0 && d <= 1 ? d : null;
+
+        // yyyy-MM-dd only, so release days compare as text.
+        private static string ReleaseDay(string value) =>
+            DateTime.TryParseExact(value, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out _) ? value : "";
 
         // A team needs members; everything else is optional. Unknown sources are kept as labels.
         private static IReadOnlyList<AiTeam> ReadTeams(JsonElement a)
@@ -428,11 +461,19 @@ namespace GI_Subtitles.Services.Characters
                 if (t.ValueKind != JsonValueKind.Object) continue;
                 var members = Strings(t, "members").Distinct(StringComparer.Ordinal).ToList();
                 if (members.Count == 0) continue;
+                // Roles come as a map ({"<id>": role}) or, in the teams v2 data, as a list ([{id, role}]).
                 var roles = new Dictionary<string, AiLocalized>(StringComparer.Ordinal);
                 foreach (var p in Members(t, "roles"))
                 {
                     var role = LocalizedValue(p.Value);
                     if (!role.IsEmpty) roles[p.Name] = role;
+                }
+                foreach (var r in Items(t, "roles"))
+                {
+                    if (r.ValueKind != JsonValueKind.Object) continue;
+                    string who = Str(r, "id");
+                    var role = Localized(r, "role");
+                    if (who.Length > 0 && !role.IsEmpty) roles[who] = role;
                 }
                 teams.Add(new AiTeam
                 {

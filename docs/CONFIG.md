@@ -1,128 +1,166 @@
 # Kaption desktop configuration reference
 
-Kaption reads its settings from `%APPDATA%\Kaption\Config.json`. The file is created on first run and is safe to hand-edit when the app is closed. Every key has a default that matches the standard install, so the file usually only holds the keys you have changed.
+Kaption keeps its settings in `%APPDATA%\Kaption\Config.json`. The file is created on first run and is safe to edit while the app is closed. Every key has a default that matches a normal install, so the file usually holds only what you changed.
 
-You do not need this document to use Kaption. It exists so forks and self-hosted deployments can redirect the client to their own infrastructure, and so support can point users at specific knobs.
+You don't need this page to use Kaption. It is here for forks that point the app at their own servers, and so support can name a specific setting. Page names below are the app's Polish ones, with the English label in brackets the first time.
 
 ## Infrastructure overrides
 
-These four keys are the ones you want if you are running a private fork and need the client to stop talking to `api.kaption.one`.
+The keys a private fork needs to stop talking to `api.kaption.one`.
 
 | Key | Default | What it does |
 |---|---|---|
-| `ApiUrl` | `https://api.kaption.one` | Backend API host. Activation, licence heartbeat, translation-pack catalog, feedback, and referral endpoints all live here. |
-| `AppUrl` | `https://kaption.one` | Web frontend for account pages, activation flow, and "open dashboard in browser" links. |
-| `UpdateFeedUrl` | `https://files.kaption.one/releases/stable/` | Velopack update feed URL. The client polls `releases.stable.json` at this prefix. Point it at your own R2/S3/static host if you ship your own build. |
-| `SentryDsn` | *empty in public source; the released installer ships with a baked-in GlitchTip DSN* | Crash-reporting ingestion URL (Sentry SDK, pointed at a Sentry or GlitchTip instance). When empty (the public-source-build default) no network crash sends happen, only local `[CRASH-REPORT:*]` log lines. Set to your own DSN to point at your Sentry/GlitchTip instance. |
+| `ApiUrl` | `https://api.kaption.one` | Backend API host: activation, the hourly licence check, the subtitle pack catalog, feedback and referrals. |
+| `AppUrl` | `https://kaption.one` | Website for account pages, sign-in and "open in browser" links. |
+| `UpdateFeedUrl` | `https://files.kaption.one/releases/stable/` | Velopack update feed. The app polls `releases.stable.json` under this prefix. |
+| `SentryDsn` | empty in the public source | Crash-report endpoint (Sentry SDK, a Sentry or GlitchTip server). Empty means crashes are only written to the local log. The official installer carries its own value. |
 
-Change these when the app is closed, then relaunch. No migration is needed — the next boot picks them up.
+Change them while the app is closed; the next start picks them up.
 
 ## Crash reporting
 
-Opt-in, off by default. First-run EULA dialog asks once; the answer is stored so the dialog does not re-prompt on every update.
+Off by default. The setup window asks once; afterwards the switch is in Pomoc › Prywatność (Help › Privacy).
 
 | Key | Default | What it does |
 |---|---|---|
-| `CrashReportingEnabled` | `false` | Master switch. When `false` the crash hook still runs locally (writes `crash.log`) but never reaches the network. |
-| `CrashReportingPromptShown` | `false` | One-shot flag set to `true` after the opt-in dialog has been answered, so it cannot appear twice. |
-| `CrashReportingPromptShownAtUnix` | `0` | Unix-seconds timestamp of the opt-in decision, for audit correlation. |
-| `SentryEnvironment` | `"production"` | Release-channel tag attached to crash events. Override to `"beta"` / `"staging"` if you fork into a channel. |
+| `CrashReportingEnabled` | `false` | Master switch. When `false`, crashes still go to `app.log` but nothing is sent. |
+| `CrashReportingPromptShown` | `false` | Set once the question has been answered, so it never comes back. |
+| `CrashReportingPromptShownAtUnix` | `0` | When the answer was given, in Unix seconds. |
+| `SentryEnvironment` | `"production"` | Channel tag on crash events, for example `"beta"` in a fork. |
+
+## Auto-start (2.5)
+
+| Key | Default | What it does |
+|---|---|---|
+| `AutoStartTranslation` | `true` | Start translating by itself when the game is on screen, and stop when the game closes. The switch "Tłumacz sam, gdy gra jest na ekranie" ("Translate by itself when the game is on screen") is on Gra i napisy (Game and subtitles). The setup window and the "Nowość w 2.5" card on Start write the same key. |
+| `AutoStartRequireFocus` | `true` | Only start while the game window is active. Turn it off under Gra i napisy › Zaawansowane (Advanced) if you play in a window next to other apps. |
+
+Auto-start checks the same things as the Start button before it starts. If you stop translating yourself, it waits until you start again.
+
+## Look and navigation (2.5)
+
+| Key | Default | What it does |
+|---|---|---|
+| `Appearance.Theme` | `"Auto"` | `"Auto"` follows the Windows app theme, `"Dark"` and `"Light"` pin one. Set it under Wygląd napisów › Wygląd aplikacji (Subtitle style › Kaption's look). Windows high contrast always wins. |
+| `Ui.AdvancedMode` | `false` | Pomoc › Tryb zaawansowany (Help › Advanced mode): opens every Zaawansowane section and shows technical details on Start and in the status bar. |
+| `Ui.Intro25Seen` | `false` | Set when the "Nowość w 2.5" card on Start is dismissed with "Rozumiem" ("Got it"). New installs never see that card. |
+| `Ui.WhatsNewSeen` | none | The subtitle update whose "Co nowego" ("What's new") card was dismissed on Start. |
 
 ## OCR and translation
 
-The defaults here are tuned per game via `GameRegionProfile` and `GameOcrTuning`, so override them only if you have specific hardware quirks or custom text.
+The per-game defaults come from `GameRegionProfile`. Override them only for specific hardware or custom text.
 
 | Key | Default | What it does |
 |---|---|---|
-| `Game` | `"Genshin"` | Active game profile: `"Genshin"`, `"StarRail"` (Honkai: Star Rail), or `"ZZZ"` (Zenless Zone Zero). Also names the per-game data folder — `%APPDATA%\Kaption\ZZZ\` and so on — and the folder is created with the case you write here, so use the exact spelling. |
-| `Input` | `"EN"` | OCR source language. Only `EN` and `JP` have PaddleOCR recognizers shipped. |
-| `Output` | `"PL"` | Primary translation language displayed on the overlay. |
-| `Output2` | `""` | Secondary translation language for dual-display mode. Empty means off. |
-| `ShowSecondLang` | `false` | Render the secondary language alongside the primary. |
-| `OcrInterval` | `100` | OCR polling interval in milliseconds. Lower = faster reaction, higher CPU. Setting it here overrides the per-game profile, and the result is clamped to 50–1000. Profile values: Genshin 100 ms, HSR 60 ms, ZZZ 60 ms. |
-| `StabilityWindow` | `4` (or per-game) | Number of consecutive near-identical frames required before OCR triggers. Higher = fewer false triggers during typewriter text animation. Profile values: Genshin 5, HSR 2, ZZZ 2. |
+| `Game` | `"Genshin"` | Active game: `"Genshin"`, `"StarRail"` or `"ZZZ"`. Also names the per-game data folder (`%APPDATA%\Kaption\ZZZ\` and so on), created with exactly this spelling. |
+| `Input` | `"EN"` | Language the game text is read in. |
+| `Output` | `"PL"` | Language shown in the overlay. |
+| `Output2` | `""` | Second language for dual display. Empty means off. |
+| `ShowSecondLang` | `false` | Show the second language under the first. |
+| `OcrInterval` | per game | Milliseconds between reads, clamped to 50 to 1000. Genshin 100, Honkai: Star Rail 60, Zenless Zone Zero 60. |
+| `StabilityWindow` | per game | Frames that must match before a read counts. Genshin 5, Honkai: Star Rail 2, Zenless Zone Zero 2. |
+| `UseSymSpell` | `true` | Fast spelling-correction step in the matcher. |
+| `OcrWeightedDistance` | `true` | Cheaper edit distance for common misreads such as `l` and `1`. |
+| `OcrModelProfile` | `"ppocr-v6-small"` | Text recognition model: the recommended `"ppocr-v6-small"` or the older `"ppocr-v4-mobile"`. Pomoc › Zaawansowane › Model rozpoznawania tekstu (Text recognition model). |
+| `UseGpuOcr` | `true` | Read on the graphics card through DirectML, with an automatic fallback to the processor. The checkbox sits in the same card; ticking it also gives the graphics card a fresh try. |
+| `OcrGpuStrikes` | none | Written by Kaption: slow graphics-card starts counted in a row. Two in a row set the quarantine below. |
+| `OcrGpuStrikesVersion` | none | App version the strikes belong to. |
+| `OcrGpuQuarantine` | none | Written by Kaption: `true` means the graphics card was too slow or unstable here, so reading runs on the processor. Cleared by ticking the GPU checkbox, and ignored after an app update. |
+| `OcrGpuQuarantineVersion` | none | App version that set the quarantine; it applies only while this matches the running build. |
+| `OcrGpuQuarantineReason` | none | Why, in words, also written to `app.log`. |
+| `OcrGpuQuarantineUtc` | none | When the quarantine started, ISO 8601 in UTC. |
 
-| `UseSymSpell` | `true` | SymSpell fast-path for spelling-error correction. Off degrades to pure Levenshtein. |
-| `OcrWeightedDistance` | `true` | OCR-confusion-weighted edit distance (e.g. `l`↔`1` cost = 0.1). Off degrades to unweighted Levenshtein. |
-| `UseGpuOcr` | `true` | Route PaddleOCR through ONNX Runtime DirectML on the GPU. Falls back to CPU automatically if initialisation fails. Exposed as **Settings → General → Use GPU acceleration (DirectML)**. |
-| `OcrGpuQuarantine` | *(absent)* | Written by Kaption, not by you. `true` means DirectML was measured as unfit on this machine (warm-up over budget, or repeated live-frame stalls) and OCR loads on the CPU instead. Cleared by re-ticking the GPU checkbox, and ignored automatically after an app update. |
-| `OcrGpuQuarantineVersion` | *(absent)* | App version that recorded the quarantine. The quarantine only applies while this matches the running build, so every release gets one fresh GPU attempt. |
-| `OcrGpuQuarantineReason` | *(absent)* | Human-readable reason, mirrored into `app.log`. |
-| `OcrGpuQuarantineUtc` | *(absent)* | ISO-8601 UTC timestamp of the first engagement. |
+## Quick translate (Ctrl+Q)
 
-**ZZZ pacing is provisional.** `OcrInterval` 60 / `StabilityWindow` 2 for Zenless Zone Zero are HSR's numbers borrowed as a starting point, not measured against a live ZZZ session — the in-code marker sits at `GameRegionProfile.cs:298-304`. If ZZZ subtitles flicker or arrive mid-animation, these two keys are the first thing to try, and telling us what worked is genuinely useful.
+| Key | Default | What it does |
+|---|---|---|
+| `QuickTranslateCloseMode` | `"Auto"` | How the popup closes: `"Auto"` after a reading time based on the text, `"Timed"` after a fixed time, `"Manual"` only when you close it. |
+| `QuickTranslateSeconds` | `8` | Seconds for `"Timed"`, 2 to 120. |
+| `QuickTranslateFontSize` | `16` | Popup text size, 12 to 28. |
+| `QuickTranslateLastArea` | none | Written by Kaption: the last selected area, reused by Ctrl+Shift+Q. |
 
 ## Overlay and layout
 
+Wygląd napisów (Subtitle style) sets these with a true-scale preview. Its three styles write a set of values at once: Klasyczny (Classic) is size 22, panel 176 and outline 1; Kontrast (Contrast) is size 22, panel 230 and outline 2; Kino (Cinema) is size 26, panel 179, outline 1 and letter spacing 0.03, placed low and centred above the dialogue. Changing a value afterwards makes the style custom. The exact numbers sit under Wygląd napisów › Zaawansowane.
+
 | Key | Default | What it does |
 |---|---|---|
-| `Region` | `"763,1797,2226,110"` | Primary dialogue region in `x,y,width,height` screen pixels. Set via in-app region picker. |
-| `Region2` | `""` | Secondary region for dual-box layouts. Empty = single region. |
-| `AnswerRegion` | `""` | Answer/choice prompt region for quest-answer translation. Empty = feature off. |
-| `Size` | `22` | Subtitle font size in pixels. |
-| `FontFamily` | `"Segoe UI"` | Font typeface. Must be installed on the system. |
-| `SubtitleBgOpacity` | `176` | Overlay background opacity, 0–255. |
-| `MaxOverlayHeight` | `0` | Maximum overlay height in pixels. `0` = unconstrained. |
+| `Region` | `"763,1797,2226,110"` | Dialogue area as `x,y,width,height` in screen pixels. Set it with the area picker on Gra i napisy, or let the setup window find it. |
+| `Region2` | `""` | Second area for two-box layouts. Empty means one area. |
+| `AnswerRegion` | `""` | Area of the answer choices, for translating them. Empty means off. |
+| `Size` | `22` | Subtitle size, 10 to 36. |
+| `Overlay.Font` | `"Source Sans 3"` | Subtitle typeface. Source Sans 3 and Inter Tight come with the app; any installed font name works too. |
+| `FontFamily` | none | The font key of 2.4 and 2.5. Read only when `Overlay.Font` is missing, and `"Segoe UI"` there means the old default, so it becomes Source Sans 3. |
+| `Overlay.Outline` | `1.0` | Outline thickness around the letters, 0 to 4. |
+| `Overlay.LetterSpacing` | `0` | Extra letter spacing in em, -0.05 to 0.12. |
+| `Overlay.AutoDarken` | `true` | Darken the panel when the scene behind the subtitle is bright, like snow or sky. |
+| `Overlay.PadBeforeCinema` | none | Written by Kaption: your position before you picked Kino, put back when you leave it. |
+| `SubtitleBgOpacity` | `176` | Panel opacity, 0 to 255. |
+| `MaxOverlayHeight` | `0` | Maximum overlay height in pixels; `0` means no limit. |
 | `MaxOverlayWidth` | `900` | Maximum overlay width in pixels. |
-| `AutoShrinkText` | `true` | Reduce font size automatically if text would overflow the max bounds. |
-| `Pad` | per-game: `[-140, 0]` Genshin / HSR, `[-180, 0]` ZZZ | `[vertical, horizontal]` pixel offset applied when anchoring the overlay to the dialogue region. Negative vertical puts the overlay above the game text. The vertical default comes from the active game profile (`SubtitlePadVertical`), not from a fixed number — ZZZ needs the extra 40 px because its dialogue bodies run long enough to wrap to 4–5 lines at the default 900 px overlay width. |
-| `PlayerName` | `""` | Custom "Traveler" replacement inserted into dialogue templates. |
+| `AutoShrinkText` | `true` | Make the text smaller when a line would need more than two rows. |
+| `Pad` | per game | `[vertical, horizontal]` offset from the dialogue area. Negative vertical puts the overlay above the game text: -140 for Genshin and Honkai: Star Rail, -180 for Zenless Zone Zero, whose lines often wrap to four or five rows. |
+| `PlayerName` | `""` | Your name, used where the dialogue addresses the Traveler. |
 
 ## Overlay cards
 
 | Key | Default | What it does |
 |---|---|---|
-| `ShowQuestBanner` | `true` | Render the quest-title card above dialogue. |
-| `ShowNpcInfo` | `false` | Render an NPC info card. Off by default — marked low-value in user feedback. |
-| `EnableAnswerTranslation` | `false` | Turn on the Answer region translation overlay. Requires `AnswerRegion`. |
-| `PredictivePreDisplay` | `false` | Pre-render the next likely dialogue line before it is recognised. Off by default — gated for stability. |
+| `ShowQuestBanner` | `true` | Show the quest title above the dialogue. |
+| `ShowNpcInfo` | `false` | Show an info card for the speaking character. |
+| `EnableAnswerTranslation` | `false` | Translate the answer choices. Needs `AnswerRegion`. |
+| `PredictivePreDisplay` | `false` | Show the likely next line before it is read. Off while it is being tested. |
 
 ## Startup and application
 
 | Key | Default | What it does |
 |---|---|---|
-| `UILang` | OS locale (`en-US` fallback) | UI language. Only `en-US` and `pl-PL` are actively maintained; `zh-CN` and `ja-JP` exist as legacy-compatibility fallbacks. |
-| `AutoStart` | `false` | Launch Kaption with Windows. Sets a registry run-key entry. |
-| `SetupCompleted` | `false` → `true` | One-shot flag; `true` once the first-run wizard has been completed. |
-| `ReferralCodeAttributedOrSkipped` | `false` | One-shot flag so the referral-code prompt does not reappear. |
-| `UiRefreshInterval` | `200` | UI timer tick interval in milliseconds (separate from OCR interval). |
+| `UILang` | Windows display language | App language: `"pl-PL"` or `"en-US"`. Japanese and Chinese still load for old settings but are no longer offered. |
+| `AutoStart` | `false` | Start Kaption with Windows. Gra i napisy › Zaawansowane › Uruchamianie (Startup). |
+| `SetupCompleted` | `false` | Set when the setup window has been finished. |
+| `SetupDismissed` | `false` | Left by the setup wizard of 2.4 and earlier. Like `SetupCompleted`, it keeps the setup window from opening by itself. |
+| `FullscreenTipAcknowledged` | `false` | Set once the Genshin display-mode tip has been read, in the setup window or on Start. |
+| `ReferralCodeAttributedOrSkipped` | `false` | Keeps the referral-code question from coming back. |
+| `UiRefreshInterval` | `150` | Interface timer in milliseconds, separate from the reading interval. |
 
 ## Licence and update
 
 | Key | Default | What it does |
 |---|---|---|
-| `HeartbeatHours` | `1` | How often the licence service pings the backend to refresh the effective tier. |
-| `UpdateSkippedVersion` | `null` | Last version the user clicked "Skip" on. Used to avoid re-nagging within 24 hours. |
-| `UpdateSkippedAtUnix` | `0` | Unix-seconds timestamp of the last skip. |
+| `HeartbeatHours` | `1` | How often the app confirms the activation with the server. |
+| `UpdateSkippedVersion` | none | The last version you chose to skip, so the update banner waits 24 hours. |
+| `UpdateSkippedAtUnix` | `0` | When it was skipped, in Unix seconds. |
 
 ## Developer and testing flags
 
-Do not enable these in user-facing builds. On every boot when `DevSkipGameGate` is `true`, Kaption writes a prominent `Logger.Log.Warn` line so the flag cannot hide in a rebrand fork.
+Don't turn these on in builds for players. While `DevSkipGameGate` is `true`, every start writes a warning to the log so the flag cannot hide in a fork.
 
 | Key | Default | What it does |
 |---|---|---|
-| `Debug` | `false` | Enables additional in-app debug outputs and more verbose Logs-tab content. |
-| `LogLevel` | `null` | Root log4net level override. `DEBUG` / `INFO` / `WARN` / `ERROR` / `FATAL` / `OFF`. Unset means use the bundled `app.config` default. |
-| `DevSkipGameGate` | `false` | Skips the "target game must be running" gate on OCR-start paths. Testing only. Logs a warn on boot when `true`. |
-| `SubtitleDebugMode` | `false` | Stops the video-OCR pipeline after the first fast scan so timings can be measured. |
-| `SubtitleDetectionFps` | `5` | Frame sampling rate for the video-subtitle exporter. |
-| `SubtitleMinDurationMs` | `200` | Minimum subtitle duration for the exporter to emit a cue. |
+| `Debug` | `false` | Extra debug output in the app and the log. |
+| `LogLevel` | none | Log level override: `DEBUG`, `INFO`, `WARN`, `ERROR`, `FATAL` or `OFF`. |
+| `DevSkipGameGate` | `false` | Skip the "the game must be running" check when starting. Testing only. |
+| `SubtitleDebugMode` | `false` | Stop the video subtitle exporter after the first quick pass, to measure timings. |
+| `SubtitleDetectionFps` | `5` | Frames per second the video subtitle exporter samples. |
+| `SubtitleMinDurationMs` | `200` | Shortest subtitle the exporter writes, in milliseconds. |
 
-## Internal / legacy
+For tests there is also the `KAPTION_CONFIG_DIR` environment variable: it moves `Config.json` to another folder (see [CONTRIBUTING](../.github/CONTRIBUTING.md)).
 
-These are still read by code paths that are either internal bookkeeping or planned for removal.
+## Internal and legacy
+
+Still read by old code paths, or kept as bookkeeping.
 
 | Key | Default | Why it exists |
 |---|---|---|
-| `Token` | `"ENGI"` | Legacy translation-service token. Not part of the Kaption backend. |
-| `Server` | `"https://mp3.2langs.com/download"` | Legacy translation-service endpoint. Not part of the Kaption backend. |
-| `Distant` | `3` | Legacy UI spacing parameter. Pending cleanup. |
-| `Update` | *(unread)* | Deprecated pre-Velopack update manifest URL. Scheduled for removal. |
-| `ConfigMigrationVersion` | *tracked automatically* | Pointer updated by `ConfigMigrations.RunAll()`. Do not edit by hand. |
+| `Token` | `"ENGI"` | Token of an old translation service. Not part of the Kaption backend. |
+| `Server` | `"https://mp3.2langs.com/download"` | Endpoint of the same old service. Not part of the Kaption backend. |
+| `Distant` | `3` | Old spacing value, waiting for clean-up. |
+| `Update` | unread | Update address from before Velopack, to be removed. |
+| `ConfigMigrationVersion` | set by the app | Which settings migrations have run. Don't edit it by hand. |
 
 ## How to override a key
 
-Edit `%APPDATA%\Kaption\Config.json` while Kaption is closed:
+Close Kaption, edit `%APPDATA%\Kaption\Config.json`, then start it again:
 
 ```json
 {
@@ -133,8 +171,8 @@ Edit `%APPDATA%\Kaption\Config.json` while Kaption is closed:
 }
 ```
 
-Relaunch. The Logs tab in Settings shows the effective values on startup so you can confirm the override took effect.
+The log in Pomoc › Dziennik (Help › Log) shows the values in effect at start-up, so you can check that the change took.
 
-## What this document is not
+## What this page is not
 
-This is not an API reference for the backend. Forking the client is easy; running the backend is not — the desktop expects a `POST /api/app/file-protection-key` endpoint that issues a per-device 32-byte secret, plus the licensing and translation-pack endpoints documented in [SECURITY.md](../.github/SECURITY.md). If you need an end-to-end self-hosted setup, open an issue and we will help.
+It is not a backend API reference. Forking the app is easy, running the backend is not: the app expects a `POST /api/app/file-protection-key` endpoint that issues a per-device secret, plus the licensing and subtitle-pack endpoints described in [SECURITY.md](../.github/SECURITY.md). If you need a fully self-hosted setup, open an issue and we will help.

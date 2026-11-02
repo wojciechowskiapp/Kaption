@@ -47,6 +47,10 @@ namespace GI_Subtitles.Views
             if (QuickTranslateSecondsRow != null)
                 QuickTranslateSecondsRow.Visibility = mode == nameof(QuickTranslateCloseMode.Timed)
                     ? Visibility.Visible : Visibility.Collapsed;
+            // The little picture of the popup shows its countdown only when it closes by itself.
+            if (QuickTranslatePreviewTimer != null)
+                QuickTranslatePreviewTimer.Visibility = mode == nameof(QuickTranslateCloseMode.Manual)
+                    ? Visibility.Collapsed : Visibility.Visible;
             if (_quickTranslateCardLoading) return;
             Config.Set(QuickTranslateSettings.CloseModeKey, mode);
         }

@@ -30,24 +30,18 @@ namespace GI_Subtitles.Views
         // short messages with a progress bar.
         private const double CounterAmberRatio = 0.80;
 
-        private static readonly System.Windows.Media.SolidColorBrush CounterAmber =
-            new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0xB4, 0x53, 0x09));
-        private static readonly System.Windows.Media.SolidColorBrush CounterRed =
-            new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0xB9, 0x1C, 0x1C));
 
         private readonly KaptionApiClient _api;
         private bool _sending;
 
         /// <summary>Currently-selected category chip tag (Bug/Idea/Love/Other), or null.</summary>
         private string _category;
-        private System.Windows.Media.Brush _counterDefaultBrush;
 
         public SendFeedbackWindow()
         {
             InitializeComponent();
             _api = new KaptionApiClient();
 
-            _counterDefaultBrush = CharCount.Foreground;
 
             Loaded += (_, __) =>
             {
@@ -82,17 +76,20 @@ namespace GI_Subtitles.Views
             foreach (var chip in new[] { CatBug, CatIdea, CatLove, CatOther })
             {
                 bool selected = _category != null && (chip.Tag as string) == _category;
-                // Visual "selected" state: swap background + border to the
-                // primary accent. We use inline colours rather than a second
-                // style so this doesn't depend on theme resources.
-                chip.Background = selected
-                    ? (System.Windows.Media.Brush)Application.Current.TryFindResource("AccentBrush")
-                        ?? new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0x3B, 0x5B, 0xDB))
-                    : System.Windows.Media.Brushes.Transparent;
-                chip.Foreground = selected
-                    ? System.Windows.Media.Brushes.White
-                    : (System.Windows.Media.Brush)Application.Current.TryFindResource("TextBrush")
-                        ?? System.Windows.Media.Brushes.Black;
+                // Selected chip: the accent fill; resource references so a theme switch carries through.
+                if (selected)
+                {
+                    chip.SetResourceReference(BackgroundProperty, "AccentFillBrush");
+                    chip.SetResourceReference(BorderBrushProperty, "AccentFillBrush");
+                    chip.SetResourceReference(ForegroundProperty, "TextOnAccentBrush");
+                }
+                else
+                {
+                    chip.SetResourceReference(BackgroundProperty, "SurfaceBrush");
+                    chip.SetResourceReference(BorderBrushProperty, "BorderBrush");
+                    chip.SetResourceReference(ForegroundProperty, "TextBrush");
+                }
+                System.Windows.Automation.AutomationProperties.SetItemStatus(chip, selected ? "selected" : string.Empty);
             }
         }
 
@@ -116,11 +113,11 @@ namespace GI_Subtitles.Views
             // Counter turns amber near the limit and red when full — soft
             // signal so users don't hit the hard MaxLength ceiling confused.
             if (length >= MaxChars)
-                CharCount.Foreground = CounterRed;
+                CharCount.SetResourceReference(System.Windows.Controls.TextBlock.ForegroundProperty, "ErrorBrush");
             else if (length >= MaxChars * CounterAmberRatio)
-                CharCount.Foreground = CounterAmber;
+                CharCount.SetResourceReference(System.Windows.Controls.TextBlock.ForegroundProperty, "WarnBrush");
             else
-                CharCount.Foreground = _counterDefaultBrush;
+                CharCount.SetResourceReference(System.Windows.Controls.TextBlock.ForegroundProperty, "TextTertiaryBrush");
 
             // Trimmed length is the real gate — a textarea full of whitespace
             // should not enable Send.

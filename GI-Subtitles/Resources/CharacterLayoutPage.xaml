@@ -1,0 +1,12 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System;assembly=mscorlib">
+    <!-- CharacterOverviewView layout in the Characters page (light or dark palette alike). -->
+    <sys:Double x:Key="Char_HeroHeight">200</sys:Double>
+    <Thickness x:Key="Char_Gutter">24,0,24,0</Thickness>
+    <Thickness x:Key="Char_ContentPadding">24,0,24,28</Thickness>
+    <sys:Double x:Key="Char_ReadingWidth">540</sys:Double>
+    <sys:Double x:Key="Char_ContentMaxWidth">880</sys:Double>
+    <sys:Double x:Key="Char_ArtWidth">420</sys:Double>
+    <sys:Boolean x:Key="Char_Focusable">True</sys:Boolean>
+</ResourceDictionary>

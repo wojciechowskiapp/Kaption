@@ -216,7 +216,7 @@ namespace GI_Subtitles.Services.Translation
             }
 
             var manifest = LoadManifest();
-            string key = $"gamedata/{game.ToLowerInvariant()}";
+            string key = ManifestKey(game);
             // Same "compare by sha256, not by UUID" pattern as
             // DictionarySyncService — publish-gamedata.sh UPSERTs the
             // gamedata_versions row on conflict (keeps id stable), so
@@ -708,15 +708,55 @@ namespace GI_Subtitles.Services.Translation
                 && _protector.FileExists(GameDataPaths.QuestInfoJson(game));
         }
 
-        private static Dictionary<string, GamedataManifestEntry> LoadManifest()
+        /// <summary>
+        /// Forget the installed bundle for <paramref name="game"/>, so the next <see cref="SyncAsync"/>
+        /// downloads it even when the published sha is unchanged. True when a row was dropped.
+        /// </summary>
+        public static bool ForgetInstalled(string game) => ForgetInstalled(game, ManifestPath);
+
+        internal static bool ForgetInstalled(string game, string manifestPath)
+        {
+            if (string.IsNullOrWhiteSpace(game))
+                return false;
+
+            lock (_manifestLock)
+            {
+                var manifest = LoadManifest(manifestPath);
+                if (!manifest.Remove(ManifestKey(game)))
+                    return false;
+                SaveManifest(manifest, manifestPath);
+            }
+            Logger.Log.Info($"GamedataSync: forgot the installed {game} bundle; the next sync downloads it again.");
+            return true;
+        }
+
+        /// <summary>
+        /// The machine-bound files a bundle install writes for <paramref name="game"/>: the five
+        /// dialogue sections and the BundleMeta sidecar. Not TextMapEN.json (plaintext) or Characters.
+        /// </summary>
+        public static IReadOnlyList<string> MachineBoundDialogueFiles(string game) => new[]
+        {
+            GameDataPaths.DialogGraphJson(game),
+            GameDataPaths.HashToDialogsJson(game),
+            GameDataPaths.NpcNamesJson(game),
+            GameDataPaths.TalkIndexJson(game),
+            GameDataPaths.QuestInfoJson(game),
+            GameDataPaths.BundleMetaJson(game),
+        };
+
+        private static string ManifestKey(string game) => $"gamedata/{game.ToLowerInvariant()}";
+
+        private static Dictionary<string, GamedataManifestEntry> LoadManifest() => LoadManifest(ManifestPath);
+
+        private static Dictionary<string, GamedataManifestEntry> LoadManifest(string manifestPath)
         {
             lock (_manifestLock)
             {
-                if (!File.Exists(ManifestPath))
+                if (!File.Exists(manifestPath))
                     return new Dictionary<string, GamedataManifestEntry>(StringComparer.OrdinalIgnoreCase);
                 try
                 {
-                    string json = File.ReadAllText(ManifestPath);
+                    string json = File.ReadAllText(manifestPath);
                     var loaded = JsonSerializer.Deserialize<Dictionary<string, GamedataManifestEntry>>(json, JsonDefaults.Options);
                     return loaded ?? new Dictionary<string, GamedataManifestEntry>(StringComparer.OrdinalIgnoreCase);
                 }
@@ -729,16 +769,19 @@ namespace GI_Subtitles.Services.Translation
         }
 
         private static void SaveManifest(Dictionary<string, GamedataManifestEntry> manifest)
+            => SaveManifest(manifest, ManifestPath);
+
+        private static void SaveManifest(Dictionary<string, GamedataManifestEntry> manifest, string manifestPath)
         {
             lock (_manifestLock)
             {
                 try
                 {
-                    GameDataPaths.EnsureRoot();
-                    string tmp = ManifestPath + ".tmp";
+                    Directory.CreateDirectory(Path.GetDirectoryName(manifestPath));
+                    string tmp = manifestPath + ".tmp";
                     File.WriteAllText(tmp, JsonSerializer.Serialize(manifest, JsonDefaults.Indented));
-                    if (File.Exists(ManifestPath)) File.Delete(ManifestPath);
-                    File.Move(tmp, ManifestPath);
+                    if (File.Exists(manifestPath)) File.Delete(manifestPath);
+                    File.Move(tmp, manifestPath);
                 }
                 catch (Exception ex)
                 {

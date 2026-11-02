@@ -35,6 +35,18 @@
         <Setter Property="SnapsToDevicePixels" Value="True"/>
     </Style>
 
+    <!-- A stat in a ranked line (substats): one line, two when the translation says something; never a fixed width. -->
+    <Style x:Key="KStatChip" TargetType="Border">
+        <Setter Property="MinHeight" Value="32"/>
+        <Setter Property="CornerRadius" Value="8"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource Char_Ring}"/>
+        <Setter Property="Background" Value="{DynamicResource Char_ChipBg}"/>
+        <Setter Property="Padding" Value="12,5,12,5"/>
+        <Setter Property="Margin" Value="0,0,8,0"/>
+        <Setter Property="SnapsToDevicePixels" Value="True"/>
+    </Style>
+
     <!-- The same chip when it opens something (set bonuses). -->
     <Style x:Key="KChipToggle" TargetType="ToggleButton">
         <Setter Property="Focusable" Value="{DynamicResource Char_Focusable}"/>
@@ -99,9 +111,96 @@
             </Setter.Value>
         </Setter>
     </Style>
-    <Style x:Key="KPrimaryLinkButton" TargetType="Button" BasedOn="{StaticResource KLinkButton}">
-        <Setter Property="Foreground" Value="{DynamicResource Char_Brand}"/>
-        <Setter Property="BorderBrush" Value="{DynamicResource Char_Brand}"/>
+
+    <!-- The page's one filled action, the character on kaption.one: the shell's accent fill and text-on-accent
+         (white on indigo, AA in both palettes and on the dark popup), with the Kaption mark in white. -->
+    <Style x:Key="KBrandButton" TargetType="Button">
+        <Setter Property="Focusable" Value="{DynamicResource Char_Focusable}"/>
+        <Setter Property="FocusVisualStyle" Value="{DynamicResource FocusRing}"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Height" Value="{DynamicResource ControlHeight}"/>
+        <Setter Property="Padding" Value="12,0,14,0"/>
+        <Setter Property="FontSize" Value="13.5"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextOnAccentBrush}"/>
+        <Setter Property="Background" Value="{DynamicResource AccentFillBrush}"/>
+        <Setter Property="UseLayoutRounding" Value="True"/>
+        <Setter Property="SnapsToDevicePixels" Value="True"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="Bd" Background="{TemplateBinding Background}" CornerRadius="8" Padding="{TemplateBinding Padding}">
+                        <ContentPresenter VerticalAlignment="Center"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource AccentFillHoverBrush}"/>
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource AccentFillPressedBrush}"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- The Kaption mark drawn for a filled accent: a white tile outline, the K and the subtitle lines. -->
+    <DrawingImage x:Key="KaptionMarkOnFill">
+        <DrawingImage.Drawing>
+            <DrawingGroup>
+                <GeometryDrawing>
+                    <GeometryDrawing.Brush>
+                        <SolidColorBrush Color="White" Opacity="0.18"/>
+                    </GeometryDrawing.Brush>
+                    <GeometryDrawing.Geometry>
+                        <RectangleGeometry Rect="0,0,32,32" RadiusX="7" RadiusY="7"/>
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+                <GeometryDrawing Brush="White" Geometry="M9,7 H12 V14.2 L17.6,7 H21.2 L15.4,15 L21.8,25 H18 L13.2,17.4 L11,20 V25 H8 V7 Z"/>
+                <GeometryDrawing>
+                    <GeometryDrawing.Brush>
+                        <SolidColorBrush Color="White" Opacity="0.6"/>
+                    </GeometryDrawing.Brush>
+                    <GeometryDrawing.Geometry>
+                        <RectangleGeometry Rect="9,27.2,6,1.4" RadiusX="0.7" RadiusY="0.7"/>
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+                <GeometryDrawing>
+                    <GeometryDrawing.Brush>
+                        <SolidColorBrush Color="White" Opacity="0.4"/>
+                    </GeometryDrawing.Brush>
+                    <GeometryDrawing.Geometry>
+                        <RectangleGeometry Rect="16.5,27.2,6.5,1.4" RadiusX="0.7" RadiusY="0.7"/>
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+            </DrawingGroup>
+        </DrawingImage.Drawing>
+    </DrawingImage>
+
+    <!-- A quiet text link (the second way to the same page, at the end of the article). -->
+    <Style x:Key="KMutedLink" TargetType="Button">
+        <Setter Property="Focusable" Value="{DynamicResource Char_Focusable}"/>
+        <Setter Property="FocusVisualStyle" Value="{DynamicResource FocusRing}"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="FontSize" Value="13"/>
+        <Setter Property="Foreground" Value="{DynamicResource Char_FgMuted}"/>
+        <Setter Property="Padding" Value="0,4,0,4"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border Background="Transparent" Padding="{TemplateBinding Padding}">
+                        <ContentPresenter x:Name="Content" VerticalAlignment="Center"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter Property="Foreground" Value="{DynamicResource Char_Fg}"/>
+                            <Setter TargetName="Content" Property="TextBlock.TextDecorations" Value="Underline"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
     </Style>
 
     <!-- Section tab: text with an underline in the character's element colour (the view's ElementFill). -->
@@ -127,6 +226,39 @@
                             <Setter Property="Foreground" Value="{DynamicResource Char_Fg}"/>
                             <Setter TargetName="Underline" Property="Background"
                                     Value="{Binding DataContext.ElementFill, RelativeSource={RelativeSource AncestorType=UserControl}}"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- A small square button at the end of a row that scrolls (the section tabs); a mouse helper, so not a tab stop. -->
+    <Style x:Key="KScrollChevron" TargetType="Button">
+        <Setter Property="Focusable" Value="False"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Width" Value="28"/>
+        <Setter Property="Height" Value="28"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+        <Setter Property="Foreground" Value="{DynamicResource Char_FgMuted}"/>
+        <Setter Property="Background" Value="{DynamicResource Char_Surface}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource Char_Ring}"/>
+        <Setter Property="UseLayoutRounding" Value="True"/>
+        <Setter Property="SnapsToDevicePixels" Value="True"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="Bd" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="1" CornerRadius="8">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource Char_Hover}"/>
+                            <Setter Property="Foreground" Value="{DynamicResource Char_Fg}"/>
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource Char_Selected}"/>
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>

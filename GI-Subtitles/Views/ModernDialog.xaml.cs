@@ -289,52 +289,49 @@ namespace GI_Subtitles.Views
         /// </summary>
         private static void ApplySeverity(ModernDialog dlg, DialogSeverity severity)
         {
-            Color accent;
-            Color bubbleBg;
+            string accent, bubbleBg;
             string pathData;
 
             switch (severity)
             {
                 case DialogSeverity.Success:
-                    accent   = ColorFromHex("#059669");                  // emerald
-                    bubbleBg = ColorFromHex("#D1FAE5");
+                    accent   = "SuccessBrush";
+                    bubbleBg = "SuccessLightBrush";
                     // Checkmark inside a circle.
                     pathData = "M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm-1.2 14.2L6.6 12l1.4-1.4 2.8 2.8 5.2-5.2 1.4 1.4-6.6 6.6z";
                     break;
                 case DialogSeverity.Warn:
-                    accent   = ColorFromHex("#D97706");                  // amber
-                    bubbleBg = ColorFromHex("#FEF3C7");
+                    accent   = "WarnBrush";
+                    bubbleBg = "WarnLightBrush";
                     // Triangle with exclamation point.
                     pathData = "M12 2L1 21h22L12 2zm1 14h-2v-2h2v2zm0-4h-2V8h2v4z";
                     break;
                 case DialogSeverity.Error:
-                    accent   = ColorFromHex("#DC2626");                  // red
-                    bubbleBg = ColorFromHex("#FEE2E2");
+                    accent   = "ErrorBrush";
+                    bubbleBg = "ErrorLightBrush";
                     // Circle with a cross.
                     pathData = "M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm4.24 13.41l-1.41 1.41L12 13.41l-2.83 2.83-1.41-1.41L10.59 12 7.76 9.17l1.41-1.41L12 10.59l2.83-2.83 1.41 1.41L13.41 12l2.83 2.83z";
                     break;
                 case DialogSeverity.Question:
-                    accent   = ColorFromHex("#2563EB");                  // blue
-                    bubbleBg = ColorFromHex("#DBEAFE");
+                    accent   = "InfoBrush";
+                    bubbleBg = "InfoLightBrush";
                     // Speech bubble with '?' inside — for consent / confirm prompts.
                     pathData = "M20 2H4a2 2 0 0 0-2 2v18l4-4h14a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2zm-7 14h-2v-2h2v2zm2.07-7.75l-.9.92C13.45 9.9 13 10.5 13 12h-2v-.5c0-1.1.45-2.1 1.17-2.83l1.24-1.26c.37-.36.59-.86.59-1.41 0-1.1-.9-2-2-2s-2 .9-2 2H8c0-2.21 1.79-4 4-4s4 1.79 4 4c0 .88-.36 1.68-.93 2.25z";
                     break;
                 default: // Info
-                    accent   = ColorFromHex("#2563EB");                  // blue
-                    bubbleBg = ColorFromHex("#DBEAFE");
+                    accent   = "InfoBrush";
+                    bubbleBg = "InfoLightBrush";
                     // Lowercase 'i' inside a circle.
                     pathData = "M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z";
                     break;
             }
 
-            dlg.AccentStrip.Background = new SolidColorBrush(accent);
-            dlg.IconBubble.Background  = new SolidColorBrush(bubbleBg);
-            dlg.IconPath.Fill          = new SolidColorBrush(accent);
+            // Palette keys, so an open dialog follows a theme switch too.
+            dlg.AccentStrip.SetResourceReference(System.Windows.Controls.Border.BackgroundProperty, accent);
+            dlg.IconBubble.SetResourceReference(System.Windows.Controls.Border.BackgroundProperty, bubbleBg);
+            dlg.IconPath.SetResourceReference(System.Windows.Shapes.Shape.FillProperty, accent);
             dlg.IconPath.Data          = Geometry.Parse(pathData);
         }
-
-        private static Color ColorFromHex(string hex)
-            => (Color)ColorConverter.ConvertFromString(hex);
 
         // ────────────────────────────────────────────────────────────────────
         //  Event handlers

@@ -59,26 +59,33 @@ namespace GI_Subtitles.Services.Rendering
             double minFontSize = p.MinFontSize > 0 ? p.MinFontSize : 12;
             bool textClipped = false;
 
-            var textSize = MeasureFullContent(p.Text, p.Header, fontSize, maxTextWidth, p.StrokeThickness, p.PixelsPerDip);
-            double contentHeight = textSize.Height + PaddingVertical + WindowMargin;
+            var first = Measure(p, fontSize, maxTextWidth);
+            double contentHeight = first.Height;
+            int maxLines = p.PreferredMaxLines;
+            bool TooLong(int lines) => maxLines > 0 && lines > maxLines;
 
-            if (contentHeight > maxHeight && p.AutoShrinkText)
+            if ((contentHeight > maxHeight || TooLong(first.Lines)) && p.AutoShrinkText)
             {
-                // Try reducing font size in 1px steps until it fits or we hit minimum
-                double tryFontSize = fontSize - 1;
-                while (tryFontSize >= minFontSize && contentHeight > maxHeight)
+                // Smaller in 1px steps: the largest size that fits the height and the preferred line count wins. The
+                // line count may cost at most a fifth of the size (three lines at 22 read better than two at 14); past
+                // that only the height counts, and text is never cut short to save a line.
+                double linesFloor = Math.Max(minFontSize, Math.Floor(fontSize * 0.8));
+                double? best = null, heightOnly = null;
+                double bestHeight = 0, heightOnlyHeight = 0;
+                if (first.Height <= maxHeight) { heightOnly = fontSize; heightOnlyHeight = first.Height; }
+                for (double tryFontSize = fontSize - 1; tryFontSize >= minFontSize; tryFontSize -= 1)
                 {
-                    textSize = MeasureFullContent(p.Text, p.Header, tryFontSize, maxTextWidth, p.StrokeThickness, p.PixelsPerDip);
-                    contentHeight = textSize.Height + PaddingVertical + WindowMargin;
-                    if (contentHeight <= maxHeight)
-                    {
-                        fontSize = tryFontSize;
-                        break;
-                    }
-                    tryFontSize -= 1;
+                    if (heightOnly.HasValue && tryFontSize < linesFloor) break;
+                    var m = Measure(p, tryFontSize, maxTextWidth);
+                    if (m.Height > maxHeight) continue;
+                    if (!heightOnly.HasValue) { heightOnly = tryFontSize; heightOnlyHeight = m.Height; }
+                    if (tryFontSize >= linesFloor && !TooLong(m.Lines)) { best = tryFontSize; bestHeight = m.Height; break; }
+                    if (!TooLong(first.Lines)) break; // only the height was the problem, and it is solved
                 }
 
-                if (contentHeight > maxHeight)
+                if (best.HasValue) { fontSize = best.Value; contentHeight = bestHeight; }
+                else if (heightOnly.HasValue) { fontSize = heightOnly.Value; contentHeight = heightOnlyHeight; }
+                else
                 {
                     fontSize = minFontSize;
                     textClipped = true;
@@ -123,6 +130,18 @@ namespace GI_Subtitles.Services.Rendering
                 TextClipped = textClipped,
                 EffectiveMaxTextWidth = maxTextWidth
             };
+        }
+
+        /// <summary>Panel height (with the window margin) and line count at <paramref name="fontSize"/>.</summary>
+        private (double Height, int Lines) Measure(SubtitleLayoutParams p, double fontSize, double maxTextWidth)
+        {
+            if (p.MeasureContent != null)
+            {
+                var m = p.MeasureContent(fontSize, maxTextWidth);
+                return (m.Size.Height + WindowMargin, m.Lines);
+            }
+            var textSize = MeasureFullContent(p.Text, p.Header, fontSize, maxTextWidth, p.StrokeThickness, p.PixelsPerDip);
+            return (textSize.Height + PaddingVertical + WindowMargin, 0);
         }
 
         private Size MeasureFullContent(string text, string header, double fontSize, double maxWidth, double strokeThickness, double pixelsPerDip)

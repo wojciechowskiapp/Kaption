@@ -136,6 +136,7 @@ namespace GI_Test
             public string LastPreloadedNpc;
             public readonly List<string> Confirmed = new List<string>();
             public bool IsLoaded => true;
+            public DialoguePrepareFailure LastPrepareFailure => DialoguePrepareFailure.None;
             public int HotCacheHits => 0;
             public int HotCacheMisses => 0;
             public bool HasSingleChainPrediction => false;

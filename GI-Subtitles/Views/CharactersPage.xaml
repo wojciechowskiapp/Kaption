@@ -2,14 +2,17 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:local="clr-namespace:GI_Subtitles.Views"
+             xmlns:shell="clr-namespace:GI_Subtitles.Views.Shell"
              IsVisibleChanged="Page_IsVisibleChanged" PreviewKeyDown="Page_PreviewKeyDown">
     <!-- The Characters tab: a searchable, filterable list of the current game's characters next to the
          selected character's page. Loading, empty and error states are part of the page. -->
+    <!-- Control styles (ModernTextBox, buttons, text styles) come from the host, which merges ModernStyles.xaml, so
+         they are DynamicResource here; the colours follow the app palette (see SyncPaletteWithApp). -->
     <UserControl.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
-                <ResourceDictionary Source="../Resources/ModernStyles.xaml"/>
                 <ResourceDictionary Source="../Resources/CharacterPaletteLight.xaml"/>
+                <ResourceDictionary Source="../Resources/CharacterLayoutPage.xaml"/>
             </ResourceDictionary.MergedDictionaries>
             <local:IconImageConverter x:Key="CharIconImage"/>
             <local:MissingIconConverter x:Key="CharMissingIcon"/>
@@ -34,7 +37,7 @@
                             </Grid>
                             <ControlTemplate.Triggers>
                                 <Trigger Property="IsMouseOver" Value="True">
-                                    <Setter TargetName="Bd" Property="Background" Value="{StaticResource SurfaceSunkenBrush}"/>
+                                    <Setter TargetName="Bd" Property="Background" Value="{DynamicResource Char_Hover}"/>
                                 </Trigger>
                                 <Trigger Property="IsSelected" Value="True">
                                     <Setter TargetName="Bd" Property="Background" Value="{Binding ElementWash}"/>
@@ -62,10 +65,10 @@
                             </Border>
                             <ControlTemplate.Triggers>
                                 <Trigger Property="IsMouseOver" Value="True">
-                                    <Setter TargetName="Ring" Property="BorderBrush" Value="{StaticResource BorderBrush}"/>
+                                    <Setter TargetName="Ring" Property="BorderBrush" Value="{DynamicResource Char_RingStrong}"/>
                                 </Trigger>
                                 <Trigger Property="IsSelected" Value="True">
-                                    <Setter TargetName="Ring" Property="BorderBrush" Value="{StaticResource TextBrush}"/>
+                                    <Setter TargetName="Ring" Property="BorderBrush" Value="{DynamicResource Char_Fg}"/>
                                 </Trigger>
                             </ControlTemplate.Triggers>
                         </ControlTemplate>
@@ -74,7 +77,7 @@
             </Style>
 
             <Style x:Key="CharRarity" TargetType="TextBlock">
-                <Setter Property="Foreground" Value="{StaticResource TextTertiaryBrush}"/>
+                <Setter Property="Foreground" Value="{DynamicResource Char_FgSubtle}"/>
                 <Style.Triggers>
                     <DataTrigger Binding="{Binding RarityTier}" Value="top">
                         <Setter Property="Foreground" Value="{DynamicResource Char_Rarity5}"/>
@@ -125,30 +128,30 @@
             <!-- ── List column ── -->
             <DockPanel Margin="0,0,16,0">
                 <Grid DockPanel.Dock="Top" Margin="0,0,0,10">
-                    <TextBox x:Name="SearchBox" Style="{StaticResource ModernTextBox}" Padding="30,5,30,5"
+                    <TextBox x:Name="SearchBox" Style="{DynamicResource ModernTextBox}" Padding="30,5,30,5"
                              TextChanged="SearchBox_TextChanged" PreviewKeyDown="SearchBox_PreviewKeyDown"
                              AutomationProperties.Name="{DynamicResource Char_Search_Label}"/>
                     <Path Data="{StaticResource IconSearch}" Width="16" Height="16" Stretch="None" Margin="10,0,0,0"
                           HorizontalAlignment="Left" VerticalAlignment="Center" IsHitTestVisible="False"
-                          Stroke="{StaticResource TextTertiaryBrush}" StrokeThickness="1.5"
+                          Stroke="{DynamicResource Char_FgSubtle}" StrokeThickness="1.6"
                           StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
                     <TextBlock x:Name="SearchPlaceholder" Text="{DynamicResource Char_Search_Label}" FontSize="13" Margin="31,0,0,0"
-                               Foreground="{StaticResource TextTertiaryBrush}" VerticalAlignment="Center" IsHitTestVisible="False"/>
-                    <Button x:Name="SearchClear" Style="{StaticResource IconButton}" Width="26" Height="26" Margin="0,0,4,0"
+                               Foreground="{DynamicResource Char_FgSubtle}" VerticalAlignment="Center" IsHitTestVisible="False"/>
+                    <Button x:Name="SearchClear" Style="{DynamicResource IconButton}" Width="26" Height="26" Margin="0,0,4,0"
                             HorizontalAlignment="Right" Visibility="Collapsed" Click="SearchClear_Click"
                             ToolTip="{DynamicResource Char_Search_Clear}" AutomationProperties.Name="{DynamicResource Char_Search_Clear}">
                         <Path Data="{StaticResource IconClose}" Width="16" Height="16" Stretch="None"
-                              Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.5"
+                              Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.6"
                               StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
                     </Button>
                 </Grid>
 
                 <DockPanel DockPanel.Dock="Top" Margin="-2,0,0,6">
-                    <Button x:Name="FilterClear" DockPanel.Dock="Right" Visibility="Collapsed" Style="{StaticResource IconButton}"
+                    <Button x:Name="FilterClear" DockPanel.Dock="Right" Visibility="Collapsed" Style="{DynamicResource IconButton}"
                             Width="26" Height="26" VerticalAlignment="Top" Click="FilterClear_Click"
                             ToolTip="{DynamicResource Char_Filter_Clear}" AutomationProperties.Name="{DynamicResource Char_Filter_Clear}">
                         <Path Data="{StaticResource IconClose}" Width="16" Height="16" Stretch="None"
-                              Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.5"
+                              Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.6"
                               StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
                     </Button>
                     <ListBox x:Name="ElementFilter" BorderThickness="0" Background="Transparent"
@@ -171,8 +174,8 @@
                     </ListBox>
                 </DockPanel>
 
-                <TextBlock x:Name="CountText" DockPanel.Dock="Top" Style="{StaticResource CaptionText}" Margin="2,0,0,6"/>
-                <TextBlock DockPanel.Dock="Bottom" Text="{DynamicResource Char_Page_Hint}" Style="{StaticResource CaptionText}"
+                <TextBlock x:Name="CountText" DockPanel.Dock="Top" Style="{DynamicResource CaptionText}" Margin="2,0,0,6"/>
+                <TextBlock DockPanel.Dock="Bottom" Text="{DynamicResource Char_Page_Hint}" Style="{DynamicResource CaptionText}"
                            Margin="2,10,0,0"/>
 
                 <Grid>
@@ -208,9 +211,9 @@
                                         </Grid>
                                     </Grid>
                                     <StackPanel Grid.Column="1" Margin="10,0,6,0" VerticalAlignment="Center">
-                                        <TextBlock Text="{Binding Name}" FontSize="13" FontWeight="Medium" Foreground="{StaticResource TextBrush}"
+                                        <TextBlock Text="{Binding Name}" FontSize="13" FontWeight="Medium" Foreground="{DynamicResource Char_Fg}"
                                                    TextTrimming="CharacterEllipsis"/>
-                                        <TextBlock Text="{Binding Gloss}" FontSize="11" Foreground="{StaticResource TextTertiaryBrush}"
+                                        <TextBlock Text="{Binding Gloss}" FontSize="11" Foreground="{DynamicResource Char_FgSubtle}"
                                                    TextTrimming="CharacterEllipsis"
                                                    Visibility="{Binding Gloss, Converter={StaticResource CharEmptyCollapsed}}"/>
                                     </StackPanel>
@@ -221,13 +224,10 @@
                         </ListBox.ItemTemplate>
                     </ListBox>
 
-                    <!-- Nothing matches the search or the filter. -->
-                    <StackPanel x:Name="NoResults" Visibility="Collapsed" Margin="8,16,8,0">
-                        <TextBlock Text="{DynamicResource Char_NoResults_Title}" Style="{StaticResource CardTitle}"/>
-                        <TextBlock Text="{DynamicResource Char_NoResults_Body}" Style="{StaticResource HintText}"/>
-                        <Button Style="{StaticResource SecondaryButton}" Content="{DynamicResource Char_Search_Clear}"
-                                HorizontalAlignment="Left" Margin="0,12,0,0" Click="ClearAll_Click"/>
-                    </StackPanel>
+                    <!-- Nothing matches the search or the filter: one sentence, one action (the shared state component). -->
+                    <shell:StateMessage x:Name="NoResults" Visibility="Collapsed" Margin="8,24,8,0" VerticalAlignment="Top"
+                                        Icon="{StaticResource IconSearch}" Text="{DynamicResource state_Char_NoResults}"
+                                        ActionText="{DynamicResource Char_Search_Clear}" ActionClick="ClearAll_Click"/>
 
                     <ItemsControl x:Name="ListSkeleton" Visibility="Collapsed" IsHitTestVisible="False" Focusable="False"
                                   ItemTemplate="{StaticResource SkeletonRow}"/>
@@ -235,7 +235,7 @@
             </DockPanel>
 
             <!-- ── Detail ── -->
-            <Border Grid.Column="1" Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource CardBorderBrush}"
+            <Border Grid.Column="1" Background="{DynamicResource Char_Surface}" BorderBrush="{DynamicResource Char_Ring}"
                     BorderThickness="1" CornerRadius="10" SnapsToDevicePixels="True">
                 <Grid local:RoundedClip.Radius="9">
                     <!-- The character page scrolls itself (its section tabs stay pinned). -->
@@ -259,45 +259,17 @@
                             <Border Style="{StaticResource Skeleton}" Height="40" Margin="0,14,0,0" CornerRadius="10"/>
                             <Border Style="{StaticResource Skeleton}" Height="40" Margin="0,10,0,0" CornerRadius="10"/>
                         </StackPanel>
-                        <TextBlock Text="{DynamicResource Char_Loading}" Style="{StaticResource CaptionText}" Margin="24,18,0,0"/>
+                        <TextBlock Text="{DynamicResource Char_Loading}" Style="{DynamicResource CaptionText}" Margin="24,18,0,0"/>
                     </StackPanel>
                 </Grid>
             </Border>
         </Grid>
 
-        <!-- ── Whole-page states ── -->
-        <StackPanel x:Name="EmptyState" Visibility="Collapsed" VerticalAlignment="Center" HorizontalAlignment="Center" MaxWidth="420">
-            <Grid Width="56" Height="56" HorizontalAlignment="Center">
-                <Ellipse Fill="{StaticResource AccentLightBrush}"/>
-                <Path Data="{StaticResource IconPeople}" Width="16" Height="16" Stretch="None" RenderTransformOrigin="0.5,0.5"
-                      Stroke="{StaticResource AccentBrush}" StrokeThickness="1.4" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
-                      StrokeLineJoin="Round">
-                    <Path.RenderTransform>
-                        <ScaleTransform ScaleX="1.6" ScaleY="1.6"/>
-                    </Path.RenderTransform>
-                </Path>
-            </Grid>
-            <TextBlock Text="{DynamicResource Char_Empty_Title}" Style="{StaticResource SectionTitle}" HorizontalAlignment="Center"
-                       Margin="0,14,0,0"/>
-            <TextBlock Text="{DynamicResource Char_Empty_Body}" Style="{StaticResource HintText}" TextAlignment="Center" Margin="0,6,0,0"/>
-        </StackPanel>
+        <!-- ── Whole-page states: the shared state component, one sentence and one action each ── -->
+        <shell:StateMessage x:Name="EmptyState" Visibility="Collapsed" Icon="{StaticResource IconPeople}"
+                            Text="{DynamicResource state_Char_Empty}" ActionText="{DynamicResource state_CheckAgain}" ActionClick="Retry_Click"/>
 
-        <StackPanel x:Name="ErrorState" Visibility="Collapsed" VerticalAlignment="Center" HorizontalAlignment="Center" MaxWidth="420">
-            <Grid Width="56" Height="56" HorizontalAlignment="Center">
-                <Ellipse Fill="{StaticResource ErrorLightBrush}"/>
-                <Path Data="{StaticResource IconWarning}" Width="16" Height="16" Stretch="None" RenderTransformOrigin="0.5,0.5"
-                      Stroke="{StaticResource ErrorBrush}" StrokeThickness="1.4" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
-                      StrokeLineJoin="Round">
-                    <Path.RenderTransform>
-                        <ScaleTransform ScaleX="1.6" ScaleY="1.6"/>
-                    </Path.RenderTransform>
-                </Path>
-            </Grid>
-            <TextBlock Text="{DynamicResource Char_Error_Title}" Style="{StaticResource SectionTitle}" HorizontalAlignment="Center"
-                       Margin="0,14,0,0"/>
-            <TextBlock Text="{DynamicResource Char_Error_Body}" Style="{StaticResource HintText}" TextAlignment="Center" Margin="0,6,0,0"/>
-            <Button x:Name="RetryButton" Style="{StaticResource ModernButton}" Content="{DynamicResource Char_Error_Retry}"
-                    HorizontalAlignment="Center" Margin="0,16,0,0" Click="Retry_Click"/>
-        </StackPanel>
+        <shell:StateMessage x:Name="ErrorState" Visibility="Collapsed" Tone="Problem" Icon="{StaticResource IconWarning}"
+                            Text="{DynamicResource state_Char_Error}" ActionText="{DynamicResource Char_Error_Retry}" ActionClick="Retry_Click"/>
     </Grid>
 </UserControl>

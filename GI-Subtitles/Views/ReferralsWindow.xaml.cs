@@ -289,7 +289,7 @@ namespace GI_Subtitles.Views
 
             var row = new Border
             {
-                Background = Brushes.White,
+                Background = (Brush)FindResource("SurfaceBrush"),
                 BorderBrush = (Brush)FindResource("CardBorderBrush"),
                 BorderThickness = new Thickness(1),
                 CornerRadius = new CornerRadius(8),
@@ -314,9 +314,9 @@ namespace GI_Subtitles.Views
             pill.Child = new System.Windows.Controls.TextBlock
             {
                 Text = DescribeInviteeStatus(status),
-                FontSize = 10,
+                FontSize = 11,
                 FontWeight = FontWeights.Bold,
-                Foreground = Brushes.White,
+                Foreground = ResolveInviteeStatusText(status),
             };
             Grid.SetColumn(pill, 0);
             grid.Children.Add(pill);
@@ -365,18 +365,20 @@ namespace GI_Subtitles.Views
             return row;
         }
 
-        private Brush ResolveInviteeStatusBrush(string status)
+        // Tint behind, status colour on top: readable in both themes (white on the dark theme's green is not).
+        private Brush ResolveInviteeStatusBrush(string status) => (Brush)FindResource(status switch
         {
-            switch (status)
-            {
-                case "active":
-                    return (Brush)FindResource("SuccessBrush");
-                case "invalid":
-                    return (Brush)FindResource("ErrorBrush");
-                default: // pending
-                    return new SolidColorBrush(Color.FromRgb(0xB4, 0x53, 0x09));
-            }
-        }
+            "active" => "SuccessLightBrush",
+            "invalid" => "ErrorLightBrush",
+            _ => "WarnLightBrush", // pending
+        });
+
+        private Brush ResolveInviteeStatusText(string status) => (Brush)FindResource(status switch
+        {
+            "active" => "SuccessBrush",
+            "invalid" => "ErrorBrush",
+            _ => "WarnBrush",
+        });
 
         private static string DescribeInviteeStatus(string status)
         {
@@ -495,7 +497,7 @@ namespace GI_Subtitles.Views
             // One card per reward. Grid: [badge | title+status | action button].
             var row = new Border
             {
-                Background = Brushes.White,
+                Background = (Brush)FindResource("SurfaceBrush"),
                 BorderBrush = (Brush)FindResource("CardBorderBrush"),
                 BorderThickness = new Thickness(1),
                 CornerRadius = new CornerRadius(8),
@@ -522,7 +524,7 @@ namespace GI_Subtitles.Views
                 Text = reward.AmountCrystalsNominal.ToString("N0"),
                 FontSize = 12,
                 FontWeight = FontWeights.Bold,
-                Foreground = Brushes.White,
+                Foreground = (Brush)FindResource(reward.AmountCrystalsNominal >= 3000 ? "SuccessBrush" : "TextOnAccentBrush"),
             };
             Grid.SetColumn(badge, 0);
             grid.Children.Add(badge);
@@ -580,8 +582,8 @@ namespace GI_Subtitles.Views
         {
             // 1980 → accent, 3280 → success; future tiers → neutral.
             if (reward.AmountCrystalsNominal >= 3000)
-                return (Brush)FindResource("SuccessBrush");
-            return (Brush)FindResource("AccentBrush");
+                return (Brush)FindResource("SuccessLightBrush");
+            return (Brush)FindResource("AccentFillBrush");
         }
 
         private Brush ResolveStatusBrush(ReferralReward reward)
@@ -1023,7 +1025,7 @@ namespace GI_Subtitles.Views
         {
             AttributeStatusText.Text = message;
             AttributeStatusText.Foreground = isError
-                ? new SolidColorBrush(Color.FromRgb(0xB9, 0x1C, 0x1C))
+                ? (Brush)FindResource("ErrorBrush")
                 : (Brush)FindResource("SuccessBrush");
             AttributeStatusText.Visibility = Visibility.Visible;
         }

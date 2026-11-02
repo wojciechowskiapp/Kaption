@@ -34,6 +34,7 @@ namespace GI_Subtitles.Views
             _licenseService = licenseService ?? throw new ArgumentNullException(nameof(licenseService));
             InitializeComponent();
             ShowInitialState();
+            Loaded += async (_, __) => Backdrop.Source = await Shell.AmbienceArt.LoadAsync(Shell.AmbienceArt.Welcome);
         }
 
         // ───────────────────────────────────────────────────────────────────

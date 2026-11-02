@@ -1,200 +1,69 @@
 # Contributing to Kaption
 
-Kaption is a small, opinionated project. Contributions are welcome. The
-goal of this file is to save you from writing code we would bounce on
-review.
+Thanks for helping. This page covers building Kaption, finding your way around the code and sending a change that can be merged.
 
-## Before you start
+By opening a pull request you agree that your contribution is licensed under both of Kaption's licences, AGPL-3.0 and the commercial one (see [LICENSE](../LICENSE)). There is no CLA to sign.
 
-- **Licence.** Kaption is dual-licensed under AGPL-3.0 and a commercial
-  licence (see [`../LICENSE`](../LICENSE)). **By opening a pull request
-  you agree that your contribution is licensed under both options
-  (inbound = outbound).** This means we can keep offering Kaption under
-  the same dual licence without coming back to ask permission later. We
-  do not require a signed CLA — opening the PR is the agreement.
-- **Scope.** This repository is the Kaption **desktop app**. The
-  backend (`api.kaption.one`), landing site (`kaption.one`), translation
-  pipeline, and release / deploy scripts are separate, closed-source
-  services. Issues or features that need backend changes are fine to
-  discuss, but PRs that require coordinated backend or pipeline changes
-  cannot be merged without our involvement on the other side.
-- **Naming.** If you fork this project and ship the fork to other people,
-  please give it a clearly different name and icon. That keeps users from
-  mistaking your build for the upstream one (and confusing support
-  channels). We don't claim any trademark or exclusive rights to the
-  "Kaption" name.
+This repository is the Windows desktop app. The backend, the website and the translation pipeline are separate and closed, so a change that needs them is welcome as an issue but cannot be merged on its own.
 
-## Project layout
+## Prerequisites
 
-- `GI-Subtitles/` — the WPF desktop app, `net10.0-windows`. UI in
-  `Views/`, models in `Models/`, services grouped by area in `Services/`
-  (OCR, Translation, Rendering, Security, Capture, Network, Update,
-  Observability, Data, Detection, Video).
-- `PaddleOCRSharp/` — ONNX-Runtime wrapper around PaddleOCR.
-- `Screenshot/` — screen capture and region-selection UI.
-- `GI-Test/` — MSTest coverage for matching, OCR primitives, dialogue
-  prediction, and the security stack.
+- Windows 10 or 11, 64-bit
+- [.NET 10 SDK](https://dotnet.microsoft.com/download) 10.0.403 or newer (`global.json` pins the feature band)
 
-The folder names retain the historical `GI-Subtitles` prefix as a
-project-structure detail; the product is **Kaption**.
-
-## Per-game code
-
-Kaption supports three games: Genshin Impact, Honkai: Star Rail, and
-Zenless Zone Zero. Nearly all per-game behaviour is a single entry in
-`Services/Detection/GameRegionProfile.cs` — process name, window title,
-dialogue-region ratios, OCR pacing, and the vision knobs. Only two
-seams live elsewhere: `GameDialogueContextFactory` and
-`GameDataUpdateService.ResolveUpstream`.
-
-The one place the games genuinely diverge is **speaker-name
-detection**. Genshin and HSR draw speaker names in gold or cyan, so
-`Services/OCR/Classification/AccentColorTextBlockClassifier.cs` finds
-them by colour. ZZZ draws them in plain white, which leaves that check
-nothing to key on, so ZZZ uses `GeometryTextBlockClassifier.cs`
-instead — the speaker name is the short, narrow block on the top row.
-Which classifier runs is decided by the `UsesGeometryClassifier` flag
-on the profile, never by a game-name comparison. Please keep new
-per-game behaviour on that pattern: add a capability flag, don't add an
-`if (game == "…")`.
-
-## What we are happy to accept
-
-- Bug fixes, with a reproducible scenario in the PR description.
-- Per-game OCR tuning tweaks — they land in `GameRegionProfile` /
-  `GameOcrTuning` without touching hot paths. Zenless Zone Zero's pacing
-  (`OcrInterval` 60 ms, `StabilityWindow` 2) is currently borrowed from
-  Honkai: Star Rail and marked provisional in code, so a measured
-  replacement backed by a real ZZZ session is especially welcome.
-- New locales for the UI — add keys to
-  `GI-Subtitles/Resources/Strings.en-US.xaml` first, then create or
-  update the matching `Strings.<locale>.xaml`. Only English and Polish
-  are actively maintained; new locales are welcome.
-- Translation-matcher improvements, documented with a benchmark before
-  and after.
-- Documentation fixes, broken-link fixes, typo fixes.
-
-## What we are unlikely to accept without discussion first
-
-- Refactors of `MainWindow.xaml.cs` or `SettingsWindow.xaml.cs`. These
-  are large code-behind files by deliberate choice — all OCR-loop state
-  is in one place. "Clean-up" PRs that extract ViewModels tend to
-  reorder timer code in subtle ways. Open an issue first.
-- Swapping a core dependency (PaddleOCR, ONNX Runtime, Velopack). The
-  build toolchain is sensitive and the licensing audit is non-trivial.
-- Features that rely on the desktop having unauthenticated internet
-  access to third-party services. Kaption is intentionally conservative
-  about what it phones home to.
+NuGet restores everything else, ONNX Runtime and DirectML included.
 
 ## Build and test
 
-Prerequisite: .NET 10 SDK 10.0.203 or newer. `global.json` pins the
-feature band. `dotnet --version` from the repo root should print
-`10.0.203` or a matching feature-band patch.
-
 ```
 dotnet build GI-Subtitles.sln -c Release
-dotnet test  GI-Test/GI-Test.csproj -c Debug
+dotnet build GI-Subtitles/GI-Subtitles.csproj -c Debug
+dotnet test GI-Test/GI-Test.csproj -c Debug
 ```
 
-Expected on a clean checkout: exactly **2 failures**, both in
-`DialoguePredictionTests` — they need a real Genshin data bundle in
-`%APPDATA%` — and **4 skips** for test data that is not checked in.
-Everything else passes. The pass total keeps growing as tests are added,
-so it is deliberately not pinned here; a third failure is the signal.
+The suite must end with 0 failed. A few tests show as skipped when data they need is not on your machine, such as recorded game text or video samples; that is expected. The build also checks every XAML resource key, so a typo fails the build instead of crashing a window later.
 
-For a self-contained Release build that bundles the .NET 10 Desktop
-runtime (the shape end users get from the official installer):
+The self-contained build, the same shape the installer ships:
 
 ```
-dotnet publish GI-Subtitles/GI-Subtitles.csproj ^
-    -c Release -r win-x64 --self-contained true
+dotnet publish GI-Subtitles/GI-Subtitles.csproj -c Release -r win-x64 --self-contained true
 ```
 
-End-user installers and auto-update artefacts are produced by a private
-release pipeline; running the published `Kaption.exe` from the build
-above is enough to verify a source build locally.
+## Run the app with a test profile
 
-## Opening an issue
+Settings normally live in `%APPDATA%\Kaption\Config.json`. To start with fresh settings and leave yours alone, point `KAPTION_CONFIG_DIR` at an empty folder before you launch a Debug build:
 
-A good bug report contains, in any order:
+```
+set KAPTION_CONFIG_DIR=%TEMP%\kaption-profile
+GI-Subtitles\bin\Debug\Kaption.exe
+```
 
-- Kaption version (Settings → About, or the first line of
-  `%APPDATA%\Kaption\app.log`).
-- Windows version + GPU + game version.
-- What you expected to happen.
-- What actually happened, with the **exact** error message or
-  screenshot.
-- The relevant slice of `%APPDATA%\Kaption\app.log` — the last 200
-  lines is usually plenty.
+With no saved settings you get the first-run setup window. Your sign-in, the subtitle packs and `app.log` still come from `%APPDATA%\Kaption`.
 
-For feature requests, lead with the workflow you want to enable.
-"As a player in X, I want Y, so that Z" is a useful template.
+## Where things live
 
-## Opening a pull request
+| Path | What's in it |
+|---|---|
+| `GI-Subtitles/` | The WPF app: `Views/` for windows and pages, `Services/` for OCR, matching, capture, network, security and characters, `Themes/` and `Resources/` for palettes, styles and the `Strings.*.xaml` dictionaries |
+| `PaddleOCRSharp/` | ONNX Runtime wrapper around PaddleOCR |
+| `Screenshot/` | Screen capture and region selection |
+| `GI-Test/` | MSTest suite |
 
-1. Fork. Create a branch off `main` with a short, kebab-case name
-   (`fix-dashboard-badge`, `hsr-tuning-v33`).
-2. Build the solution and run the test suite (commands above).
-3. Verify user-visible changes manually. WPF overlay behaviour is
-   genuinely hard to unit-test. If you changed layout code, attach
-   before / after screenshots to the PR.
-4. Keep commits focused. Prefer short imperative subjects with a scope
-   first:
-   - `Dashboard: fix disabled-state badge not clearing`
-   - `HSR: bump stability window for typewriter dialogue`
-5. Open the PR against `main`. Fill out the description — one
-   paragraph on the change, one on verification steps. Screenshots for
-   any UI change. Call out any deploy or backend impact.
+Each game is one entry in `Services/Detection/GameRegionProfile.cs`: process name, dialogue area, pacing and how speaker names are found. New per-game behaviour goes there as a flag on the profile, not as `if (game == ...)`.
 
-## Code style
+## Rules that matter
 
-There is no linter configured. Match the surrounding style, plus:
+- **Four string files.** Every new UI string goes into all four dictionaries: `Strings.en-US.xaml`, `Strings.pl-PL.xaml`, `Strings.ja-JP.xaml` and `Strings.zh-CN.xaml`. English and Polish are maintained and a test checks that their keys match; English text in the other two is fine.
+- **No em dashes** in the string files. A test fails on them; use a comma, a colon or a full stop.
+- **Tests must not depend on your machine.** They run on a clean Windows runner with no Kaption install and no sign-in on disk. If your change touches start-up, sign-in or file protection, run the tests once with `%APPDATA%\Kaption\activation.dat` renamed, then rename it back. Use `TestProtection` for a fake activation, and never let a test write to the real profile.
+- Match the surrounding code: the newest C# on .NET 10, four-space indents, comments that say why. Window code-behind stays next to its XAML.
 
-- C# 12, `net10.0-windows`. Modern features (records, target-typed
-  `new`, file-scoped namespaces) are fine.
-- 4-space indentation. PascalCase for types/methods/public members,
-  camelCase for locals, `_camelCase` for private fields.
-- WPF code-behind paired with the `.xaml`. Do not extract a ViewModel
-  unless that is the point of the PR.
-- User-facing strings go in `Resources/Strings.<locale>.xaml`, accessed
-  via `{DynamicResource KeyName}` or `L("KeyName", "Fallback")`.
-- No emojis in code or logs.
-- Comments should explain **why**, not **what**. If a comment restates
-  the code, delete it.
+## Issues
 
-## Configuration and secrets
+A useful bug report has the Kaption version (the chip at the bottom left, or the first line of `%APPDATA%\Kaption\app.log`), your Windows version, graphics card and game version, what you expected, what happened instead, and the last 200 lines of `app.log`. For a feature, start with what you want to do in the game.
 
-Do not commit secrets or local environment files. Desktop config is
-stored per-user under `%APPDATA%\Kaption\Config.json`.
-`GI-Subtitles/Properties/VersionInfo.cs` is rewritten by the release
-pipeline, so treat incidental diffs there carefully — check before
-committing.
+Found a security problem? Please don't open an issue; follow [SECURITY.md](./SECURITY.md).
 
-## Translation packs
+## Pull requests
 
-The shipped translation packs (Genshin Impact PL, HSR PL) are produced
-by a private translation pipeline and shipped from our backend. Zenless
-Zone Zero is wired up in the client but has **no published pack yet**,
-so ZZZ bug reports should be about capture, region, or speaker
-detection rather than translation quality. If you want to contribute a
-translation for a language we do not yet ship, open an issue first —
-there is significant infrastructure on our side (LLM keys, multi-hour
-runs, publishing scripts) and we want to coordinate before you spend
-time.
-
-## Security
-
-If you think you have found a security issue, **do not open a public
-issue or PR**. Follow [`SECURITY.md`](./SECURITY.md) — email or file a
-GitHub private advisory.
-
-## Questions
-
-- Build errors on Windows → open an issue with the full `dotnet build`
-  output.
-- Anything else → open a discussion thread, or just mention it in the
-  PR.
-
-We try to respond within a few days. If a PR has been sitting for more
-than a week with no response, nudge us.
+Branch off `main`, keep the change focused, build and run the tests, and add before and after screenshots for anything visible. Short commit subjects with the area first read best, for example `Characters: keep the reading position on redraw`.

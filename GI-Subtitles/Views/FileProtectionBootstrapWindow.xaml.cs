@@ -65,123 +65,14 @@ namespace GI_Subtitles.Views
         private async Task RunFetchAsync()
         {
             ShowWorking();
-
-            // 3 attempts total: immediate + 1s + 3s back-off. Each attempt
-            // is capped at 10 s to keep the dialog responsive — the shared
-            // HttpClient's default 30 s timeout would let one slow request
-            // freeze the UI for half a minute.
-            int[] backoffMs = { 1000, 3000 };
-            int maxAttempts = backoffMs.Length + 1;
-            const int perAttemptTimeoutMs = 10_000;
-            string lastError = null;
-
-            for (int attempt = 0; attempt < maxAttempts; attempt++)
+            string error = await Shell.DeviceKeyBootstrap.FetchAsync(_licenseService, _deviceSessionJwt, L).ConfigureAwait(true);
+            if (error == null)
             {
-                try
-                {
-                    var api = new KaptionApiClient();
-                    using var cts = new CancellationTokenSource(perAttemptTimeoutMs);
-                    var resp = await api
-                        .FetchFileProtectionKeyAsync(_deviceSessionJwt, cts.Token)
-                        .ConfigureAwait(true);
-
-                    if (resp == null || string.IsNullOrEmpty(resp.DeviceSecretB64))
-                    {
-                        lastError = "Empty server response.";
-                    }
-                    else if (!Persist(resp))
-                    {
-                        // Persist returns false only when LicenseService has
-                        // no current activation in memory — should not happen
-                        // here because EnsureActivated ran before us. Bail out
-                        // with a clear error rather than proceeding into
-                        // FileProtectionFactory.Create() which would throw on
-                        // the first encrypt/decrypt instead.
-                        lastError = "Couldn't store the secret locally. Restart Kaption and sign in again.";
-                        Logger.Log.Error(
-                            "FileProtectionBootstrap (foreground): Persist returned false — activation went missing during bootstrap.");
-                        break;
-                    }
-                    else
-                    {
-                        _allowClose = true;
-                        DialogResult = true;
-                        return;
-                    }
-                }
-                catch (UnauthorizedException ex)
-                {
-                    // Session expired between activation and now. Re-login
-                    // is the only recovery — bail out and let the next
-                    // launch surface the LoginWindow.
-                    lastError = "Sign-in expired. Restart Kaption to sign in again.";
-                    Logger.Log.Warn($"FileProtectionBootstrap (foreground): unauthorised: {ex.Message}");
-                    break;
-                }
-                catch (FileProtectionKeyUnavailableException ex)
-                {
-                    lastError = "This device isn't registered. Restart Kaption to re-activate.";
-                    Logger.Log.Warn($"FileProtectionBootstrap (foreground): device not registered: {ex.Message}");
-                    break;
-                }
-                catch (RateLimitedException ex)
-                {
-                    lastError = $"Server is busy. Try again in {Math.Max(1, (int)ex.RetryAfter.TotalSeconds)} seconds.";
-                    Logger.Log.Warn($"FileProtectionBootstrap (foreground): rate limited (retry-after {ex.RetryAfter.TotalSeconds:N0}s)");
-                    break;
-                }
-                catch (Exception ex)
-                {
-                    lastError = ex.Message;
-                    Logger.Log.Warn(
-                        $"FileProtectionBootstrap (foreground): attempt {attempt + 1}/{maxAttempts} " +
-                        $"failed ({ex.GetType().Name}: {ex.Message})");
-                }
-
-                if (attempt + 1 < maxAttempts)
-                {
-                    await Task.Delay(backoffMs[attempt]).ConfigureAwait(true);
-                }
+                _allowClose = true;
+                DialogResult = true;
+                return;
             }
-
-            ShowError(lastError ?? "Unknown error.");
-        }
-
-        /// <summary>
-        /// Decode + persist the wire response. Returns false when the
-        /// LicenseService has no current activation (a programmer error
-        /// in our caller — EnsureActivated ran before this should have
-        /// guaranteed one). Returns true otherwise; an in-memory persist
-        /// is enough even if the disk save failed (LicenseService logs
-        /// the disk-save failure separately and the next launch will
-        /// re-fetch).
-        /// </summary>
-        private bool Persist(FileProtectionKeyResponse resp)
-        {
-            byte[] secret = KaptionApiClient.DecodeBase64Url(resp.DeviceSecretB64);
-            long? issuedAtMs = ParseIso(resp.IssuedAt);
-            long? expiresAtMs = ParseIso(resp.ExpiresAt);
-
-            bool ok = _licenseService.SetFileProtectionSecret(
-                secret, issuedAtMs, expiresAtMs, resp.Version, resp.PbkdfIterations);
-
-            Logger.Log.Info(
-                $"FileProtectionBootstrap (foreground): secret stored " +
-                $"(deviceSecret=<redacted, len={secret.Length}>, " +
-                $"version={resp.Version}, iters={resp.PbkdfIterations}, " +
-                $"persisted={ok}).");
-            return ok;
-        }
-
-        private static long? ParseIso(string iso)
-        {
-            if (string.IsNullOrEmpty(iso)) return null;
-            if (!DateTime.TryParse(iso,
-                    System.Globalization.CultureInfo.InvariantCulture,
-                    System.Globalization.DateTimeStyles.RoundtripKind,
-                    out DateTime utc))
-                return null;
-            return new DateTimeOffset(utc, TimeSpan.Zero).ToUnixTimeMilliseconds();
+            ShowError(error);
         }
 
         private void ShowWorking()
@@ -195,9 +86,12 @@ namespace GI_Subtitles.Views
             WorkingPanel.Visibility = Visibility.Collapsed;
             ErrorPanel.Visibility = Visibility.Visible;
             ErrorDetail.Text = string.IsNullOrEmpty(message)
-                ? "Check your internet connection and try again."
+                ? L("shell_Protect_Err_Generic", "Check your internet connection and try again.")
                 : message;
         }
+
+        private static string L(string key, string fallback)
+            => Application.Current?.TryFindResource(key) as string ?? fallback;
 
         private async void Retry_Click(object sender, RoutedEventArgs e)
         {

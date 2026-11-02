@@ -57,6 +57,7 @@ namespace GI_Subtitles.Views
         {
             InitializeComponent();
             ApplyLocalizedInlineText();
+            Loaded += async (_, __) => Backdrop.Source = await Shell.AmbienceArt.LoadAsync(Shell.AmbienceArt.Welcome);
         }
 
         /// <summary>
@@ -69,24 +70,31 @@ namespace GI_Subtitles.Views
         {
             try
             {
-                string L(string key, string fallback)
-                    => Application.Current?.TryFindResource(key) as string ?? fallback;
-
-                if (RunLinkEula != null)
-                    RunLinkEula.Text = L("Eula_LinkEula", "EULA");
-                if (RunLinkPrivacy != null)
-                    RunLinkPrivacy.Text = L("Eula_LinkPrivacy", "Privacy Policy");
-                if (RunLegalPrefix != null)
-                    RunLegalPrefix.Text = L("Eula_LegalMicrocopyPrefix", "By clicking ");
-                if (RunLegalAction != null)
-                    RunLegalAction.Text = L("Eula_LegalMicrocopyAction", "Accept & continue");
-                if (RunLegalSuffix != null)
-                    RunLegalSuffix.Text = L("Eula_LegalMicrocopySuffix", ", you agree to the End-User License Agreement and Privacy Policy linked above.");
+                ApplyInlineText(FindName, (key, fallback) => Application.Current?.TryFindResource(key) as string ?? fallback);
             }
             catch (Exception ex)
             {
                 Logger.Log.Warn($"EulaAcceptanceWindow: localized inline text setup failed: {ex.Message}");
             }
+        }
+
+        private const string LegalFormatFallback = "By clicking {0}, you agree to the End-User License Agreement and Privacy Policy linked above.";
+
+        /// <summary>
+        /// The link labels and the consent line in the UI language. The line is one sentence per language with {0}
+        /// for the button name: XAML string resources trim the spaces that separate pieces would need. Static so the
+        /// render tests show what the app shows.
+        /// </summary>
+        internal static void ApplyInlineText(Func<string, object> find, Func<string, string, string> L)
+        {
+            if (find("RunLinkEula") is System.Windows.Documents.Run eula) eula.Text = L("Eula_LinkEula", "EULA");
+            if (find("RunLinkPrivacy") is System.Windows.Documents.Run privacy) privacy.Text = L("Eula_LinkPrivacy", "Privacy Policy");
+            string format = L("Eula_LegalMicrocopy_Format", LegalFormatFallback);
+            int at = format?.IndexOf("{0}", StringComparison.Ordinal) ?? -1;
+            if (at < 0) { format = LegalFormatFallback; at = format.IndexOf("{0}", StringComparison.Ordinal); }
+            if (find("RunLegalPrefix") is System.Windows.Documents.Run prefix) prefix.Text = format.Substring(0, at);
+            if (find("RunLegalAction") is System.Windows.Documents.Run action) action.Text = L("Eula_LegalMicrocopyAction", "Accept & continue");
+            if (find("RunLegalSuffix") is System.Windows.Documents.Run suffix) suffix.Text = format.Substring(at + 3);
         }
 
         /// <summary>
@@ -129,6 +137,8 @@ namespace GI_Subtitles.Views
                 Config.Set(ConfigKeyCrashOptIn, crashOptIn);
                 Config.Set(ConfigKeyCrashPrompted, true);
                 Config.Set(ConfigKeyCrashPromptedAt, now);
+                // Opting in here must take effect in this session too, not only after a restart.
+                GI_Subtitles.Services.Observability.CrashReportingService.RefreshConsent();
 
                 Logger.Log.Info(
                     $"EULA accepted (version={CurrentEulaVersion}, crash_opt_in={crashOptIn}).");

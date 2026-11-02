@@ -11,6 +11,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 using System;
+using System.Reflection;
 using GI_Subtitles.Services.Network;
 using GI_Subtitles.Services.Security;
 
@@ -60,6 +61,58 @@ namespace GI_Test
         {
             ActivationData act = FakeActivation(seed);
             return new ServerKeyFileProtectionService(() => act);
+        }
+
+        /// <summary>
+        /// Puts a <see cref="LicenseService"/> holding a fake activation into <c>App.LicenseService</c> until the
+        /// returned scope is disposed, then puts back what was there. A window that builds its file protection while
+        /// it is constructed (SettingsWindow calls <see cref="FileProtectionFactory.Create"/> in a field initializer)
+        /// then never falls back to the activation on disk: a developer machine has the user's, a fresh CI runner has
+        /// none, and the test must not depend on which one it runs on.
+        ///
+        /// The activation carries the file-protection secret but no session token, so nothing the window starts
+        /// (its Translations scan) calls the API with it. The service is also marked disposed, so a revocation path
+        /// (<see cref="LicenseService.ReportRemoteRevocation"/>) returns before it could clear the real activation file.
+        /// </summary>
+        public static IDisposable UseFakeLicense(int seed = 0xA17C6)
+        {
+            ActivationData activation = FakeActivation(seed);
+            activation.DeviceSessionJwt = null;
+            return new FakeLicenseScope(activation);
+        }
+
+        private sealed class FakeLicenseScope : IDisposable
+        {
+            private static readonly PropertyInfo AppLicense =
+                typeof(GI_Subtitles.App).GetProperty(nameof(GI_Subtitles.App.LicenseService), BindingFlags.Public | BindingFlags.Static)
+                ?? throw new MissingMemberException(nameof(GI_Subtitles.App), nameof(GI_Subtitles.App.LicenseService));
+
+            private static readonly FieldInfo Current = Field("_current");
+            private static readonly FieldInfo Disposed = Field("_disposed");
+
+            private readonly LicenseService _previous;
+            private bool _restored;
+
+            public FakeLicenseScope(ActivationData activation)
+            {
+                _previous = GI_Subtitles.App.LicenseService;
+                // The public constructor only reads a stored activation (no network, no write); the fake replaces it.
+                var fake = new LicenseService(new KaptionApiClient());
+                Current.SetValue(fake, activation);
+                Disposed.SetValue(fake, true);
+                AppLicense.SetValue(null, fake);
+            }
+
+            public void Dispose()
+            {
+                if (_restored) return;
+                _restored = true;
+                AppLicense.SetValue(null, _previous);
+            }
+
+            private static FieldInfo Field(string name) =>
+                typeof(LicenseService).GetField(name, BindingFlags.Instance | BindingFlags.NonPublic)
+                ?? throw new MissingFieldException(nameof(LicenseService), name);
         }
     }
 }

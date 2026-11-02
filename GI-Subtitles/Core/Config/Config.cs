@@ -13,7 +13,11 @@ namespace GI_Subtitles.Core.Config
     /// </summary>
     public static class Config
     {
-        private static readonly string SettingsFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Kaption");
+        // KAPTION_CONFIG_DIR is for tests: they point the settings at a temporary folder, never a real profile.
+        private static readonly string SettingsFolder =
+            Environment.GetEnvironmentVariable("KAPTION_CONFIG_DIR") is string dir && dir.Length > 0
+                ? dir
+                : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Kaption");
         private static readonly string SettingsFile = Path.Combine(SettingsFolder, "Config.json");
         private static readonly Dictionary<string, JsonNode> _settings = new Dictionary<string, JsonNode>();
         private static readonly object _settingsLock = new object();

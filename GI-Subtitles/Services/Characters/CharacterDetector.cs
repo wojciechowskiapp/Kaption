@@ -61,6 +61,21 @@ namespace GI_Subtitles.Services.Characters
             return best >= SkillWeight && best >= 2 * runnerUp ? ranked[0].Key : null;
         }
 
+        /// <summary>
+        /// The index of the record's skill a recognised line names (whole title, or after a short "Kind:" prefix,
+        /// normalised like the matcher), or -1. Lets the popup say which skill it recognised.
+        /// </summary>
+        public static int SkillIndexFor(CharacterRecord record, string line)
+        {
+            if (record == null) return -1;
+            var keys = Keys(line).ToList();
+            if (keys.Count == 0) return -1;
+            for (int i = 0; i < record.Skills.Count; i++)
+                foreach (string k in Keys(record.Skills[i].Name))
+                    if (keys.Contains(k, StringComparer.Ordinal)) return i;
+            return -1;
+        }
+
         /// <summary>Normalized full text, plus the part after a short "Kind:" prefix.</summary>
         private static IEnumerable<string> Keys(string text)
         {

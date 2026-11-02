@@ -35,6 +35,8 @@ namespace GI_Subtitles.Services.Characters
             new ConcurrentDictionary<string, Lazy<Task<string>>>(StringComparer.Ordinal);
         private readonly ConcurrentDictionary<string, DateTime> _failedAt =
             new ConcurrentDictionary<string, DateTime>(StringComparer.Ordinal);
+        private readonly ConcurrentDictionary<string, byte> _quietHosts =
+            new ConcurrentDictionary<string, byte>(StringComparer.OrdinalIgnoreCase);
 
         public CharacterImageCache(string directory, HttpClient http)
         {
@@ -118,7 +120,7 @@ namespace GI_Subtitles.Services.Characters
             }
         }
 
-        // PNG, JPEG, GIF, WebP or ICO by signature; a CDN error page served as image/* is rejected.
+        // PNG, JPEG, GIF or WebP by signature; a CDN error page served as image/* is rejected.
         internal static bool LooksLikeImage(byte[] b)
         {
             if (b == null || b.Length < 12) return false;
@@ -127,8 +129,7 @@ namespace GI_Subtitles.Services.Characters
             bool gif = b[0] == 0x47 && b[1] == 0x49 && b[2] == 0x46 && b[3] == 0x38;
             bool webp = b[0] == 0x52 && b[1] == 0x49 && b[2] == 0x46 && b[3] == 0x46 &&
                         b[8] == 0x57 && b[9] == 0x45 && b[10] == 0x42 && b[11] == 0x50;
-            bool ico = b[0] == 0x00 && b[1] == 0x00 && b[2] == 0x01 && b[3] == 0x00; // favicons
-            return png || jpg || gif || webp || ico;
+            return png || jpg || gif || webp;
         }
 
         private string PathFor(string url)
@@ -144,10 +145,13 @@ namespace GI_Subtitles.Services.Characters
             }
         }
 
+        // A missing image is expected (the page shows a glyph instead): DEBUG, once per host.
         private string Fail(string url, string why)
         {
             _failedAt[url] = DateTime.UtcNow;
-            Logger.Log.Warn($"Icon not cached ({why}): {url}");
+            string host = Uri.TryCreate(url, UriKind.Absolute, out var uri) ? uri.Host : "";
+            if (_quietHosts.TryAdd(host, 0) && Logger.IsDebugEnabled)
+                Logger.Log.Debug($"Image not cached ({why}): {url}; further misses from {host} are not logged.");
             return null;
         }
 

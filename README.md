@@ -2,97 +2,67 @@
 
 [![CI](https://github.com/wojciechowskiapp/Kaption/actions/workflows/ci.yml/badge.svg)](https://github.com/wojciechowskiapp/Kaption/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/wojciechowskiapp/Kaption/actions/workflows/codeql.yml/badge.svg)](https://github.com/wojciechowskiapp/Kaption/actions/workflows/codeql.yml)
-[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/wojciechowskiapp/Kaption)
 [![License: AGPL-3.0 OR Commercial](https://img.shields.io/badge/license-AGPL--3.0%20OR%20Commercial-blue.svg)](./LICENSE)
 
-Real-time subtitle translation for Hoyoverse games on Windows. Kaption reads the dialogue box off your screen and draws a translated subtitle over the game. It does not modify game files, inject code, or read game memory.
-
-Everything after the download runs locally — screen capture, OCR, and matching all happen on your machine.
+Kaption shows Polish subtitles over the dialogue in Genshin Impact, Honkai: Star Rail and Zenless Zone Zero. It reads the dialogue box from your screen and draws the translation on top, without touching the game's files or memory.
 
 **[Download for Windows](https://kaption.one/#download)** · [kaption.one](https://kaption.one)
 
-![Kaption translating an NPC dialogue in Genshin Impact](./docs/screenshots/hero-dialog.jpg)
+![A Polish subtitle from Kaption over a Genshin Impact dialogue](./docs/screenshots/hero-dialog.jpg)
 
 ## Supported games
 
-| Game | Status |
-|---|---|
-| Genshin Impact | Supported |
-| Honkai: Star Rail | Supported |
-| Zenless Zone Zero | Supported since 2.2.0 |
-
-Polish is the current translation target. Other languages work as soon as a translation pack exists — adding one is a backend change, not a client release.
+- Genshin Impact
+- Honkai: Star Rail
+- Zenless Zone Zero
 
 ## How it works
 
-1. Capture the screen region where the game draws dialogue (DXGI, GDI fallback).
-2. Run OCR on it (PaddleOCR via ONNX Runtime, GPU with a CPU fallback).
-3. Match the recognised text against the game's dialogue data, in three stages: SymSpell → n-gram candidates → Levenshtein weighted by common OCR confusions (`l`↔`1`, `O`↔`0`). OCR noise rarely breaks the match.
-4. Draw the translation in an overlay above the dialogue box.
-
-End to end this takes about 80 ms, and the overlay is excluded from screen capture so it never reads itself.
-
-Speaker names are separated from the dialogue line per game: Genshin and Star Rail print them in an accent colour, ZZZ prints them in plain white, so ZZZ uses layout geometry instead.
+1. Kaption captures the part of the screen where the game shows dialogue.
+2. It reads the text on your own PC, on the graphics card when it can.
+3. It finds that line in the game's own dialogue data, even when a few letters were misread.
+4. It draws the Polish line in a small overlay just above the dialogue box.
 
 ## Requirements
 
-- Windows 10 2004 or later, 64-bit
-- A CPU with AVX (required by PaddleOCR)
-- A DirectX 12 / DirectML GPU is recommended — recognition runs under 10 ms there, versus 40–80 ms on CPU
-- ~500 MB of disk for translation packs
+- Windows 10 version 2004 or later, 64-bit, on a CPU with AVX
+- A DirectX 12 graphics card is recommended; without one, reading runs on the processor, more slowly
+- About 500 MB of disk space for the subtitle packs
 
-The installer bundles the .NET 10 runtime, so there is nothing else to install. Updates are handled by Velopack.
+The installer brings the .NET runtime with it, and Kaption updates itself.
+
+## Features in 2.5
+
+![Kaption 2.5 on its Home page while translating](./docs/screenshots/app-home.png)
+
+- Auto-start: Kaption starts translating when the game is on screen and stops when you close it.
+- New subtitles: a clearer typeface that stays readable over bright scenes, and Wygląd napisów (Subtitle style) with a true-scale preview and three styles.
+- Setup in one window: language, game, sign-in and the first subtitle download, one step after another.
+- Postacie (Characters): skills, builds and materials for every character in the three games, with game terms in English and the Polish next to them.
+- Ctrl+Q quick translate: select any panel in the game, read it in Polish, and open the card of the character Kaption recognised.
+- Polish subtitle packs for all three games, refreshed after each game patch.
+
+## Privacy
+
+Your screen is read on your own computer and screen images never leave it; subtitle packs are encrypted for your machine. Crash reports stay off unless you turn them on in Pomoc › Prywatność (Help › Privacy), and [docs/PRIVACY.md](./docs/PRIVACY.md) explains what the app sends and when.
 
 ## Building
 
-Needs the [.NET 10 SDK](https://dotnet.microsoft.com/download) (10.0.203+) and Windows — the project targets `net10.0-windows`.
+Windows and the [.NET 10 SDK](https://dotnet.microsoft.com/download) (10.0.403 or newer) are all you need:
 
 ```
-dotnet build GI-Subtitles/GI-Subtitles.csproj -c Debug
-dotnet test  GI-Test/GI-Test.csproj           -c Debug
+dotnet build GI-Subtitles.sln -c Release
+dotnet test GI-Test/GI-Test.csproj -c Debug
 ```
 
-Tests should be fully green. Some are marked inconclusive rather than failed when the data they need isn't present locally: several need game data that isn't checked in, and the dialogue-prediction tests are pinned to specific Genshin lines that come and go between patches.
-
-For a self-contained build, the same shape end users get:
-
-```
-dotnet publish GI-Subtitles/GI-Subtitles.csproj -c Release -r win-x64 --self-contained true
-```
-
-Config lives at `%APPDATA%\Kaption\Config.json`; every key is documented in [`docs/CONFIG.md`](./docs/CONFIG.md).
-
-## Layout
-
-| Path | What's in it |
-|---|---|
-| `GI-Subtitles/` | The WPF app — OCR pipeline, matcher, overlay, settings, licensing |
-| `PaddleOCRSharp/` | ONNX Runtime wrapper around PaddleOCR |
-| `Screenshot/` | Screen capture and region selection |
-| `GI-Test/` | MSTest suite |
-
-This repo is the desktop client. The backend, landing site, and translation pipeline are separate and not published.
-
-## Translation pack encryption
-
-Packs are AES-256 encrypted with HMAC-SHA256 authentication and PBKDF2-stretched keys, derived from a per-device secret issued on first launch and mixed with a machine fingerprint. A pack copied to another machine will not decrypt, and nothing in this repo is a usable key by itself. Details in [`.github/SECURITY.md`](./.github/SECURITY.md).
-
-## Contributing
-
-Bug reports and focused PRs are welcome — see [`.github/CONTRIBUTING.md`](./.github/CONTRIBUTING.md). For anything exploitable, please follow [`.github/SECURITY.md`](./.github/SECURITY.md) instead of opening a public issue.
+Settings live in `%APPDATA%\Kaption\Config.json`, described key by key in [docs/CONFIG.md](./docs/CONFIG.md). Where the code lives and how to send a change: [CONTRIBUTING](./.github/CONTRIBUTING.md). Security reports: [SECURITY](./.github/SECURITY.md).
 
 ## Licence
 
-Dual-licensed: [AGPL-3.0](./LICENSE-AGPL) or a [commercial licence](./LICENSE-COMMERCIAL). [`LICENSE`](./LICENSE) explains which applies. Third-party components are listed in [`THIRD_PARTY_LICENSES.txt`](./THIRD_PARTY_LICENSES.txt); privacy terms are at [kaption.one/privacy](https://kaption.one/privacy).
-
-If you fork and redistribute, please use a different name and icon so builds don't get confused with this one. There's no trademark claim on "Kaption".
+Kaption is dual-licensed under [AGPL-3.0](./LICENSE-AGPL) or a [commercial licence](./LICENSE-COMMERCIAL); [LICENSE](./LICENSE) explains which applies. Third-party components and their licences are listed in [THIRD_PARTY_LICENSES.txt](./THIRD_PARTY_LICENSES.txt). If you ship a fork, please give it its own name and icon.
 
 ## Credits
 
-Kaption began as a fork of [qew21/Genshin-Subtitles](https://github.com/qew21/Genshin-Subtitles) (Apache-2.0). The pipeline, matcher, networking and UI have since been rewritten, but the original idea — OCR the dialogue, look it up in the game's TextMap, draw the translation on top — came from there.
+Kaption began as a fork of [qew21/Genshin-Subtitles](https://github.com/qew21/Genshin-Subtitles) (Apache-2.0), where the idea of reading the dialogue and looking it up in the game's text came from. Every line is matched against game data maintained by [Dimbreath](https://www.patreon.com/c/dimbreath/posts): [AnimeGameData2](https://gitlab.com/Dimbreath/animegamedata2), [turnbasedgamedata](https://gitlab.com/Dimbreath/turnbasedgamedata) and [ZenlessData](https://git.mero.moe/dimbreath/ZenlessData). If that work helps you too, please support it. Kaption is built on PaddleOCR, ONNX Runtime, OpenCV, Velopack, Lucene.NET and Sentry.
 
-The game data every line is matched against is maintained by [Dimbreath](https://www.patreon.com/c/dimbreath/posts): [AnimeGameData2](https://gitlab.com/Dimbreath/animegamedata2), [turnbasedgamedata](https://gitlab.com/Dimbreath/turnbasedgamedata), and [ZenlessData](https://git.mero.moe/dimbreath/ZenlessData). None of this works without those staying current with each patch — if they've helped you too, support them directly.
-
-Built on PaddleOCR, ONNX Runtime, OpenCV, Velopack, Lucene.NET and Sentry.
-
-Kaption is an independent project and is not affiliated with HoYoverse, Cognosphere or miHoYo.
+Kaption is independent and not affiliated with HoYoverse, Cognosphere or miHoYo.

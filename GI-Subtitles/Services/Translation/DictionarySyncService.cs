@@ -59,6 +59,8 @@ namespace GI_Subtitles.Services.Translation
     {
         public int Downloaded { get; internal set; }
         public int UpToDate { get; internal set; }
+        /// <summary>A new version of a pack already installed: version rewritten, no download, no index rebuild, no restart.</summary>
+        public int Relabelled { get; internal set; }
         public int Skipped { get; internal set; }     // tier-gated, etc.
         public int Failed { get; internal set; }
         public List<string> Messages { get; } = new List<string>();
@@ -88,6 +90,39 @@ namespace GI_Subtitles.Services.Translation
 
         /// <summary>Path to the manifest JSON (even when the file doesn't exist yet).</summary>
         public static string ManifestFilePath => ManifestPath;
+
+        /// <summary>The pack download in flight, for the Start page and the setup window; null when idle.</summary>
+        public static DownloadProgressInfo CurrentDownload { get; private set; }
+
+        /// <summary>Raised on a pool thread about every percent of a pack download, and once with null when it ends.</summary>
+        public static event Action<DownloadProgressInfo> DownloadProgress;
+
+        public sealed record DownloadProgressInfo(string Game, string Language, double Fraction, long TotalBytes);
+
+        private static void PublishProgress(DownloadProgressInfo info)
+        {
+            CurrentDownload = info;
+            try { DownloadProgress?.Invoke(info); }
+            catch (Exception ex) { Logger.Log.Warn($"DictionarySync: progress listener threw: {ex.Message}"); }
+        }
+
+        /// <summary>Synchronous IProgress (no SynchronizationContext hop), throttled to whole percents.</summary>
+        private sealed class PackProgress : IProgress<double>
+        {
+            private readonly string _game, _language;
+            private readonly long _total;
+            private int _lastPercent = -1;
+
+            public PackProgress(string game, string language, long total) { _game = game; _language = language; _total = total; }
+
+            public void Report(double value)
+            {
+                int percent = (int)Math.Clamp(value * 100, 0, 100);
+                if (percent == _lastPercent) return;
+                _lastPercent = percent;
+                PublishProgress(new DownloadProgressInfo(_game, _language, Math.Clamp(value, 0, 1), _total));
+            }
+        }
 
         /// <summary>
         /// Public read-only snapshot of the on-disk manifest — the Translations
@@ -323,7 +358,7 @@ namespace GI_Subtitles.Services.Translation
             syncWatch.Stop();
             Logger.Log.Info(
                 $"DictionarySync: done in {syncWatch.ElapsedMilliseconds} ms — " +
-                $"downloaded={result.Downloaded} upToDate={result.UpToDate} " +
+                $"downloaded={result.Downloaded} upToDate={result.UpToDate} relabelled={result.Relabelled} " +
                 $"skipped={result.Skipped} failed={result.Failed}");
             return result;
             }
@@ -337,38 +372,85 @@ namespace GI_Subtitles.Services.Translation
         //  One file
         // ─────────────────────────────────────────────────────────────────────
 
-        private async Task SyncOneAsync(
+        private Task SyncOneAsync(
             FileMetadata meta,
             byte[] distKey,
             Dictionary<string, ManifestEntry> manifest,
             DictionarySyncResult result,
             CancellationToken ct)
         {
+            var ops = new PackOps
+            {
+                Download = (m, plaintextPath, progress, token) => _api.DownloadFileAsync(
+                    _license.CurrentActivation?.DeviceSessionJwt, m, plaintextPath, progress, token, distributionKey: distKey),
+                // Streaming variant: caps peak RAM at the pipe buffer (~16 KB) instead of materialising the whole
+                // plaintext (~80 MB for PL) + the whole ciphertext (~80 MB) on the LOH during re-encryption.
+                Encrypt = (plaintextPath, finalPath) => _protector.EncryptFileStreaming(plaintextPath, finalPath),
+                // Packs installed before 2.6 have no record: their content hash is read once from the pack itself.
+                HashInstalledPack = localPath =>
+                {
+                    try
+                    {
+                        using var plain = _protector.OpenDecryptStream(localPath);
+                        return PackRecord.Sha256OfStream(plain);
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Log.Warn($"DictionarySync: could not read the installed pack {localPath} to compare it: {ex.Message}");
+                        return null;
+                    }
+                },
+                InvalidateCaches = (game, language) => GameDataUpdateService.InvalidateDownstreamCaches(
+                    GameDataPaths.GameDir(game), language, preserveTargetGisub: true),
+                FinalPath = (game, language) =>
+                {
+                    GameDataPaths.EnsureGameDir(game);
+                    return GameDataPaths.TextMapGisub(game, language.ToUpperInvariant());
+                },
+            };
+            return SyncOneCoreAsync(meta, manifest, result, ops, ct);
+        }
+
+        /// <summary>The side effects of one pack's sync, so tests can run the decision path without a server.</summary>
+        internal sealed class PackOps
+        {
+            /// <summary>Downloads the dist file and leaves the decrypted pack at the given path.</summary>
+            public Func<FileMetadata, string, IProgress<double>, CancellationToken, Task> Download;
+            /// <summary>Re-encrypts the plaintext machine-bound to the final path.</summary>
+            public Action<string, string> Encrypt;
+            /// <summary>SHA-256 of the installed pack's decrypted bytes, or null when it cannot be read.</summary>
+            public Func<string, string> HashInstalledPack;
+            /// <summary>Removes the matcher index and merged caches built from the previous pack; returns how many.</summary>
+            public Func<string, string, int> InvalidateCaches;
+            public Func<string, string, string> FinalPath;
+        }
+
+        internal static async Task SyncOneCoreAsync(
+            FileMetadata meta,
+            Dictionary<string, ManifestEntry> manifest,
+            DictionarySyncResult result,
+            PackOps ops,
+            CancellationToken ct)
+        {
             string key = ManifestKey(meta);
             ManifestEntry existing = manifest.TryGetValue(key, out var e) ? e : null;
+            bool localExists = existing != null && File.Exists(existing.LocalPath);
 
-            // "Has this pack changed?" is answered by file_sha256, not by
-            // FileVersionId. Reason: publish-translation.sh now UPSERTs
-            // file_versions rows (ON CONFLICT DO UPDATE) so download_logs'
-            // FK stays valid across re-publishes. That means a re-published
-            // pack keeps its original row id — if we still compared by
-            // FileVersionId, the desktop would see "same id" and skip the
-            // re-download, never picking up the new content. sha256 is
-            // content-addressable and changes every time we re-encrypt
-            // (random IV on AES-CBC → different ciphertext even for
-            // identical plaintext), so it catches every real publish.
-            //
-            // Treat missing local sha as "force re-download" so old
-            // manifests (from builds before this check existed) get one
-            // sanity re-sync after upgrade; after that the sha is cached
-            // and the check is cheap.
-            bool shaMatches = !string.IsNullOrEmpty(existing?.FileSha256)
-                && string.Equals(existing.FileSha256, meta.Sha256, StringComparison.OrdinalIgnoreCase);
+            // "Has this pack changed?" Same version and file_sha256: nothing to do. A new version (or a re-published one)
+            // is downloaded unless the pack inside is the one already installed: the server's pack_sha256 against the
+            // installed pack's hash (tier 1), or the very same published file under a new version (tier 2). file_sha256
+            // alone cannot tell, because every publish re-encrypts with a random IV.
+            var record = localExists ? PackRecord.Read(existing.LocalPath) : null;
+            bool computedHash = false;
+            string computedPackSha = null;
+            var (action, reason) = PackSyncDecision.Decide(existing, localExists, meta, record, () =>
+            {
+                computedHash = true;
+                computedPackSha = ops.HashInstalledPack?.Invoke(existing.LocalPath);
+                return computedPackSha;
+            });
 
-            if (existing != null
-                && string.Equals(existing.Version, meta.Version, StringComparison.Ordinal)
-                && shaMatches
-                && File.Exists(existing.LocalPath))
+            if (action == PackSyncAction.UpToDate)
             {
                 Logger.Log.Info(
                     $"DictionarySync: up-to-date — {meta.Game}/{meta.Language} v{meta.Version} " +
@@ -378,19 +460,36 @@ namespace GI_Subtitles.Services.Translation
                 return;
             }
 
-            // Targets — plaintext lands at .tmp, machine-bound .gisub is the
+            if (action == PackSyncAction.Relabel)
+            {
+                string previous = existing.Version;
+                manifest[key] = new ManifestEntry
+                {
+                    Game = existing.Game ?? meta.Game,
+                    Language = existing.Language ?? meta.Language,
+                    Version = meta.Version,
+                    FileVersionId = meta.FileVersionId,
+                    FileSha256 = meta.Sha256,
+                    LocalPath = existing.LocalPath,
+                    DownloadedAtUnix = existing.DownloadedAtUnix,
+                    FileSizeBytes = meta.Size,
+                };
+                PackRecord.Write(existing.LocalPath, record?.PackSha256 ?? (computedHash ? computedPackSha : null) ?? meta.ContentSha256,
+                    meta.Sha256, meta.Size);
+                Logger.Log.Info(
+                    $"DictionarySync: pack unchanged, version relabelled — {meta.Game}/{meta.Language} v{previous} → v{meta.Version} " +
+                    $"({reason}); no download, no index rebuild.");
+                result.Relabelled++;
+                return;
+            }
+
+            // Targets — plaintext lands at .plain, machine-bound .gisub is the
             // permanent home. Two distinct paths so a partial re-encryption
             // can't corrupt the old cache. Path resolution goes through
             // GameDataPaths so DictionarySync writes into the same per-game
             // folder VoiceContentHelper reads from.
-            GameDataPaths.EnsureGameDir(meta.Game);
-            string finalPath = GameDataPaths.TextMapGisub(meta.Game, meta.Language.ToUpperInvariant());
+            string finalPath = ops.FinalPath(meta.Game, meta.Language);
             string plaintextTmp = finalPath + ".plain";
-
-            string reason = existing == null ? "new" :
-                (!File.Exists(existing.LocalPath) ? "cache-missing" :
-                (!string.Equals(existing.Version, meta.Version, StringComparison.Ordinal) ? $"version {existing.Version}→{meta.Version}" :
-                (string.IsNullOrEmpty(existing.FileSha256) ? "sha-unrecorded (legacy manifest)" : "content-changed (sha differs)")));
 
             Logger.Log.Info(
                 $"DictionarySync: downloading {meta.Game}/{meta.Language} v{meta.Version} " +
@@ -402,13 +501,15 @@ namespace GI_Subtitles.Services.Translation
             // plaintextTmp will be plaintext bytes after this returns
             // (KaptionApiClient.DownloadFileAsync handles the .gisub-dist
             // decode in-place via DistributionCipher).
-            await _api.DownloadFileAsync(
-                _license.CurrentActivation?.DeviceSessionJwt,
-                meta,
-                plaintextTmp,
-                progress: null,
-                ct: ct,
-                distributionKey: distKey).ConfigureAwait(false);
+            PublishProgress(new DownloadProgressInfo(meta.Game, meta.Language, 0, meta.Size));
+            try
+            {
+                await ops.Download(meta, plaintextTmp, new PackProgress(meta.Game, meta.Language, meta.Size), ct).ConfigureAwait(false);
+            }
+            finally
+            {
+                PublishProgress(null);
+            }
 
             long downloadedBytes = File.Exists(plaintextTmp) ? new FileInfo(plaintextTmp).Length : 0;
             long downloadMs = fileWatch.ElapsedMilliseconds;
@@ -419,21 +520,21 @@ namespace GI_Subtitles.Services.Translation
                 $"DictionarySync: fetched {downloadedBytes:N0} plaintext bytes in " +
                 $"{downloadMs} ms ({mbPerSec:0.#} MB/s). Re-encrypting machine-bound...");
 
+            // The pack's own hash, while it is plaintext: the next revision with the same content is then a relabel.
+            string packSha = null;
+            try { packSha = File.Exists(plaintextTmp) ? PackRecord.Sha256OfFile(plaintextTmp) : null; }
+            catch (Exception ex) { Logger.Log.Warn($"DictionarySync: could not hash {plaintextTmp}: {ex.Message}"); }
+            if (packSha != null && meta.ContentSha256 != null && !string.Equals(packSha, meta.ContentSha256, StringComparison.OrdinalIgnoreCase))
+                Logger.Log.Warn($"DictionarySync: {meta.Game}/{meta.Language} v{meta.Version} pack_sha256 {meta.ContentSha256} does not match the downloaded pack ({packSha}).");
+
             // Re-encrypt machine-bound to the canonical .gisub location. Any
             // copy of `finalPath` to another machine becomes garbage at this
             // point — the encryption key is derived from this machine's
             // hardware fingerprint.
-            //
-            // Streaming variant: caps peak RAM at the pipe buffer (~16 KB)
-            // instead of materialising the whole plaintext (~80 MB for PL) +
-            // the whole ciphertext (~80 MB) on the LOH during re-encryption.
-            // The legacy byte[] path is still available via EncryptFile for
-            // smaller callers; DictionarySync is the big-file hot path and
-            // standardises on the streaming pipeline.
             var encryptWatch = Stopwatch.StartNew();
             try
             {
-                _protector.EncryptFileStreaming(plaintextTmp, finalPath);
+                ops.Encrypt(plaintextTmp, finalPath);
             }
             finally
             {
@@ -447,6 +548,7 @@ namespace GI_Subtitles.Services.Translation
                 $"DictionarySync: installed {meta.Game}/{meta.Language} v{meta.Version} — " +
                 $"{finalSize:N0} bytes (encrypt {encryptWatch.ElapsedMilliseconds} ms, " +
                 $"total {fileWatch.ElapsedMilliseconds} ms) at {finalPath}");
+            PackRecord.Write(finalPath, packSha, meta.Sha256, meta.Size);
 
             // Invalidate matcher / merged-dict caches that were built from
             // the PREVIOUS pack version. Without this sweep, a fresh pack
@@ -462,9 +564,7 @@ namespace GI_Subtitles.Services.Translation
             // matcher index) gets reaped and rebuilt on next launch.
             try
             {
-                string gameDir = GameDataPaths.GameDir(meta.Game);
-                int invalidated = GameDataUpdateService.InvalidateDownstreamCaches(
-                    gameDir, meta.Language, preserveTargetGisub: true);
+                int invalidated = ops.InvalidateCaches?.Invoke(meta.Game, meta.Language) ?? 0;
                 if (invalidated > 0)
                 {
                     Logger.Log.Info(

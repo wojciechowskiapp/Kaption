@@ -561,7 +561,8 @@ namespace GI_Subtitles.Views
             int fontSize = Config.Get<int>("Size", 22);
             FontSizeSlider.Value = Math.Max(FontSizeSlider.Minimum, Math.Min(FontSizeSlider.Maximum, fontSize));
             FontSizeTextBox.Text = fontSize.ToString();
-            string fontFamily = Config.Get("FontFamily", "Segoe UI");
+            // 2.6: the saved face as the overlay reads it ("Segoe UI" from a 2.5 launch means the default face).
+            string fontFamily = Services.Rendering.OverlayStyle.FromConfig().FontFamily;
             foreach (ComboBoxItem fontItem in FontFamilyComboBox.Items)
             {
                 if ((string)fontItem.Tag == fontFamily) { FontFamilyComboBox.SelectedItem = fontItem; break; }
@@ -582,6 +583,9 @@ namespace GI_Subtitles.Views
             // tab is first shown so startup stays fast; we only wire up the
             // placeholder summary here.
             InitializeTranslationsTab();
+
+            // Theme, advanced sections, Start cards and status bar (SettingsWindow.Shell.cs).
+            InitializeShell();
         }
 
         private void ResetLocation_Click(object sender, RoutedEventArgs e)
@@ -746,30 +750,9 @@ namespace GI_Subtitles.Views
         /// </summary>
         private void UpdateWindowTitle()
         {
-            try
-            {
-                string baseTitle = System.Windows.Application.Current?
-                    .TryFindResource("App_Settings") as string;
-
-                if (string.IsNullOrWhiteSpace(baseTitle))
-                {
-                    // Fallback to existing title if resource is missing
-                    baseTitle = this.Title;
-                }
-
-                if (!string.IsNullOrEmpty(_version))
-                {
-                    this.Title = $"{baseTitle} ({_version})";
-                }
-                else
-                {
-                    this.Title = baseTitle;
-                }
-            }
-            catch
-            {
-                // In case of any unexpected error, keep the current title
-            }
+            string page = L("App_Settings", "Settings");
+            Title = string.IsNullOrWhiteSpace(page) ? "Kaption" : $"Kaption \u00B7 {page}";
+            ApplyVersionToShell();
         }
 
         private void ApplyLanguage(string cultureTag)
@@ -783,12 +766,16 @@ namespace GI_Subtitles.Views
             }
             catch (Exception ex) { Logger.Log.Error($"Invalid culture '{cultureTag}': {ex.Message}"); }
 
+            // The strings live in the app's resources. A test that builds this window has no app: nothing to merge into.
+            var appResources = System.Windows.Application.Current?.Resources;
+            if (appResources == null) return;
+
             // First remove the old language resources
-            var oldLangs = System.Windows.Application.Current.Resources.MergedDictionaries
+            var oldLangs = appResources.MergedDictionaries
                 .Where(d => d.Source != null && d.Source.OriginalString.Contains("Resources/Strings"))
                 .ToList();
             foreach (var d in oldLangs)
-                System.Windows.Application.Current.Resources.MergedDictionaries.Remove(d);
+                appResources.MergedDictionaries.Remove(d);
 
             // Merge the new language resources. Load en-US first as the BASE dictionary so
             // that any keys missing from the selected locale fall back to English instead
@@ -798,7 +785,7 @@ namespace GI_Subtitles.Views
             {
                 Source = new Uri("pack://application:,,,/Resources/Strings.en-US.xaml", UriKind.Absolute)
             };
-            System.Windows.Application.Current.Resources.MergedDictionaries.Add(enBase);
+            appResources.MergedDictionaries.Add(enBase);
 
             // Only layer a second dictionary on top when the requested culture is something
             // other than en-US — loading en-US twice would be wasteful.
@@ -823,7 +810,7 @@ namespace GI_Subtitles.Views
                 }
                 if (rd != null)
                 {
-                    System.Windows.Application.Current.Resources.MergedDictionaries.Add(rd);
+                    appResources.MergedDictionaries.Add(rd);
                 }
             }
 
@@ -910,6 +897,10 @@ namespace GI_Subtitles.Views
                             $"Bootstrap: ready — inputDownloaded={result.InputDownloaded} outputDownloaded={result.OutputDownloaded}");
                     }
                 }
+            }
+            catch (Exception ex) when (DispatcherShutdown.IsShutdownCancellation(ex, Dispatcher.HasShutdownStarted))
+            {
+                Logger.Log.Info("EnsureGameDataReady abandoned — app is closing.");
             }
             catch (Exception ex)
             {
@@ -1388,6 +1379,7 @@ namespace GI_Subtitles.Views
             // follow-up (OptimizedMatcher hot path needs to read via FstKeyIndex
             // + ZstdValueDecoder directly, not hydrate Entry[]).
             bool useMatcherBlob = Config.Get<bool>("UseMatcherBlob", false);
+            _ = Dispatcher.BeginInvoke(new Action(MarkIndexBuildStarted));
 
             await Task.Run(() =>
             {
@@ -1660,7 +1652,7 @@ namespace GI_Subtitles.Views
                     }
 
                     // Update Matcher on UI thread
-                    Dispatcher.Invoke(() =>
+                    TryInvokeUnlessClosing(() =>
                     {
                         if (Matcher is IDisposable oldDisposable) { try { oldDisposable.Dispose(); } catch { /* best-effort */ } }
                         Matcher = newMatcher;
@@ -1668,13 +1660,15 @@ namespace GI_Subtitles.Views
                 }
             });
 
-            await System.Windows.Application.Current.Dispatcher.InvokeAsync(() =>
+            bool statusShown = await TryInvokeAsyncUnlessClosing(() =>
             {
                 Logger.Log.Debug("Loaded OptimizedMatcher...");
                 Status.Content = $"Ready - {contentDict.Count:N0} entries loaded";
                 UpdateDashboardStatus();
                 UpdateDashboardRegionInfo();
             });
+            if (!statusShown)
+                return; // app is closing
 
             // Load DialogueContextEngine on background thread (non-blocking)
             // This downloads/builds the dialogue graph on first run, then loads it.
@@ -1684,7 +1678,7 @@ namespace GI_Subtitles.Views
             string gameDataDir = Path.Combine(dataDir, Game);
             string textMapEnPath = $"{gameDataDir}\\TextMapEN.json";
 
-            _ = Task.Run(() =>
+            _ = Task.Run(async () =>
             {
                 try
                 {
@@ -1702,7 +1696,8 @@ namespace GI_Subtitles.Views
                         }));
                     });
 
-                    var engine = GameDialogueContextFactory.Create(Game);
+                    string engineGame = Game;
+                    var engine = GameDialogueContextFactory.Create(engineGame);
                     // Session 24+: graph files now ship as machine-bound `.gisub`
                     // via GamedataSyncService (R2-delivered bundle). Passing the
                     // real protectionHelper lets DialogueContextEngine resolve
@@ -1721,7 +1716,19 @@ namespace GI_Subtitles.Views
                     // a meaningful cost for a one-shot engine load.
                     engine.Load(gameDataDir, textMapEnPath, engineProgress, _protectionHelper);
 
-                    Dispatcher.Invoke(() =>
+                    // The sync only checks that bundle files exist, so a bundle encrypted under
+                    // another device key would stay unreadable on every launch. Re-fetch it once.
+                    if (_gamedataRecoveryGate.TryBegin(engineGame, engine.LastPrepareFailure))
+                    {
+                        engine = await RecoverFromStaleGamedataBundleAsync(
+                            engineGame, gameDataDir, textMapEnPath, engineProgress);
+                        if (engine == null)
+                            return;
+                    }
+
+                    if (Dispatcher.HasShutdownStarted)
+                        return;
+                    await Dispatcher.InvokeAsync(() =>
                     {
                         ContextEngine = engine;
                         DownloadProgressBar.Visibility = Visibility.Collapsed;
@@ -1745,10 +1752,14 @@ namespace GI_Subtitles.Views
                         UpdateDashboardStatus();
                     });
                 }
+                catch (Exception ex) when (DispatcherShutdown.IsShutdownCancellation(ex, Dispatcher.HasShutdownStarted))
+                {
+                    Logger.Log.Info("DialogueContextEngine prepare abandoned — app is closing.");
+                }
                 catch (Exception ex)
                 {
                     Logger.Log.Error($"DialogueContextEngine load failed: {ex.Message}");
-                    Dispatcher.BeginInvoke(new Action(() =>
+                    _ = Dispatcher.BeginInvoke(new Action(() =>
                     {
                         DownloadProgressBar.Visibility = Visibility.Collapsed;
                     }));
@@ -1756,7 +1767,7 @@ namespace GI_Subtitles.Views
             });
 
             // Must run on UI thread since it accesses WPF controls
-            Dispatcher.Invoke(() => DisplayLocalFileDates());
+            TryInvokeUnlessClosing(DisplayLocalFileDates);
         }
 
         /// <summary>
@@ -1811,6 +1822,87 @@ namespace GI_Subtitles.Views
             await CheckDataAsync(renew, isCryptoRetry: true);
         }
 
+        // Static: "once per game" has to hold for the whole process.
+        private static readonly GamedataRecoveryGate _gamedataRecoveryGate = new GamedataRecoveryGate();
+
+        /// <summary>
+        /// Self-heal for a gamedata bundle that fails HMAC here: wipes its machine-bound files,
+        /// forgets the install, re-syncs and prepares the engine once more. Returns the new
+        /// engine, or null when the app is closing or the game was switched meanwhile.
+        /// </summary>
+        private async Task<IGameDialogueContext> RecoverFromStaleGamedataBundleAsync(
+            string game, string gameDataDir, string textMapEnPath,
+            IProgress<(int percent, string message)> engineProgress)
+        {
+            if (Dispatcher.HasShutdownStarted)
+                return null;
+
+            Logger.Log.Warn(
+                $"Gamedata bundle for {game} failed HMAC check — clearing its machine-bound files "
+                + "and re-downloading it under the current device key.");
+            foreach (string path in GamedataSyncService.MachineBoundDialogueFiles(game))
+                _protectionHelper.DeleteBothVariants(path);
+            GamedataSyncService.ForgetInstalled(game);
+
+            await Dispatcher.InvokeAsync(() =>
+            {
+                Status.Content = L("Status_DialogueDataFromAnotherDevice",
+                    "Dialogue data was from another device — re-downloading…");
+            });
+            await EnsureGameDataReadyAsync();
+
+            if (Dispatcher.HasShutdownStarted || !string.Equals(Game, game, StringComparison.OrdinalIgnoreCase))
+            {
+                Logger.Log.Info($"Gamedata self-heal for {game} stopped before re-preparing — app closing or game switched.");
+                return null;
+            }
+
+            var engine = GameDialogueContextFactory.Create(game);
+            engine.Load(gameDataDir, textMapEnPath, engineProgress, _protectionHelper);
+            if (engine.LastPrepareFailure == DialoguePrepareFailure.StaleMachineBoundFile)
+            {
+                Logger.Log.Error(
+                    $"Gamedata bundle for {game} still fails HMAC after wiping and re-syncing it — "
+                    + "prediction stays offline this session.");
+            }
+            return engine;
+        }
+
+        /// <summary>
+        /// Dispatcher.Invoke that stands down once WPF has begun shutting down, instead of
+        /// surfacing the aborted operation as "A task was canceled.". False when skipped.
+        /// </summary>
+        private bool TryInvokeUnlessClosing(Action action)
+        {
+            if (Dispatcher.HasShutdownStarted)
+                return false;
+            try
+            {
+                Dispatcher.Invoke(action);
+                return true;
+            }
+            catch (Exception ex) when (DispatcherShutdown.IsShutdownCancellation(ex, Dispatcher.HasShutdownStarted))
+            {
+                return false;
+            }
+        }
+
+        /// <summary>Awaitable form of <see cref="TryInvokeUnlessClosing"/>.</summary>
+        private async Task<bool> TryInvokeAsyncUnlessClosing(Action action)
+        {
+            if (Dispatcher.HasShutdownStarted)
+                return false;
+            try
+            {
+                await Dispatcher.InvokeAsync(action);
+                return true;
+            }
+            catch (Exception ex) when (DispatcherShutdown.IsShutdownCancellation(ex, Dispatcher.HasShutdownStarted))
+            {
+                return false;
+            }
+        }
+
         /// <summary>
         /// True when <paramref name="ex"/> (or anything in its inner-exception
         /// chain) is a <see cref="System.Security.Cryptography.CryptographicException"/>
@@ -1818,15 +1910,7 @@ namespace GI_Subtitles.Views
         /// under a different device key / machine fingerprint. Walks the chain
         /// in case the decrypt failure is wrapped before it reaches us.
         /// </summary>
-        private static bool IsCryptographicFailure(Exception ex)
-        {
-            for (Exception cur = ex; cur != null; cur = cur.InnerException)
-            {
-                if (cur is System.Security.Cryptography.CryptographicException)
-                    return true;
-            }
-            return false;
-        }
+        private static bool IsCryptographicFailure(Exception ex) => CryptoFailure.IsCryptographic(ex);
 
         private static void TryDeleteFile(string path)
         {
@@ -1938,7 +2022,7 @@ namespace GI_Subtitles.Views
             Match match = Regex.Match(responseText ?? string.Empty, @"datetime=""([^""]*)""");
             if (!match.Success)
             {
-                Logger.Log.Error("No datetime attribute found in the input string.");
+                Logger.Log.Warn("Upstream repo page carried no datetime attribute.");
                 return null;
             }
 
@@ -1949,17 +2033,21 @@ namespace GI_Subtitles.Views
             }
             catch (Exception ex)
             {
-                Logger.Log.Error("Error parsing datetime: " + ex.Message);
+                Logger.Log.Warn("Upstream repo datetime did not parse: " + ex.Message);
                 return null;
             }
         }
 
+        // Shorter than the shared client's 30 s: the probe is optional, so give up early.
+        private static readonly TimeSpan RepoProbeTimeout = TimeSpan.FromSeconds(10);
+
         public async Task GetRepositoryModificationDateAsync()
         {
+            using var probeTimeout = new CancellationTokenSource(RepoProbeTimeout);
             try
             {
                 Logger.Log.Info($"Load start.");
-                HttpResponseMessage response = await client.GetAsync(repoUrl);
+                HttpResponseMessage response = await client.GetAsync(repoUrl, probeTimeout.Token);
                 response.EnsureSuccessStatusCode();
                 string responseText = await response.Content.ReadAsStringAsync();
                 if (Game == "ZZZ")
@@ -2000,57 +2088,9 @@ namespace GI_Subtitles.Views
             }
             catch (Exception ex)
             {
-                Logger.Log.Error(ex);
-                RepoModifiedDate.Text = "Error: " + ex.Message;
+                Logger.Log.Warn(Services.Network.UpstreamProbeLog.ProbeFailed(repoUrl, ex, RepoProbeTimeout));
+                RepoModifiedDate.Text = "Error: " + Services.Network.UpstreamProbeLog.Describe(ex, RepoProbeTimeout);
             }
-        }
-
-        public async Task<string> GetRepositoryModificationDate(string url, string game)
-        {
-            try
-            {
-                HttpResponseMessage response = await client.GetAsync(url);
-                response.EnsureSuccessStatusCode();
-                string responseText = await response.Content.ReadAsStringAsync();
-                if (Game == "ZZZ")
-                {
-                    // Parse failure falls through to the `return ""` at the
-                    // bottom, exactly as the pre-dedupe code did.
-                    string parsed = ParseGiteaCommitDate(responseText);
-                    if (parsed != null) return parsed;
-                }
-                else if (Game == "Wuthering" || Game == "Genshin")
-                {
-                    var reader = XmlReader.Create(new System.IO.StringReader(responseText));
-                    var feed = SyndicationFeed.Load(reader);
-                    var item = feed?.Items?.FirstOrDefault();
-                    var dateTime = item?.LastUpdatedTime ?? item?.PublishDate;
-                    return dateTime?.ToString() ?? "";
-                }
-                else
-                {
-                    JsonArray jsonArray = JsonNode.Parse(responseText)?.AsArray();
-                    if (jsonArray.Count > 0)
-                    {
-                        List<string> dateList = new List<string>();
-                        foreach (var date in jsonArray)
-                        {
-                            dateList.Add(date["commit"]?["committed_date"]?.ToString());
-                        }
-                        dateList.Sort();
-                        dateList.Reverse();
-                        return dateList[0];
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                if (!url.Contains("gitlab"))
-                {
-                    Logger.Log.Error(ex);
-                }
-            }
-            return "";
         }
 
         private async void SyncButton_Click(object sender, RoutedEventArgs e)
@@ -2452,9 +2492,23 @@ namespace GI_Subtitles.Views
             }
             catch (Exception ex)
             {
+                // A failed native load is cached for the process, so the
+                // compatibility profile would fail the same way. Warn, not Error:
+                // MainWindow sends this failure to GlitchTip exactly once.
+                if (OcrRuntimeDiagnostics.IsRuntimeUnavailable(ex, out string runtimeError))
+                {
+                    string diagnostics = OcrRuntimeDiagnostics.Probe();
+                    Logger.Log.Warn(
+                        $"ONNX Runtime failed to load ({runtimeError}); skipping the compatibility " +
+                        "profile, which needs the same runtime. Only a restart can retry the load." +
+                        Environment.NewLine + diagnostics);
+                    throw new OcrRuntimeUnavailableException(runtimeError, diagnostics, ex);
+                }
+
                 if (!requested.FallsBackToCompatibilityProfile)
                 {
-                    Logger.Log.Error($"Error loading OCR profile '{requested.Id}': {ex}");
+                    // Warn, not Error: KickOffEngineInit sends the one GlitchTip event for this failure.
+                    Logger.Log.Warn($"Error loading OCR profile '{requested.Id}': {ex}");
                     throw new Exception($"Failed to load OCR model {requested.ModelName}.", ex);
                 }
 
@@ -2469,7 +2523,7 @@ namespace GI_Subtitles.Views
                 }
                 catch (Exception fallbackEx)
                 {
-                    Logger.Log.Error($"OCR compatibility fallback failed: {fallbackEx}");
+                    Logger.Log.Warn($"OCR compatibility fallback failed: {fallbackEx}");
                     throw new Exception(
                         $"Failed to load both {requested.ModelName} and the compatibility OCR model.",
                         fallbackEx);
@@ -2834,11 +2888,12 @@ namespace GI_Subtitles.Views
             // First unregister all hotkeys
             UnregisterAllHotkeys();
 
-            // Register all hotkeys
+            var taken = new List<string>();
             foreach (var hotkey in _hotkeys)
             {
-                RegisterHotkey(hotkey);
+                if (!RegisterHotkey(hotkey)) taken.Add(hotkey.DisplayText);
             }
+            SetHotkeyConflicts(taken);
         }
 
         // Add this helper method to your class
@@ -2856,7 +2911,7 @@ namespace GI_Subtitles.Views
             return 0;
         }
 
-        private void RegisterHotkey(HotkeyViewModel hotkey)
+        private bool RegisterHotkey(HotkeyViewModel hotkey)
         {
             uint modifiers = 0;
             if (hotkey.IsCtrl) modifiers |= MOD_CTRL;
@@ -2868,12 +2923,10 @@ namespace GI_Subtitles.Views
 
 
 
-            if (!RegisterHotKey(_windowHandle, hotkey.Id, modifiers, virtualKey))
-            {
-                // Registration failed, possibly because of hotkey conflict
-                System.Windows.MessageBox.Show($"Failed to register hotkey {hotkey.GetHotkeyText()}\nMay be conflicts with other applications.",
-                                "Registration failed", MessageBoxButton.OK, MessageBoxImage.Warning);
-            }
+            if (RegisterHotKey(_windowHandle, hotkey.Id, modifiers, virtualKey)) return true;
+            // Usually another app owns the combination; SetHotkeyConflicts tells the user where.
+            Logger.Log.Warn($"Hotkey {hotkey.GetHotkeyText()} (id {hotkey.Id}) could not be registered; another application may own it.");
+            return false;
         }
 
         public void UnregisterAllHotkeys()
@@ -3043,6 +3096,7 @@ namespace GI_Subtitles.Views
                 };
                 HotkeySettingsManager.SaveSettings(settings);
                 RegisterAllHotkeys();
+                RefreshHotkeysCard();
             }
             catch (Exception ex)
             {
@@ -3154,8 +3208,8 @@ namespace GI_Subtitles.Views
 
         private void DashToggleOcr_Click(object sender, RoutedEventArgs e)
         {
-            OnToggleOCR?.Invoke();
-            // UpdateDashboardStatus is called inside the delegate
+            // Start/Stop, retry, account or packs: whatever the state card offers (SettingsWindow.Shell.cs).
+            OnStateCardPrimary();
         }
 
         private void DashSelectRegion_Click(object sender, RoutedEventArgs e)
@@ -3313,6 +3367,7 @@ namespace GI_Subtitles.Views
             OnRetryEngineLoad?.Invoke(true);
         }
 
+        /// <summary>
         private void DashToggleSubtitle_Click(object sender, RoutedEventArgs e)
         {
             OnToggleSubtitles?.Invoke();
@@ -3329,35 +3384,12 @@ namespace GI_Subtitles.Views
             // Jump to the Translations tab. Match by Tag (culture-invariant),
             // not Header — the Header is a DynamicResource and resolves to the
             // user's current UI language ("Tłumaczenia" in PL, etc.).
-            SelectTabByTag("Translations");
-        }
-
-        /// <summary>
-        /// Selects the TabItem whose Tag (case-insensitive) equals <paramref name="tag"/>.
-        /// Returns true when found. Used by Dashboard jump-to buttons.
-        /// </summary>
-        private bool SelectTabByTag(string tag)
-        {
-            if (string.IsNullOrEmpty(tag)) return false;
-            try
+            if (_cardState?.Kind == Shell.StartCardKind.ReaderFailed)
             {
-                var tabControl = FindTabControl(this);
-                if (tabControl == null) return false;
-                foreach (var item in tabControl.Items)
-                {
-                    if (item is System.Windows.Controls.TabItem ti &&
-                        (ti.Tag as string)?.Equals(tag, StringComparison.OrdinalIgnoreCase) == true)
-                    {
-                        ti.IsSelected = true;
-                        return true;
-                    }
-                }
+                OnRetryEngineLoad?.Invoke(true);
+                return;
             }
-            catch (Exception ex)
-            {
-                Logger.Log.Warn($"SelectTabByTag({tag}) failed: {ex.Message}");
-            }
-            return false;
+            SelectTabByTag(Shell.SettingsNavigation.Game);
         }
 
         /// <summary>
@@ -3456,57 +3488,6 @@ namespace GI_Subtitles.Views
             }
         }
 
-        /// <summary>Walk the visual tree until we hit the TabControl the Dashboard lives in.</summary>
-        private static System.Windows.Controls.TabControl FindTabControl(DependencyObject root)
-        {
-            if (root == null) return null;
-            int count = System.Windows.Media.VisualTreeHelper.GetChildrenCount(root);
-            for (int i = 0; i < count; i++)
-            {
-                var child = System.Windows.Media.VisualTreeHelper.GetChild(root, i);
-                if (child is System.Windows.Controls.TabControl tc) return tc;
-                var nested = FindTabControl(child);
-                if (nested != null) return nested;
-            }
-            return null;
-        }
-
-        /// <summary>
-        /// Refresh the read-only "Active translation" line on the Dashboard
-        /// to reflect the current Config triple. Called from
-        /// <see cref="UpdateDashboardStatus"/> so any state change that
-        /// already triggers a status refresh also refreshes this strip.
-        /// </summary>
-        private void UpdateDashboardActiveTranslation()
-        {
-            if (DashActiveTranslationText == null) return;
-            try
-            {
-                string game = Config.Get("Game", "Genshin") ?? "Genshin";
-                string input = Config.Get("Input", "EN") ?? "EN";
-                string output = Config.Get("Output", "PL") ?? "PL";
-
-                // One registry, one label. The switch that used to live here
-                // silently fell through to the raw tag for any game added
-                // elsewhere — which is exactly how "ZZZ" would have shown up
-                // on the Dashboard while the pills said "Zenless Zone Zero".
-                string gameDisplay = Services.Detection.GameRegionProfile.DisplayNameOf(game);
-
-                string inputDisplay = HumanLang(input);
-                string outputDisplay = HumanLang(output);
-
-                string pending = _translationRestartPending
-                    ? "  \u00B7  " + L("Dash_Status_RestartRequired", "Selected — restart required")
-                    : string.Empty;
-                DashActiveTranslationText.Text = $"{gameDisplay}  \u00B7  {inputDisplay}  \u2192  {outputDisplay}{pending}";
-            }
-            catch (Exception ex)
-            {
-                Logger.Log.Warn($"UpdateDashboardActiveTranslation failed: {ex.Message}");
-                DashActiveTranslationText.Text = "\u2014";
-            }
-        }
-
         private static string HumanLang(string code)
         {
             if (string.IsNullOrEmpty(code)) return "?";
@@ -3533,221 +3514,6 @@ namespace GI_Subtitles.Views
         }
 
         /// <summary>
-        /// Updates all Dashboard status indicators.
-        /// Call this whenever OCR/engine/dictionary state changes.
-        /// </summary>
-        public void UpdateDashboardStatus()
-        {
-            if (!Dispatcher.CheckAccess())
-            {
-                Dispatcher.BeginInvoke(new Action(UpdateDashboardStatus));
-                return;
-            }
-
-            try
-            {
-                UpdateDashboardActiveTranslation();
-                bool ocrRunning = IsOcrRunning?.Invoke() ?? false;
-                bool engineReady = IsEngineReady?.Invoke() ?? false;
-                bool subtitleVis = IsSubtitleVisible?.Invoke() ?? true;
-                bool matcherLoaded = Matcher?.Loaded == true;
-                bool dictLoaded = IsMatcherReady;
-                bool dictMissing = matcherLoaded && !dictLoaded;
-                bool downloading = App.StartupStatus == App.InitialStartupStatus.DownloadingTranslations;
-                var engineState = Engine;
-                bool engineLoading = engineState == EngineStatus.Loading;
-                bool engineFailed = engineState == EngineStatus.Failed;
-
-                // OCR toggle button: stays "Start" while translations download
-                // OR while the OCR engine hasn't finished initializing. The
-                // click is gated by TryGateInitialDictionarySync /
-                // TryGateEngineReady too, but disabling the button here makes
-                // the waiting state user-visible — no "I clicked Start and
-                // nothing happened" tickets.
-                if (DashToggleOcrButton != null)
-                {
-                    DashToggleOcrButton.Content = ocrRunning
-                        ? TryFindResource("Dash_StopOCR") as string ?? "Stop"
-                        : TryFindResource("Dash_StartOCR") as string ?? "Start";
-                    // Stop is always allowed; Start is gated on initial sync
-                    // AND on the engine being live. A failed engine still
-                    // disables Start — the Retry banner below is the CTA.
-                    DashToggleOcrButton.IsEnabled = ocrRunning ||
-                        (!downloading && !engineLoading && !engineFailed && engineReady && dictLoaded);
-                }
-
-                // OCR status badge — priority order: Running › Downloading ›
-                // Engine Failed › Engine Loading › Stopped. The download and
-                // engine-loading states both use amber so the three "work in
-                // progress" pills read as a single family; red is reserved
-                // for Stopped + Engine Failed to signal actionable blockers.
-                if (DashOcrStatusBadge != null && DashOcrStatusText != null)
-                {
-                    if (ocrRunning)
-                    {
-                        var fg = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x05, 0x96, 0x69));
-                        DashOcrStatusBadge.Background = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0xD1, 0xFA, 0xE5));
-                        DashOcrStatusText.Foreground = fg;
-                        DashOcrStatusText.Text = TryFindResource("Dash_Status_Running") as string ?? "Running";
-                        if (DashOcrStatusIcon != null) DashOcrStatusIcon.Foreground = fg;
-                    }
-                    else if (downloading)
-                    {
-                        // Amber — same accent as Engine/Dictionary "Loading…" states so
-                        // the three row statuses read as consistent "work in progress".
-                        var fg = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0xD9, 0x77, 0x06));
-                        DashOcrStatusBadge.Background = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0xFE, 0xF3, 0xC7));
-                        DashOcrStatusText.Foreground = fg;
-                        DashOcrStatusText.Text = TryFindResource("Dash_Status_Downloading") as string ?? "Checking and updating translations…";
-                        if (DashOcrStatusIcon != null) DashOcrStatusIcon.Foreground = fg;
-                    }
-                    else if (engineFailed)
-                    {
-                        var fg = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0xDC, 0x26, 0x26));
-                        DashOcrStatusBadge.Background = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0xFE, 0xE2, 0xE2));
-                        DashOcrStatusText.Foreground = fg;
-                        DashOcrStatusText.Text = TryFindResource("Dash_Status_EngineFailed") as string ?? "Translator failed to load";
-                        if (DashOcrStatusIcon != null) DashOcrStatusIcon.Foreground = fg;
-                    }
-                    else if (engineLoading)
-                    {
-                        var fg = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0xD9, 0x77, 0x06));
-                        DashOcrStatusBadge.Background = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0xFE, 0xF3, 0xC7));
-                        DashOcrStatusText.Foreground = fg;
-                        DashOcrStatusText.Text = TryFindResource("Dash_Status_EngineLoading") as string ?? "Starting the dialogue reader…";
-                        if (DashOcrStatusIcon != null) DashOcrStatusIcon.Foreground = fg;
-                    }
-                    else if (dictMissing)
-                    {
-                        var fg = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0xDC, 0x26, 0x26));
-                        DashOcrStatusBadge.Background = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0xFE, 0xE2, 0xE2));
-                        DashOcrStatusText.Foreground = fg;
-                        DashOcrStatusText.Text = TryFindResource("Dash_Status_TranslationDataMissing") as string ?? "Translation data missing";
-                        if (DashOcrStatusIcon != null) DashOcrStatusIcon.Foreground = fg;
-                    }
-                    else if (!dictLoaded)
-                    {
-                        var fg = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0xD9, 0x77, 0x06));
-                        DashOcrStatusBadge.Background = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0xFE, 0xF3, 0xC7));
-                        DashOcrStatusText.Foreground = fg;
-                        DashOcrStatusText.Text = TryFindResource("Dash_Status_PreparingTranslations") as string ?? "Preparing translations…";
-                        if (DashOcrStatusIcon != null) DashOcrStatusIcon.Foreground = fg;
-                    }
-                    else
-                    {
-                        var fg = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0xDC, 0x26, 0x26));
-                        DashOcrStatusBadge.Background = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0xFE, 0xE2, 0xE2));
-                        DashOcrStatusText.Foreground = fg;
-                        DashOcrStatusText.Text = TryFindResource("Dash_Status_Stopped") as string ?? "Stopped";
-                        if (DashOcrStatusIcon != null) DashOcrStatusIcon.Foreground = fg;
-                    }
-                }
-
-                // Engine-failed banner (non-modal). Collapsed unless the last
-                // init attempt threw; shows Retry + "Fallback to CPU" buttons
-                // wired to MainWindow.OnRetryEngineLoad. The Retry path
-                // flips engine status back to Loading, the banner auto-hides,
-                // and the background Task.Run starts again. Failure is
-                // already reported to GlitchTip via
-                // CrashReportingService.ReportException in MainWindow — this
-                // panel is the user-facing counterpart.
-                if (DashEngineFailedBanner != null)
-                {
-                    DashEngineFailedBanner.Visibility = engineFailed ? Visibility.Visible : Visibility.Collapsed;
-                    if (engineFailed && DashEngineFailedDetails != null)
-                    {
-                        var err = LastEngineError;
-                        DashEngineFailedDetails.Text = err != null
-                            ? $"{err.GetType().Name}: {err.Message}"
-                            : TryFindResource("Dash_EngineFailed_UnknownDetails") as string ?? "Unknown error.";
-                    }
-                }
-
-                // Detail status
-                if (DashOcrDetailStatus != null)
-                {
-                    DashOcrDetailStatus.Text = ocrRunning
-                        ? TryFindResource("Dash_Status_Running") as string ?? "Running"
-                        : TryFindResource("Dash_Status_Stopped") as string ?? "Stopped";
-                    DashOcrDetailStatus.Foreground = StatusBrush(ocrRunning ? "SuccessBrush" : "ErrorBrush");
-                }
-
-                // Engine status: says what is happening, not just "Loading".
-                if (DashEngineStatus != null)
-                {
-                    if (engineFailed)
-                    {
-                        DashEngineStatus.Text = TryFindResource("Dash_Status_EngineFailed") as string ?? "Translator failed to load";
-                        DashEngineStatus.Foreground = StatusBrush("ErrorBrush");
-                    }
-                    else if (engineReady)
-                    {
-                        DashEngineStatus.Text = TryFindResource("Dash_Status_Ready") as string ?? "Ready";
-                        DashEngineStatus.Foreground = StatusBrush("SuccessBrush");
-                    }
-                    else
-                    {
-                        DashEngineStatus.Text = TryFindResource("Dash_Footer_EngineLoading") as string ?? "Starting the reader…";
-                        DashEngineStatus.Foreground = StatusBrush("WarnBrush");
-                    }
-                }
-
-                // Dictionary status
-                if (DashDictStatus != null)
-                {
-                    if (dictLoaded)
-                    {
-                        DashDictStatus.Text = string.Format(System.Globalization.CultureInfo.CurrentCulture,
-                            TryFindResource("Dash_Footer_DictReady_Format") as string ?? "{0:N0} entries", contentDict.Count);
-                        DashDictStatus.Foreground = StatusBrush("SuccessBrush");
-                    }
-                    else if (dictMissing)
-                    {
-                        DashDictStatus.Text = TryFindResource("Dash_Status_TranslationDataMissing") as string ?? "Translation data missing";
-                        DashDictStatus.Foreground = StatusBrush("ErrorBrush");
-                    }
-                    else
-                    {
-                        DashDictStatus.Text = TryFindResource("Dash_Footer_DictLoading") as string ?? "Loading the dictionary…";
-                        DashDictStatus.Foreground = StatusBrush("WarnBrush");
-                    }
-                }
-
-                // Prediction engine status
-                if (DashPredictionStatus != null)
-                {
-                    if (ContextEngine?.IsLoaded == true)
-                    {
-                        DashPredictionStatus.Text = ContextEngine.GetStats();
-                        DashPredictionStatus.Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x05, 0x96, 0x69));
-                    }
-                    else if (ContextEngine != null)
-                    {
-                        DashPredictionStatus.Text = "Loading...";
-                        DashPredictionStatus.Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0xD9, 0x77, 0x06));
-                    }
-                    else
-                    {
-                        DashPredictionStatus.Text = "Not loaded";
-                        DashPredictionStatus.Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x9C, 0xA3, 0xAF));
-                    }
-                }
-
-                // Subtitle toggle button
-                if (DashToggleSubtitleButton != null)
-                {
-                    DashToggleSubtitleButton.Content = subtitleVis
-                        ? TryFindResource("Dash_HideSubtitles") as string ?? "Hide Subtitles"
-                        : TryFindResource("Dash_ShowSubtitles") as string ?? "Show Subtitles";
-                }
-            }
-            catch (Exception ex)
-            {
-                Logger.Log.Error($"UpdateDashboardStatus error: {ex}");
-            }
-        }
-
-        /// <summary>
         /// Updates the region info display on the Dashboard tab.
         /// </summary>
         public void UpdateDashboardRegionInfo()
@@ -3769,7 +3535,9 @@ namespace GI_Subtitles.Views
                 }
                 else
                 {
-                    DashRegionInfo.Text = $"✓  {width} × {height} px  ·  ({x}, {y})";
+                    DashRegionInfo.Text = string.Format(CultureInfo.CurrentUICulture,
+                        L("shell_Region_Set_Format", "{0} × {1} px at {2}, {3}"), width, height, x, y);
+                    _ = UpdateRegionPreviewAsync();
                 }
 
                 // Show answer region info if configured
@@ -3942,6 +3710,9 @@ namespace GI_Subtitles.Views
 
         private void AutoShrinkCheckBox_Changed(object sender, RoutedEventArgs e)
         {
+            // XAML's IsChecked="True" fires this inside InitializeComponent, before the saved value is shown: writing
+            // then would turn a saved "off" back on at every launch.
+            if (!IsInitialized) return;
             Config.Set("AutoShrinkText", AutoShrinkCheckBox.IsChecked == true);
             UpdateMainWindowLayout();
         }
@@ -3971,37 +3742,22 @@ namespace GI_Subtitles.Views
 
         private void FontFamilyComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
+            // The XAML's selected item fires this inside InitializeComponent, and the constructor shows the saved face
+            // under _suppressSliderUpdate: only a user's pick writes.
+            if (!IsInitialized || _suppressSliderUpdate || _syncingLook) return;
             if (FontFamilyComboBox.SelectedItem is ComboBoxItem item && item.Tag is string fontName)
             {
-                Config.Set("FontFamily", fontName);
-                if (System.Windows.Application.Current.MainWindow is MainWindow mainWindow)
-                {
-                    var fontFamily = new System.Windows.Media.FontFamily(fontName);
-                    mainWindow.SubtitleText.FontFamily = fontFamily;
-                    mainWindow.HeaderText.FontFamily = fontFamily;
-                }
+                Config.Set(Services.Rendering.OverlayStyle.FontKey, fontName);
+                OverlayLookChanged(syncControls: false);
             }
         }
 
-        private void UpdateMainWindowPosition()
-        {
-            if (System.Windows.Application.Current.MainWindow is MainWindow mainWindow)
-            {
-                mainWindow.UpdateWindowPosition();
-            }
-        }
+        private void UpdateMainWindowPosition() => OverlayLookChanged(syncControls: false);
 
         /// <summary>
         /// Trigger layout recalculation on the main window (for display zone changes).
         /// </summary>
-        private void UpdateMainWindowLayout()
-        {
-            if (System.Windows.Application.Current.MainWindow is MainWindow mainWindow)
-            {
-                mainWindow._cachedFontSize = Config.Get<int>("Size", 24);
-                mainWindow.UpdateWindowHeightAndTop();
-            }
-        }
+        private void UpdateMainWindowLayout() => OverlayLookChanged(syncControls: false);
 
         private void RegionField_LostFocus(object sender, RoutedEventArgs e)
         {
@@ -4244,19 +4000,7 @@ namespace GI_Subtitles.Views
                     ? Visibility.Visible
                     : Visibility.Collapsed;
             }
-            if (DashGpuStatusNote != null)
-            {
-                OcrGpuStatus status = OcrGpuFitness.Status(
-                    Config.Get("UseGpuOcr", true), quarantined, Engine == EngineStatus.Ready, engine?.IsUsingGpu == true,
-                    OcrGpuQuarantine.StrikeThisSession);
-                DashGpuStatusNote.Text = status switch
-                {
-                    OcrGpuStatus.Unavailable => L("Dash_GpuUnavailable", "Running on the processor: the graphics card could not be started for translation. Updating the graphics driver usually fixes this; restart Kaption afterwards."),
-                    OcrGpuStatus.RetryNextLaunch => L("Dash_GpuRetryNextLaunch", "Running on the processor this time: the graphics card was busy or slow while Kaption started. It gets another try at the next launch."),
-                    _ => L("Dash_GpuQuarantined", "Running on the processor: the graphics card was too slow at startup. Tick “Use GPU acceleration” under General to try it again."),
-                };
-                DashGpuStatusNote.Visibility = status == OcrGpuStatus.Ok ? Visibility.Collapsed : Visibility.Visible;
-            }
+            UpdateEngineCard();
         }
 
         /// <summary>
@@ -4275,8 +4019,7 @@ namespace GI_Subtitles.Views
             Logger.Log.Info($"UseGpuOcr changed to {enabled}; restart required to rebuild the OCR engine.");
             if (OcrGpuQuarantineHint != null)
                 OcrGpuQuarantineHint.Visibility = Visibility.Collapsed;
-            if (enabled && DashGpuStatusNote != null)
-                DashGpuStatusNote.Visibility = Visibility.Collapsed;
+            UpdateEngineCard();
             if (OcrModelRestartHint != null)
                 OcrModelRestartHint.Visibility = Visibility.Visible;
         }
@@ -4832,6 +4575,9 @@ namespace GI_Subtitles.Views
         private readonly HashSet<string> _activeDownloads
             = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
+        /// <summary>The last pack sync installed new content (false after a relabel: same pack, new version).</summary>
+        private bool _lastPackSyncChangedContent;
+
         /// <summary>
         /// Wire up the list + kick off an initial background scan. Runs once
         /// from the constructor; subsequent refreshes go through
@@ -4886,6 +4632,7 @@ namespace GI_Subtitles.Views
 
             SetTranslationsSummary("Scanning local folder and checking for updates…");
             SetTranslationsControlsEnabled(false);
+            if (_translationPacks.Count == 0) SetTranslationsLoading(true);
 
             try
             {
@@ -4953,12 +4700,14 @@ namespace GI_Subtitles.Views
                     // ObservableCollection, but we key off the explicit count
                     // to keep the toggle in sync with the same frame that
                     // clears/repopulates the collection above.
+                    SetTranslationsLoading(false);
                     if (TranslationsEmptyState != null)
                     {
                         TranslationsEmptyState.Visibility = _translationPacks.Count == 0
                             ? Visibility.Visible
                             : Visibility.Collapsed;
                     }
+                    _ = RefreshPacksCardAsync();
 
                     // Pill highlight + IsActiveTarget reconciliation. Done last
                     // so it reads from the fully-populated _translationPacks.
@@ -4969,7 +4718,12 @@ namespace GI_Subtitles.Views
             catch (Exception ex)
             {
                 Logger.Log.Warn($"Translations: scan failed: {ex.Message}");
-                await Dispatcher.InvokeAsync(() => SetTranslationsSummary("Scan failed — see logs."));
+                await Dispatcher.InvokeAsync(() =>
+                {
+                    SetTranslationsSummary(L("state_ScanFailed", "Could not check the packs. The log has the details."));
+                    SetTranslationsLoading(false);
+                    if (TranslationsEmptyState != null && _translationPacks.Count == 0) TranslationsEmptyState.Visibility = Visibility.Visible;
+                });
             }
             finally
             {
@@ -5370,6 +5124,7 @@ namespace GI_Subtitles.Views
             SetTranslationsSummary($"Downloading {pack.LanguageDisplayName} for {pack.GameDisplayName}\u2026");
 
             bool success = false;
+            _lastPackSyncChangedContent = false;
             try
             {
                 var sync = new Services.Translation.DictionarySyncService(
@@ -5388,6 +5143,8 @@ namespace GI_Subtitles.Views
                     var result = await Task.Run(() => sync.SyncAsync(wireGame, wireLang, cts.Token));
                     success = result.Ok &&
                         GameDataPaths.HasAnyTextMap(pack.Game, pack.Language);
+                    // A relabelled pack (same content, new version) needs no restart: the loaded matcher is already it.
+                    _lastPackSyncChangedContent = result.Downloaded > 0;
                     if (result.Messages.Count > 0)
                     {
                         TranslationsNoticeText.Text = result.Messages[0];
@@ -5462,7 +5219,7 @@ namespace GI_Subtitles.Views
             try
             {
                 bool installed = await DownloadPackCoreAsync(pack);
-                if (installed &&
+                if (installed && _lastPackSyncChangedContent &&
                     string.Equals(pack.Game, Config.Get("Game", "Genshin"), StringComparison.OrdinalIgnoreCase) &&
                     string.Equals(pack.Language, Config.Get("Output", "PL"), StringComparison.OrdinalIgnoreCase))
                 {
@@ -5521,6 +5278,7 @@ namespace GI_Subtitles.Views
             {
                 e.Cancel = true;
                 Hide();
+                notifyIcon?.ShowCloseToTrayToastOnce();
                 return;
             }
             base.OnClosing(e);

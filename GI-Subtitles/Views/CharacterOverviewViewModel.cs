@@ -29,6 +29,8 @@ namespace GI_Subtitles.Views
         /// <summary>Hero art: splash decoded to this height (the band shows its upper half), portrait to this size.</summary>
         public const int SplashDecodeHeight = 760;
         public const int HeroPortrait = 200;
+        /// <summary>The ambience image behind the header, decoded at the updater's own height (1216×688 today).</summary>
+        public const int HeroAmbienceDecodeHeight = 688;
     }
 
     /// <summary>
@@ -43,10 +45,16 @@ namespace GI_Subtitles.Views
                 ["constellation"] = "C", ["eidolon"] = "E", ["mindscape"] = "M",
             };
 
+        /// <summary>"Gra też w drużynach" shows this many hosts until "Pokaż więcej".</summary>
+        public const int TeamHostCap = 6;
+
         private readonly Color _hue;
         private ImageSource _heroArt;
-        private ImageSource _ambience;
+        private ImageSource _heroAmbience;
         private bool _darkSurface;
+        private bool _allTeamHostsShown;
+        private bool _canOpenCharacters;
+        private string _siteLanguage = "pl";
 
         public CharacterOverviewViewModel(CharacterOverviewModel model)
         {
@@ -59,6 +67,7 @@ namespace GI_Subtitles.Views
             ElementSoft = ElementPalette.Brush(_hue, 0x40);
             ElementWash = ElementPalette.Brush(_hue, 0x1F);
             HeroWash = Wash(_hue);
+            HeroTint = Tint(_hue);
 
             var skills = model.Skills.Where(s => !ProgressionLetters.ContainsKey(s.Kind ?? "")).ToList();
             Skills = skills.Select((s, i) => SkillRow.From(s, showKind: i == 0 || skills[i - 1].Kind != s.Kind)).ToList();
@@ -72,21 +81,31 @@ namespace GI_Subtitles.Views
             ProgressionKey = progression.Count > 0 ? "Char_Tab_" + progression[0].Kind.ToLowerInvariant() : "";
 
             SetGroups = model.SetGroups.Select(SetGroupRow.From).Where(g => g.Options.Count > 0).ToList();
-            MainStats = model.MainStats.Where(m => m.Stats.Count > 0).Select(m => new MainStatRow
+            // Stat, set, weapon and material names read as the game shows them; the translation is a gloss.
+            MainStats = model.MainStats.Where(m => m.Stats.Count > 0).Select(m =>
             {
-                SlotKey = m.SlotKey,
-                Icon = SlotIcons.For(m.Slot),
-                Primary = m.Stats[0],
-                Alternatives = m.Stats.Count > 1 ? " / " + string.Join(" / ", m.Stats.Skip(1)) : "",
+                var english = m.Stats.Select((s, i) => ShortStatName(i < m.EnglishStats.Count && m.EnglishStats[i].Length > 0 ? m.EnglishStats[i] : s)).ToList();
+                return new MainStatRow
+                {
+                    SlotKey = m.SlotKey,
+                    Icon = SlotIcons.For(m.Slot),
+                    Primary = english[0],
+                    Alternatives = english.Count > 1 ? " / " + string.Join(" / ", english.Skip(1)) : "",
+                    Gloss = GlossOf(english, GlossInputs(english, m.Stats), " / "),
+                };
             }).ToList();
-            SubStats = model.SubStats.Select((s, i) => new RankedStat { Rank = i + 1, Name = s }).ToList();
+            SubStats = model.SubStats.Select((s, i) =>
+            {
+                string english = ShortStatName(i < model.SubStatsEnglish.Count && model.SubStatsEnglish[i].Length > 0 ? model.SubStatsEnglish[i] : s);
+                return new RankedStat { Rank = i + 1, Name = english, Gloss = GlossOf(new[] { english }, GlossInputs(new[] { english }, new[] { s }), "") };
+            }).ToList();
             Weapons = model.Weapons.Select(w => new WeaponRow(w, Game)).ToList();
 
             // When the whole build is an AI pick the section says so once; otherwise each AI line does.
             Tips = model.Highlights.Select(h => new TipRow(h, Game) { ShowAiTag = h.IsAi && !(model.HasBuild && model.BuildIsAi) }).ToList();
             MaterialsAscension = model.MaterialsAscension.Select(m => new MaterialRow(m)).ToList();
             MaterialsSkills = model.MaterialsSkills.Select(m => new MaterialRow(m)).ToList();
-            Links = model.Links.Select(l => new LinkRow(l.Label, l.Url) { IconPath = l.IconPath }).ToList();
+            Links = model.Links.Select(l => new LinkRow(l.Label, l.Url, l.IconKey, l.Monogram)).ToList();
 
             // The guide's first section is the summary "at a glance"; the rest is the article further down.
             if (model.Guide.Count > 0)
@@ -102,6 +121,7 @@ namespace GI_Subtitles.Views
 
             Facts = BuildFacts(model, Skills);
             Teams = model.Teams.Select(t => new TeamCardRow(t)).ToList();
+            TeamHosts = model.TeamHosts.Select(h => new TeamHostRow(h)).ToList();
             TeammateCards = model.TeammateCards.Count > 0
                 ? model.TeammateCards.Select(t => new TeammateChip(t.Name, t.IconPath)).ToList()
                 : model.Teammates.Select(n => new TeammateChip(n, null)).ToList();
@@ -112,8 +132,11 @@ namespace GI_Subtitles.Views
                 Later(() => LoadHeroArt(model), a => { _heroArt = a; Changed(nameof(HeroArt)); Changed(nameof(HasSplash)); Changed(nameof(HasPortraitArt)); Changed(nameof(HasNoArt)); });
             if (HasAmbience)
             {
-                _ambience = IconImages.CachedOrNull(model.AmbiencePath, OverviewImageSizes.Ambience);
-                if (_ambience == null) Later(() => IconImages.Load(model.AmbiencePath, OverviewImageSizes.Ambience), a => Ambience = a);
+                // The header's backdrop: on disk next to the bundle once fetched; until then (or offline) the plain wash.
+                _heroAmbience = IconImages.LargeCachedOrNull(model.AmbiencePath, OverviewImageSizes.HeroAmbienceDecodeHeight);
+                if (_heroAmbience == null)
+                    Later(() => IconImages.LoadLarge(model.AmbiencePath, OverviewImageSizes.HeroAmbienceDecodeHeight),
+                        a => { _heroAmbience = a; Changed(nameof(HeroAmbience)); Changed(nameof(HasHeroAmbience)); });
             }
         }
 
@@ -126,13 +149,14 @@ namespace GI_Subtitles.Views
             if (model == null) return;
             LoadHeroArt(model);
             IconImages.Load(model.IconPath, OverviewImageSizes.Portrait);
-            IconImages.Load(model.AmbiencePath, OverviewImageSizes.Ambience);
+            IconImages.LoadLarge(model.AmbiencePath, OverviewImageSizes.HeroAmbienceDecodeHeight);
             foreach (var s in model.Skills)
                 IconImages.Load(s.IconPath, ProgressionLetters.ContainsKey(s.Kind ?? "") ? OverviewImageSizes.Rank : OverviewImageSizes.Skill);
             foreach (var o in model.SetGroups.SelectMany(g => g.Options)) IconImages.Load(o.IconPath, OverviewImageSizes.Set);
             foreach (var w in model.Weapons) IconImages.Load(w.IconPath, OverviewImageSizes.Weapon);
             foreach (var m in model.Teams.SelectMany(t => t.Members)) IconImages.Load(m.IconPath, OverviewImageSizes.Member);
             foreach (var m in model.TeammateCards) IconImages.Load(m.IconPath, OverviewImageSizes.Member);
+            foreach (var h in model.TeamHosts) IconImages.Load(h.IconPath, OverviewImageSizes.Member);
             foreach (var h in model.Highlights) IconImages.Load(h.IconPath, OverviewImageSizes.Tip);
             foreach (var m in model.MaterialsAscension.Concat(model.MaterialsSkills)) IconImages.Load(m.IconPath, OverviewImageSizes.Material);
         }
@@ -154,6 +178,29 @@ namespace GI_Subtitles.Views
             var brush = new LinearGradientBrush(Color.FromArgb(0x24, hue.R, hue.G, hue.B), Color.FromArgb(0x08, hue.R, hue.G, hue.B), 0);
             brush.Freeze();
             return brush;
+        }
+
+        // Over the ambience image: the element rises from the lower half, where the header meets the panels below.
+        private static Brush Tint(Color hue)
+        {
+            var brush = new LinearGradientBrush { StartPoint = new System.Windows.Point(0, 0), EndPoint = new System.Windows.Point(0, 1) };
+            brush.GradientStops.Add(new GradientStop(Color.FromArgb(0x00, hue.R, hue.G, hue.B), 0.35));
+            brush.GradientStops.Add(new GradientStop(Color.FromArgb(0x2E, hue.R, hue.G, hue.B), 0.8));
+            brush.GradientStops.Add(new GradientStop(Color.FromArgb(0x1F, hue.R, hue.G, hue.B), 1));
+            brush.Freeze();
+            return brush;
+        }
+
+        /// <summary>
+        /// The interface language the page link follows ("pl" opens the Polish page, anything else the English one).
+        /// The view reads it from the strings in use, so a host and its tests agree.
+        /// </summary>
+        internal void SetSiteLanguage(string language)
+        {
+            if (string.IsNullOrEmpty(language) || string.Equals(language, _siteLanguage, StringComparison.OrdinalIgnoreCase)) return;
+            _siteLanguage = language;
+            Changed(nameof(PageUrl));
+            Changed(nameof(HasPageUrl));
         }
 
         /// <summary>The host's surface: element text and icons are darkened on light, lightened on dark.</summary>
@@ -212,6 +259,14 @@ namespace GI_Subtitles.Views
         /// <summary>The element colour, readable as text and icons on the host's surface.</summary>
         public Brush ElementText => ElementPalette.Brush(ElementPalette.Readable(_hue, _darkSurface));
 
+        /// <summary>The character's ambience image behind the header (null until it is on disk and decoded).</summary>
+        public ImageSource HeroAmbience => _heroAmbience;
+        public bool HasHeroAmbience => _heroAmbience != null;
+        /// <summary>Where the header's crop of the ambience image is centred (the data's focal point, 0 to 1).</summary>
+        public System.Windows.Point AmbienceFocal => new System.Windows.Point(Model.AmbienceFocalX, Model.AmbienceFocalY);
+        /// <summary>The element's colour rising from the header's lower half over the ambience image.</summary>
+        public Brush HeroTint { get; }
+
         public ImageSource HeroArt => _heroArt;
         public bool HasSplash => _heroArt != null && Model.SplashPath != null;
         public bool HasPortraitArt => _heroArt != null && Model.SplashPath == null;
@@ -225,19 +280,17 @@ namespace GI_Subtitles.Views
         /// <summary>The AI summary (the guide's first section), else the AI playstyle bullets.</summary>
         public IReadOnlyList<GuideBlock> Summary { get; }
         public bool HasSummary => Summary.Count > 0;
-        public bool HasSummaryOrArt => HasSummary || HasAmbience;
+        /// <summary>The ambience image is on disk. It is the header's backdrop (a theme for the page), not a picture
+        /// in "W skrócie".</summary>
         public bool HasAmbience => !string.IsNullOrEmpty(Model.AmbiencePath);
-        public ImageSource Ambience
-        {
-            get => _ambience;
-            private set { if (!ReferenceEquals(_ambience, value)) { _ambience = value; Changed(); } }
-        }
         public string AmbienceAlt => Model.AmbienceAlt;
-        public bool HasAmbienceAlt => !string.IsNullOrWhiteSpace(Model.AmbienceAlt);
-        /// <summary>Reserved before the image decodes, so nothing jumps.</summary>
-        public double AmbienceHeight => OverviewImageSizes.Ambience / (Model.AmbienceAspect > 0.3 ? Model.AmbienceAspect : 16.0 / 9.0);
         public IReadOnlyList<FactTile> Facts { get; }
-        public bool HasGlance => HasSummary || HasAmbience || Facts.Count > 0;
+        public bool HasGlance => HasSummary || Facts.Count > 0;
+        /// <summary>
+        /// "W skrócie" is a heading (and a tab) only with something to read. The catalogs carry no official intro
+        /// text today, so without an AI summary the key facts sit under the hero on their own.
+        /// </summary>
+        public bool ShowGlanceHeading => HasSummary;
 
         // ── skills and ranks ──
         public IReadOnlyList<SkillRow> Skills { get; }
@@ -266,7 +319,33 @@ namespace GI_Subtitles.Views
         public IReadOnlyList<TeammateChip> TeammateCards { get; }
         /// <summary>The game's own teammates, shown only when there are no team comps.</summary>
         public bool ShowTeammates => Teams.Count == 0 && TeammateCards.Count > 0;
-        public bool HasTeams => Teams.Count > 0 || TeammateCards.Count > 0;
+        public bool HasTeams => Teams.Count > 0 || TeammateCards.Count > 0 || TeamHosts.Count > 0;
+
+        /// <summary>Other characters' teams with a place for this one, the newest host first ("Gra też w drużynach").</summary>
+        public IReadOnlyList<TeamHostRow> TeamHosts { get; }
+        public bool HasTeamHosts => TeamHosts.Count > 0;
+        /// <summary>The first <see cref="TeamHostCap"/> hosts, or all of them after "Pokaż więcej".</summary>
+        public IReadOnlyList<TeamHostRow> ShownTeamHosts =>
+            _allTeamHostsShown || TeamHosts.Count <= TeamHostCap ? TeamHosts : TeamHosts.Take(TeamHostCap).ToList();
+        /// <summary>How many hosts "Pokaż więcej" adds; 0 once they show.</summary>
+        public int HiddenTeamHosts => TeamHosts.Count - ShownTeamHosts.Count;
+        public bool HasHiddenTeamHosts => HiddenTeamHosts > 0;
+
+        public void ShowAllTeamHosts()
+        {
+            if (_allTeamHostsShown) return;
+            _allTeamHostsShown = true;
+            Changed(nameof(ShownTeamHosts));
+            Changed(nameof(HiddenTeamHosts));
+            Changed(nameof(HasHiddenTeamHosts));
+        }
+
+        /// <summary>A host's name opens that character's page; only where a host can switch pages (the Characters tab).</summary>
+        public bool CanOpenCharacters
+        {
+            get => _canOpenCharacters;
+            internal set { if (_canOpenCharacters != value) { _canOpenCharacters = value; Changed(); } }
+        }
 
         // ── tips, materials, guide, links ──
         public IReadOnlyList<TipRow> Tips { get; }
@@ -277,8 +356,9 @@ namespace GI_Subtitles.Views
         public bool HasTips => Model.HasTips;
         public bool HasGuide => Guide.Count > 0;
         public bool HasMaterials => MaterialsAscension.Count > 0 || MaterialsSkills.Count > 0;
-        public string PageUrl => Model.PageUrl;
-        public bool HasPageUrl => Model.PageUrl.Length > 0;
+        /// <summary>The character's own page on kaption.one in the interface's language (Polish or English).</summary>
+        public string PageUrl => Model.PageUrlFor(_siteLanguage);
+        public bool HasPageUrl => PageUrl.Length > 0;
         public bool HasLinks => HasPageUrl || Links.Count > 0;
         public string WeaponsKey => Game.Length > 0 ? "Char_Weapons_" + Game : "Char_Weapons";
 
@@ -286,7 +366,7 @@ namespace GI_Subtitles.Views
         {
             var list = new List<SectionLink>();
             void Add(bool shown, string key, string labelKey) { if (shown) list.Add(new SectionLink(key, labelKey)); }
-            Add(HasGlance, "Glance", "Char_Nav_Glance");
+            Add(HasGlance && ShowGlanceHeading, "Glance", "Char_Nav_Glance");
             Add(HasBuildSection, "Build", "Char_Section_Build");
             Add(HasSkills, "Skills", "Char_Section_Skills");
             Add(HasProgression, "Ranks", ProgressionKey);
@@ -307,11 +387,14 @@ namespace GI_Subtitles.Views
                             ?? skills.FirstOrDefault(s => s.Kind == "chain" && s.Title.StartsWith("Ultimate", StringComparison.OrdinalIgnoreCase))
                             ?? skills.FirstOrDefault(s => s.Kind == "skill");
             if (signature != null)
-                facts.Add(new FactTile("Char_Fact_Signature", signature.Title, signature));
+                facts.Add(new FactTile("Char_Fact_Signature", SkillMarkers.WithMarker(signature.Title, signature.Marker), signature));
             if (model.Leveling.Count > 0)
             {
                 var first = skills.FirstOrDefault(s => s.Title == model.Leveling[0]);
-                facts.Add(new FactTile("Char_Fact_LevelFirst", model.Leveling[0], first) { IsAi = model.LevelingIsAi });
+                facts.Add(new FactTile("Char_Fact_LevelFirst", SkillMarkers.WithMarker(model.Leveling[0], first?.Marker), first)
+                {
+                    IsAi = model.LevelingIsAi,
+                });
             }
             return facts;
         }
@@ -347,6 +430,50 @@ namespace GI_Subtitles.Views
             }
             return sb.ToString();
         }
+
+        /// <summary>The game's short names for the percent stats ("ATK%", not "ATK Percentage"); every other name as given.</summary>
+        internal static string ShortStatName(string english)
+        {
+            string s = english?.Trim() ?? "";
+            if (string.Equals(s, "ATK Percentage", StringComparison.OrdinalIgnoreCase)) return "ATK%";
+            if (string.Equals(s, "DEF Percentage", StringComparison.OrdinalIgnoreCase)) return "DEF%";
+            if (string.Equals(s, "HP Percentage", StringComparison.OrdinalIgnoreCase)) return "HP%";
+            return english;
+        }
+
+        private static bool IsShortStat(string name) => name is "ATK%" or "DEF%" or "HP%";
+
+        /// <summary>A short name needs no gloss: its translation is left out of the gloss line.</summary>
+        private static IReadOnlyList<string> GlossInputs(IReadOnlyList<string> english, IReadOnlyList<string> translated) =>
+            english.Select((e, i) => IsShortStat(e) ? e : i < translated.Count ? translated[i] : e).ToList();
+
+        /// <summary>The translated names joined, or "" when each reads the same as the English one.</summary>
+        internal static string GlossOf(IReadOnlyList<string> english, IReadOnlyList<string> translated, string separator)
+        {
+            bool differs = false;
+            var parts = new List<string>();
+            for (int i = 0; i < english.Count; i++)
+            {
+                string t = i < translated.Count && !string.IsNullOrWhiteSpace(translated[i]) ? translated[i] : english[i];
+                differs |= TranslatesAWord(english[i], t);
+                parts.Add(t);
+            }
+            return differs ? string.Join(separator, parts) : "";
+        }
+
+        /// <summary>
+        /// The web's rule for a gloss: worth a line only when it translates at least one word ("Procent ATK" for
+        /// "ATK Percentage" does; "CRIT DMG" for "CRIT DMG" or a reordering of the same words does not).
+        /// </summary>
+        internal static bool TranslatesAWord(string english, string translated)
+        {
+            if (string.IsNullOrWhiteSpace(translated)) return false;
+            var words = new HashSet<string>(Words(english), StringComparer.OrdinalIgnoreCase);
+            return Words(translated).Any(w => !words.Contains(w));
+        }
+
+        private static IEnumerable<string> Words(string s) =>
+            System.Text.RegularExpressions.Regex.Matches(s ?? "", @"[\p{L}\p{N}]+").Cast<System.Text.RegularExpressions.Match>().Select(m => m.Value);
 
         /// <summary>Two names when the pack translates it: the English one the game shows first.</summary>
         internal static (string Title, string Subtitle) Names(string english, string translated)
@@ -494,6 +621,8 @@ namespace GI_Subtitles.Views
         public string Title { get; private set; } = "";
         /// <summary>The translation under it, "" when the pack has none or it matches.</summary>
         public string Subtitle { get; private set; } = "";
+        /// <summary>"(E)", "(Q)", …: written after the name wherever it appears outside this card.</summary>
+        public string Marker { get; private set; } = "";
         public string IconPath { get; private set; }
         public Geometry Glyph { get; private set; }
         /// <summary>AI line, else the official short text, else the start of the description.</summary>
@@ -527,6 +656,7 @@ namespace GI_Subtitles.Views
                 Name = s.Name,
                 Title = title,
                 Subtitle = subtitle,
+                Marker = s.Marker ?? "",
                 IconPath = s.IconPath,
                 Glyph = SkillGlyphs.For(s.Kind),
                 Preview = preview,
@@ -596,26 +726,36 @@ namespace GI_Subtitles.Views
         internal static SetGroupRow From(OverviewSetGroup g) => new SetGroupRow
         {
             PiecesText = g.Combine ? string.Join("+", g.Options.Select(_ => g.Pieces)) : g.Pieces.ToString(),
-            Options = g.Options.Select((o, i) => new SetOptionRow(o, i, g.Combine)).ToList(),
+            Options = g.Options.Select((o, i) => new SetOptionRow(o, i, g.Combine, g.Pieces)).ToList(),
         };
     }
 
     public sealed class SetOptionRow : ExpandableRow
     {
-        internal SetOptionRow(OverviewSet set, int index, bool combine)
+        internal SetOptionRow(OverviewSet set, int index, bool combine, int pieces = 0)
         {
-            Name = set.Name;
+            // "4 × A lub B" or "2 × A + 2 × B": the count before the first chip, before each chip of a pair.
+            PiecesLabel = pieces > 0 && (index == 0 || combine) ? $"{pieces} ×" : "";
+            Name = string.IsNullOrWhiteSpace(set.EnglishName) ? set.Name : set.EnglishName;
+            Gloss = CharacterOverviewViewModel.GlossOf(new[] { Name }, new[] { set.Name }, "");
             IconPath = set.IconPath;
-            Initial = CharacterOverviewViewModel.InitialOf(set.Name);
+            Initial = CharacterOverviewViewModel.InitialOf(Name);
             ShowOr = index > 0 && !combine;
             ShowPlus = index > 0 && combine;
             Bonuses = set.BonusItems.Count > 0
                 ? set.BonusItems.Select(b => BonusLine.From(b.Pieces, b.Text)).ToList()
                 : set.Bonuses.Select(BonusLine.Parse).ToList();
-            BonusesText = string.Join(Environment.NewLine, set.Bonuses);
+            BonusesText = string.Join(Environment.NewLine, (Gloss.Length > 0 ? new[] { Gloss } : Array.Empty<string>()).Concat(set.Bonuses));
         }
 
+        /// <summary>The name the game shows (English).</summary>
         public string Name { get; }
+        /// <summary>The translated name, "" when it reads the same.</summary>
+        public string Gloss { get; }
+        public bool HasGloss => Gloss.Length > 0;
+        /// <summary>"4 ×" before the chip it applies to, else "".</summary>
+        public string PiecesLabel { get; }
+        public bool HasPieces => PiecesLabel.Length > 0;
         public string IconPath { get; }
         public string Initial { get; }
         public bool ShowOr { get; }
@@ -651,6 +791,7 @@ namespace GI_Subtitles.Views
         {
             LabelKey = h.LabelKey == "Char_Tip_Weapon" && game.Length > 0 ? "Char_Tip_Weapon_" + game : h.LabelKey;
             Text = h.Text;
+            Gloss = h.Gloss ?? "";
             IsAi = h.IsAi;
             IconPath = h.IconPath;
             HasIconSlot = h.IconUrl != null;
@@ -659,6 +800,9 @@ namespace GI_Subtitles.Views
 
         public string LabelKey { get; }
         public string Text { get; }
+        /// <summary>The terms in the pack's language, shown smaller beneath; "" when they read the same.</summary>
+        public string Gloss { get; }
+        public bool HasGloss => Gloss.Length > 0;
         public bool IsAi { get; }
         public bool ShowAiTag { get; internal set; }
         public string IconPath { get; }
@@ -671,13 +815,17 @@ namespace GI_Subtitles.Views
     {
         internal MaterialRow(OverviewMaterial m)
         {
-            Name = m.Name;
+            Name = string.IsNullOrWhiteSpace(m.EnglishName) ? m.Name : m.EnglishName;
+            Gloss = CharacterOverviewViewModel.GlossOf(new[] { Name }, new[] { m.Name }, "");
             CountText = "×" + m.Count.ToString("N0", System.Globalization.CultureInfo.CurrentCulture);
             IconPath = m.IconPath;
-            Initial = CharacterOverviewViewModel.InitialOf(m.Name);
+            Initial = CharacterOverviewViewModel.InitialOf(Name);
         }
 
+        /// <summary>The name the game shows (English); the translation is the tooltip.</summary>
         public string Name { get; }
+        public string Gloss { get; }
+        public bool HasGloss => Gloss.Length > 0;
         public string CountText { get; }
         public string IconPath { get; }
         public string Initial { get; }
@@ -685,16 +833,22 @@ namespace GI_Subtitles.Views
 
     public sealed class LinkRow
     {
-        internal LinkRow(string label, string url)
+        internal LinkRow(string label, string url, string iconKey = LinkHosts.Generic, string monogram = "")
         {
             Label = label ?? "";
             Url = url ?? "";
+            IconKey = iconKey ?? LinkHosts.Generic;
+            Monogram = monogram ?? "";
         }
 
         public string Label { get; }
         public string Url { get; }
-        /// <summary>The site's favicon on disk; null shows a globe.</summary>
-        public string IconPath { get; internal set; }
+        /// <summary>The site's mark, drawn by the app: a letter tile, the video glyph, else a link glyph.</summary>
+        public string IconKey { get; }
+        public string Monogram { get; }
+        public bool HasMonogram => Monogram.Length > 0;
+        public bool IsVideo => IconKey == LinkHosts.YouTube;
+        public bool IsGeneric => !HasMonogram && !IsVideo;
     }
 
     /// <summary>A guide section that opens in place; the first one starts open.</summary>
@@ -722,7 +876,7 @@ namespace GI_Subtitles.Views
             Why = team.Why;
             Source = team.Source ?? "";
             IsOfficial = Source == "official";
-            IsAi = Source == "ai";
+            IsAi = CharacterTeamIndex.IsUpdaterPick(Source); // "ai", "ai+sources", "ai+curated": no source label
             Members = team.Members.Select(m => new TeamMemberRow(m)).ToList();
         }
 
@@ -752,6 +906,27 @@ namespace GI_Subtitles.Views
         public string Initial { get; }
     }
 
+    /// <summary>One row of "Gra też w drużynach": the host, the host's team and this character's role in it.</summary>
+    public sealed class TeamHostRow
+    {
+        internal TeamHostRow(OverviewTeamHost host)
+        {
+            HostId = host.HostId;
+            HostName = host.HostName;
+            IconPath = host.IconPath;
+            Initial = CharacterOverviewViewModel.InitialOf(host.HostName);
+            TeamName = host.TeamName;
+            Role = host.Role;
+        }
+
+        public string HostId { get; }
+        public string HostName { get; }
+        public string IconPath { get; }
+        public string Initial { get; }
+        public string TeamName { get; }
+        public string Role { get; }
+    }
+
     /// <summary>A teammate chip: portrait when cached, otherwise the initial.</summary>
     public sealed class TeammateChip
     {
@@ -771,31 +946,52 @@ namespace GI_Subtitles.Views
     {
         public string SlotKey { get; set; } = "";
         public Geometry Icon { get; set; }
+        /// <summary>Stat names as the game shows them (English).</summary>
         public string Primary { get; set; } = "";
         public string Alternatives { get; set; } = "";
+        /// <summary>The same stats translated, beneath; "" when they read the same.</summary>
+        public string Gloss { get; set; } = "";
+        public bool HasGloss => Gloss.Length > 0;
     }
 
+    /// <summary>One substat in priority order: the order carries the rank, the first chip is marked.</summary>
     public sealed class RankedStat
     {
         public int Rank { get; set; }
+        /// <summary>The stat as the game shows it (English); the translation, when it says something, beneath.</summary>
         public string Name { get; set; } = "";
+        public string Gloss { get; set; } = "";
+        public bool HasGloss => Gloss.Length > 0;
+        public bool IsFirst => Rank == 1;
+        /// <summary>A muted "›" before every chip but the first.</summary>
+        public bool ShowSeparator => Rank > 1;
+        /// <summary>What a screen reader says: the rank the chip no longer prints, the stat, its translation.</summary>
+        public string AutomationName => HasGloss ? $"{Rank}. {Name} ({Gloss})" : $"{Rank}. {Name}";
     }
 
     public sealed class WeaponRow : ExpandableRow
     {
         internal WeaponRow(OverviewWeapon w, string game)
         {
-            Name = w.Name;
             RarityText = w.RarityText;
             RarityTier = CharacterOverviewViewModel.Tier(game, w.Rarity);
             IsRank = RarityText.Length == 1 && char.IsLetter(RarityText[0]);
             IconPath = w.IconPath;
-            Initial = CharacterOverviewViewModel.InitialOf(w.Name);
-            PassiveName = w.PassiveName;
+            Name = string.IsNullOrWhiteSpace(w.EnglishName) ? w.Name : w.EnglishName;
+            Gloss = CharacterOverviewViewModel.GlossOf(new[] { Name }, new[] { w.Name }, "");
+            Initial = CharacterOverviewViewModel.InitialOf(Name);
+            PassiveName = string.IsNullOrWhiteSpace(w.EnglishPassiveName) ? w.PassiveName : w.EnglishPassiveName;
+            PassiveGloss = CharacterOverviewViewModel.GlossOf(new[] { PassiveName }, new[] { w.PassiveName }, "");
             Passive = w.Passive;
         }
 
+        /// <summary>The name the game shows (English).</summary>
         public string Name { get; }
+        /// <summary>" (translated name)" after it, "" when it reads the same.</summary>
+        public string Gloss { get; }
+        public string GlossSuffix => Gloss.Length > 0 ? " (" + Gloss + ")" : "";
+        public string PassiveGloss { get; }
+        public bool HasPassiveGloss => PassiveGloss.Length > 0;
         public string RarityText { get; }
         public string RarityTier { get; }
         public bool IsRank { get; }

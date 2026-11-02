@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Windows;
 using GI_Subtitles.Models;
@@ -55,7 +56,19 @@ namespace GI_Subtitles.Services.Rendering
         /// Detected text blocks with positions from OCR.
         /// </summary>
         public List<TextBlockInfo> DetectedBlocks { get; set; }
+
+        /// <summary>
+        /// Measures the whole panel (padding included) at a font size and text width with the real control, so auto-shrink sees the face,
+        /// spacing and line balancing the overlay draws. Null: the built-in Segoe UI estimate (the promo renderer).
+        /// </summary>
+        public Func<double, double, SubtitleContentMeasure> MeasureContent { get; set; }
+
+        /// <summary>With auto-shrink on, the text shrinks until it fits in this many lines (0 = no limit).</summary>
+        public int PreferredMaxLines { get; set; }
     }
+
+    /// <summary>The panel's size at one font size and how many lines the subtitle took.</summary>
+    public readonly record struct SubtitleContentMeasure(Size Size, int Lines);
 
     /// <summary>
     /// Result of subtitle layout calculation.

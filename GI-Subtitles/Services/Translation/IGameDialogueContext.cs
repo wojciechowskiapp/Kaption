@@ -25,6 +25,20 @@ namespace GI_Subtitles.Services.Translation
         public string EnText;
     }
 
+    /// <summary>Why the last <see cref="IGameDialogueContext.Load"/> left the engine unloaded.</summary>
+    public enum DialoguePrepareFailure
+    {
+        /// <summary>No failure recorded: prepared, or not loaded yet.</summary>
+        None = 0,
+
+        /// <summary>A machine-bound bundle file failed HMAC (another device key, or tampered).
+        /// Re-downloading the bundle fixes it.</summary>
+        StaleMachineBoundFile,
+
+        /// <summary>Any other refusal: game mismatch, corrupt sidecar, unexpected error.</summary>
+        Other,
+    }
+
     /// <summary>
     /// Game-agnostic public contract for the dialogue prediction engine.
     /// Consumers (MainWindow, SettingsWindow, AnswerTranslationService)
@@ -38,6 +52,10 @@ namespace GI_Subtitles.Services.Translation
         /// the dialogue graph and auxiliary indexes. Volatile: read safely
         /// from any thread.</summary>
         bool IsLoaded { get; }
+
+        /// <summary>Why the last <see cref="Load"/> left <see cref="IsLoaded"/> false;
+        /// <see cref="DialoguePrepareFailure.None"/> when it succeeded.</summary>
+        DialoguePrepareFailure LastPrepareFailure { get; }
 
         /// <summary>Total hot-cache hits since construction. Diagnostic only;
         /// surfaced on the Dashboard via <see cref="GetStats"/>. Increments

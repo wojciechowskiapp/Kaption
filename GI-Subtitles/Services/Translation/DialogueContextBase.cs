@@ -124,6 +124,11 @@ namespace GI_Subtitles.Services.Translation
 
         bool IGameDialogueContext.IsLoaded => IsLoaded;
 
+        private volatile DialoguePrepareFailure _lastPrepareFailure;
+
+        /// <inheritdoc/>
+        public DialoguePrepareFailure LastPrepareFailure => _lastPrepareFailure;
+
         // Lazy-load state. Kept separate from IsLoaded so call-site gates
         // continue to flow through to hot-path methods. Flips to true only
         // when the underlying graph, NPC names, talk index, quest info, and
@@ -335,6 +340,7 @@ namespace GI_Subtitles.Services.Translation
             IProgress<(int percent, string message)> progress = null,
             FileProtectionHelper protectionHelper = null)
         {
+            _lastPrepareFailure = DialoguePrepareFailure.None;
             try
             {
                 // Forward-compat: optional BundleMeta file lets us gate on
@@ -344,8 +350,10 @@ namespace GI_Subtitles.Services.Translation
                 // bundle_version source. This is the ONE check we do
                 // eagerly — it's a sub-KB file and it determines whether
                 // we're willing to load *anything* for this game at all.
-                if (!ValidateBundleMeta(dataDir, protectionHelper))
+                DialoguePrepareFailure metaFailure = ValidateBundleMeta(dataDir, protectionHelper);
+                if (metaFailure != DialoguePrepareFailure.None)
                 {
+                    _lastPrepareFailure = metaFailure;
                     IsLoaded = false;
                     _isFullyLoaded = false;
                     return;
@@ -378,6 +386,7 @@ namespace GI_Subtitles.Services.Translation
             catch (Exception ex)
             {
                 Logger.Log.Error($"Failed to prepare dialogue engine: {ex.Message}");
+                _lastPrepareFailure = DialoguePrepareFailure.Other;
                 IsLoaded = false;
                 _isFullyLoaded = false;
             }
@@ -638,21 +647,21 @@ namespace GI_Subtitles.Services.Translation
 
         /// <summary>
         /// Check an optional <c>BundleMeta</c> sidecar for bundle_version +
-        /// extension.game. Returns false only when a meta is present AND the
-        /// declared game contradicts <see cref="ExpectedBundleGame"/>.
+        /// extension.game. Reports a failure only when a meta is present AND it
+        /// is unreadable or declares a game other than <see cref="ExpectedBundleGame"/>.
         /// Missing meta = v1 bundle = accept.
         /// </summary>
-        private bool ValidateBundleMeta(string dataDir, FileProtectionHelper protectionHelper)
+        private DialoguePrepareFailure ValidateBundleMeta(string dataDir, FileProtectionHelper protectionHelper)
         {
             if (string.IsNullOrEmpty(ExpectedBundleGame))
-                return true;
+                return DialoguePrepareFailure.None;
 
             string metaPath = Path.Combine(dataDir, "BundleMeta.json");
             bool metaExists = protectionHelper != null
                 ? protectionHelper.FileExists(metaPath)
                 : File.Exists(metaPath);
             if (!metaExists)
-                return true; // v1 bundles have no meta — tolerate.
+                return DialoguePrepareFailure.None; // v1 bundles have no meta — tolerate.
 
             try
             {
@@ -663,16 +672,25 @@ namespace GI_Subtitles.Services.Translation
                 // sidecar fields (bundle_version, schema hints).
                 string bundleGame = ReadBundleMetaGame(metaPath, protectionHelper);
                 if (string.IsNullOrEmpty(bundleGame))
-                    return true; // extension missing = v1 bundle — tolerate.
+                    return DialoguePrepareFailure.None; // extension missing = v1 bundle — tolerate.
 
                 if (!string.Equals(bundleGame, ExpectedBundleGame, StringComparison.OrdinalIgnoreCase))
                 {
                     Logger.Log.Error(
                         $"BundleMeta game mismatch: expected \"{ExpectedBundleGame}\" " +
                         $"but bundle declares \"{bundleGame}\". Refusing to load.");
-                    return false;
+                    return DialoguePrepareFailure.Other;
                 }
-                return true;
+                return DialoguePrepareFailure.None;
+            }
+            catch (Exception ex) when (CryptoFailure.IsCryptographic(ex))
+            {
+                // Intact bytes sealed under another device key (fingerprint drift, copied
+                // %APPDATA%, rotated secret). Expected, so Warn: the caller re-downloads.
+                Logger.Log.Warn(
+                    $"BundleMeta for \"{ExpectedBundleGame}\" was encrypted on another device ({ex.Message}); " +
+                    "refusing to load until the gamedata bundle is re-downloaded.");
+                return DialoguePrepareFailure.StaleMachineBoundFile;
             }
             catch (Exception ex)
             {
@@ -680,10 +698,10 @@ namespace GI_Subtitles.Services.Translation
                 // A corrupt BundleMeta often co-occurs with a half-written
                 // split file set (process killed mid-install). Loading
                 // partial data into the prediction engine silently
-                // degrades OCR matching; refusing to load forces a
-                // clean re-sync on the next launch, which is cheap.
+                // degrades OCR matching. Nothing re-syncs it (the sync only
+                // checks that the files exist), so this stays an Error.
                 Logger.Log.Error($"BundleMeta parse failed ({ex.Message}); refusing to load because ExpectedBundleGame is set.");
-                return false;
+                return DialoguePrepareFailure.Other;
             }
         }
 

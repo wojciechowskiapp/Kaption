@@ -1,0 +1,12 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System;assembly=mscorlib">
+    <!-- CharacterOverviewView layout in the Ctrl+Q popup: narrow, and it never takes focus from the game. -->
+    <sys:Double x:Key="Char_HeroHeight">156</sys:Double>
+    <Thickness x:Key="Char_Gutter">16,0,16,0</Thickness>
+    <Thickness x:Key="Char_ContentPadding">16,0,16,20</Thickness>
+    <sys:Double x:Key="Char_ReadingWidth">520</sys:Double>
+    <sys:Double x:Key="Char_ContentMaxWidth">760</sys:Double>
+    <sys:Double x:Key="Char_ArtWidth">240</sys:Double>
+    <sys:Boolean x:Key="Char_Focusable">False</sys:Boolean>
+</ResourceDictionary>

@@ -22,9 +22,9 @@ namespace GI_Subtitles.Services.Characters
             foreach (var mat in Materials(model)) mat.IconPath = cache.CachedPathOrNull(mat.IconUrl);
             foreach (var skill in model.Skills) skill.IconPath = cache.CachedPathOrNull(skill.IconUrl);
             foreach (var member in Members(model)) member.IconPath = cache.CachedPathOrNull(member.IconUrl);
+            foreach (var host in model.TeamHosts) host.IconPath = cache.CachedPathOrNull(host.IconUrl);
             model.SplashPath = cache.CachedPathOrNull(model.SplashUrl);
             model.AmbiencePath = cache.CachedPathOrNull(model.AmbienceUrl);
-            foreach (var link in model.Links) link.IconPath = cache.CachedPathOrNull(link.IconUrl);
         }
 
         /// <returns>True when at least one new icon is now on disk.</returns>
@@ -48,12 +48,12 @@ namespace GI_Subtitles.Services.Characters
                 jobs.Add(Fetch(cache, skill.IconUrl, p => skill.IconPath = p));
             foreach (var member in Members(model).Where(x => x.IconPath == null && x.IconUrl != null))
                 jobs.Add(Fetch(cache, member.IconUrl, p => member.IconPath = p));
+            foreach (var host in model.TeamHosts.Where(x => x.IconPath == null && x.IconUrl != null))
+                jobs.Add(Fetch(cache, host.IconUrl, p => host.IconPath = p));
             if (model.SplashPath == null && model.SplashUrl != null)
                 jobs.Add(Fetch(cache, model.SplashUrl, p => model.SplashPath = p, CharacterImageCache.LargeMaxBytes));
             if (model.AmbiencePath == null && model.AmbienceUrl != null)
                 jobs.Add(Fetch(cache, model.AmbienceUrl, p => model.AmbiencePath = p, CharacterImageCache.LargeMaxBytes));
-            foreach (var link in model.Links.Where(x => x.IconPath == null && x.IconUrl != null))
-                jobs.Add(Fetch(cache, link.IconUrl, p => link.IconPath = p));
             if (jobs.Count == 0) return false;
             return (await Task.WhenAll(jobs).ConfigureAwait(false)).Any(got => got);
         }

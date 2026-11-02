@@ -1,0 +1,389 @@
+<Window x:Class="GI_Subtitles.Views.OnboardingWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:shell="clr-namespace:GI_Subtitles.Views.Shell"
+        Title="Kaption"
+        Width="1000" Height="720" MinWidth="960" MinHeight="720"
+        Icon="../Resources/kaption.ico"
+        WindowStartupLocation="CenterScreen"
+        ResizeMode="CanMinimize"
+        Style="{DynamicResource KaptionWindow}">
+
+    <!-- One window for the whole first run (Witaj → Gra → Zaloguj → Przygotowuję → Gotowe); the same window is the
+         setup guide from Help. Flow rules: Views/Shell/OnboardingFlow.cs. -->
+
+    <Window.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="../Resources/ModernStyles.xaml"/>
+            </ResourceDictionary.MergedDictionaries>
+
+            <!-- A step in the rail: mark, label; done / current / upcoming. -->
+            <DataTemplate x:Key="RailStep">
+                <Grid MinHeight="40">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="24"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Grid Width="20" Height="20" VerticalAlignment="Center" HorizontalAlignment="Left">
+                        <Ellipse x:Name="ring" Stroke="{StaticResource BandRingBrush}" StrokeThickness="1.5"/>
+                        <Ellipse x:Name="dot" Width="8" Height="8" Fill="{StaticResource BandAccentBrush}" Visibility="Collapsed"/>
+                        <Ellipse x:Name="done" Fill="{StaticResource BandAccentBrush}" Visibility="Collapsed"/>
+                        <Path x:Name="check" Data="{StaticResource IconCheck}" Width="16" Height="16" Stretch="None" Margin="2,2,0,0"
+                              HorizontalAlignment="Left" VerticalAlignment="Top" Stroke="{StaticResource BandBgBrush}" StrokeThickness="2"
+                              StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" Visibility="Collapsed"/>
+                    </Grid>
+                    <TextBlock x:Name="label" Grid.Column="1" Text="{Binding Label}" Margin="12,0,0,0" VerticalAlignment="Center"
+                               FontSize="{StaticResource FontSizeLarge}" Foreground="{StaticResource BandMutedBrush}"/>
+                </Grid>
+                <DataTemplate.Triggers>
+                    <DataTrigger Binding="{Binding State}" Value="Current">
+                        <Setter TargetName="ring" Property="Stroke" Value="{StaticResource BandAccentBrush}"/>
+                        <Setter TargetName="dot" Property="Visibility" Value="Visible"/>
+                        <Setter TargetName="label" Property="Foreground" Value="{StaticResource BandTextBrush}"/>
+                        <Setter TargetName="label" Property="FontWeight" Value="SemiBold"/>
+                    </DataTrigger>
+                    <DataTrigger Binding="{Binding State}" Value="Done">
+                        <Setter TargetName="ring" Property="Visibility" Value="Collapsed"/>
+                        <Setter TargetName="done" Property="Visibility" Value="Visible"/>
+                        <Setter TargetName="check" Property="Visibility" Value="Visible"/>
+                        <Setter TargetName="label" Property="Foreground" Value="{StaticResource BandDetailBrush}"/>
+                    </DataTrigger>
+                </DataTemplate.Triggers>
+            </DataTemplate>
+
+            <!-- One checklist row: mark, text, optional bar and note. -->
+            <Style x:Key="ChecklistText" TargetType="TextBlock">
+                <Setter Property="FontSize" Value="{StaticResource FontSizeLarge}"/>
+                <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
+                <Setter Property="TextWrapping" Value="Wrap"/>
+                <Setter Property="VerticalAlignment" Value="Center"/>
+            </Style>
+        </ResourceDictionary>
+    </Window.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <shell:TitleBar x:Name="WindowTitleBar" Title="Kaption" Subtitle="{DynamicResource onb_Window_Subtitle}" CanMaximize="False"/>
+
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="300"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- ═══ Step rail on the ambience art ═══ -->
+            <Grid ClipToBounds="True">
+                <Border Background="{StaticResource BandBgBrush}"/>
+                <Border Opacity="0.6" RenderOptions.BitmapScalingMode="HighQuality">
+                    <Border.Background>
+                        <ImageBrush x:Name="RailArt" Stretch="UniformToFill" AlignmentX="Center"/>
+                    </Border.Background>
+                </Border>
+                <Border Background="{StaticResource RailScrimBrush}"/>
+                <StackPanel Margin="32,36,24,28">
+                    <Image Source="{StaticResource KaptionMark}" Width="40" Height="40" HorizontalAlignment="Left"
+                           RenderOptions.BitmapScalingMode="HighQuality"/>
+                    <TextBlock Text="Kaption" Margin="0,14,0,0" FontFamily="{StaticResource FontDisplay}" FontSize="24" FontWeight="SemiBold"
+                               Foreground="{StaticResource BandTextBrush}"/>
+                    <TextBlock Text="{DynamicResource onb_Rail_Tagline}" Margin="0,4,0,0" Style="{StaticResource BandSub}"/>
+                    <ItemsControl x:Name="StepList" Margin="0,40,0,0" ItemTemplate="{StaticResource RailStep}" Focusable="False"
+                                  AutomationProperties.Name="{DynamicResource onb_Window_Subtitle}"/>
+                </StackPanel>
+            </Grid>
+
+            <!-- ═══ The step ═══ -->
+            <Grid Grid.Column="1">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <ScrollViewer x:Name="StepScroller" Style="{StaticResource PageScroller}">
+                    <StackPanel Margin="48,32,48,24" MaxWidth="600" HorizontalAlignment="Left">
+                        <TextBlock x:Name="StepEyebrow" Style="{StaticResource Eyebrow}" Margin="0,0,0,10"/>
+                        <TextBlock x:Name="StepHeading" Style="{StaticResource PageHeading}" FontSize="26"
+                                   AutomationProperties.HeadingLevel="Level1" AutomationProperties.LiveSetting="Polite"/>
+                        <TextBlock x:Name="StepLead" Style="{StaticResource BodyText}" FontSize="{StaticResource FontSizeLarge}" Margin="0,8,0,22"/>
+
+                        <!-- 1 · Witaj -->
+                        <StackPanel x:Name="WelcomePanel">
+                            <TextBlock Text="{DynamicResource onb_Welcome_Language}" Style="{StaticResource FieldLabel}" Margin="0,0,0,8"/>
+                            <WrapPanel Margin="0,0,0,24">
+                                <RadioButton x:Name="LangPl" Style="{StaticResource SegmentRadio}" GroupName="OnbLang" Content="Polski" Tag="pl-PL"
+                                             Checked="Language_Checked"/>
+                                <RadioButton x:Name="LangEn" Style="{StaticResource SegmentRadio}" GroupName="OnbLang" Content="English" Tag="en-US"
+                                             Checked="Language_Checked"/>
+                            </WrapPanel>
+                            <Border Style="{StaticResource Callout}" Padding="16,14">
+                                <StackPanel>
+                                    <CheckBox x:Name="EulaCheck" Style="{StaticResource ModernCheckBox}" Checked="Eula_Changed" Unchecked="Eula_Changed">
+                                        <TextBlock TextWrapping="Wrap" Foreground="{DynamicResource TextBrush}">
+                                            <Run x:Name="RunEulaPrefix"/><Hyperlink x:Name="EulaLink" NavigateUri="https://kaption.one/legal/eula" RequestNavigate="Link_RequestNavigate"><Run x:Name="RunEulaLink1"/></Hyperlink><Run x:Name="RunEulaMid"/><Hyperlink x:Name="PrivacyLink" NavigateUri="https://kaption.one/legal/privacy" RequestNavigate="Link_RequestNavigate"><Run x:Name="RunEulaLink2"/></Hyperlink><Run x:Name="RunEulaSuffix"/>
+                                        </TextBlock>
+                                    </CheckBox>
+                                    <TextBlock x:Name="EulaAcceptedNote" Text="{DynamicResource onb_Rerun_Eula}" Style="{StaticResource BodyText}"
+                                               Visibility="Collapsed"/>
+                                    <CheckBox x:Name="CrashCheck" Style="{StaticResource ModernCheckBox}" Margin="0,14,0,0"
+                                              Content="{DynamicResource onb_Welcome_Crash}"/>
+                                    <TextBlock Text="{DynamicResource onb_Welcome_CrashHint}" Style="{StaticResource HintText}" Margin="28,4,0,0"/>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- How it works, in three frames: the game's line, Kaption reading it, the Polish line above it. -->
+                            <TextBlock Text="{DynamicResource onb_How_Title}" Style="{StaticResource FieldLabel}" Margin="0,28,0,10"
+                                       AutomationProperties.HeadingLevel="Level2"/>
+                            <Grid x:Name="HowItWorksStrip" HorizontalAlignment="Left">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="24"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="24"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+                                <shell:HowItWorksFrame Stage="1"/>
+                                <Path Grid.Column="1" Data="{StaticResource IconChevronRight}" Width="16" Height="16" Stretch="None" StrokeThickness="1.6"
+                                      Stroke="{DynamicResource TextTertiaryBrush}" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                                      StrokeLineJoin="Round" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                <shell:HowItWorksFrame Grid.Column="2" Stage="2"/>
+                                <Path Grid.Column="3" Data="{StaticResource IconChevronRight}" Width="16" Height="16" Stretch="None" StrokeThickness="1.6"
+                                      Stroke="{DynamicResource TextTertiaryBrush}" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                                      StrokeLineJoin="Round" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                <shell:HowItWorksFrame Grid.Column="4" Stage="3"/>
+                                <TextBlock Grid.Row="1" Text="{DynamicResource onb_How_1}" Style="{StaticResource HintText}" TextAlignment="Center"
+                                           Width="{x:Static shell:HowItWorksFrame.FrameWidth}" Margin="0,8,0,0"/>
+                                <TextBlock Grid.Row="1" Grid.Column="2" Text="{DynamicResource onb_How_2}" Style="{StaticResource HintText}" TextAlignment="Center"
+                                           Width="{x:Static shell:HowItWorksFrame.FrameWidth}" Margin="0,8,0,0"/>
+                                <TextBlock Grid.Row="1" Grid.Column="4" Text="{DynamicResource onb_How_3}" Style="{StaticResource HintText}" TextAlignment="Center"
+                                           Width="{x:Static shell:HowItWorksFrame.FrameWidth}" Margin="0,8,0,0"/>
+                            </Grid>
+                        </StackPanel>
+
+                        <!-- 2 · Gra -->
+                        <StackPanel x:Name="GamePanel" Visibility="Collapsed">
+                            <Border x:Name="DetectBanner" Style="{StaticResource Callout}" Margin="0,0,0,16">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <shell:StatusMark x:Name="DetectMark" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                                    <TextBlock x:Name="DetectText" Grid.Column="1" Style="{StaticResource BodyText}" Foreground="{DynamicResource TextBrush}"
+                                               VerticalAlignment="Center" AutomationProperties.LiveSetting="Polite"/>
+                                    <Button x:Name="CheckAgainButton" Grid.Column="2" Style="{StaticResource LinkButton}" Margin="12,0,0,0"
+                                            Content="{DynamicResource onb_Game_CheckAgain}" Click="CheckAgain_Click"/>
+                                </Grid>
+                            </Border>
+                            <TextBlock Text="{DynamicResource onb_Game_Pick}" Style="{StaticResource FieldLabel}" Margin="0,0,0,8"/>
+                            <WrapPanel Margin="0,0,0,16">
+                                <RadioButton x:Name="GameGenshin" Style="{StaticResource SegmentRadio}" GroupName="OnbGame" Content="Genshin Impact"
+                                             Tag="Genshin" Checked="Game_Checked"/>
+                                <RadioButton x:Name="GameStarRail" Style="{StaticResource SegmentRadio}" GroupName="OnbGame" Content="Honkai: Star Rail"
+                                             Tag="StarRail" Checked="Game_Checked"/>
+                                <RadioButton x:Name="GameZzz" Style="{StaticResource SegmentRadio}" GroupName="OnbGame" Content="Zenless Zone Zero"
+                                             Tag="ZZZ" Checked="Game_Checked"/>
+                            </WrapPanel>
+                            <!-- Genshin in exclusive full screen hides the overlay: said here, inline, instead of a modal later. -->
+                            <Border x:Name="DisplayModeNotice" Style="{StaticResource Callout}" Background="{DynamicResource WarnLightBrush}"
+                                    Margin="0,0,0,16" Visibility="Collapsed">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Path Data="{StaticResource IconWarning}" Width="16" Height="16" Stretch="None" VerticalAlignment="Top" Margin="0,2,10,0"
+                                          Stroke="{DynamicResource WarnBrush}" StrokeThickness="1.6" StrokeLineJoin="Round"
+                                          StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
+                                    <StackPanel Grid.Column="1">
+                                        <TextBlock Text="{DynamicResource onb_DisplayMode}" Style="{StaticResource BodyText}" Foreground="{DynamicResource TextBrush}"/>
+                                        <Button Style="{StaticResource LinkButton}" Content="{DynamicResource onb_DisplayMode_Link}" Click="Borderless_Click"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+                            <Border Style="{StaticResource Card}">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="18"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Border Width="208" Height="117" CornerRadius="8" Background="{DynamicResource Ink950Brush}"
+                                            BorderBrush="{DynamicResource HairlineBrush}" BorderThickness="1" ClipToBounds="True" VerticalAlignment="Top">
+                                        <Grid>
+                                            <Image x:Name="RegionPreviewImage" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality"
+                                                   AutomationProperties.Name="{DynamicResource shell_Region_Title}"/>
+                                            <TextBlock x:Name="RegionPreviewEmpty" Text="{DynamicResource shell_Region_Preview_None}"
+                                                       Foreground="{StaticResource BandSubBrush}" FontSize="{StaticResource FontSizeSmall}"
+                                                       TextWrapping="Wrap" TextAlignment="Center" VerticalAlignment="Center" Margin="18,0"/>
+                                        </Grid>
+                                    </Border>
+                                    <StackPanel Grid.Column="2">
+                                        <TextBlock Text="{DynamicResource shell_Region_Title}" Style="{StaticResource CardTitle}"/>
+                                        <TextBlock x:Name="RegionStatus" Style="{StaticResource BodyText}" Text="{DynamicResource onb_Region_None}"/>
+                                        <TextBlock x:Name="RegionMonitor" Style="{StaticResource HintText}" Margin="0,2,0,12"/>
+                                        <WrapPanel>
+                                            <Button x:Name="DetectRegionButton" Style="{StaticResource SecondaryButton}" Margin="0,0,8,8"
+                                                    Content="{DynamicResource shell_Region_Detect}" Click="DetectRegion_Click"/>
+                                            <Button Style="{StaticResource SecondaryButton}" Margin="0,0,8,8"
+                                                    Content="{DynamicResource onb_Region_Fix}" Click="FixRegion_Click"/>
+                                        </WrapPanel>
+                                        <TextBlock Text="{DynamicResource onb_Region_Hint}" Style="{StaticResource HintText}"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+                            <Expander x:Name="ManualExpander" Style="{StaticResource AdvancedExpander}" Header="{DynamicResource onb_Manual_Header}">
+                                <StackPanel Margin="2,6,0,0">
+                                    <CheckBox x:Name="SkipAutoStartCheck" Style="{StaticResource ModernCheckBox}"
+                                              Content="{DynamicResource onb_Manual_SkipAutoStart}"/>
+                                    <TextBlock Text="{DynamicResource onb_Manual_Hint}" Style="{StaticResource HintText}" Margin="28,4,0,0"/>
+                                </StackPanel>
+                            </Expander>
+                        </StackPanel>
+
+                        <!-- 3 · Zaloguj -->
+                        <Grid x:Name="SignInPanel" Visibility="Collapsed">
+                            <StackPanel x:Name="SignInIdle" HorizontalAlignment="Left" MaxWidth="440">
+                                <Button x:Name="SignInButton" Style="{StaticResource PrimaryHeroButton}" HorizontalAlignment="Left" MinWidth="300"
+                                        Content="{DynamicResource onb_SignIn_Button}" Click="SignIn_Click"/>
+                                <TextBlock Text="{DynamicResource onb_SignIn_Hint}" Style="{StaticResource HintText}" Margin="0,12,0,0"/>
+                            </StackPanel>
+                            <StackPanel x:Name="SignInWaiting" Visibility="Collapsed">
+                                <StackPanel Orientation="Horizontal">
+                                    <shell:StatusMark State="Working" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                                    <TextBlock Text="{DynamicResource onb_SignIn_Waiting}" Style="{StaticResource SectionTitle}" VerticalAlignment="Center"
+                                               AutomationProperties.LiveSetting="Polite"/>
+                                </StackPanel>
+                                <TextBlock Text="{DynamicResource onb_SignIn_WaitingHint}" Style="{StaticResource BodyText}" Margin="34,6,0,16"/>
+                                <Button Style="{StaticResource SecondaryButton}" Content="{DynamicResource Common_Cancel}" HorizontalAlignment="Left"
+                                        Margin="34,0,0,0" Click="SignInCancel_Click"/>
+                            </StackPanel>
+                            <StackPanel x:Name="SignInError" Visibility="Collapsed">
+                                <StackPanel Orientation="Horizontal">
+                                    <shell:StatusMark State="Warning" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                                    <TextBlock x:Name="SignInErrorTitle" Style="{StaticResource SectionTitle}" VerticalAlignment="Center"
+                                               AutomationProperties.LiveSetting="Assertive"/>
+                                </StackPanel>
+                                <TextBlock x:Name="SignInErrorText" Style="{StaticResource BodyText}" Margin="34,6,0,16"/>
+                                <WrapPanel Margin="34,0,0,0">
+                                    <Button Style="{StaticResource ModernButton}" Content="{DynamicResource Common_TryAgain}" Click="SignIn_Click" Margin="0,0,8,8"/>
+                                    <Button x:Name="OpenAccountButton" Style="{StaticResource SecondaryButton}" Content="{DynamicResource shell_Action_OpenAccount}"
+                                            Click="OpenAccount_Click" Visibility="Collapsed" Margin="0,0,8,8"/>
+                                </WrapPanel>
+                            </StackPanel>
+                            <StackPanel x:Name="SignInDone" Visibility="Collapsed" Orientation="Horizontal">
+                                <shell:StatusMark State="Done" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                                <TextBlock x:Name="SignInDoneText" Style="{StaticResource SectionTitle}" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Grid>
+
+                        <!-- 4 · Przygotowuję -->
+                        <StackPanel x:Name="PreparePanel" Visibility="Collapsed">
+                            <Border x:Name="KeyErrorBox" Style="{StaticResource Callout}" Background="{DynamicResource ErrorLightBrush}"
+                                    Margin="0,0,0,18" Visibility="Collapsed">
+                                <StackPanel>
+                                    <TextBlock Text="{DynamicResource shell_Protect_Error_Title}" Style="{StaticResource CardTitle}"/>
+                                    <TextBlock x:Name="KeyErrorText" Style="{StaticResource BodyText}" Foreground="{DynamicResource TextBrush}" Margin="0,0,0,12"/>
+                                    <WrapPanel>
+                                        <Button Style="{StaticResource ModernButton}" Content="{DynamicResource Common_TryAgain}" Click="KeyRetry_Click" Margin="0,0,8,0"/>
+                                        <Button Style="{StaticResource GhostButton}" Content="{DynamicResource onb_Quit}" Click="Quit_Click"/>
+                                    </WrapPanel>
+                                </StackPanel>
+                            </Border>
+                            <Grid Margin="0,0,0,18">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <shell:StatusMark x:Name="PackMark" State="Working" VerticalAlignment="Top" Margin="0,1,14,0"/>
+                                <StackPanel Grid.Column="1">
+                                    <TextBlock x:Name="PackText" Style="{StaticResource ChecklistText}" AutomationProperties.LiveSetting="Polite"/>
+                                    <ProgressBar x:Name="PackBar" Style="{StaticResource ModernProgressBar}" Minimum="0" Maximum="1" Margin="0,10,0,0"
+                                                 Visibility="Collapsed"/>
+                                </StackPanel>
+                            </Grid>
+                            <Grid Margin="0,0,0,18">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <shell:StatusMark x:Name="IndexMark" VerticalAlignment="Top" Margin="0,1,14,0"/>
+                                <StackPanel Grid.Column="1">
+                                    <TextBlock x:Name="IndexText" Style="{StaticResource ChecklistText}" Text="{DynamicResource onb_Prepare_Index}"/>
+                                    <TextBlock x:Name="IndexNote" Style="{StaticResource HintText}" Text="{DynamicResource onb_Prepare_Index_Later}" Margin="0,2,0,0"/>
+                                </StackPanel>
+                            </Grid>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <shell:StatusMark x:Name="ReaderMark" VerticalAlignment="Top" Margin="0,1,14,0"/>
+                                <StackPanel Grid.Column="1">
+                                    <TextBlock x:Name="ReaderText" Style="{StaticResource ChecklistText}"/>
+                                    <TextBlock x:Name="ReaderNote" Style="{StaticResource HintText}" Text="{DynamicResource onb_Prepare_Reader_Later}" Margin="0,2,0,0"/>
+                                </StackPanel>
+                            </Grid>
+                        </StackPanel>
+
+                        <!-- 5 · Gotowe -->
+                        <StackPanel x:Name="DonePanel" Visibility="Collapsed" Margin="0,18,0,0">
+                            <StackPanel Margin="0,0,0,20">
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                                    <shell:StatusMark x:Name="DoneGameMark" State="Done" Margin="0,0,12,0"/>
+                                    <TextBlock x:Name="DoneGameText" Style="{StaticResource ChecklistText}"/>
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                                    <shell:StatusMark x:Name="DoneRegionMark" State="Done" Margin="0,0,12,0"/>
+                                    <TextBlock x:Name="DoneRegionText" Style="{StaticResource ChecklistText}"/>
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal">
+                                    <shell:StatusMark x:Name="DonePackMark" State="Done" Margin="0,0,12,0"/>
+                                    <TextBlock x:Name="DonePackText" Style="{StaticResource ChecklistText}"/>
+                                </StackPanel>
+                            </StackPanel>
+                            <TextBlock x:Name="DoneStartText" Style="{StaticResource BodyText}" FontSize="{StaticResource FontSizeLarge}"
+                                       Foreground="{DynamicResource TextBrush}"/>
+                            <TextBlock x:Name="DoneIndexText" Style="{StaticResource HintText}" Margin="0,4,0,20"/>
+                            <Border Style="{StaticResource Card}" Width="360" HorizontalAlignment="Left">
+                                <StackPanel>
+                                    <TextBlock Text="{DynamicResource onb_Done_Hotkeys}" Style="{StaticResource CardTitle}" Margin="0,0,0,6"/>
+                                    <ItemsControl x:Name="DoneHotkeys" ItemTemplate="{StaticResource HotkeyCapsRow}" Focusable="False"/>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                    </StackPanel>
+                </ScrollViewer>
+
+                <!-- Footer: back on the left, the step's action on the right. -->
+                <Border Grid.Row="1" BorderBrush="{DynamicResource HairlineBrush}" BorderThickness="0,1,0,0" Padding="40,14,40,14"
+                        Background="{DynamicResource BgBrush}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button x:Name="BackButton" Style="{StaticResource GhostButton}" Content="{DynamicResource onb_Back}" Click="Back_Click"/>
+                        <Button x:Name="QuitButton" Style="{StaticResource GhostButton}" Content="{DynamicResource onb_Quit}" Click="Quit_Click"/>
+                        <Button x:Name="SecondaryButton" Grid.Column="2" Style="{StaticResource SecondaryButton}" Margin="0,0,10,0"
+                                Content="{DynamicResource onb_Done_Characters}" Click="Characters_Click" Visibility="Collapsed"/>
+                        <Button x:Name="NextButton" Grid.Column="3" Style="{StaticResource ModernButton}" Margin="0" MinWidth="140"
+                                Content="{DynamicResource onb_Next}" Click="Next_Click" IsDefault="True"/>
+                        <Button x:Name="FinishButton" Grid.Column="3" Style="{StaticResource PrimaryHeroButton}" Margin="0" MinWidth="180"
+                                Content="{DynamicResource onb_Done_Start}" Click="Finish_Click" Visibility="Collapsed"/>
+                    </Grid>
+                </Border>
+            </Grid>
+        </Grid>
+    </Grid>
+</Window>

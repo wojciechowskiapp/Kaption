@@ -8,6 +8,7 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Documents;
 using System.Windows.Markup;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
@@ -25,6 +26,26 @@ namespace GI_Test
     internal static class RenderTestKit
     {
         public static string OutputDir => Path.Combine(Path.GetTempPath(), "kaption-render");
+
+        /// <summary>
+        /// The 2.6 review renders: %TEMP%\kaption-w26\renders\&lt;yyyyMMdd-HHmm&gt;\, one dated folder per test run (set
+        /// KAPTION_RENDER_STAMP to choose the name), so a review copy is never overwritten by another agent's run.
+        /// </summary>
+        public static string ReviewDir => ReviewDirValue.Value;
+        private static readonly Lazy<string> ReviewDirValue = new(() => Path.Combine(Path.GetTempPath(), "kaption-w26", "renders",
+            Environment.GetEnvironmentVariable("KAPTION_RENDER_STAMP") is { Length: > 0 } stamp ? stamp : DateTime.Now.ToString("yyyyMMdd-HHmm")));
+
+        /// <summary>Writes a review render into <see cref="ReviewDir"/> (sub-folder allowed in the name); returns the path.</summary>
+        public static string SaveReview(BitmapSource bitmap, string name)
+        {
+            AssertNotBlank(bitmap, name);
+            string path = Path.Combine(ReviewDir, name.Replace('/', Path.DirectorySeparatorChar));
+            Directory.CreateDirectory(Path.GetDirectoryName(path));
+            var encoder = new PngBitmapEncoder();
+            encoder.Frames.Add(BitmapFrame.Create(bitmap));
+            using (var fs = File.Create(path)) encoder.Save(fs);
+            return path;
+        }
 
         public static string RepoRoot()
         {
@@ -144,6 +165,45 @@ namespace GI_Test
             return path;
         }
 
+        // ── contrast (WCAG ratio of a text against what is drawn behind it) ──
+
+        public static Color Fg(Brush brush) => brush is SolidColorBrush s ? s.Color : Colors.White;
+
+        /// <summary>Where a text's glyphs are: the element's box, narrowed to the text it holds (a stretched line is
+        /// as wide as its column, the words are not).</summary>
+        public static Rect InkBox(FrameworkElement element, FrameworkElement host)
+        {
+            FrameworkElement text = element is TextBlock ? element : Descendants<TextBlock>(element).FirstOrDefault() ?? element;
+            double width = text is TextBlock tb
+                ? Math.Min(tb.ActualWidth, tb.DesiredSize.Width - tb.Margin.Left - tb.Margin.Right)
+                : text.ActualWidth;
+            return text.TransformToAncestor(host).TransformBounds(new Rect(0, 0, Math.Max(1, width), text.ActualHeight));
+        }
+
+        /// <summary>The relative luminance below which <paramref name="fraction"/> of the pixels in a box fall.</summary>
+        public static double BrightestLuminance(BitmapSource bitmap, Rect box, double fraction)
+        {
+            int x0 = Math.Max(0, (int)Math.Floor(box.X)), y0 = Math.Max(0, (int)Math.Floor(box.Y));
+            int x1 = Math.Min(bitmap.PixelWidth, (int)Math.Ceiling(box.Right)), y1 = Math.Min(bitmap.PixelHeight, (int)Math.Ceiling(box.Bottom));
+            int w = x1 - x0, h = y1 - y0;
+            Assert.IsTrue(w > 0 && h > 0, $"the text box {box} lies on the render");
+            var pixels = new byte[w * h * 4];
+            bitmap.CopyPixels(new Int32Rect(x0, y0, w, h), pixels, w * 4, 0);
+            var lum = new double[w * h];
+            for (int i = 0; i < lum.Length; i++)
+                lum[i] = RelativeLuminance(Color.FromRgb(pixels[i * 4 + 2], pixels[i * 4 + 1], pixels[i * 4]));
+            Array.Sort(lum);
+            return lum[Math.Min(lum.Length - 1, (int)(lum.Length * fraction))];
+        }
+
+        public static double RelativeLuminance(Color c)
+        {
+            static double Lin(byte v) { double s = v / 255.0; return s <= 0.04045 ? s / 12.92 : Math.Pow((s + 0.055) / 1.055, 2.4); }
+            return 0.2126 * Lin(c.R) + 0.7152 * Lin(c.G) + 0.0722 * Lin(c.B);
+        }
+
+        public static double ContrastRatio(double a, double b) => (Math.Max(a, b) + 0.05) / (Math.Min(a, b) + 0.05);
+
         public static IEnumerable<T> Descendants<T>(DependencyObject root) where T : DependencyObject
         {
             int n = VisualTreeHelper.GetChildrenCount(root);
@@ -194,7 +254,7 @@ namespace GI_Test
         /// plain host that carries the window's background, its resources and the UI strings. Code-behind never
         /// runs, so text it sets at runtime shows the XAML defaults.
         /// </summary>
-        public static Border LoadLooseWindow(string viewPath, string lang, out Window window)
+        public static Border LoadLooseWindow(string viewPath, string lang, out Window window, string palette = "Light")
         {
             string root = RepoRoot() ?? throw new AssertInconclusiveException("Repository root not found.");
             string xaml = File.ReadAllText(Path.Combine(root, "GI-Subtitles", viewPath.Replace('/', Path.DirectorySeparatorChar)));
@@ -210,9 +270,16 @@ namespace GI_Test
             window.Content = null;
             window.Resources = new ResourceDictionary();
 
-            var host = new Border { Background = window.Background ?? Brushes.White, Child = content, UseLayoutRounding = true };
+            var host = new Border { Child = content, UseLayoutRounding = true, SnapsToDevicePixels = true };
+            // The app-level palette slot (ThemeService) comes first; window resources may not redefine its keys.
+            host.Resources.MergedDictionaries.Add(Dictionary("Themes/Tokens.xaml"));
+            host.Resources.MergedDictionaries.Add(Dictionary($"Themes/Palette.{palette}.xaml"));
+            host.Resources.MergedDictionaries.Add(Dictionary("Themes/Shell.xaml"));
             foreach (var d in Strings(lang)) host.Resources.MergedDictionaries.Add(d);
             host.Resources.MergedDictionaries.Add(resources);
+            if (window.Background is SolidColorBrush b && b.Color.A == 0) host.Background = Brushes.Transparent;
+            else host.SetResourceReference(Border.BackgroundProperty, "BgBrush");
+            host.SetResourceReference(TextElement.ForegroundProperty, "TextBrush");
             return host;
         }
     }

@@ -167,8 +167,8 @@ namespace GI_Test
             var c = Catalog(json);
             var m = CharacterOverviewBuilder.Build(c.Find("1001"), c,
                 new DictLookup(new Dictionary<string, string> { ["Frigid Cold Arrow"] = "Mroźna strzała" }));
-            Assert.AreEqual("Frigid Cold Arrow", m.Highlights.Single(h => h.LabelKey == "Char_Tip_Leveling").Text,
-                "the game shows English skill names, so references use them");
+            Assert.AreEqual("Frigid Cold Arrow (Basic)", m.Highlights.Single(h => h.LabelKey == "Char_Tip_Leveling").Text,
+                "the game shows English skill names, so references use them, with the game's type marker");
             CollectionAssert.AreEqual(new[] { "Frigid Cold Arrow" }, m.Leveling.ToArray());
             Assert.IsFalse(m.LevelingIsAi);
         }

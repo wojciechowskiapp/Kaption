@@ -361,15 +361,9 @@ namespace GI_Subtitles
 
         protected override void OnStartup(StartupEventArgs e)
         {
-            // Suspend WPF's auto-shutdown while we drive pre-MainWindow dialogs
-            // (LoginWindow + crash-reporting MessageBox). With the default
-            // ShutdownMode=OnLastWindowClose, each dialog close takes
-            // Application.Windows.Count to zero — no MainWindow exists yet
-            // because the StartupUri loads AFTER OnStartup returns — so WPF
-            // queues a Shutdown(). Then DoStartup tries to LoadComponent
-            // Views/MainWindow.xaml and throws InvalidOperationException
-            // "Application is shutting down". Restored below before
-            // base.OnStartup so MainWindow-close terminates the app normally.
+            // Suspend WPF's auto-shutdown while the pre-MainWindow dialogs run: each
+            // dialog close would take Windows.Count to zero and shut the app down.
+            // Restored at the end of this method, just before MainWindow is created.
             ShutdownMode = ShutdownMode.OnExplicitShutdown;
 
             // One-shot migration: older builds let users pick CHS as source language
@@ -529,6 +523,21 @@ namespace GI_Subtitles
             // Load UI language resources before MainWindow is created
             LoadUILanguageResources();
 
+            // Palette before the first window (EULA/onboarding included): Auto follows Windows, dark otherwise.
+            GI_Subtitles.Themes.ThemeService.Initialize();
+
+            // ── First run: one setup window (language + licence → game → sign-in → key + pack → done). ──
+            // It records the same acceptance, activation and key as the windows below, which then pass instantly.
+            if (GI_Subtitles.Views.Shell.OnboardingFlow.IsFirstRunNeeded())
+            {
+                int setupExit = RunFirstRunSetup();
+                if (setupExit != 0)
+                {
+                    Shutdown(setupExit);
+                    return;
+                }
+            }
+
             // ── First-run legal acceptance (Step -1 in the install experience) ──
             // Velopack's installer is silent by design (delta updates reuse the
             // same bootstrapper, we don't want to re-ask on every patch). So
@@ -593,7 +602,7 @@ namespace GI_Subtitles
                 Shutdown(3);
                 return;
             }
-            WipeLegacyProtectedCacheFiles();
+            if (InitialSyncTask == null) WipeLegacyProtectedCacheFiles(); // the first-run setup already did
 
             // Kick off the first dictionary sync BEFORE MainWindow materialises so
             // the network round-trip runs in parallel with WPF window construction
@@ -603,16 +612,33 @@ namespace GI_Subtitles
             // touched disk, and the matcher silently came up empty. Setting
             // StartupStatus to DownloadingTranslations here lets the Dashboard
             // render a "please wait" state the moment SettingsWindow shows.
-            KickOffInitialDictionarySync();
+            // The first-run setup has already run (and awaited) it.
+            if (InitialSyncTask == null) KickOffInitialDictionarySync();
 
             // Hand lifetime back to WPF's default. Just flipping the mode
             // doesn't trigger a shutdown — that only happens on a Window-close
             // event. Our pre-MainWindow dialogs are already closed, so this is
-            // safe. From here on, closing MainWindow (the next window to
-            // appear, via StartupUri) will exit the app normally.
-            ShutdownMode = ShutdownMode.OnLastWindowClose;
+            // safe. From here on, closing MainWindow (created below) will exit
+            // the app normally.
+            try
+            {
+                ShutdownMode = ShutdownMode.OnLastWindowClose;
+            }
+            catch (InvalidOperationException)
+            {
+                // The setter throws once Shutdown() has been called (session end, or a
+                // declined re-login during a dialog); Application.IsShuttingDown is internal.
+                Logger.Log.Info("Startup: shutdown already in progress, MainWindow not created.");
+                return;
+            }
 
             base.OnStartup(e);
+
+            // Created here, not via StartupUri: WPF loads StartupUri after OnStartup
+            // returns even when a startup dialog has already shut the app down.
+            var main = new Views.MainWindow();
+            MainWindow = main;
+            main.Show();
         }
 
         /// <summary>
@@ -725,7 +751,7 @@ namespace GI_Subtitles
         {
             try
             {
-                LicenseService = new LicenseService();
+                LicenseService ??= new LicenseService();
             }
             catch (Exception ex)
             {
@@ -844,6 +870,48 @@ namespace GI_Subtitles
         /// progress UI, and Retry/Quit buttons; it returns DialogResult=true
         /// on success, false on user quit.
         /// </summary>
+        /// <summary>
+        /// The first-run setup window. Returns the old chain's exit codes when it is closed early (2 licence
+        /// declined, 1 not signed in, 3 no file key), 0 when the app may start.
+        /// </summary>
+        private int RunFirstRunSetup()
+        {
+            try
+            {
+                LicenseService ??= new LicenseService();
+            }
+            catch (Exception ex)
+            {
+                Logger.Log.Error($"Could not construct LicenseService: {ex}");
+                GI_Subtitles.Views.ModernDialog.Error(
+                    owner: null,
+                    title: "Kaption couldn't start",
+                    body: "We couldn't initialise Kaption's licensing layer. Reinstalling the app usually resolves this.",
+                    technicalDetails: ex.ToString());
+                return 1;
+            }
+            var setup = new Views.OnboardingWindow(LicenseService, GI_Subtitles.Views.Shell.OnboardingMode.FirstRun)
+            {
+                StartSync = () =>
+                {
+                    WipeLegacyProtectedCacheFiles();
+                    KickOffInitialDictionarySync();
+                },
+                InitialSync = () => InitialSyncTask,
+            };
+            setup.ShowFirstRun();
+            FirstRunOutcome = setup.Result;
+            // The setup waited for the pack sync before anything in this process loaded a pack, so a pack it replaced
+            // needs no restart: the matcher loads the new one. (Without this, a reinstall over old data asked for one.)
+            if (InitialSyncTask?.IsCompleted == true && Interlocked.Exchange(ref _translationUpdateRequiresRestart, 0) != 0)
+                Logger.Log.Info("First-run setup: the pack was updated before anything loaded it; no restart needed.");
+            Logger.Log.Info($"First-run setup closed: exit={setup.ExitCode}, outcome={setup.Result}.");
+            return setup.ExitCode;
+        }
+
+        /// <summary>Where the first-run setup asked to land (Start or Characters); MainWindow reads it once.</summary>
+        internal static Views.OnboardingWindow.Outcome FirstRunOutcome { get; set; }
+
         private bool EnsureFileProtectionSecret()
         {
             try
@@ -1187,6 +1255,16 @@ namespace GI_Subtitles
             }
         }
 
+        [System.Runtime.InteropServices.DllImport("kernel32.dll")]
+        private static extern ushort GetUserDefaultUILanguage();
+
+        /// <summary>"pl-PL" when Windows shows its UI in Polish; never throws.</summary>
+        internal static string WindowsDisplayLanguage()
+        {
+            try { return new CultureInfo(GetUserDefaultUILanguage()).Name; }
+            catch { return CultureInfo.InstalledUICulture.Name; }
+        }
+
         /// <summary>
         /// Load UI language resources based on Config["UILang"] before any UI components are created
         /// </summary>
@@ -1216,7 +1294,8 @@ namespace GI_Subtitles
                 string savedUiLang = Config.Get<string>("UILang");
                 if (string.IsNullOrEmpty(savedUiLang))
                 {
-                    var osLocale = System.Globalization.CultureInfo.CurrentUICulture.Name;
+                    // The Windows display language itself: CurrentUICulture was already overwritten above.
+                    var osLocale = WindowsDisplayLanguage();
                     if (osLocale.StartsWith("pl", StringComparison.OrdinalIgnoreCase))
                     {
                         uiLang = "pl-PL";

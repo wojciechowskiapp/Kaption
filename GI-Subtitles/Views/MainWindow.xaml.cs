@@ -290,6 +290,18 @@ namespace GI_Subtitles.Views
             EnableMultipleHttp2Connections = true,
         }) { Timeout = TimeSpan.FromSeconds(30) };
         internal int _cachedFontSize;
+
+        // ── The subtitle panel (Services/Rendering/SubtitleCard) and its parts, as the code has always named them. ──
+        internal OutlinedTextBlock HeaderText => SubtitleBackground.HeaderText;
+        internal OutlinedTextBlock SubtitleText => SubtitleBackground.SubtitleText;
+        internal OutlinedTextBlock AnswerText => SubtitleBackground.AnswerText;
+        internal Border AnswerSeparator => SubtitleBackground.AnswerSeparator;
+        /// <summary>Look and position from Config (OverlayStyle); re-read by <see cref="ApplyOverlayStyle"/>.</summary>
+        private OverlayStyle _overlayStyle = OverlayStyle.Default;
+        /// <summary>Window height of a one-line subtitle with a name: the fixed edge's distance from the saved offset.</summary>
+        private double _referenceWindowHeight = 90;
+        private DateTime _lastBackdropSampleUtc = DateTime.MinValue;
+        private int _backdropSampleBusy;
         private volatile int failedCount = 0;
         private bool usingRegion2 = false;
 
@@ -467,6 +479,7 @@ namespace GI_Subtitles.Views
             }
 
             _cachedFontSize = Config.Get<int>("Size", SubtitleOverlayDefaults.FontSize);
+            ApplyOverlayStyle(relayout: false);
 
             // Initialize screen capture: try DXGI (GPU, fast) first, fall back to GDI
             var dxgi = new DxgiScreenCapture();
@@ -515,45 +528,8 @@ namespace GI_Subtitles.Views
             // "Matcher not loaded yet, skipping translation".
             Task.Run(async () => await data.Load());
 
-            // Upstream "a newer pack is available" balloon — only meaningful
-            // when we already have a local copy to compare against. Same
-            // reason it was originally gated: no local date means no "this
-            // is newer than yours" claim to make.
-            if (data.FileExists())
-            {
-                Task.Run(async () =>
-                {
-                    try
-                    {
-                        var modify = await data.GetRepositoryModificationDate(data.repoUrl, Game);
-                        DateTime inputDate = data.GetLocalFileDates(InputLanguage, OutputLanguage, Game);
-
-                        if (DateTime.TryParse(modify, out DateTime repoDate))
-                        {
-                            if (repoDate > inputDate)
-                            {
-                                // BeginInvoke (not Invoke): this runs on a
-                                // background Task and we don't need to wait
-                                // for the balloon tip / title-flash work to
-                                // finish. Invoke would block this Task on
-                                // the UI thread, which is a latent cause of
-                                // cross-thread freezes when UI is busy.
-                                _ = System.Windows.Application.Current.Dispatcher.BeginInvoke(new Action(() =>
-                                {
-                                    notifyIcon.ShowBalloonTip(3000, "Language pack update notification", $"Repository update time: {repoDate}, local modification time: {inputDate}", ToolTipIcon.Info);
-                                    string originalTitle = data.Title;
-                                    data.Title = $"[Language pack update]{originalTitle}";
-                                    data.Title = originalTitle;
-                                }));
-                            }
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        Logger.Log.Error(ex);
-                    }
-                });
-            }
+            // The old "upstream repo is newer than your pack" balloon was removed
+            // 2026-11-02: packs arrive through the auto-updater, so it was never actionable.
             // Wire up Dashboard actions
             data.OnToggleOCR = () =>
             {
@@ -641,9 +617,12 @@ namespace GI_Subtitles.Views
             data.IsSubtitleVisible = () => ShowText;
             data.IsEngineReady = () => _engineReady;
             data.OnOpenSetupWizard = () => ShowSetupWizard();
+            InitAutoStart();
 
             // Always open settings window on startup (non-modal so UI stays responsive)
             data.Show();
+            if (App.FirstRunOutcome == Views.OnboardingWindow.Outcome.Characters) data.ShowCharactersPage();
+            App.FirstRunOutcome = Views.OnboardingWindow.Outcome.None;
 
             // Put the first-run wizard above its Settings owner. Previously it
             // was shown first and then immediately covered by this larger window.
@@ -726,10 +705,7 @@ namespace GI_Subtitles.Views
                 UpdateWindowPosition();
             }
 
-            // Apply configurable subtitle background opacity (0-255, default 176 = #B0)
-            int bgOpacity = Config.Get<int>("SubtitleBgOpacity", SubtitleOverlayDefaults.BackgroundOpacity);
-            bgOpacity = Math.Max(0, Math.Min(255, bgOpacity));
-            SubtitleBackground.Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb((byte)bgOpacity, 0, 0, 0));
+            // Panel opacity, face, outline and spacing were applied with the style above (ApplyOverlayStyle).
 
             // P2: idle-hide timer — fade out subtitle after 1s of no new text
             _idleHideTimer = new System.Windows.Threading.DispatcherTimer
@@ -751,7 +727,7 @@ namespace GI_Subtitles.Views
                     return;
                 }
 
-                var fadeOut = new System.Windows.Media.Animation.DoubleAnimation(1, 0, TimeSpan.FromMilliseconds(SubtitleOverlayDefaults.IdleFadeOutMs));
+                var fadeOut = new System.Windows.Media.Animation.DoubleAnimation(1, 0, SubtitleCard.Fade(SubtitleOverlayDefaults.IdleFadeOutMs));
                 SubtitleBackground.BeginAnimation(OpacityProperty, fadeOut);
                 _subtitleVisible = false;
 
@@ -768,13 +744,6 @@ namespace GI_Subtitles.Views
                 data?.ContextEngine?.Reset();
                 _subtitleResolver.ClearCache();
             };
-
-            // Apply saved font family
-            string savedFont = Config.Get("FontFamily", SubtitleOverlayDefaults.FontFamily);
-            var fontFamily = new System.Windows.Media.FontFamily(savedFont);
-            SubtitleText.FontFamily = fontFamily;
-            HeaderText.FontFamily = fontFamily;
-            AnswerText.FontFamily = fontFamily;
 
             // Show the main window immediately so the user sees the loading indicator.
             this.Opacity = 1;
@@ -952,7 +921,11 @@ namespace GI_Subtitles.Views
                         }
                         return;
                     }
-                    Logger.Log.Error("Failed to load OCR engine: " + ex.Message, ex);
+                    // Warn, not Error: SentryAppender forwards Error lines, and the
+                    // ReportException below is this failure's single GlitchTip event.
+                    // Its [CRASH-REPORT] line keeps the full trace in app.log.
+                    Logger.Log.Warn("Failed to load OCR engine: " +
+                        ((ex as OcrRuntimeUnavailableException)?.Summary ?? ex.Message));
                     Interlocked.Exchange(ref _runtimeOcrRecoveryInFlight, 0);
                     // Surface to telemetry — we only see GPU-init failures
                     // on the user's machine, so server-side visibility
@@ -1269,7 +1242,11 @@ namespace GI_Subtitles.Views
                         UITimer.Stop();
                         SwitchIcon("kaption.ico");
                         Logger.Log.Warn("OCR stopped: capture region was cleared while running.");
-                        Dispatcher.BeginInvoke(new Action(() => data?.UpdateDashboardStatus()));
+                        Dispatcher.BeginInvoke(new Action(() =>
+                        {
+                            NotifyStoppedByApp();
+                            data?.UpdateDashboardStatus();
+                        }));
                     }
                     catch (Exception ex) { Logger.Log.Warn($"Auto-stop after region loss failed: {ex.Message}"); }
                     return;
@@ -1659,8 +1636,14 @@ namespace GI_Subtitles.Views
             // The default is per-game: -140 clears a Genshin dialogue panel
             // but not the taller overlay that Zenless's long centred captions
             // wrap to. See GameRegionProfile.SubtitlePadVertical.
-            double baseTop = Convert.ToInt16(notify.Region[1]) / Scale
-                + Config.GetPad(Services.Detection.GameRegionProfile.ForCurrentGame().SubtitlePadVertical);
+            // 2.6: the panel grows away from the game's dialogue (OverlayPlacement); a one-line subtitle with a name
+            // still lands where this offset always put it.
+            double baseTop = OverlayPlacement.WindowTop(
+                Convert.ToInt16(notify.Region[1]) / Scale,
+                Convert.ToInt16(notify.Region[3]) / Scale,
+                Config.GetPad(Services.Detection.GameRegionProfile.ForCurrentGame().SubtitlePadVertical),
+                _referenceWindowHeight,
+                this.Height > 0 && !double.IsNaN(this.Height) ? this.Height : _referenceWindowHeight);
 
             foreach (var screen in Screen.AllScreens)
             {
@@ -1705,131 +1688,229 @@ namespace GI_Subtitles.Views
         /// </summary>
         internal void UpdateWindowHeightAndTop()
         {
-            Dispatcher.BeginInvoke(new Action(() =>
+            Dispatcher.BeginInvoke(new Action(UpdateWindowHeightAndTopNow), System.Windows.Threading.DispatcherPriority.Loaded);
+        }
+
+        /// <summary>
+        /// The same layout, done now: UpdateText calls this so the window is sized and placed in the same frame as the
+        /// new line. (Queued at Loaded priority it ran after the render, so every line change showed one frame of the
+        /// new text in the old panel, then the panel jumped.)
+        /// </summary>
+        internal void UpdateWindowHeightAndTopNow()
+        {
+            try
             {
-                try
+                if (notify?.Region == null || notify.Region.Length < 4) return;
+
+                Screen targetScreen = null;
+                foreach (var screen in Screen.AllScreens)
                 {
-                    if (notify?.Region == null || notify.Region.Length < 4) return;
-
-                    Screen targetScreen = null;
-                    foreach (var screen in Screen.AllScreens)
+                    if (screen.WorkingArea.Contains(
+                            new System.Drawing.Point(
+                                Convert.ToInt16(notify.Region[0]),
+                                Convert.ToInt16(notify.Region[1]))))
                     {
-                        if (screen.WorkingArea.Contains(
-                                new System.Drawing.Point(
-                                    Convert.ToInt16(notify.Region[0]),
-                                    Convert.ToInt16(notify.Region[1]))))
-                        {
-                            targetScreen = screen;
-                            break;
-                        }
+                        targetScreen = screen;
+                        break;
                     }
-                    if (targetScreen == null)
-                        targetScreen = Screen.PrimaryScreen;
-
-                    double screenScale = GetScaleForScreen(targetScreen);
-                    int fontSize = Config.Get<int>("Size", SubtitleOverlayDefaults.FontSize);
-
-                    // Get detected text blocks for Embedded Illusion mode
-                    var detectedBlocks = _lastDetectedText?.DialogueBlocks;
-
-                    var layoutParams = new SubtitleLayoutParams
-                    {
-                        Text = SubtitleText.Text,
-                        Header = HeaderText.Visibility == Visibility.Visible ? HeaderText.Text : null,
-                        FontSize = fontSize,
-                        CaptureRegion = new int[]
-                        {
-                            Convert.ToInt16(notify.Region[0]),
-                            Convert.ToInt16(notify.Region[1]),
-                            Convert.ToInt16(notify.Region[2]),
-                            Convert.ToInt16(notify.Region[3])
-                        },
-                        Scale = Scale,
-                        // Per-game default; a user-set Pad still wins.
-                        PadVertical = Config.GetPad(
-                            Services.Detection.GameRegionProfile.ForCurrentGame().SubtitlePadVertical),
-                        PadHorizontal = Config.GetPadHorizontal(0),
-                        ScreenBounds = new System.Windows.Rect(
-                            targetScreen.Bounds.Left / screenScale,
-                            targetScreen.Bounds.Top / screenScale,
-                            targetScreen.Bounds.Width / screenScale,
-                            targetScreen.Bounds.Height / screenScale),
-                        MaxHeight = Config.Get<int>("MaxOverlayHeight", SubtitleOverlayDefaults.MaxOverlayHeight),
-                        MaxWidth = Config.Get<int>("MaxOverlayWidth", SubtitleOverlayDefaults.MaxOverlayWidth),
-                        AutoShrinkText = Config.Get<bool>("AutoShrinkText", SubtitleOverlayDefaults.AutoShrinkText),
-                        MinFontSize = SubtitleOverlayDefaults.MinFontSize,
-                        StrokeThickness = SubtitleText.StrokeThickness,
-                        PixelsPerDip = VisualTreeHelper.GetDpi(this).PixelsPerDip,
-                        DetectedBlocks = detectedBlocks
-                    };
-
-                    var layout = _layoutEngine.CalculateLayout(layoutParams);
-
-                    // Apply font size if auto-shrink changed it
-                    if (Math.Abs(layout.EffectiveFontSize - SubtitleText.FontSize) > 0.5)
-                    {
-                        SubtitleText.FontSize = layout.EffectiveFontSize;
-                        // Scale header proportionally
-                        HeaderText.FontSize = Math.Max(layout.EffectiveFontSize - 2, 10);
-                    }
-
-                    // Apply max text width constraint
-                    if (layout.EffectiveMaxTextWidth > 0)
-                    {
-                        SubtitleText.MaxTextWidth = layout.EffectiveMaxTextWidth;
-                        HeaderText.MaxTextWidth = layout.EffectiveMaxTextWidth;
-                        AnswerText.MaxTextWidth = layout.EffectiveMaxTextWidth;
-                    }
-
-                    {
-                        // Content-driven height with screen clamping
-                        SubtitleBackground.Measure(new System.Windows.Size(this.ActualWidth, double.PositiveInfinity));
-                        double contentHeight = SubtitleBackground.DesiredSize.Height;
-                        if (contentHeight <= 0)
-                            contentHeight = fontSize + 30;
-
-                        double desiredHeight = contentHeight + 10;
-
-                        // Expand max height for visible answer section
-                        double effectiveMaxHeight = layout.Height;
-                        if (AnswerText.Visibility == Visibility.Visible && effectiveMaxHeight > 0)
-                        {
-                            AnswerText.Measure(new System.Windows.Size(this.ActualWidth, double.PositiveInfinity));
-                            effectiveMaxHeight += AnswerText.DesiredSize.Height + AnswerSeparator.Height + 20;
-                        }
-
-                        // Apply MaxHeight clamp from layout engine
-                        if (effectiveMaxHeight > 0 && desiredHeight > effectiveMaxHeight)
-                            desiredHeight = effectiveMaxHeight;
-
-                        double screenTop = targetScreen.Bounds.Top / screenScale;
-                        double screenBottom = targetScreen.Bounds.Bottom / screenScale;
-                        double newTop = this.Top;
-
-                        if (newTop < screenTop)
-                            newTop = screenTop;
-                        if (newTop + desiredHeight > screenBottom)
-                            newTop = screenBottom - desiredHeight;
-
-                        this.Top = newTop;
-                        this.Height = desiredHeight;
-                    }
-
-                    // Runtime overlap guard: the layout engine has just
-                    // placed the overlay — if it ended up inside a capture
-                    // region (because the user moved the region, grew the
-                    // overlay, or the region sits so close to the overlay's
-                    // clamped position that there's no room), hide the
-                    // subtitle and show a red alert until the user fixes
-                    // it. Runs on every layout update so it self-recovers
-                    // the moment the region moves clear.
-                    CheckRuntimeOverlapAndApply();
                 }
-                catch (Exception ex)
+                if (targetScreen == null)
+                    targetScreen = Screen.PrimaryScreen;
+
+                double screenScale = GetScaleForScreen(targetScreen);
+                int fontSize = Config.Get<int>("Size", SubtitleOverlayDefaults.FontSize);
+                double pixelsPerDip = VisualTreeHelper.GetDpi(this).PixelsPerDip;
+
+                // Get detected text blocks for Embedded Illusion mode
+                var detectedBlocks = _lastDetectedText?.DialogueBlocks;
+
+                var layoutParams = new SubtitleLayoutParams
                 {
-                    Logger.Log.Error($"Error updating window height/top: {ex}");
+                    Text = SubtitleText.Text,
+                    Header = HeaderText.Visibility == Visibility.Visible ? HeaderText.Text : null,
+                    FontSize = fontSize,
+                    CaptureRegion = new int[]
+                    {
+                        Convert.ToInt16(notify.Region[0]),
+                        Convert.ToInt16(notify.Region[1]),
+                        Convert.ToInt16(notify.Region[2]),
+                        Convert.ToInt16(notify.Region[3])
+                    },
+                    Scale = Scale,
+                    // Per-game default; a user-set Pad still wins.
+                    PadVertical = Config.GetPad(
+                        Services.Detection.GameRegionProfile.ForCurrentGame().SubtitlePadVertical),
+                    PadHorizontal = Config.GetPadHorizontal(0),
+                    ScreenBounds = new System.Windows.Rect(
+                        targetScreen.Bounds.Left / screenScale,
+                        targetScreen.Bounds.Top / screenScale,
+                        targetScreen.Bounds.Width / screenScale,
+                        targetScreen.Bounds.Height / screenScale),
+                    MaxHeight = Config.Get<int>("MaxOverlayHeight", SubtitleOverlayDefaults.MaxOverlayHeight),
+                    MaxWidth = Config.Get<int>("MaxOverlayWidth", SubtitleOverlayDefaults.MaxOverlayWidth),
+                    AutoShrinkText = Config.Get<bool>("AutoShrinkText", SubtitleOverlayDefaults.AutoShrinkText),
+                    MinFontSize = SubtitleOverlayDefaults.MinFontSize,
+                    StrokeThickness = SubtitleText.StrokeThickness,
+                    PixelsPerDip = pixelsPerDip,
+                    DetectedBlocks = detectedBlocks,
+                    PreferredMaxLines = SubtitleOverlayDefaults.PreferredMaxLines,
+                };
+                // Auto-shrink measures the real panel: this face, its spacing and the balanced lines.
+                layoutParams.MeasureContent = (size, textWidth) => MeasurePanelAt(size, textWidth, layoutParams);
+
+                var layout = _layoutEngine.CalculateLayout(layoutParams);
+
+                // Font size: the saved size, or what auto-shrink chose (the tag and answers follow).
+                SubtitleBackground.SetTextSize(layout.EffectiveFontSize);
+
+                // Apply max text width constraint
+                if (layout.EffectiveMaxTextWidth > 0)
+                {
+                    SubtitleText.MaxTextWidth = layout.EffectiveMaxTextWidth;
+                    HeaderText.MaxTextWidth = layout.EffectiveMaxTextWidth;
+                    AnswerText.MaxTextWidth = layout.EffectiveMaxTextWidth;
                 }
-            }), System.Windows.Threading.DispatcherPriority.Loaded);
+
+                {
+                    // Content-driven height with screen clamping
+                    SubtitleBackground.Measure(new System.Windows.Size(this.ActualWidth, double.PositiveInfinity));
+                    double contentHeight = SubtitleBackground.DesiredSize.Height;
+                    if (contentHeight <= 0)
+                        contentHeight = fontSize + 30;
+
+                    double desiredHeight = contentHeight + 10;
+
+                    // Expand max height for visible answer section
+                    double effectiveMaxHeight = layout.Height;
+                    if (AnswerText.Visibility == Visibility.Visible && effectiveMaxHeight > 0)
+                    {
+                        AnswerText.Measure(new System.Windows.Size(this.ActualWidth, double.PositiveInfinity));
+                        effectiveMaxHeight += AnswerText.DesiredSize.Height + AnswerSeparator.Height + 20;
+                    }
+
+                    // Apply MaxHeight clamp from layout engine
+                    if (effectiveMaxHeight > 0 && desiredHeight > effectiveMaxHeight)
+                        desiredHeight = effectiveMaxHeight;
+
+                    double screenTop = targetScreen.Bounds.Top / screenScale;
+                    double screenBottom = targetScreen.Bounds.Bottom / screenScale;
+                    // The edge nearest the game's dialogue stays put; the panel grows away from it.
+                    double regionTop = Convert.ToInt16(notify.Region[1]) / Scale;
+                    double regionHeight = Convert.ToInt16(notify.Region[3]) / Scale;
+                    SubtitleBackground.GrowsUpward = OverlayPlacement.GrowsUpward(regionTop, regionHeight, layoutParams.PadVertical, _referenceWindowHeight);
+                    double newTop = OverlayPlacement.WindowTop(regionTop, regionHeight, layoutParams.PadVertical, _referenceWindowHeight, desiredHeight);
+
+                    if (newTop < screenTop)
+                        newTop = screenTop;
+                    if (newTop + desiredHeight > screenBottom)
+                        newTop = screenBottom - desiredHeight;
+
+                    this.Top = newTop;
+                    this.Height = desiredHeight;
+                }
+
+                // Runtime overlap guard: the layout engine has just
+                // placed the overlay — if it ended up inside a capture
+                // region (because the user moved the region, grew the
+                // overlay, or the region sits so close to the overlay's
+                // clamped position that there's no room), hide the
+                // subtitle and show a red alert until the user fixes
+                // it. Runs on every layout update so it self-recovers
+                // the moment the region moves clear.
+                CheckRuntimeOverlapAndApply();
+                SampleBackdropSoon(force: true);
+            }
+            catch (Exception ex)
+            {
+                Logger.Log.Error($"Error updating window height/top: {ex}");
+            }
+        }
+
+        /// <summary>The whole panel at a font size, measured without touching the panel on screen.</summary>
+        private SubtitleContentMeasure MeasurePanelAt(double size, double textWidth, SubtitleLayoutParams p)
+        {
+            var style = _overlayStyle;
+            double face = OverlayFonts.FaceScale(style.FontFamily);
+            var family = OverlayFonts.Resolve(style.FontFamily);
+            // The width the engine will hand the text (its MaxWidth rule), never wider than the window leaves inside the panel.
+            double windowText = this.ActualWidth > 0 ? this.ActualWidth - style.Padding.Left - style.Padding.Right : double.PositiveInfinity;
+            double maxWidth = textWidth > 0 && !double.IsInfinity(textWidth) ? Math.Min(textWidth, windowText) : windowText;
+            var line = OutlinedTextBlock.MeasureText(p.Text, size * face, family, style.Weight, FontStyles.Normal,
+                maxWidth, style.StrokeThickness, p.PixelsPerDip, style.Tracking, true, out int lines);
+            double height = style.Padding.Top + style.Padding.Bottom + line.Height;
+            double width = line.Width;
+            if (!string.IsNullOrEmpty(p.Header))
+            {
+                double headerSize = Math.Max(11, Math.Round(size * 0.68)) * face;
+                var name = OutlinedTextBlock.MeasureText(p.Header, headerSize, family, FontWeights.SemiBold, FontStyles.Normal,
+                    maxWidth, Math.Round(style.StrokeThickness * 0.6, 2), p.PixelsPerDip);
+                height += name.Height + 9 * style.Scale;
+                width = Math.Max(width, name.Width + 16 * style.Scale);
+            }
+            return new SubtitleContentMeasure(new System.Windows.Size(width + style.Padding.Left + style.Padding.Right, height), lines);
+        }
+
+        /// <summary>
+        /// Re-reads the subtitle look and position from Config (Wygląd napisów calls this after every change) and lays the
+        /// panel out again.
+        /// </summary>
+        internal void ApplyOverlayStyle(bool relayout = true)
+        {
+            try
+            {
+                _overlayStyle = OverlayStyle.FromConfig();
+                _cachedFontSize = _overlayStyle.Size;
+                SubtitleBackground.ApplyStyle(_overlayStyle);
+                _referenceWindowHeight = SubtitleCard.ReferenceHeight(_overlayStyle, VisualTreeHelper.GetDpi(this).PixelsPerDip) + 10;
+                if (!relayout) return;
+                UpdateWindowPosition();
+                UpdateWindowHeightAndTopNow();
+            }
+            catch (Exception ex)
+            {
+                Logger.Log.Warn($"ApplyOverlayStyle: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Measures how bright the game is behind the panel (right after a new line, else at most about once a second)
+        /// so the panel can darken over bright scenes. Off the UI thread; nothing on the capture path.
+        /// </summary>
+        private void SampleBackdropSoon(bool force = false)
+        {
+            if (!_overlayStyle.AutoDarken || !_subtitleVisible || SubtitleBackground.Visibility != Visibility.Visible) return;
+            var now = DateTime.UtcNow;
+            double since = (now - _lastBackdropSampleUtc).TotalMilliseconds;
+            if (since < (force ? 250 : 1200)) return;
+            if (Interlocked.Exchange(ref _backdropSampleBusy, 1) == 1) return;
+            _lastBackdropSampleUtc = now;
+            try
+            {
+                if (SubtitleBackground.ActualWidth <= 0 || SubtitleBackground.ActualHeight <= 0 || PresentationSource.FromVisual(this) == null)
+                {
+                    Interlocked.Exchange(ref _backdropSampleBusy, 0);
+                    return;
+                }
+                var topLeft = SubtitleBackground.PointToScreen(new System.Windows.Point(0, 0));
+                var bottomRight = SubtitleBackground.PointToScreen(new System.Windows.Point(SubtitleBackground.ActualWidth, SubtitleBackground.ActualHeight));
+                int x = (int)topLeft.X, y = (int)topLeft.Y, w = (int)(bottomRight.X - topLeft.X), h = (int)(bottomRight.Y - topLeft.Y);
+                Task.Run(() =>
+                {
+                    double? luminance = null;
+                    try { luminance = BackdropSampler.Sample(x, y, w, h); }
+                    finally { Interlocked.Exchange(ref _backdropSampleBusy, 0); }
+                    if (luminance is double value)
+                        Dispatcher.BeginInvoke(new Action(() =>
+                        {
+                            var settle = new System.Windows.Media.Animation.DoubleAnimation(value, SubtitleCard.Fade(300));
+                            SubtitleBackground.BeginAnimation(SubtitleCard.BackdropLuminanceProperty, settle);
+                        }));
+                });
+            }
+            catch (Exception)
+            {
+                Interlocked.Exchange(ref _backdropSampleBusy, 0);
+            }
         }
 
         public void UpdateText(object sender, EventArgs e)
@@ -1936,6 +2017,8 @@ namespace GI_Subtitles.Views
                             {
                                 HeaderText.Text = header;
                                 HeaderText.Visibility = Visibility.Visible;
+                                // The tag takes the speaker's element colour only when the character data already knows them.
+                                SubtitleBackground.SetSpeakerHue(SpeakerHue.For(Game, _detectedNpcName));
                             }
                             else
                             {
@@ -1961,12 +2044,16 @@ namespace GI_Subtitles.Views
                             bool isPredictionRefinement = _lastDisplayedWasPredicted && ocrText.Length > 1
                                 && !displayingPrediction;
 
+                            // A new line on screen (not a restore or a refinement of the same line) counts for "Tłumaczę · 37 linii".
+                            if (!string.IsNullOrEmpty(content) && !isRecentRestore && !isPredictionRefinement)
+                                data?.CountTranslatedLine();
+
                             if (!isRecentRestore && !isPredictionRefinement)
                             {
                                 // Animate text change: quick fade in
                                 SubtitleText.Opacity = 0;
                                 SubtitleText.Text = content;
-                                var textFadeIn = new System.Windows.Media.Animation.DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(SubtitleOverlayDefaults.TextFadeInMs));
+                                var textFadeIn = new System.Windows.Media.Animation.DoubleAnimation(0, 1, SubtitleCard.Fade(SubtitleOverlayDefaults.TextFadeInMs));
                                 SubtitleText.BeginAnimation(OpacityProperty, textFadeIn);
                             }
                             else
@@ -1999,18 +2086,18 @@ namespace GI_Subtitles.Views
                                 _recentContent = content;
                                 _recentContentTime = DateTime.UtcNow;
                             }
-                            SubtitleText.FontSize = _cachedFontSize;
+                            SubtitleBackground.SetTextSize(_cachedFontSize);
 
                             // Apply visual style: italic + semi-transparent for fallback, normal for translation
                             if (_isFallbackText)
                             {
                                 SubtitleText.FontStyle = FontStyles.Italic;
-                                SubtitleText.Foreground = new SolidColorBrush(System.Windows.Media.Color.FromArgb(180, 255, 255, 255));
+                                SubtitleText.Foreground = OverlayTokens.Brush(OverlayTokens.Text, 180);
                             }
                             else
                             {
                                 SubtitleText.FontStyle = FontStyles.Normal;
-                                SubtitleText.Foreground = new SolidColorBrush(Colors.White);
+                                SubtitleText.Foreground = OverlayTokens.Brush(OverlayTokens.Text);
 
                                 // Log matched translation to dialogue log (skip for predicted display —
                                 // wait until OCR confirms the actual match to avoid logging guesses).
@@ -2053,7 +2140,6 @@ namespace GI_Subtitles.Views
                         if (AnswerText.Text != answerDisplay || wasHidden)
                         {
                             AnswerText.Text = answerDisplay;
-                            AnswerText.FontSize = Math.Max(12, _cachedFontSize - 3);
                             needsLayoutUpdate = true;
                         }
                     }
@@ -2068,7 +2154,7 @@ namespace GI_Subtitles.Views
                     // Replaces 2-4 separate UpdateWindowHeightAndTop() calls that used to fire
                     // on content change, header change, and answer show/hide — each of which
                     // queued its own Dispatcher.BeginInvoke and produced visible window jumps.
-                    if (needsLayoutUpdate) UpdateWindowHeightAndTop();
+                    if (needsLayoutUpdate) UpdateWindowHeightAndTopNow();
 
                     // Always check show/hide — even when content hasn't changed, hide if empty
                     bool hasContent = !string.IsNullOrEmpty(lastContent) || !string.IsNullOrEmpty(lastHeader);
@@ -2080,7 +2166,7 @@ namespace GI_Subtitles.Views
                             _lastContentChangeTime = DateTime.UtcNow;
                             SubtitleBackground.Visibility = Visibility.Visible;
                             SubtitleBackground.BeginAnimation(OpacityProperty, null);
-                            var fadeIn = new System.Windows.Media.Animation.DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(SubtitleOverlayDefaults.ContainerFadeInMs));
+                            var fadeIn = new System.Windows.Media.Animation.DoubleAnimation(0, 1, SubtitleCard.Fade(SubtitleOverlayDefaults.ContainerFadeInMs));
                             SubtitleBackground.BeginAnimation(OpacityProperty, fadeIn);
                             _subtitleVisible = true;
                         }
@@ -2093,6 +2179,8 @@ namespace GI_Subtitles.Views
                             _idleHideTimer.Start();
                         }
                     }
+                    // The scene behind the panel changes as the camera moves: look again about once a second.
+                    if (hasContent && _subtitleVisible) SampleBackdropSoon();
                     // Forced OCR (in GetOCR) ensures re-check even when screen won't stabilize.
                 }
                 catch (Exception ex)
@@ -2569,7 +2657,10 @@ namespace GI_Subtitles.Views
                 try { SwitchIcon("kaption.ico"); } catch { /* non-fatal */ }
                 try { data?.UpdateDashboardStatus(); } catch { /* non-fatal */ }
                 if (wasRunning)
+                {
                     Logger.Log.Info("OCR stopped by license-state change.");
+                    NotifyStoppedByApp();
+                }
             }
             catch (Exception ex)
             {
@@ -2686,6 +2777,18 @@ namespace GI_Subtitles.Views
                 try { if (data != null && !data.IsVisible) data.Show(); }
                 catch { /* non-fatal */ }
                 var err = data?.LastEngineError;
+                // A failed ONNX Runtime load is cached for the process, so Retry cannot help here.
+                if (err is GI_Subtitles.Services.OCR.OcrRuntimeUnavailableException runtimeGone)
+                {
+                    GI_Subtitles.Views.ModernDialog.Error(
+                        owner: this,
+                        title: LocalizedString("Dash_EngineFailed_Runtime_Title", "Text recognition couldn't start"),
+                        body: string.Format(
+                            LocalizedString("Dash_EngineFailed_Runtime_Body", "Windows couldn't load a component Kaption needs to read on-screen text (error {0}). Try restarting Kaption first."),
+                            runtimeGone.ErrorCode),
+                        technicalDetails: err.ToString());
+                    return false;
+                }
                 GI_Subtitles.Views.ModernDialog.Error(
                     owner: this,
                     title: LocalizedString("Dialog_EngineFailed_Title", "Translator didn't load"),
@@ -2789,6 +2892,14 @@ namespace GI_Subtitles.Views
                 if (profile?.ProcessNames == null || profile.ProcessNames.Length == 0)
                     return true; // Unknown game — we can't verify, so don't block.
 
+                // Auto-start's own start: the watcher has just seen the game (off the UI thread), so no listing here.
+                if (_autoStartStarting && _lastGameRunning && _gameProbe.GamePid != 0)
+                {
+                    _knownGameProcessIds.Clear();
+                    _knownGameProcessIds.Add(_gameProbe.GamePid);
+                    return true;
+                }
+
                 _knownGameProcessIds.Clear();
                 foreach (var procName in profile.ProcessNames)
                 {
@@ -2889,20 +3000,10 @@ namespace GI_Subtitles.Views
                 if (Config.Get("FullscreenTipAcknowledged", false))
                     return true;
 
-                Logger.Log.Info("TryGateFullscreenTip: showing one-time Genshin display-mode tip.");
-
-                var dialog = new GI_Subtitles.Views.FullscreenTipWindow();
-                try { dialog.Owner = this; } catch { /* ignore — dialog still works without an owner */ }
-
-                bool? result = dialog.ShowDialog();
-                if (dialog.Acknowledged)
-                {
-                    Config.Set("FullscreenTipAcknowledged", true);
-                    Logger.Log.Info("TryGateFullscreenTip: user acknowledged — won't show again.");
-                    return true;
-                }
-
-                Logger.Log.Info("TryGateFullscreenTip: user cancelled — tip will show again next start.");
+                // Session 50: no modal. The tip sits on Start with "Rozumiem"; the next start passes. New installs
+                // acknowledge it in the setup window's game step and never see this.
+                Logger.Log.Info("TryGateFullscreenTip: showing the display-mode notice on Start.");
+                data?.ShowDisplayModeNotice();
                 return false;
             }
             catch (Exception ex)
@@ -3027,11 +3128,16 @@ namespace GI_Subtitles.Views
 
             if (this.IsLoaded && this.ActualWidth > 0 && this.ActualHeight > 0)
             {
+                // The size just asked for, not the last laid-out one: a new line sets Top and Height together and is
+                // checked before the window's layout pass. With the panel growing away from the dialogue (2.6), Top
+                // moves with every line, so the stale height made a shorter line look like it reached into the area.
+                double width = !double.IsNaN(this.Width) && this.Width > 0 ? this.Width : this.ActualWidth;
+                double height = !double.IsNaN(this.Height) && this.Height > 0 ? this.Height : this.ActualHeight;
                 overlayRect = new System.Windows.Rect(
                     this.Left * Scale,
                     this.Top * Scale,
-                    this.ActualWidth * Scale,
-                    this.ActualHeight * Scale);
+                    width * Scale,
+                    height * Scale);
                 projected = false;
             }
             else
@@ -3283,6 +3389,9 @@ namespace GI_Subtitles.Views
                     if (SubtitleBackground != null)
                     {
                         _subtitleBgVisibilityBeforeOverlap = SubtitleBackground.Visibility;
+                        // The panel is hidden by opacity between lines; remember it so leaving this state hides it again
+                        // instead of leaving an empty panel on screen.
+                        _subtitleBgOpacityBeforeOverlap = SubtitleBackground.Opacity;
                         SubtitleBackground.Visibility = System.Windows.Visibility.Visible;
                     }
                     // Force MainWindow itself visible + opaque. Some config
@@ -3431,7 +3540,13 @@ namespace GI_Subtitles.Views
                     _headerTextBeforeOverlap = null;
 
                     if (SubtitleBackground != null)
+                    {
                         SubtitleBackground.Visibility = _subtitleBgVisibilityBeforeOverlap;
+                        // The drag hint forced the panel opaque; with no line on screen it goes back to hidden (an empty
+                        // panel used to stay behind after the overlap cleared).
+                        SubtitleBackground.BeginAnimation(OpacityProperty, null);
+                        SubtitleBackground.Opacity = _subtitleBgOpacityBeforeOverlap;
+                    }
 
                     // Restore opacity only if the user had a lower preference.
                     if (_opacityBeforeOverlap > 0)
@@ -3530,64 +3645,56 @@ namespace GI_Subtitles.Views
         /// <summary>
         /// Opens the setup wizard window. Can be called on first run or via Dashboard.
         /// </summary>
+        private Views.OnboardingWindow _setupWindow;
+
+        /// <summary>"Uruchom kreator" (Help, status bar): the setup window over the running app.</summary>
         private void ShowSetupWizard()
         {
-            var wizard = new SetupWizardWindow(notify);
-            wizard.OnStartOCR = () =>
+            if (_setupWindow != null)
             {
-                if (!OCRTimer.IsEnabled)
+                if (_setupWindow.WindowState == WindowState.Minimized) _setupWindow.WindowState = WindowState.Normal;
+                _setupWindow.Activate();
+                return;
+            }
+            var w = new Views.OnboardingWindow(App.LicenseService, Views.Shell.OnboardingMode.Rerun)
+            {
+                ChooseRegion = () =>
                 {
-                    // Explicit region check: previously UpdateWindowPosition
-                    // blew up with IndexOutOfRangeException when notify.Region
-                    // was empty (fresh install, user clicked Start before
-                    // completing the region-selection step). The position
-                    // call is now guarded internally, but we also want to
-                    // tell the user WHY nothing's happening rather than
-                    // silently starting a timer that has no region to read.
-                    if (!HasConfiguredRegion())
-                    {
-                        GI_Subtitles.Views.ModernDialog.Warn(
-                            owner: wizard,
-                            title: LocalizedString("Dialog_RegionMissing_Title", "Capture region missing"),
-                            body: LocalizedString("Dialog_RegionMissing_Body", "Pick the part of the screen where the game's dialogue appears before starting translation."),
-                            details: LocalizedString("Dialog_RegionMissing_Details", "Go back to the wizard's Region step, or open Settings \u203A Regions and click \"Select Region\" — then try again."));
-                        return false;
-                    }
-
-                    if (!TryGateOcrStart()) return false;
-                    if (!TryGateInitialDictionarySync()) return false;
-                    if (!TryGateEngineReady()) return false;
-                    if (!TryGateMatcherReady()) return false;
-                    if (!TryGateGameRunning()) return false;
-                    if (!TryGateFullscreenTip()) return false;
-                    if (!TryGateOverlayNotInRegion()) return false;
-                    ResetOcrPipelineState(clearImageCaches: true);
-                    UpdateWindowPosition();
-                    ShowReadyPlaceholderIfEmpty();
-                    ResetActiveOcrWindow();
-                    StartOcrTimers();
-                    System.Media.SystemSounds.Exclamation.Play();
-                    SwitchIcon("kaption-running.ico");
-                    data.UpdateDashboardStatus();
-                }
-                return true;
+                    string before = Config.Get<string>("Region", "");
+                    notify.ChooseRegion();
+                    return !string.Equals(before, Config.Get<string>("Region", ""), StringComparison.Ordinal);
+                },
+                GetEngine = () => data?.engine,
+                SwitchGame = id => data?.SwitchGame(id),
+                ReadyState = () => (data?.IsMatcherReady == true, data?.Engine == SettingsWindow.EngineStatus.Ready, data?.engine?.IsUsingGpu == true),
+                AutoStartChanged = on =>
+                {
+                    _autoStart?.SetEnabled(on);
+                    data?.RefreshAutoStartControls();
+                },
             };
-            wizard.OnOpenSettings = () =>
+            w.RegionChanged = () =>
             {
-                if (data != null && !data.IsVisible)
-                    data.Show();
+                notify.Region = Config.Get<string>("Region", "").Split(',');
+                data?.UpdateDashboardRegionInfo();
+                OnCaptureRegionUserChange(dialogOwner: w);
             };
-            wizard.GetEngine = () => data?.engine;
-            wizard.GetGameId = () => Game;
-            wizard.OnCaptureRegionUserChanged = () => OnCaptureRegionUserChange(dialogOwner: wizard);
             try
             {
-                wizard.Owner = data;
-                wizard.WindowStartupLocation = WindowStartupLocation.CenterOwner;
+                w.Owner = data;
+                w.WindowStartupLocation = WindowStartupLocation.CenterOwner;
             }
-            catch { /* owner is cosmetic; wizard remains usable */ }
-            wizard.Show();
-            wizard.Activate();
+            catch { /* owner is cosmetic */ }
+            w.Closed += (_, __) =>
+            {
+                var outcome = w.Result;
+                _setupWindow = null;
+                if (outcome == Views.OnboardingWindow.Outcome.Characters) data?.ShowCharactersPage();
+                else if (outcome == Views.OnboardingWindow.Outcome.Start) data?.ShowStartPage();
+            };
+            _setupWindow = w;
+            w.Show();
+            w.Activate();
         }
 
         /// <summary>
@@ -3661,10 +3768,12 @@ namespace GI_Subtitles.Views
                 var rect = Screenshot.Screenshot.GetRegion();
                 // The picker activated itself; give the game its focus back before reading.
                 RestoreForeground(previousForeground);
-                if (rect.Width <= 0 || rect.Height <= 0) return;
-                var selection = new System.Drawing.Rectangle(
-                    (int)Math.Round(rect.X), (int)Math.Round(rect.Y),
-                    (int)Math.Round(rect.Width), (int)Math.Round(rect.Height));
+                if (!QuickTranslateArea.TryFromPicker(rect, out var selection))
+                {
+                    // Cancel, or a click without a real drag: dismiss quietly and keep the last area.
+                    if (Logger.IsDebugEnabled) Logger.Log.Debug($"QuickTranslateRegion: pick dismissed ({rect})");
+                    return;
+                }
                 QuickTranslateArea.Save(selection);
                 await RunQuickTranslateAsync(selection);
             }
@@ -3803,28 +3912,29 @@ namespace GI_Subtitles.Views
                 var lookup = _characterLookup;
                 var icons = CharacterImageCache.ForGame(game);
                 // Disk checks and image decoding stay off the UI thread, which also paces the overlay.
-                var model = await Task.Run(async () =>
+                var found = await Task.Run(async () =>
                 {
                     var catalog = await CharacterCatalogService.GetAsync(game).ConfigureAwait(false);
-                    if (catalog.IsEmpty) return null;
+                    if (catalog.IsEmpty) return default;
                     var record = DetectorFor(catalog).Detect(lines);
-                    if (record == null) return null;
+                    if (record == null) return default;
                     var m = CharacterOverviewBuilder.Build(record, catalog, lookup);
                     CharacterIcons.ApplyCached(m, icons);
                     CharacterOverviewViewModel.PrepareVisuals(m);
-                    return m;
+                    return (model: m, record);
                 });
 
+                var model = found.model;
                 if (model == null || !ReferenceEquals(popup, _quickTranslatePopup) || !popup.IsVisible) return;
                 Func<string> plain = () => model.ToPlainText(key => TryFindResource(key) as string);
-                popup.SetCharacter(new CharacterOverviewView(model), model.Name, plain);
+                popup.SetCharacter(new CharacterOverviewView(model), new QuickTranslateContext(model, found.record, lines), plain);
 
                 // Images not on disk yet: render now, swap in the full view once they arrive.
                 if (await CharacterIcons.FetchMissingAsync(model, icons))
                 {
                     await Task.Run(() => CharacterOverviewViewModel.PrepareVisuals(model));
                     if (ReferenceEquals(popup, _quickTranslatePopup) && popup.IsVisible)
-                        popup.SetCharacter(new CharacterOverviewView(model), model.Name, plain);
+                        popup.SetCharacter(new CharacterOverviewView(model), new QuickTranslateContext(model, found.record, lines), plain);
                 }
             }
             catch (Exception ex)
@@ -4403,7 +4513,9 @@ namespace GI_Subtitles.Views
                 // UpdateWindowPosition used to APPLY a pad: the final
                 // Top = regionY/scale + Pad, so Pad = Top - regionY/scale.
                 double scale = Scale > 0 ? Scale : 1.0;
-                int newPadV = (int)Math.Round(this.Top - regionY / scale);
+                int regionH = notify.Region.Length > 3 && int.TryParse(notify.Region[3], out int h) ? h : 0;
+                int newPadV = OverlayPlacement.PadFor(this.Top, this.ActualHeight > 0 ? this.ActualHeight : this.Height,
+                    regionY / scale, regionH / scale, _referenceWindowHeight);
 
                 // Horizontal pad: overlay is centred on screen + PadHorizontal.
                 // Derive from where the user dropped the box.
@@ -4458,14 +4570,9 @@ namespace GI_Subtitles.Views
 
         public void SwitchIcon(string iconName)
         {
-            Uri iconUri = new Uri($"pack://application:,,,/Resources/{iconName}");
-            Stream iconStream = System.Windows.Application.GetResourceStream(iconUri).Stream;
-
-            // Create a new Icon object
-            Icon newIcon = new Icon(iconStream);
-
-            // Update the NotifyIcon's icon
-            notifyIcon.Icon = newIcon;
+            // Running/stopped from the start paths; the Start page refines it (amber while busy).
+            notify?.SetTrayState(iconName != null && iconName.Contains("running", StringComparison.OrdinalIgnoreCase)
+                ? Core.UI.TrayState.Translating : Core.UI.TrayState.Idle);
         }
 
         // Handle window messages
@@ -4476,6 +4583,7 @@ namespace GI_Subtitles.Views
             {
                 if (wParam.ToInt32() == HOTKEY_ID_1)
                 {
+                    bool wasRunning = OCRTimer.IsEnabled;
                     if (OCRTimer.IsEnabled)
                     {
                         OCRTimer.Stop();
@@ -4504,6 +4612,7 @@ namespace GI_Subtitles.Views
                         SystemSounds.Exclamation.Play();
                         SwitchIcon("kaption-running.ico");
                     }
+                    NotifyUserToggled(wasRunning);
                     data.UpdateDashboardStatus();
                     handled = true;
                 }
@@ -4819,6 +4928,8 @@ namespace GI_Subtitles.Views
         private System.Windows.Visibility _headerVisibilityBeforeOverlap;
         private System.Windows.Visibility _subtitleTextVisibilityBeforeOverlap;
         private System.Windows.Visibility _subtitleBgVisibilityBeforeOverlap;
+        /// <summary>The panel's opacity before the drag hint forced it opaque (0 between lines), restored on exit.</summary>
+        private double _subtitleBgOpacityBeforeOverlap = 1;
         private double _opacityBeforeOverlap = 1.0;
         private double _subtitleMinWidthBeforeOverlap;
         private double _subtitleMinHeightBeforeOverlap;

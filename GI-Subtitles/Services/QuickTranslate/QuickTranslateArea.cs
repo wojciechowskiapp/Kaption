@@ -41,6 +41,26 @@ namespace GI_Subtitles.Services.QuickTranslate
             return true;
         }
 
+        /// <summary>
+        /// The picker's physical-pixel rect, rounded. False for a cancel (<see cref="System.Windows.Rect.Empty"/>),
+        /// a non-finite value, or a side under <see cref="MinSide"/> once rounded.
+        /// </summary>
+        public static bool TryFromPicker(System.Windows.Rect picked, out Rectangle selection)
+        {
+            selection = Rectangle.Empty;
+            if (picked.IsEmpty
+                || !double.IsFinite(picked.X) || !double.IsFinite(picked.Y)
+                || !double.IsFinite(picked.Width) || !double.IsFinite(picked.Height))
+                return false;
+
+            var r = new Rectangle(
+                (int)Math.Round(picked.X), (int)Math.Round(picked.Y),
+                (int)Math.Round(picked.Width), (int)Math.Round(picked.Height));
+            if (r.Width < MinSide || r.Height < MinSide) return false;
+            selection = r;
+            return true;
+        }
+
         public static void Save(Rectangle area)
         {
             try { Config.Set(ConfigKey, Format(area)); }

@@ -1,13 +1,16 @@
 ﻿<Application x:Class="GI_Subtitles.App"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:local="clr-namespace:GI_Subtitles"
-             StartupUri="Views/MainWindow.xaml">
+             xmlns:local="clr-namespace:GI_Subtitles">
     <Application.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
-                <!-- Design tokens (colours, type, spacing, radii, focus, brand mark) for every window. -->
+                <!-- Design tokens (ramps, type, spacing, radii, focus, brand mark) for every window. -->
                 <ResourceDictionary Source="Themes/Tokens.xaml"/>
+                <!-- Semantic palette slot: ThemeService swaps Dark/Light here at startup and live (Auto follows Windows). -->
+                <ResourceDictionary Source="Themes/Palette.Dark.xaml"/>
+                <!-- Window chrome, navigation rail, chips, skeletons and empty states shared by every window. -->
+                <ResourceDictionary Source="Themes/Shell.xaml"/>
                 <!-- Default language resource (will be replaced at runtime) -->
                 <ResourceDictionary Source="pack://application:,,,/Resources/Strings.zh-CN.xaml"/>
             </ResourceDictionary.MergedDictionaries>

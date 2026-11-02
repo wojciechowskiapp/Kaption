@@ -66,8 +66,10 @@ namespace GI_Test
             var m = CharacterOverviewBuilder.Build(c.Find("1001"), c, new DictLookup(pl));
 
             // Official build wins: best set/weapon/main stats come from it, not from the AI priority.
+            // Names a player looks for in the game read as the game shows them; the translation is the gloss.
             var set = m.Highlights.Single(h => h.LabelKey == "Char_Tip_Set");
-            Assert.AreEqual("Łowca", set.Text);
+            Assert.AreEqual("Hunter of Glacial Forest", set.Text);
+            Assert.AreEqual("Łowca", set.Gloss);
             Assert.IsFalse(set.IsAi);
             Assert.AreEqual("https://img.example/relic/71003.png", set.IconUrl);
             var weapon = m.Highlights.Single(h => h.LabelKey == "Char_Tip_Weapon");
@@ -77,7 +79,7 @@ namespace GI_Test
 
             // Official leveling order, not AI, in the English names the game shows.
             var leveling = m.Highlights.Single(h => h.LabelKey == "Char_Tip_Leveling");
-            Assert.AreEqual("Frigid Cold Arrow", leveling.Text);
+            Assert.AreEqual("Frigid Cold Arrow (Basic)", leveling.Text);
             Assert.IsFalse(leveling.IsAi);
 
             // Progression picks come from AI priority and say so.
@@ -91,7 +93,9 @@ namespace GI_Test
 
             Assert.AreEqual("Prydwen", m.Links.Single().Label);
             Assert.AreEqual("Przegląd", m.Guide[0].Heading, "Polish guide preferred");
-            Assert.AreEqual("https://kaption.one/pl/postacie/honkai-star-rail/?q=March%207th", m.PageUrl);
+            // The character's own page on the site, Polish or English by the interface (CharacterPageLink).
+            Assert.AreEqual("https://kaption.one/pl/postacie/honkai-star-rail/march-7th/", m.PageUrlPl);
+            Assert.AreEqual("https://kaption.one/characters/honkai-star-rail/march-7th/", m.PageUrlEn);
             Assert.IsTrue(m.HasTips);
         }
 
@@ -118,7 +122,7 @@ namespace GI_Test
             Assert.IsFalse(dan.HasTips);
             Assert.AreEqual(0, dan.Highlights.Count);
             Assert.AreEqual(0, dan.Links.Count);
-            Assert.AreEqual("https://kaption.one/pl/postacie/honkai-star-rail/?q=Dan%20Heng", dan.PageUrl);
+            Assert.AreEqual("https://kaption.one/pl/postacie/honkai-star-rail/dan-heng/", dan.PageUrlPl);
 
             var march = CharacterOverviewBuilder.Build(c.Find("1001"), c, null);
             Assert.IsTrue(march.HasTips, "an official build alone gives highlights");

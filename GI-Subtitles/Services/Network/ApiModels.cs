@@ -307,6 +307,25 @@ namespace GI_Subtitles.Services.Network
         [JsonInclude]
         public string Sha256 { get; private set; }
 
+        /// <summary>
+        /// SHA-256 of the decrypted pack bytes (the publish pipeline's plaintext_sha256 of translation.plain.json). Unlike
+        /// <see cref="Sha256"/> it does not change when an unchanged pack is re-encrypted under a new revision, so a
+        /// revision bump with the same content is relabelled instead of downloaded. Absent on older servers.
+        /// </summary>
+        [JsonPropertyName("pack_sha256")]
+        [JsonInclude]
+        public string PackSha256 { get; private set; }
+
+        /// <summary>The same hash under the publish pipeline's own name, accepted as an alias of <see cref="PackSha256"/>.</summary>
+        [JsonPropertyName("plaintext_sha256")]
+        [JsonInclude]
+        public string PlaintextSha256 { get; private set; }
+
+        /// <summary>The pack's content hash when the server sends one, else null.</summary>
+        [JsonIgnore]
+        public string ContentSha256 => !string.IsNullOrWhiteSpace(PackSha256) ? PackSha256
+            : !string.IsNullOrWhiteSpace(PlaintextSha256) ? PlaintextSha256 : null;
+
         [JsonPropertyName("min_tier")]
         [JsonInclude]
         public string MinTier { get; private set; }

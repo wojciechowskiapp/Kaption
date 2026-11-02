@@ -116,7 +116,7 @@ namespace GI_Subtitles.Models
         public TranslationPackSource Source
         {
             get => _source;
-            set { if (_source != value) { _source = value; Raise(nameof(Source)); Raise(nameof(SourceLabel)); } }
+            set { if (_source != value) { _source = value; Raise(nameof(Source)); Raise(nameof(SourceLabel)); Raise(nameof(RowTooltip)); } }
         }
 
         private string _localPath;
@@ -124,7 +124,7 @@ namespace GI_Subtitles.Models
         public string LocalPath
         {
             get => _localPath;
-            set { if (_localPath != value) { _localPath = value; Raise(nameof(LocalPath)); Raise(nameof(IsInstalled)); } }
+            set { if (_localPath != value) { _localPath = value; Raise(nameof(LocalPath)); Raise(nameof(IsInstalled)); Raise(nameof(RowTooltip)); } }
         }
 
         private long _localSize;
@@ -178,7 +178,7 @@ namespace GI_Subtitles.Models
         public string RemoteVersion
         {
             get => _remoteVersion;
-            set { if (_remoteVersion != value) { _remoteVersion = value; Raise(nameof(RemoteVersion)); Raise(nameof(CanUpdate)); } }
+            set { if (_remoteVersion != value) { _remoteVersion = value; Raise(nameof(RemoteVersion)); Raise(nameof(CanUpdate)); Raise(nameof(VersionLabel)); } }
         }
 
         private string _localVersion;
@@ -191,7 +191,7 @@ namespace GI_Subtitles.Models
         public string LocalVersion
         {
             get => _localVersion;
-            set { if (_localVersion != value) { _localVersion = value; Raise(nameof(LocalVersion)); Raise(nameof(CanUpdate)); } }
+            set { if (_localVersion != value) { _localVersion = value; Raise(nameof(LocalVersion)); Raise(nameof(CanUpdate)); Raise(nameof(VersionLabel)); } }
         }
 
         /// <summary>Wire size of the .gisub-dist in bytes when known.</summary>
@@ -217,12 +217,11 @@ namespace GI_Subtitles.Models
             {
                 switch (Source)
                 {
-                    case TranslationPackSource.LocalCache:
-                        return HasLocalSource ? "Installed (local)" : "Installed (unknown origin)";
-                    case TranslationPackSource.PaidCached: return "Installed (Kaption pack)";
-                    case TranslationPackSource.RemoteAvailable: return "Available";
-                    case TranslationPackSource.RemoteLocked: return "Locked";
-                    case TranslationPackSource.Missing: return "Not installed";
+                    case TranslationPackSource.LocalCache: return L("shell_Pack_Status_Local", "On this PC");
+                    case TranslationPackSource.PaidCached: return L("shell_Pack_Status_Installed", "Installed");
+                    case TranslationPackSource.RemoteAvailable: return L("shell_Pack_Status_Available", "Available");
+                    case TranslationPackSource.RemoteLocked: return L("shell_Pack_Status_Locked", "Locked");
+                    case TranslationPackSource.Missing: return L("shell_Pack_Status_Missing", "Not installed");
                     default: return "?";
                 }
             }
@@ -237,22 +236,31 @@ namespace GI_Subtitles.Models
                 {
                     case TranslationPackSource.LocalCache:
                         return HasLocalSource
-                            ? "Built from a local source file on this device."
-                            : "Cache found with no local source — origin unknown (likely migrated from an older install).";
+                            ? L("shell_Pack_Source_Local", "Built from a source file on this PC.")
+                            : L("shell_Pack_Source_LocalUnknown", "Found on this PC, origin unknown (probably from an older install).");
                     case TranslationPackSource.PaidCached:
-                        return "Downloaded from Kaption and encrypted to this device.";
+                        return L("shell_Pack_Source_Paid", "Downloaded from Kaption and locked to this PC.");
                     case TranslationPackSource.RemoteAvailable:
-                        return "Kaption pack available to download.";
+                        return L("shell_Pack_Source_Available", "Ready to download.");
                     case TranslationPackSource.RemoteLocked:
                         return RemoteMinTier != null
-                            ? $"Requires {RemoteMinTier}. Upgrade to unlock."
-                            : "Tier-locked. Upgrade to unlock.";
+                            ? string.Format(L("shell_Pack_Source_Locked_Format", "Needs {0}. Upgrade to unlock."), RemoteMinTier)
+                            : L("shell_Pack_Source_LockedNoTier", "Locked on your plan.");
                     case TranslationPackSource.Missing:
-                        return "No local cache and no available download for your tier.";
+                        return L("shell_Pack_Source_Missing", "Nothing on this PC and nothing to download on your plan.");
                     default: return string.Empty;
                 }
             }
         }
+
+        /// <summary>The version the row shows: what is installed, else what can be downloaded ("" when neither is known).</summary>
+        public string VersionLabel => !string.IsNullOrEmpty(LocalVersion) ? LocalVersion : RemoteVersion ?? string.Empty;
+
+        /// <summary>
+        /// The row's tooltip: where the pack came from and its file. The row itself stays one line (language, version,
+        /// state); this is the technical detail behind it.
+        /// </summary>
+        public string RowTooltip => string.IsNullOrEmpty(LocalPath) ? SourceLabel : SourceLabel + "\n" + LocalPath;
 
         /// <summary>Pretty byte size — "88.6 MB", "312 B", etc.</summary>
         public string SizeLabel
@@ -260,7 +268,7 @@ namespace GI_Subtitles.Models
             get
             {
                 long bytes = LocalSize > 0 ? LocalSize : RemoteSize;
-                if (bytes <= 0) return "—";
+                if (bytes <= 0) return string.Empty;
                 return FormatSize(bytes);
             }
         }
@@ -270,13 +278,13 @@ namespace GI_Subtitles.Models
         {
             get
             {
-                if (!LocalModifiedAt.HasValue) return "—";
+                if (!LocalModifiedAt.HasValue) return string.Empty; // nothing on disk yet: nothing to date
                 var dt = LocalModifiedAt.Value;
                 var age = DateTime.Now - dt;
-                if (age.TotalSeconds < 60) return "just now";
-                if (age.TotalMinutes < 60) return $"{(int)age.TotalMinutes} min ago";
-                if (age.TotalHours < 24) return $"{(int)age.TotalHours} h ago";
-                if (age.TotalDays < 7) return $"{(int)age.TotalDays} d ago";
+                if (age.TotalSeconds < 60) return L("shell_Pack_JustNow", "just now");
+                if (age.TotalMinutes < 60) return string.Format(L("shell_Pack_MinAgo_Format", "{0} min ago"), (int)age.TotalMinutes);
+                if (age.TotalHours < 24) return string.Format(L("shell_Pack_HoursAgo_Format", "{0} h ago"), (int)age.TotalHours);
+                if (age.TotalDays < 7) return string.Format(L("shell_Pack_DaysAgo_Format", "{0} d ago"), (int)age.TotalDays);
                 return dt.ToString("yyyy-MM-dd");
             }
         }
@@ -336,7 +344,14 @@ namespace GI_Subtitles.Models
         }
 
         /// <summary>"Active" when this row is the selected target, empty otherwise — XAML binds directly.</summary>
-        public string ActiveLabel => _isActiveTarget ? "Active" : string.Empty;
+        public string ActiveLabel => _isActiveTarget ? L("shell_Pack_Active", "In use") : string.Empty;
+
+        /// <summary>Resource lookup for hosts without a WPF Application (render tests); the app leaves it null.</summary>
+        internal static Func<string, object> Lookup;
+
+        // UI copy comes from the string dictionaries; English when they are not loaded.
+        private static string L(string key, string fallback)
+            => (Lookup?.Invoke(key) ?? System.Windows.Application.Current?.TryFindResource(key)) as string ?? fallback;
 
         /// <summary>
         /// Subtle row background hint — the active row gets a faint tint so

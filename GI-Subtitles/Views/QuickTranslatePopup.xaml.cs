@@ -39,6 +39,8 @@ namespace GI_Subtitles.Views
         [DllImport("user32.dll")] private static extern bool GetWindowRect(IntPtr hWnd, out RECT rect);
         [DllImport("user32.dll")]
         private static extern bool SetWindowPos(IntPtr hWnd, IntPtr after, int x, int y, int cx, int cy, uint flags);
+        [DllImport("user32.dll")] private static extern IntPtr GetForegroundWindow();
+        [DllImport("user32.dll")] private static extern bool SetForegroundWindow(IntPtr hWnd);
 
         private readonly IReadOnlyList<QuickTranslateSegment> _segments;
         private readonly QuickTranslateSettings _settings;
@@ -51,6 +53,11 @@ namespace GI_Subtitles.Views
         private bool _userMoved;
         private bool _closing;
         private Func<string> _overviewText;
+        private QuickTranslateContext _context;
+        private CharacterOverviewView _overview;
+        private IReadOnlyList<LineMark> _marks = Array.Empty<LineMark>();
+        // The window that had focus (the game) before the user clicked into the popup; it gets focus back on close.
+        private IntPtr _returnFocusTo;
 
         public QuickTranslatePopup(IReadOnlyList<QuickTranslateSegment> segments,
                                    QuickTranslateSettings settings,
@@ -83,10 +90,14 @@ namespace GI_Subtitles.Views
 
             SourceInitialized += OnSourceInitialized;
             Loaded += OnLoaded;
-            SizeChanged += (s, e) => { if (!_userMoved) Place(); };
+            SizeChanged += (s, e) => { if (!_userMoved) Place(e.NewSize); };
             MouseEnter += (s, e) => _dismissal.Pause();
             MouseLeave += (s, e) => _dismissal.Resume();
-            Closed += (s, e) => _timer.Stop();
+            Closed += (s, e) =>
+            {
+                _timer.Stop();
+                if (_returnFocusTo != IntPtr.Zero) SetForegroundWindow(_returnFocusTo);
+            };
         }
 
         /// <summary>Screen bounds in physical pixels, for masking the popup out of captures.</summary>
@@ -107,14 +118,100 @@ namespace GI_Subtitles.Views
             Resources["Char_Accent"] = accent;
         }
 
-        /// <summary>Adds the character tab. Safe to call before or after the window is shown.</summary>
-        public void SetCharacter(UIElement overview, string characterName, Func<string> plainText)
+        /// <summary>
+        /// Shows the recognised character: the strip under the translation, the skill lines marked, and the page
+        /// ready to open inline. Safe before or after the window is shown, and again when images arrive.
+        /// </summary>
+        public void SetCharacter(CharacterOverviewView overview, QuickTranslateContext context, Func<string> plainText)
         {
-            if (overview == null || string.IsNullOrWhiteSpace(characterName)) return;
-            OverviewHost.Content = overview;
-            OverviewTab.Content = characterName;
+            if (overview == null || context == null) return;
+            bool redraw = _context?.IsExpanded == true; // a redraw keeps the page open, at the same place
+            double offset = _overview?.VerticalOffset ?? 0;
+            if (redraw) context.Expand();
+            _context = context;
+            _overview = overview;
             _overviewText = plainText;
-            TabsPanel.Visibility = Visibility.Visible;
+            overview.ShowHero = false; // the strip heads the page
+            OverviewHost.Content = overview;
+            ContextStrip.DataContext = context;
+            ContextStrip.Visibility = Visibility.Visible;
+            _marks = context.MarksFor(_segments);
+            RenderTranslation();
+            ApplyMode();
+            if (redraw && offset > 0)
+                Dispatcher.BeginInvoke(new Action(() => { if (overview.VerticalOffset < 1) overview.ScrollTo(offset); }),
+                    DispatcherPriority.Loaded);
+        }
+
+        /// <summary>Translation with the strip under it, or the character's page with the strip as its header.</summary>
+        private void ApplyMode()
+        {
+            bool page = _context?.IsExpanded == true;
+            BodyScroll.Visibility = page ? Visibility.Collapsed : Visibility.Visible;
+            OverviewHost.Visibility = page ? Visibility.Visible : Visibility.Collapsed;
+            Grid.SetRow(ContextStrip, page ? 1 : 3);
+            ContextStrip.Margin = page ? new Thickness(12, 2, 12, 8) : new Thickness(12, 0, 12, 10);
+            OpenCardButton.Visibility = page ? Visibility.Collapsed : Visibility.Visible;
+            BackButton.Visibility = page ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        private void OpenCardButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (_context == null) return;
+            PinFromInteraction();
+            _context.Expand();
+            ApplyMode();
+            // Open where the recognised skill is; the page lays out first.
+            string section = _context.SectionToOpen;
+            if (section != null && _overview != null)
+                Dispatcher.BeginInvoke(new Action(() => _overview.ScrollToSection(section)), DispatcherPriority.Loaded);
+            if (IsActive) BackButton.Focus();
+        }
+
+        private void BackButton_Click(object sender, RoutedEventArgs e)
+        {
+            _context?.Collapse();
+            ApplyMode();
+            if (IsActive) OpenCardButton.Focus();
+        }
+
+        // Esc: an open page closes first, then the popup. Tab and Enter work as in any window once it has focus.
+        private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key != Key.Escape) return;
+            e.Handled = true;
+            if (_context != null && _context.Escape() == PopupEscape.Collapse)
+            {
+                ApplyMode();
+                OpenCardButton.Focus();
+                return;
+            }
+            CloseNow();
+        }
+
+        // The popup never takes focus by itself. Once the user clicks into it (anything but closing), it can,
+        // so Tab / Enter / Esc reach it; the game gets focus back when it closes.
+        private void Window_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (_hwnd == IntPtr.Zero || _returnFocusTo != IntPtr.Zero || IsWithin(e.OriginalSource, CloseButton)) return;
+            try
+            {
+                _returnFocusTo = GetForegroundWindow();
+                int ex = GetWindowLong(_hwnd, GWL_EXSTYLE);
+                SetWindowLong(_hwnd, GWL_EXSTYLE, ex & ~WS_EX_NOACTIVATE);
+                Activate();
+            }
+            catch (Exception ex)
+            {
+                Logger.Log.Warn($"QuickTranslatePopup activate: {ex.Message}");
+            }
+        }
+
+        private static bool IsWithin(object source, DependencyObject ancestor)
+        {
+            for (var d = source as DependencyObject; d != null; d = VisualTreeHelper.GetParent(d))
+                if (ReferenceEquals(d, ancestor)) return true;
+            return false;
         }
 
         /// <summary>Closes immediately, without the fade. Used when a new Ctrl+Q replaces this popup.</summary>
@@ -151,15 +248,23 @@ namespace GI_Subtitles.Views
             _timer.Start();
         }
 
-        private void Place()
+        /// <param name="newSize">The size being applied (DIP). The window rectangle can still hold the old one
+        /// here, which put a popup that shrank back from the card beside the selection instead of below it.</param>
+        private void Place(Size? newSize = null)
         {
             if (_hwnd == IntPtr.Zero || _closing) return;
             try
             {
                 if (!GetWindowRect(_hwnd, out RECT r)) return;
+                var size = new Size(r.Right - r.Left, r.Bottom - r.Top);
+                if (newSize.HasValue && PresentationSource.FromVisual(this)?.CompositionTarget is CompositionTarget target0)
+                {
+                    var toDevice = target0.TransformToDevice;
+                    size = new Size(Math.Round(newSize.Value.Width * toDevice.M11), Math.Round(newSize.Value.Height * toDevice.M22));
+                }
                 var target = PopupPlacement.Compute(
                     new Rect(_selectionPx.X, _selectionPx.Y, _selectionPx.Width, _selectionPx.Height),
-                    new Size(r.Right - r.Left, r.Bottom - r.Top),
+                    size,
                     new Rect(_workAreaPx.X, _workAreaPx.Y, _workAreaPx.Width, _workAreaPx.Height));
                 SetWindowPos(_hwnd, HWND_TOPMOST, (int)Math.Round(target.X), (int)Math.Round(target.Y), 0, 0,
                     SWP_NOSIZE | SWP_NOACTIVATE);
@@ -235,10 +340,11 @@ namespace GI_Subtitles.Views
                     TranslationPanel.Children.Add(Paragraph(seg.Source, "Char_FgMuted", italic: true));
                     continue;
                 }
-                bool title = i < _segments.Count - 1 && seg.Translation.Length <= 60 && seg.Translation.IndexOf('\n') < 0;
+                var mark = i < _marks.Count ? _marks[i] : default;
+                bool title = mark.FromCard || (i < _segments.Count - 1 && seg.Translation.Length <= 60 && seg.Translation.IndexOf('\n') < 0);
                 var p = Paragraph(seg.Translation, title ? "Char_Accent" : "Char_Fg", italic: false);
                 if (title) p.FontWeight = FontWeights.SemiBold;
-                TranslationPanel.Children.Add(p);
+                TranslationPanel.Children.Add(mark.FromCard ? FromCardLine(p, mark.Badge) : (UIElement)p);
                 if (showOriginal)
                 {
                     var src = Paragraph(seg.Source, "Char_FgMuted", italic: false);
@@ -249,16 +355,46 @@ namespace GI_Subtitles.Views
             }
         }
 
-        private TextBlock Paragraph(string text, string brushKey, bool italic) => new TextBlock
+        private TextBlock Paragraph(string text, string brushKey, bool italic)
         {
-            Text = text,
-            TextWrapping = TextWrapping.Wrap,
-            FontSize = _settings.FontSize,
-            LineHeight = _settings.FontSize * 1.4,
-            Foreground = (Brush)FindResource(brushKey),
-            FontStyle = italic ? FontStyles.Italic : FontStyles.Normal,
-            Margin = new Thickness(0, 0, 0, 8),
-        };
+            var block = new TextBlock
+            {
+                Text = text,
+                TextWrapping = TextWrapping.Wrap,
+                FontSize = _settings.FontSize,
+                LineHeight = _settings.FontSize * 1.4,
+                FontStyle = italic ? FontStyles.Italic : FontStyles.Normal,
+                Margin = new Thickness(0, 0, 0, 8),
+            };
+            // A palette key, resolved where the text lives, so it follows the palette (and works in any host).
+            block.SetResourceReference(TextBlock.ForegroundProperty, brushKey);
+            return block;
+        }
+
+        // A skill title the character's data confirms: its type badge and a quiet "z karty postaci".
+        private UIElement FromCardLine(TextBlock title, string badge)
+        {
+            title.Margin = new Thickness(0, 0, 8, 0);
+            var line = new WrapPanel { Margin = new Thickness(0, 0, 0, 8) };
+            line.Children.Add(title);
+            if (badge.Length > 0) line.Children.Add(TagChip(badge, null, "Char_Fg", semiBold: true));
+            line.Children.Add(TagChip(null, "QuickTranslate_FromCard", "Char_FgSubtle", semiBold: false));
+            return line;
+        }
+
+        // A small tag from Themes/Chips.xaml: literal text, or a string resource resolved where the tag lives.
+        private static Border TagChip(string text, string textKey, string brushKey, bool semiBold)
+        {
+            var tag = new Border { Margin = new Thickness(0, 2, 6, 2) };
+            tag.SetResourceReference(StyleProperty, "KTag");
+            var label = new TextBlock { FontWeight = semiBold ? FontWeights.SemiBold : FontWeights.Normal };
+            label.SetResourceReference(StyleProperty, "KTagText");
+            label.SetResourceReference(TextBlock.ForegroundProperty, brushKey);
+            if (textKey != null) label.SetResourceReference(TextBlock.TextProperty, textKey);
+            else label.Text = text;
+            tag.Child = label;
+            return tag;
+        }
 
         private TextBlock Notice(string text)
         {
@@ -290,16 +426,6 @@ namespace GI_Subtitles.Views
             catch (InvalidOperationException) { /* button released before the drag began */ }
         }
 
-        private void Tab_Checked(object sender, RoutedEventArgs e)
-        {
-            if (!IsLoaded || TranslationBand == null || OverviewHost == null) return;
-            PinFromInteraction();
-            bool overview = OverviewTab.IsChecked == true;
-            OverviewHost.Visibility = overview ? Visibility.Visible : Visibility.Collapsed;
-            BodyScroll.Visibility = overview ? Visibility.Collapsed : Visibility.Visible;
-            BodyScroll.ScrollToTop();
-        }
-
         private void OriginalToggle_Click(object sender, RoutedEventArgs e)
         {
             PinFromInteraction();
@@ -309,7 +435,7 @@ namespace GI_Subtitles.Views
         private void CopyButton_Click(object sender, RoutedEventArgs e)
         {
             PinFromInteraction();
-            string text = OverviewTab.IsChecked == true ? _overviewText?.Invoke() : TranslationPlainText();
+            string text = _context?.IsExpanded == true ? _overviewText?.Invoke() : TranslationPlainText();
             if (string.IsNullOrEmpty(text)) return;
             try
             {

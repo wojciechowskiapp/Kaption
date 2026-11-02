@@ -26,7 +26,8 @@ namespace GI_Test
                 new OverviewGuideSection { Heading = "Build", Body = "B." },
                 new OverviewGuideSection { Heading = "Teams", Body = "C." },
             },
-            PageUrl = "https://kaption.one/pl/postacie/starrail/?q=Kafka",
+            PageUrlPl = "https://kaption.one/pl/postacie/honkai-star-rail/kafka/",
+            PageUrlEn = "https://kaption.one/characters/honkai-star-rail/kafka/",
         };
 
         [TestMethod]

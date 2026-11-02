@@ -32,6 +32,9 @@ namespace GI_Subtitles.Core.UI
         ToolStripMenuItem settingItem;
         ToolStripMenuItem feedbackItem;
         ToolStripMenuItem exitItem;
+        ToolStripMenuItem startStopItem;
+        ToolStripMenuItem charactersItem;
+        private TrayState _trayState = TrayState.Idle;
         private int Size = Config.Config.Get<int>("Size");
         private bool AutoStart = Config.Config.Get("AutoStart", false);
         public string[] Region = Config.Config.Get<string>("Region", "").Split(',');
@@ -71,13 +74,25 @@ namespace GI_Subtitles.Core.UI
             languageSelector = new ToolStripMenuItem(trayLanguage);
             languageSelector.DropDownItems.Add(CreateLanguageItem("English", "en-US"));
             languageSelector.DropDownItems.Add(CreateLanguageItem("Polski", "pl-PL"));
-            languageSelector.DropDownItems.Add(CreateLanguageItem("日本語", "ja-JP"));
-            languageSelector.DropDownItems.Add(CreateLanguageItem("简体中文", "zh-CN"));
+            // Polish and English only, as in the app (UiLanguage); the ja/zh dictionaries stay for old configs.
 
-            settingItem = new ToolStripMenuItem(trayOpenApp);
+            settingItem = new ToolStripMenuItem(GetLocalizedString("shell_Tray_Settings", trayOpenApp));
+            startStopItem = new ToolStripMenuItem(GetLocalizedString("shell_Tray_Start", "Start translating"));
+            charactersItem = new ToolStripMenuItem(GetLocalizedString("shell_Tray_Characters", "Characters"));
+            // Same gated path as the Start button and Ctrl+Shift+S.
+            startStopItem.Click += (sender, e) =>
+            {
+                try { data?.OnToggleOCR?.Invoke(); }
+                catch (Exception ex) { Logger.Log.Warn($"Tray start/stop failed: {ex.Message}"); }
+            };
+            charactersItem.Click += (sender, e) =>
+            {
+                try { data?.ShowCharactersPage(); }
+                catch (Exception ex) { Logger.Log.Warn($"Tray characters failed: {ex.Message}"); }
+            };
             string trayFeedback = GetLocalizedString("Tray_Feedback", "Send feedback\u2026");
             feedbackItem = new ToolStripMenuItem(trayFeedback);
-            exitItem = new ToolStripMenuItem(trayExit);
+            exitItem = new ToolStripMenuItem(GetLocalizedString("shell_Tray_Exit", trayExit));
             ToolStripMenuItem versionItem = new ToolStripMenuItem(version)
             {
                 Enabled = false
@@ -92,18 +107,7 @@ namespace GI_Subtitles.Core.UI
                 // surface non-modally and just raise if already up.
                 try
                 {
-                    if (data == null) return;
-                    if (data.IsVisible)
-                    {
-                        if (data.WindowState == System.Windows.WindowState.Minimized)
-                            data.WindowState = System.Windows.WindowState.Normal;
-                        data.Activate();
-                    }
-                    else
-                    {
-                        data.Show();
-                        data.Activate();
-                    }
+                    data?.ShowStartPage();
                 }
                 catch (Exception ex)
                 {
@@ -138,19 +142,19 @@ namespace GI_Subtitles.Core.UI
             // access that people rarely used. The ToolStripMenuItem builders
             // (fontSizeSelector / languageSelector) stay assigned in case other
             // code references them, but are not added to the visible strip.
+            // Session 50: the four things people reach for from the tray. Feedback lives under Help.
             contextMenuStrip.Items.Add(versionItem);
             contextMenuStrip.Items.Add(new ToolStripSeparator());
+            contextMenuStrip.Items.Add(startStopItem);
+            contextMenuStrip.Items.Add(charactersItem);
             contextMenuStrip.Items.Add(settingItem);
-            contextMenuStrip.Items.Add(feedbackItem);
             contextMenuStrip.Items.Add(new ToolStripSeparator());
             contextMenuStrip.Items.Add(exitItem);
             contextMenuStrip.Opening += ContextMenuStrip_Opening; // The menu is opened before triggering
             contextMenuStrip.Closed += ContextMenuStrip_Closed;   // The menu is closed after triggering
-            Uri iconUri = new Uri("pack://application:,,,/Resources/kaption.ico");
-            Stream iconStream = System.Windows.Application.GetResourceStream(iconUri).Stream;
             notifyIcon = new NotifyIcon
             {
-                Icon = new Icon(iconStream),
+                Icon = TrayIcons.For(TrayState.Idle),
                 Visible = true,
                 ContextMenuStrip = contextMenuStrip,
                 // Tooltip shows tier + email + paid_until on hover. Pulled from
@@ -166,6 +170,9 @@ namespace GI_Subtitles.Core.UI
                 {
                     App.LicenseService.ActivationStateChanged += (_, __) =>
                     {
+                        // Once the Start page has reported a state, the tooltip carries that word ("Kaption · Czekam na
+                        // grę"); the licence heartbeat a few seconds after launch must not put the plan label back over it.
+                        if (_trayLabel != null) return;
                         try { notifyIcon.Text = BuildTrayTooltip(); }
                         catch (Exception ex) { Logger.Log.Warn($"NotifyIcon: tooltip refresh failed: {ex.Message}"); }
                     };
@@ -175,6 +182,11 @@ namespace GI_Subtitles.Core.UI
             {
                 Logger.Log.Warn($"NotifyIcon: could not subscribe to ActivationStateChanged: {ex.Message}");
             }
+            notifyIcon.DoubleClick += (_, __) =>
+            {
+                try { data?.ShowStartPage(); }
+                catch (Exception ex) { Logger.Log.Warn($"Tray double-click failed: {ex.Message}"); }
+            };
             SetAutoStart(AutoStart);
             _trayIcon = notifyIcon;
             return notifyIcon;
@@ -194,7 +206,7 @@ namespace GI_Subtitles.Core.UI
                 var data = App.LicenseService?.CurrentActivation;
                 string text = data == null
                     ? "Kaption"
-                    : $"Kaption — {LicenseStatusFormatter.ShortLabel(data)}";
+                    : $"Kaption · {LicenseStatusFormatter.ShortLabel(data)}";
                 if (text.Length > 63) text = text.Substring(0, 60) + "...";
                 return text;
             }
@@ -305,13 +317,13 @@ namespace GI_Subtitles.Core.UI
                     languageSelector.Text = trayLanguage;
                 }
 
-                // Update settings menu item text
-                string traySettings = GetLocalizedString("Tray_Settings", "Settings");
-                settingItem.Text = traySettings;
-
-                // Update exit menu item text
-                string trayExit = GetLocalizedString("Tray_Exit", "Exit");
-                exitItem.Text = trayExit;
+                settingItem.Text = GetLocalizedString("shell_Tray_Settings", "Settings");
+                exitItem.Text = GetLocalizedString("shell_Tray_Exit", "Quit Kaption");
+                if (charactersItem != null) charactersItem.Text = GetLocalizedString("shell_Tray_Characters", "Characters");
+                if (startStopItem != null)
+                    startStopItem.Text = (data?.IsOcrRunning?.Invoke() ?? false)
+                        ? GetLocalizedString("shell_Tray_Stop", "Stop translating")
+                        : GetLocalizedString("shell_Tray_Start", "Start translating");
             }
             catch (Exception ex)
             {
@@ -657,6 +669,46 @@ namespace GI_Subtitles.Core.UI
         private void ContextMenuStrip_Opening(object sender, System.ComponentModel.CancelEventArgs e)
         {
             isContextMenuOpen = true;
+            if (startStopItem != null)
+            {
+                bool running = data?.IsOcrRunning?.Invoke() ?? false;
+                startStopItem.Text = running
+                    ? GetLocalizedString("shell_Tray_Stop", "Stop translating")
+                    : GetLocalizedString("shell_Tray_Start", "Start translating");
+            }
+        }
+
+        /// <summary>Grey idle, brand blue translating, amber busy; the Start page's state card drives it.</summary>
+        /// <summary>Icon colour for the state, and the state word in the tooltip ("Kaption · Czekam na grę").</summary>
+        public void SetTrayState(TrayState state, string label = null)
+        {
+            if (_trayIcon == null) return;
+            if (state != _trayState)
+            {
+                _trayState = state;
+                try { _trayIcon.Icon = TrayIcons.For(state); }
+                catch (Exception ex) { Logger.Log.Warn($"Tray icon update failed: {ex.Message}"); }
+            }
+            if (string.IsNullOrWhiteSpace(label) || label == _trayLabel) return;
+            _trayLabel = label;
+            try
+            {
+                string text = "Kaption · " + label;
+                _trayIcon.Text = text.Length > 63 ? text.Substring(0, 60) + "..." : text;
+            }
+            catch (Exception ex) { Logger.Log.Warn($"Tray tooltip update failed: {ex.Message}"); }
+        }
+
+        private string _trayLabel;
+
+        /// <summary>The first time the window is closed to the tray, say where Kaption went.</summary>
+        public void ShowCloseToTrayToastOnce()
+        {
+            if (Config.Config.Get("Ui.TrayToastShown", false)) return;
+            Config.Config.Set("Ui.TrayToastShown", true);
+            ShowBalloonTip(GetLocalizedString("shell_Tray_Toast_Title", "Kaption is still running"),
+                GetLocalizedString("shell_Tray_Toast_Body", "You'll find it in the tray, next to the clock."),
+                () => data?.ShowStartPage());
         }
 
         private void ContextMenuStrip_Closed(object sender, ToolStripDropDownClosedEventArgs e)
@@ -792,7 +844,7 @@ namespace GI_Subtitles.Core.UI
             if (dialogueOverlaps)
             {
                 dialogueLabelText += "  " + GetLocalizedString(
-                    "Overlap_Badge_Warning", "⚠ Overlay covers this region — OCR will fail");
+                    "Overlap_Badge_Warning", "⚠ Subtitles cover the dialogue. Translation won't work here.");
             }
             var dialogueLabel = new System.Windows.Controls.TextBlock
             {
@@ -856,7 +908,7 @@ namespace GI_Subtitles.Core.UI
                 if (answerOverlaps)
                 {
                     answerLabelText += "  " + GetLocalizedString(
-                        "Overlap_Badge_Warning", "⚠ Overlay covers this region — OCR will fail");
+                        "Overlap_Badge_Warning", "⚠ Subtitles cover the dialogue. Translation won't work here.");
                 }
                 var answerLabel = new System.Windows.Controls.TextBlock
                 {

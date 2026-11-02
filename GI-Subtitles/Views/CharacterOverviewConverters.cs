@@ -218,6 +218,45 @@ namespace GI_Subtitles.Views
             throw new NotSupportedException();
     }
 
+    /// <summary>
+    /// The part of the ambience image the header shows. The band is wider than the picture, so a strip of it fills the
+    /// band at the picture's own proportions, centred on its focal point and kept inside it (a narrower band takes a
+    /// column instead). Relative units, for an ImageBrush with Stretch Fill.
+    /// </summary>
+    public static class HeroArtFrame
+    {
+        public static Rect Viewbox(double areaWidth, double areaHeight, double imageWidth, double imageHeight, Point focal)
+        {
+            if (!(areaWidth > 0 && areaHeight > 0 && imageWidth > 0 && imageHeight > 0)) return new Rect(0, 0, 1, 1);
+            double area = areaWidth / areaHeight, image = imageWidth / imageHeight;
+            double fx = double.IsNaN(focal.X) ? 0.5 : Math.Clamp(focal.X, 0, 1);
+            double fy = double.IsNaN(focal.Y) ? 0.5 : Math.Clamp(focal.Y, 0, 1);
+            if (area >= image)
+            {
+                double h = image / area;
+                return new Rect(0, Math.Clamp(fy - h / 2, 0, 1 - h), 1, h);
+            }
+            double w = area / image;
+            return new Rect(Math.Clamp(fx - w / 2, 0, 1 - w), 0, w, 1);
+        }
+    }
+
+    /// <summary>[band width, band height, image, focal point] → the ImageBrush viewbox (<see cref="HeroArtFrame"/>).</summary>
+    public sealed class HeroArtFrameConverter : IMultiValueConverter
+    {
+        public object Convert(object[] values, Type targetType, object parameter, CultureInfo culture)
+        {
+            double width = values.Length > 0 && values[0] is double w ? w : 0;
+            double height = values.Length > 1 && values[1] is double h ? h : 0;
+            var image = values.Length > 2 ? values[2] as BitmapSource : null;
+            var focal = values.Length > 3 && values[3] is Point p ? p : new Point(0.5, 0.5);
+            return HeroArtFrame.Viewbox(width, height, image?.PixelWidth ?? 0, image?.PixelHeight ?? 0, focal);
+        }
+
+        public object[] ConvertBack(object value, Type[] targetTypes, object parameter, CultureInfo culture) =>
+            throw new NotSupportedException();
+    }
+
     /// <summary>Collapses empty strings and empty lists.</summary>
     public sealed class EmptyToCollapsedConverter : IValueConverter
     {

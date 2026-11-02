@@ -103,6 +103,7 @@ namespace GI_Subtitles.Views
         {
             InitializeComponent();
             ListSkeleton.ItemsSource = SkeletonWidths;
+            SyncPaletteWithApp(); // the app's palette, before the first paint
             // Subscribed for the page's life, not per Loaded: a tab page unloads whenever another tab is shown,
             // and a data update while it is hidden must still mark it stale.
             CharacterCatalogService.CatalogChanged += OnCatalogChanged;
@@ -488,7 +489,7 @@ namespace GI_Subtitles.Views
                 if (version != _selectionVersion || model == null) return;
 
                 _shownId = item.Id;
-                OverviewHost.Content = new CharacterOverviewView(model);
+                OverviewHost.Content = Overview(model);
                 SetSkeleton(DetailSkeleton, false);
 
                 // Missing images download in the background; re-render once they are on disk.
@@ -496,14 +497,43 @@ namespace GI_Subtitles.Views
                 await Task.Run(() => CharacterOverviewViewModel.PrepareVisuals(model));
                 if (version != _selectionVersion) return;
                 double offset = (OverviewHost.Content as CharacterOverviewView)?.VerticalOffset ?? 0;
-                var view = new CharacterOverviewView(model);
+                var view = Overview(model);
                 OverviewHost.Content = view;
-                _ = Dispatcher.BeginInvoke(new Action(() => view.ScrollTo(offset)), System.Windows.Threading.DispatcherPriority.Loaded);
+                // Input runs before this: a section tab clicked on the new page meanwhile wins over the old position.
+                _ = Dispatcher.BeginInvoke(new Action(() => { if (view.VerticalOffset < 1) view.ScrollTo(offset); }),
+                    System.Windows.Threading.DispatcherPriority.Loaded);
             }
             catch (Exception ex)
             {
                 Logger.Log.Warn($"Character page failed: {ex.Message}");
             }
+        }
+
+        // The tab's page: a "Gra też w drużynach" row opens the host here.
+        private CharacterOverviewView Overview(CharacterOverviewModel model)
+        {
+            var view = new CharacterOverviewView(model);
+            view.EnableCharacterLinks(id => OpenCharacter(id));
+            return view;
+        }
+
+        /// <summary>
+        /// Switches the page to another character, as picking it in the list would; a search or element filter that
+        /// hides it is cleared first. False when the character is not in the list.
+        /// </summary>
+        internal bool OpenCharacter(string id)
+        {
+            var item = _items.FirstOrDefault(i => i.Id == id);
+            if (item == null) return false;
+            if (!(CharacterList.ItemsSource is IEnumerable<CharacterListItem> shown) || !shown.Contains(item))
+            {
+                ElementFilter.SelectedItem = null;
+                SearchBox.Clear();
+                ApplyFilter();
+            }
+            CharacterList.SelectedItem = item;
+            CharacterList.ScrollIntoView(item);
+            return true;
         }
 
         /// <summary>Lower-case, no diacritics ("Łowca" → "lowca"), whitespace kept.</summary>
@@ -515,6 +545,50 @@ namespace GI_Subtitles.Views
             foreach (char ch in decomposed)
                 if (CharUnicodeInfo.GetUnicodeCategory(ch) != UnicodeCategory.NonSpacingMark) sb.Append(ch);
             return sb.ToString().Normalize(NormalizationForm.FormC);
+        }
+
+        /// <summary>
+        /// Follows the app's palette: the dark character palette on a dark surface, the light one on a light surface.
+        /// The resolved colour decides, so a black high-contrast theme gets the dark page too. The shell calls this
+        /// when the theme changes; the page also checks when it is created and when it joins a host.
+        /// </summary>
+        public void SyncPaletteWithApp()
+        {
+            if (TryFindResource("BgColor") is Color surface) UsePalette(IsDarkSurface(surface));
+        }
+
+        internal static bool IsDarkSurface(Color c) => 0.2126 * c.R + 0.7152 * c.G + 0.0722 * c.B < 128;
+
+        protected override void OnVisualParentChanged(DependencyObject oldParent)
+        {
+            base.OnVisualParentChanged(oldParent);
+            if (VisualParent != null) SyncPaletteWithApp();
+        }
+
+        /// <summary>
+        /// Puts the page on the dark or light character palette and redraws the character shown, whose element
+        /// colours are tuned to the surface. Hosts normally call <see cref="SyncPaletteWithApp"/> instead.
+        /// </summary>
+        public void UsePalette(bool dark)
+        {
+            string wanted = dark ? "CharacterPaletteDark.xaml" : "CharacterPaletteLight.xaml";
+            var merged = Resources.MergedDictionaries;
+            var current = merged.FirstOrDefault(d => d.Source?.OriginalString.Contains("CharacterPalette") == true);
+            if (current?.Source.OriginalString.EndsWith(wanted, StringComparison.Ordinal) == true) return;
+            var next = new ResourceDictionary
+            {
+                Source = new Uri($"pack://application:,,,/{typeof(CharactersPage).Assembly.GetName().Name};component/Resources/{wanted}"),
+            };
+            if (current != null) merged[merged.IndexOf(current)] = next;
+            else merged.Add(next);
+
+            if (OverviewHost.Content is CharacterOverviewView shown && shown.DataContext is CharacterOverviewViewModel vm)
+            {
+                double offset = shown.VerticalOffset;
+                var redrawn = new CharacterOverviewView(vm.Model);
+                OverviewHost.Content = redrawn;
+                _ = Dispatcher.BeginInvoke(new Action(() => redrawn.ScrollTo(offset)), DispatcherPriority.Loaded);
+            }
         }
 
         private string L(string key, string fallback) => TryFindResource(key) as string ?? fallback;

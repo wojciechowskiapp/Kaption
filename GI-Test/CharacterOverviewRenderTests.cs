@@ -102,6 +102,15 @@ namespace GI_Test
                     Layout(host, w, h);
                     written.Add(Save(Snapshot(host), $"tab-characters-{w + 16:0}x{h + 39:0}-pl.png"));
                 }
+                {
+                    // The same page in a dark-themed host: it picks the dark character palette by itself.
+                    var page = Page(catalog, "Chiori", out var host, dark: true);
+                    Layout(host, 1264, 761);
+                    var list = (ListBox)page.FindName("CharacterList");
+                    list.ScrollIntoView(list.SelectedItem);
+                    Layout(host, 1264, 761);
+                    written.Add(Save(Snapshot(host), "tab-characters-1280x800-dark-pl.png"));
+                }
                 foreach (var state in new[] { CharactersPage.PageState.Loading, CharactersPage.PageState.Empty, CharactersPage.PageState.Error })
                 {
                     var page = Page(CharacterCatalog.Empty, null, out var host);
@@ -139,20 +148,46 @@ namespace GI_Test
                 host.Resources.MergedDictionaries.Add(resources);
                 foreach (var d in Strings("pl-PL")) host.Resources.MergedDictionaries.Add(d);
                 Layout(host, 520);
-                written.Add(Save(Snapshot(host), "popup-translation-pl.png"));
+                written.Add(Save(Snapshot(host), "popup-translation-pl.png")); // nothing recognised: no strip
 
+                // A skill screen: the character is recognised, the skill title is marked, the strip offers the card.
                 var model = BuildModel(root, Samples[0]);
-                if (model != null)
+                var catalog = LoadCatalog(root, "genshin", injectAiFor: "Chiori");
+                var record = catalog?.Characters.FirstOrDefault(c => c.Name == "Chiori");
+                if (model != null && record != null)
                 {
-                    var view = new CharacterOverviewView(model);
-                    popup.SetCharacter(view, model.Name, () => model.ToPlainText());
-                    // Tab_Checked waits for IsLoaded; flip the panels the way it does.
-                    ((FrameworkElement)popup.FindName("OverviewHost")).Visibility = Visibility.Visible;
-                    ((ToggleButton)popup.FindName("OverviewTab")).IsChecked = true;
-                    ((FrameworkElement)popup.FindName("BodyScroll")).Visibility = Visibility.Collapsed;
-                    chrome.MaxHeight = 900;
-                    Layout(host, 452);
-                    written.Add(Save(Snapshot(host), "popup-overview-pl.png"));
+                    var skillScreen = new[]
+                    {
+                        new QuickTranslateSegment("Fluttering Hasode", "k0", "Powiewająca Hasode", true),
+                        new QuickTranslateSegment(
+                            "Dashes nimbly forward with silken steps. Once this dash ends, Chiori will summon the automaton doll \"Tamoto\" beside her.",
+                            "k1", "Zwinnie doskakuje jedwabnymi krokami. Gdy doskok się skończy, Chiori przywołuje obok siebie lalkę automat \"Tamoto\".", true),
+                        new QuickTranslateSegment("Hold to dash further.", "k2", "Przytrzymaj, żeby doskoczyć dalej.", true),
+                    };
+                    var recognised = new QuickTranslatePopup(skillScreen, QuickTranslateSettings.FromValues(null, 8, 16),
+                        new System.Drawing.Rectangle(400, 300, 520, 160));
+                    var chrome2 = (FrameworkElement)recognised.Content;
+                    var resources2 = recognised.Resources;
+                    recognised.Content = null;
+                    recognised.Resources = new ResourceDictionary();
+                    var host2 = new Border { Child = chrome2, UseLayoutRounding = true, Background = new SolidColorBrush(Color.FromRgb(0x3A, 0x45, 0x55)), Padding = new Thickness(16) };
+                    host2.Resources.MergedDictionaries.Add(resources2);
+                    foreach (var d in Strings("pl-PL")) host2.Resources.MergedDictionaries.Add(d);
+
+                    var context = new QuickTranslateContext(model, record, skillScreen.Select(s => s.Source).ToList());
+                    recognised.SetCharacter(new CharacterOverviewView(model), context, () => model.ToPlainText());
+                    Layout(host2, 520);
+                    written.Add(Save(Snapshot(host2), "popup-recognised-pl.png"));
+
+                    // "Otwórz kartę": the page opens inline, the strip heads it, "Wróć do tłumaczenia" on top.
+                    ((Button)recognised.FindName("OpenCardButton")).RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+                    chrome2.MaxHeight = 900;
+                    Layout(host2, 452);
+                    var page = (CharacterOverviewView)((ContentControl)recognised.FindName("OverviewHost")).Content;
+                    var active = ((CharacterOverviewViewModel)page.DataContext).Sections.Single(s => s.IsActive).Key;
+                    Console.WriteLine($"expanded: active section {active}, offset {page.VerticalOffset:0}");
+                    Assert.AreEqual("Skills", active, "the card opens at the recognised skill");
+                    written.Add(Save(Snapshot(host2), "popup-expanded-pl.png"));
                 }
             });
             foreach (string p in written) Console.WriteLine(p);
@@ -173,7 +208,9 @@ namespace GI_Test
             };
             if (dark) TextOptions.SetTextFormattingMode(host, TextFormattingMode.Display);
             foreach (var d in Strings(lang)) host.Resources.MergedDictionaries.Add(d);
+            host.Resources.MergedDictionaries.Add(Dictionary($"Themes/Palette.{(dark ? "Dark" : "Light")}.xaml"));
             host.Resources.MergedDictionaries.Add(Dictionary($"Resources/CharacterPalette{(dark ? "Dark" : "Light")}.xaml"));
+            host.Resources.MergedDictionaries.Add(Dictionary($"Resources/CharacterLayout{(dark ? "Popup" : "Page")}.xaml"));
             double width = dark ? PopupWidth : DetailWidth;
             clock.Restart();
             host.Width = width;
@@ -194,15 +231,23 @@ namespace GI_Test
             return Snapshot(host);
         }
 
-        private static CharactersPage Page(CharacterCatalog catalog, string select, out Border host)
+        internal static CharactersPage Page(CharacterCatalog catalog, string select, out Border host, bool dark = false)
         {
             var page = new CharactersPage
             {
                 GameSource = () => "Genshin", PackSource = () => null, PackReady = () => true, FetchImages = Fetch,
                 LookupOverride = catalog.IsEmpty ? null : PackLookup.For("genshin", catalog),
             };
-            host = new Border { Background = new SolidColorBrush(Color.FromRgb(0xF7, 0xF8, 0xFC)), Child = page, Padding = new Thickness(20, 16, 20, 12), UseLayoutRounding = true };
+            // As in Settings: the app palette (ThemeService's slot), the control styles and the strings come from the
+            // host, which has them before the page joins it.
+            host = new Border { Padding = new Thickness(20, 16, 20, 12), UseLayoutRounding = true };
+            host.Resources.MergedDictionaries.Add(Dictionary($"Themes/Palette.{(dark ? "Dark" : "Light")}.xaml"));
+            host.Resources.MergedDictionaries.Add(Dictionary("Resources/ModernStyles.xaml"));
+            host.Resources.MergedDictionaries.Add(Dictionary("Themes/Tokens.xaml"));
+            host.Resources.MergedDictionaries.Add(Dictionary("Themes/Shell.xaml")); // App.xaml merges it in the app: the state component's styles
             foreach (var d in Strings("pl-PL")) host.Resources.MergedDictionaries.Add(d);
+            host.SetResourceReference(Border.BackgroundProperty, "BgBrush");
+            host.Child = page;
             if (catalog.IsEmpty) return page;
 
             var load = page.LoadAsync("Genshin", _ => Task.FromResult(catalog));
@@ -220,7 +265,7 @@ namespace GI_Test
             return page;
         }
 
-        private static void Pump(Func<bool> done)
+        internal static void Pump(Func<bool> done)
         {
             for (int i = 0; i < 400 && !done(); i++)
             {
@@ -238,7 +283,7 @@ namespace GI_Test
 
         // ── models ──────────────────────────────────────────────────────────
 
-        private static CharacterCatalog LoadCatalog(string root, string game, string injectAiFor = null)
+        internal static CharacterCatalog LoadCatalog(string root, string game, string injectAiFor = null)
         {
             string dir = Path.Combine(root, "tools", "out", game);
             string file = Directory.Exists(dir)
@@ -409,7 +454,7 @@ namespace GI_Test
         /// Polish text for previews, from the local PL pack joined to the installed English TextMap.
         /// Exact match only, like MatcherTranslationLookup. Null (English) when either file is missing.
         /// </summary>
-        private sealed class PackLookup : ITranslationLookup
+        internal sealed class PackLookup : ITranslationLookup
         {
             private static readonly Dictionary<string, PackLookup> Cache = new Dictionary<string, PackLookup>();
             private readonly Dictionary<string, string> _map;

@@ -70,7 +70,9 @@ namespace GI_Test
             CollectionAssert.AreEqual(new[] { "Pierwszy akapit.", "Drugi.", "punkt" }, vm.Summary.Select(b => b.Text).ToArray());
             Assert.IsTrue(vm.Summary[2].IsBullet);
             Assert.IsTrue(vm.HasAmbience);
-            Assert.AreEqual(OverviewImageSizes.Ambience / 2.0, vm.AmbienceHeight, 1e-9, "space is reserved from the data's aspect");
+            Assert.IsFalse(vm.HasHeroAmbience, "not on disk: the header keeps the plain wash");
+            Assert.AreEqual(new System.Windows.Point(0.5, CharacterOverviewModel.DefaultFocalY), vm.AmbienceFocal,
+                "no focal point in the data: centred, a little above the middle");
 
             CollectionAssert.AreEqual(new[] { "Char_Fact_Role", "Char_Fact_Signature", "Char_Fact_LevelFirst" },
                 vm.Facts.Select(f => f.LabelKey).ToArray());

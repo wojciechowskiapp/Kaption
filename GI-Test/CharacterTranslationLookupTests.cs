@@ -61,11 +61,11 @@ namespace GI_Test
             Assert.AreEqual("Grand Expectation", ranks[0].EnglishName, "the name the game shows stays the reference");
             Assert.AreEqual("Wielkie oczekiwanie", ranks[0].Name);
             Assert.AreEqual("Zwiększenie ATK Fantastic Voyage nie ma już ograniczenia związanego z HP i zyskuje dodatkowe 20% Bazowego ATK Bennetta.",
-                ranks[0].Description, "a key with colour tags still matches; the tags never reach the screen");
+                ranks[0].Description, "a key with colour tags still matches; the tags never reach the screen (no ultimate here, so no marker)");
             Assert.IsFalse(ranks[0].DescriptionInEnglish);
 
-            Assert.AreEqual("Zwiększa Poziom Passion Overload o 3.\nMaksymalny poziom ulepszeń to 15.", ranks[2].Description,
-                "line breaks match the pack's literal \\n");
+            Assert.AreEqual("Zwiększa Poziom Passion Overload (E) o 3.\nMaksymalny poziom ulepszeń to 15.", ranks[2].Description,
+                "line breaks match the pack's literal \\n; the skill named in it gets its marker");
             Assert.IsFalse(ranks[2].DescriptionInEnglish);
         }
 

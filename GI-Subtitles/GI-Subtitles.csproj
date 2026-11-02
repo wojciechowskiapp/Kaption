@@ -185,6 +185,15 @@
     <Resource Include="Resources\kaption-running.ico" />
     <Resource Include="Resources\qrcode.jpg" />
     <Resource Include="Resources\drag.png" />
+    <!-- AI ambience art (Start state card per game, welcome backdrop), q78 JPEG, at most 220 KB each. -->
+    <Resource Include="Assets\Ambience\*.jpg" />
+    <!-- Subtitle overlay faces (OFL-1.1): Source Sans 3 Semibold/Bold unmodified, Inter Tight 600/700 cut to Latin and
+         Latin Extended (tools/fonts/build_overlay_fonts.py). Resolved by Services/Rendering/OverlayFonts. -->
+    <Resource Include="Assets\Fonts\*.ttf" />
+    <None Include="..\THIRD_PARTY_LICENSES.txt" Link="THIRD_PARTY_LICENSES.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <!-- Licence texts THIRD_PARTY_LICENSES.txt points to "next to this one": LGPL-2.1 (PaddleOCRSharp, FFmpeg) and OFL-1.1 (fonts). -->
+    <None Include="..\LICENSE-LGPL-2.1" Link="LICENSE-LGPL-2.1" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Include="..\LICENSE-OFL-1.1" Link="LICENSE-OFL-1.1" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>
