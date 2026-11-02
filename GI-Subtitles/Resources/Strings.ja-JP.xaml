@@ -217,4 +217,17 @@
     <sys:String x:Key="Char_Tips_MoreOnSite" xmlns:sys="clr-namespace:System;assembly=mscorlib">kaption.one で詳しく見る</sys:String>
     <sys:String x:Key="Char_SiteLocale" xmlns:sys="clr-namespace:System;assembly=mscorlib">en</sys:String>
     <sys:String x:Key="Char_SubStats" xmlns:sys="clr-namespace:System;assembly=mscorlib">サブステータス</sys:String>
+    <!-- Build card (2.5.1): the site has Polish and English pages, so Japanese opens the English one. -->
+    <sys:String x:Key="card_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">ビルドカード</sys:String>
+    <sys:String x:Key="card_Entry_Hint" xmlns:sys="clr-namespace:System;assembly=mscorlib">ゲームの UID でカードメーカーを開きます。</sys:String>
+    <sys:String x:Key="card_Entry_Tip" xmlns:sys="clr-namespace:System;assembly=mscorlib">Kaption がゲーム画面の隅から UID を読み取り、kaption.one のビルドカードメーカーを開きます。スターレイルとゼンレスゾーンゼロでは、ゲームのメニュー（Esc）を開くと UID が表示されます。ゲームが画面にないときは、ページで UID を入力してください。</sys:String>
+    <sys:String x:Key="card_Reading" xmlns:sys="clr-namespace:System;assembly=mscorlib">ゲーム画面から UID を読み取っています…</sys:String>
+    <sys:String x:Key="card_Uid_NotRead" xmlns:sys="clr-namespace:System;assembly=mscorlib">ゲーム画面から UID を読み取れませんでした。ページで入力してください。</sys:String>
+    <sys:String x:Key="card_Uid_MenuHint" xmlns:sys="clr-namespace:System;assembly=mscorlib">スターレイルとゼンレスゾーンゼロでは、ゲームのメニュー（Esc）を開くと UID が表示されます。</sys:String>
+    <sys:String x:Key="card_Reader_Loading" xmlns:sys="clr-namespace:System;assembly=mscorlib">文字の読み取り機能はまだ準備中です。少し待ってからもう一度お試しください。</sys:String>
+    <sys:String x:Key="card_Memory_Format" xmlns:sys="clr-namespace:System;assembly=mscorlib">カードはこの UID で開きます: {0}</sys:String>
+    <sys:String x:Key="card_Memory_None" xmlns:sys="clr-namespace:System;assembly=mscorlib">保存された UID はありません。次回、Kaption がゲーム画面から読み取ります。</sys:String>
+    <sys:String x:Key="card_Forget" xmlns:sys="clr-namespace:System;assembly=mscorlib">UID を削除</sys:String>
+    <sys:String x:Key="card_Forget_Tip" xmlns:sys="clr-namespace:System;assembly=mscorlib">すべてのゲームの UID を削除し、次回はゲーム画面から読み取ります。</sys:String>
+    <sys:String x:Key="card_Forget_Done" xmlns:sys="clr-namespace:System;assembly=mscorlib">削除しました。次回、Kaption がゲーム画面から UID を読み取ります。</sys:String>
 </ResourceDictionary>

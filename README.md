@@ -40,6 +40,7 @@ The installer brings the .NET runtime with it, and Kaption updates itself.
 - Setup in one window: language, game, sign-in and the first subtitle download, one step after another.
 - Postacie (Characters): skills, builds and materials for every character in the three games, with game terms in English and the Polish next to them.
 - Ctrl+Q quick translate: select any panel in the game, read it in Polish, and open the card of the character Kaption recognised.
+- Build cards on [kaption.one/my-build](https://kaption.one/my-build/): a shareable PNG of any character from your UID, in a dozen layouts, in Polish or English.
 - Polish subtitle packs for all three games, refreshed after each game patch.
 
 ## Privacy

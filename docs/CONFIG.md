@@ -46,6 +46,18 @@ Auto-start checks the same things as the Start button before it starts. If you s
 | `Ui.Intro25Seen` | `false` | Set when the "Nowość w 2.5" card on Start is dismissed with "Rozumiem" ("Got it"). New installs never see that card. |
 | `Ui.WhatsNewSeen` | none | The subtitle update whose "Co nowego" ("What's new") card was dismissed on Start. |
 
+## Build card (2.5.1)
+
+"Karta buildu" ("Build card") is the tile in Skróty (Shortcuts) on Start and the button in the Postacie (Characters) header. It opens the build card maker on kaption.one with your UID. The first time, Kaption reads the UID from the corner of the game screen and keeps it here, so the next click opens straight away. Start › Zaawansowane › Zapomnij UID ("Forget UID") clears all three keys.
+
+| Key | Default | What it does |
+|---|---|---|
+| `BuildCard.Uid.Genshin` | none | Written by Kaption: the last UID read from the Genshin Impact screen. |
+| `BuildCard.Uid.StarRail` | none | The same for Honkai: Star Rail. |
+| `BuildCard.Uid.ZZZ` | none | The same for Zenless Zone Zero. |
+
+Only 9 or 10 digits without a leading zero count; anything else in these keys is ignored. The UID leaves your PC only in the address the browser opens (`kaption.one/pl/moj-build/?game=genshin&uid=...`, or `/my-build/` with an English interface). The log never names it, and diagnostic bundles mask it.
+
 ## OCR and translation
 
 The per-game defaults come from `GameRegionProfile`. Override them only for specific hardware or custom text.

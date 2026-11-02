@@ -104,6 +104,81 @@ namespace GI_Test
             Assert.AreEqual(0, hits.Count, "The character screens say nothing about AI:\n" + string.Join("\n", hits));
         }
 
+        /// <summary>The build card's keys (2.5.1): Start's Skróty tile, the Characters header, Start › Zaawansowane.</summary>
+        private static Dictionary<string, string> BuildCardCopy(string file) =>
+            Strings(file).Where(s => s.Key.StartsWith("card_")).ToDictionary(s => s.Key, s => s.Value);
+
+        private static readonly string[] Locales = { "Strings.en-US.xaml", "Strings.pl-PL.xaml", "Strings.ja-JP.xaml", "Strings.zh-CN.xaml" };
+
+        /// <summary>U+2014, written as a number so this test does not carry the character itself.</summary>
+        private const char EmDash = (char)0x2014;
+
+        [TestMethod]
+        public void BuildCardKeys_ExistInAllFourLocales_AndAreTranslated()
+        {
+            var en = BuildCardCopy("Strings.en-US.xaml");
+            Assert.IsTrue(en.Count >= 10, "the build card's keys are there");
+            foreach (string other in Locales.Skip(1))
+            {
+                var copy = BuildCardCopy(other);
+                CollectionAssert.AreEquivalent(en.Keys.OrderBy(k => k).ToList(), copy.Keys.OrderBy(k => k).ToList(),
+                    $"{other}: missing {string.Join(", ", en.Keys.Except(copy.Keys))}; extra {string.Join(", ", copy.Keys.Except(en.Keys))}");
+                var english = copy.Where(kv => kv.Value == en[kv.Key] && Regex.IsMatch(kv.Value, "[a-z]{4,}")).Select(kv => kv.Key).ToList();
+                Assert.AreEqual(0, english.Count, $"{other} copies English for: {string.Join(", ", english)}");
+                StringAssert.Contains(copy["card_Memory_Format"], "{0}", $"{other}: the remembered UIDs go in the format");
+            }
+            // The owner's words for the Polish line, and the entry's name.
+            var pl = BuildCardCopy("Strings.pl-PL.xaml");
+            Assert.AreEqual("Nie udało się odczytać UID z ekranu gry. Wpisz go na stronie.", pl["card_Uid_NotRead"]);
+            Assert.AreEqual("Karta buildu", pl["card_Title"]);
+            Assert.AreEqual("Zapomnij UID", pl["card_Forget"]);
+        }
+
+        /// <summary>
+        /// 2.5.1 polish: a line of its own while the text reader is still loading, and where Star Rail and ZZZ show the UID
+        /// (their menu, Esc) both in the entry's tooltip and in the line after a read that found none.
+        /// </summary>
+        [TestMethod]
+        public void BuildCardCopy_SaysTheReaderIsLoading_AndWhereStarRailAndZzzShowTheUid()
+        {
+            var pl = BuildCardCopy("Strings.pl-PL.xaml");
+            var en = BuildCardCopy("Strings.en-US.xaml");
+            Assert.AreEqual("Czytnik tekstu jeszcze się ładuje. Spróbuj za chwilę.", pl["card_Reader_Loading"]);
+            Assert.AreEqual("The text reader is still loading. Try again in a moment.", en["card_Reader_Loading"]);
+            Assert.AreEqual("W Star Rail i ZZZ otwórz menu gry (Esc), tam widać UID.", pl["card_Uid_MenuHint"]);
+            Assert.AreEqual("In Star Rail and ZZZ open the game menu (Esc), the UID is shown there.", en["card_Uid_MenuHint"]);
+            foreach (string file in Locales)
+            {
+                var copy = BuildCardCopy(file);
+                StringAssert.Contains(copy["card_Entry_Tip"], copy["card_Uid_MenuHint"], $"{file}: the tooltip says where the menus show the UID");
+                StringAssert.Contains(copy["card_Uid_MenuHint"], "Esc", $"{file}: names the key");
+                Assert.AreNotEqual(copy["card_Uid_NotRead"], copy["card_Reader_Loading"], $"{file}: loading is not the same as not found");
+            }
+        }
+
+        [TestMethod]
+        public void BuildCardCopy_HasNoEmDashNoShoutingAndNoAI()
+        {
+            var hits = new List<string>();
+            foreach (string file in Locales)
+            foreach (var (key, value) in BuildCardCopy(file))
+            {
+                if (value.Contains(EmDash)) hits.Add($"{file}: {key} has an em dash");
+                if (value.Contains('!')) hits.Add($"{file}: {key} has an exclamation mark");
+                if (Regex.IsMatch(value, @"\bAI\b") || value.IndexOf("sztuczn", System.StringComparison.OrdinalIgnoreCase) >= 0)
+                    hits.Add($"{file}: {key} mentions AI");
+                if (Regex.IsMatch(value, @"\bOCR\b")) hits.Add($"{file}: {key} says OCR");
+            }
+            // And none in the feature's own code and its documentation either.
+            string root = RenderTestKit.RepoRoot();
+            var sources = Directory.GetFiles(Path.Combine(root, "GI-Subtitles", "Services", "Cards"), "*.cs")
+                .Append(Path.Combine(root, "GI-Subtitles", "Views", "SettingsWindow.BuildCard.cs"))
+                .Append(Path.Combine(root, "docs", "CONFIG.md"));
+            foreach (string path in sources)
+                if (File.ReadAllText(path).Contains(EmDash)) hits.Add($"{Path.GetFileName(path)} has an em dash");
+            Assert.AreEqual(0, hits.Count, string.Join("\n", hits));
+        }
+
         [TestMethod]
         public void EnglishAndPolishShellKeysMatch()
         {

@@ -616,6 +616,7 @@ namespace GI_Subtitles.Views
             data.IsOcrRunning = () => OCRTimer.IsEnabled;
             data.IsSubtitleVisible = () => ShowText;
             data.IsEngineReady = () => _engineReady;
+            data.OverlayScreenAreas = OverlayScreenAreas;
             data.OnOpenSetupWizard = () => ShowSetupWizard();
             InitAutoStart();
 
@@ -2253,6 +2254,67 @@ namespace GI_Subtitles.Views
             {
                 Logger.Log.Error($"MaskOverlayAreas error: {ex}");
             }
+        }
+
+        /// <summary>
+        /// Where Kaption draws over the game right now, in screen pixels: the subtitle panel while any of it shows (a fade
+        /// included) and the Ctrl+Q popup while it is open. The build card's UID read (Settings) blacks these out of its
+        /// capture, so a subtitle beside the game's corner is never read in place of the UID. Of this window only the panel
+        /// counts: the window is the dialogue area's width plus 200 DIP and see-through beside the panel, where the game,
+        /// and its UID, show.
+        /// </summary>
+        internal IReadOnlyList<System.Drawing.Rectangle> OverlayScreenAreas()
+        {
+            var areas = new List<System.Drawing.Rectangle>(2);
+            try
+            {
+                var panel = SubtitleBackground;
+                if (IsVisible && Opacity > 0 && panel != null && panel.IsVisible && panel.Opacity > 0
+                    && PresentationSource.FromVisual(this) != null)
+                {
+                    var area = PanelScreenArea(this, panel);
+                    if (area.Width > 0 && area.Height > 0) areas.Add(area);
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log.Info($"Overlay bounds for the UID read unavailable: {ex.Message}");
+            }
+            var popup = _quickTranslatePopup;
+            if (popup != null && popup.IsVisible)
+            {
+                var bounds = popup.PhysicalBounds;
+                if (bounds.Width > 0 && bounds.Height > 0) areas.Add(bounds);
+            }
+            return areas;
+        }
+
+        /// <summary>
+        /// The panel <paramref name="card"/> draws, in screen pixels, inside <paramref name="window"/>: the control's box,
+        /// widened to the panel it draws while a size change settles (SubtitleCard.PanelWidth and PanelHeight), plus a few
+        /// pixels of anti-aliased edge. Both must be on screen (PointToScreen).
+        /// </summary>
+        internal static System.Drawing.Rectangle PanelScreenArea(FrameworkElement window, SubtitleCard card)
+        {
+            var windowBox = ScreenBox(window, new System.Windows.Rect(0, 0, window.ActualWidth, window.ActualHeight));
+            double w = card.ActualWidth, h = card.ActualHeight;
+            if (w <= 0 || h <= 0) return windowBox;
+            double pw = double.IsNaN(card.PanelWidth) ? w : Math.Max(w, card.PanelWidth);
+            double ph = double.IsNaN(card.PanelHeight) ? h : Math.Max(h, card.PanelHeight);
+            var drawn = new System.Windows.Rect((w - pw) / 2, card.GrowsUpward ? h - ph : 0, pw, ph);
+            drawn.Inflate(4, 4);
+            var painted = System.Drawing.Rectangle.Intersect(windowBox, ScreenBox(card, drawn));
+            return painted.Width > 0 && painted.Height > 0 ? painted : windowBox;
+        }
+
+        /// <summary>A rectangle in <paramref name="visual"/>'s coordinates, as screen pixels.</summary>
+        private static System.Drawing.Rectangle ScreenBox(System.Windows.Media.Visual visual, System.Windows.Rect rect)
+        {
+            var a = visual.PointToScreen(rect.TopLeft);
+            var b = visual.PointToScreen(rect.BottomRight);
+            return System.Drawing.Rectangle.FromLTRB(
+                (int)Math.Floor(Math.Min(a.X, b.X)), (int)Math.Floor(Math.Min(a.Y, b.Y)),
+                (int)Math.Ceiling(Math.Max(a.X, b.X)), (int)Math.Ceiling(Math.Max(a.Y, b.Y)));
         }
 
         /// <summary>

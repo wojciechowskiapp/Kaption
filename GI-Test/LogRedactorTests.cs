@@ -57,12 +57,29 @@ namespace GI_Test
         [DataRow("\"password\": \"hunter2\"", "hunter2")]
         [DataRow("api_key=sk-abcdef123456", "sk-abcdef123456")]
         [DataRow("\"machine_fingerprint\": \"a1b2c3d4e5f6\"", "a1b2c3d4e5f6")]
+        [DataRow("  \"BuildCard.Uid.Genshin\": \"735366201\",", "735366201")]
+        [DataRow("\"BuildCard.Uid.ZZZ\":\"1300025292\"", "1300025292")]
         public void Scrub_SecretShapedAssignments_LoseTheirValue(string input, string secret)
         {
             string result = LogRedactor.Scrub(input);
 
             Assert.IsFalse(result.Contains(secret), $"Secret survived redaction: {result}");
             StringAssert.Contains(result, LogRedactor.RedactedValue);
+        }
+
+        [TestMethod]
+        public void Scrub_BuildCardLines_AndBuildWords_AreUntouched()
+        {
+            // Only the remembered UID's value goes; the build card's own log lines never carry the digits, and a
+            // "build" key is not a "buildcard.uid" one.
+            foreach (string line in new[]
+            {
+                "Build card opened for Genshin with the UID read from the screen.",
+                "Build card UID read for StarRail: NotFound in 41 ms.",
+                "BuildVersion=2.5.1",
+                "\"BuildCard.Seen\": true",
+            })
+                Assert.AreEqual(line, LogRedactor.Scrub(line));
         }
 
         [TestMethod]

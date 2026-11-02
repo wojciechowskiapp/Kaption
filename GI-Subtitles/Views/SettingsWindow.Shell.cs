@@ -80,6 +80,7 @@ namespace GI_Subtitles.Views
             SyncAutoStartControls();
             ShowIntro25IfNew();
             RestoreAdvancedState();
+            RefreshBuildCardMemory();
             InitializeLookPage();
             CharactersPage?.SyncPaletteWithApp();
             ThemeService.ThemeChanged += OnThemeChanged;
@@ -1181,7 +1182,9 @@ namespace GI_Subtitles.Views
         {
             if (_bulkExpanding || !(sender is Expander ex) || !ReferenceEquals(e.OriginalSource, ex)) return;
             Config.Set(AdvancedSectionKeyPrefix + ex.Name, ex.IsExpanded);
-            if (ex == HomeAdvancedExpander) RefreshHomeAdvancedDetails();
+            if (ex != HomeAdvancedExpander) return;
+            RefreshHomeAdvancedDetails();
+            RefreshBuildCardMemory();
         }
 
         private void AdvancedModeToggle_Changed(object sender, RoutedEventArgs e)

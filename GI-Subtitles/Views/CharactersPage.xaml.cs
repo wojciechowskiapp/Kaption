@@ -18,12 +18,21 @@ using Logger = GI_Subtitles.Common.Logger;
 
 namespace GI_Subtitles.Views
 {
-    /// <summary>Where the Characters page gets the translation pack and the active game (the Settings window).</summary>
+    /// <summary>
+    /// Where the Characters page gets the translation pack and the active game, and what opens the build card from its
+    /// header (the Settings window).
+    /// </summary>
     public interface ICharacterPageHost
     {
         OptimizedMatcher CharacterPack { get; }
         bool IsCharacterPackReady { get; }
         string CharacterGame { get; }
+
+        /// <summary>
+        /// "Karta buildu": opens the build card maker on kaption.one with the player's UID when one can be had.
+        /// <paramref name="showNote"/> gets the line to show under the header's buttons, or null to hide it.
+        /// </summary>
+        Task OpenBuildCardAsync(Action<string> showNote);
     }
 
     /// <summary>List row. Public so WPF binding can read it; IconPath updates in place once downloaded.</summary>
@@ -128,6 +137,8 @@ namespace GI_Subtitles.Views
         internal ITranslationLookup LookupOverride { get; set; }
         /// <summary>False keeps the page on images already on disk (render tests: no network, no stray work).</summary>
         internal bool FetchImages { get; set; } = true;
+        /// <summary>Overrides the host's build card (tests, or a host that is not the Settings window).</summary>
+        internal Func<Action<string>, Task> BuildCardSource { get; set; }
         internal PageState State { get; private set; } = PageState.Loading;
 
         private ICharacterPageHost Host => _host;
@@ -509,12 +520,29 @@ namespace GI_Subtitles.Views
             }
         }
 
-        // The tab's page: a "Gra też w drużynach" row opens the host here.
+        // The tab's page: a "Gra też w drużynach" row opens the host here, and the header has "Karta buildu".
         private CharacterOverviewView Overview(CharacterOverviewModel model)
         {
             var view = new CharacterOverviewView(model);
             view.EnableCharacterLinks(id => OpenCharacter(id));
+            Func<Action<string>, Task> openCard = BuildCardSource;
+            if (openCard == null && Host is ICharacterPageHost host) openCard = host.OpenBuildCardAsync;
+            if (openCard != null)
+            {
+                view.EnableBuildCard(_ => openCard(ShowBuildCardNote));
+                view.ShowBuildCardNote(_buildCardNote);
+            }
             return view;
+        }
+
+        private string _buildCardNote;
+
+        // The line belongs to the page, not to one character: it stays when another character opens, until the next
+        // click replaces it.
+        private void ShowBuildCardNote(string text)
+        {
+            _buildCardNote = text;
+            (OverviewHost.Content as CharacterOverviewView)?.ShowBuildCardNote(text);
         }
 
         /// <summary>
@@ -585,7 +613,8 @@ namespace GI_Subtitles.Views
             if (OverviewHost.Content is CharacterOverviewView shown && shown.DataContext is CharacterOverviewViewModel vm)
             {
                 double offset = shown.VerticalOffset;
-                var redrawn = new CharacterOverviewView(vm.Model);
+                // Through Overview, so the redrawn page keeps its team links and the build card.
+                var redrawn = Overview(vm.Model);
                 OverviewHost.Content = redrawn;
                 _ = Dispatcher.BeginInvoke(new Action(() => redrawn.ScrollTo(offset)), DispatcherPriority.Loaded);
             }

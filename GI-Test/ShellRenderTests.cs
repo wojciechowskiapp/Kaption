@@ -364,6 +364,102 @@ namespace GI_Test
             foreach (string p in written) Console.WriteLine(p);
         }
 
+        /// <summary>
+        /// "Karta buildu" as a player meets it, in both palettes and languages: the tile in Start's Skróty, the same tile
+        /// with the quiet line after a read that found no UID, Start › Zaawansowane with a remembered UID and "Zapomnij UID",
+        /// and the Characters tab with the header button and its line. Review renders under build-card/.
+        /// </summary>
+        [TestMethod]
+        public void RendersTheBuildCardEntries()
+        {
+            var written = new List<string>();
+            RunSta(() =>
+            {
+                foreach (string palette in WindowRenderTests.Palettes)
+                foreach (string lang in new[] { "pl-PL", "en-US" })
+                {
+                    string tag = $"{lang.Substring(0, 2)}-{palette.ToLowerInvariant()}";
+                    var culture = new CultureInfo(lang);
+                    var host = LoadLooseWindow("Views/SettingsWindow.xaml", lang, out var window, palette);
+                    string L(string key, string fallback) => host.TryFindResource(key) as string ?? fallback;
+                    Fill(host, window, Scene.Stopped, lang);
+                    Select(window, SettingsNavigation.Home);
+                    var tile = (Button)window.FindName("BuildCardTile");
+                    var note = (TextBlock)window.FindName("BuildCardNote");
+                    Layout(host, GuideWidth, GuideHeight);
+                    Assert.IsTrue(tile.ActualHeight >= 44, $"the tile is a 44 px target ({tile.ActualHeight:0})");
+                    Assert.AreEqual(Visibility.Collapsed, note.Visibility, "no line before a click");
+                    var keys = (Border)window.FindName("HotkeysTile");
+                    Assert.IsTrue(tile.TransformToAncestor(keys).Transform(new Point(0, 0)).Y > 0, "inside the Skróty tile");
+                    written.Add(SaveReview(Snapshot(host), $"build-card/start-{tag}.png"));
+
+                    // No UID on the game screen: one quiet line under the tile, no dialog.
+                    note.Text = L("card_Uid_NotRead", "");
+                    note.Visibility = Visibility.Visible;
+                    Layout(host, GuideWidth, GuideHeight);
+                    written.Add(SaveReview(Snapshot(host), $"build-card/start-not-read-{tag}.png"));
+
+                    // Start › Zaawansowane with a UID kept for Genshin and the small action that forgets it, filled the way the
+                    // app fills it on expanding (the technical details, then the build card's row). The page is laid out at its
+                    // final size first: a resize in the same pass as the expansion leaves this harness's grid row stale.
+                    Layout(host, GuideWidth, 1240);
+                    var advanced = (Expander)window.FindName("HomeAdvancedExpander");
+                    advanced.IsExpanded = true;
+                    ((TextBlock)window.FindName("HomeAdvancedDetails")).Text =
+                        "Reader: DmlExecutionProvider · PP-OCRv6 Small · GPU on · NVIDIA GeForce RTX 5070 Ti\n" +
+                        "Index: 536,737 entries · dictionary 536,737\nPack genshin/pl: 7.1.0-r8 (fv_01a19a16439b)";
+                    SettingsWindow.ApplyBuildCardMemoryTo(window.FindName, new[] { ("Genshin", "735366201") }, L, culture);
+                    Layout(host, GuideWidth, 1240);
+                    var forget = (Button)window.FindName("BuildCardForgetButton");
+                    Assert.IsTrue(forget.IsEnabled, "something to forget");
+                    Assert.IsTrue(forget.ActualHeight >= 36 && advanced.ActualHeight > 100, $"the row shows ({advanced.ActualHeight:0} px)");
+                    StringAssert.Contains(((TextBlock)window.FindName("BuildCardMemoryText")).Text, "Genshin Impact 735366201");
+                    written.Add(SaveReview(Snapshot(host), $"build-card/start-advanced-{tag}.png"));
+
+                    // The Characters tab: the header's button next to the kaption.one one, and its line.
+                    var page = CharactersTabWithBuildCard(palette, lang, out var pageHost);
+                    Layout(pageHost, GuideWidth - 120, GuideHeight - 120);
+                    var overview = (ContentControl)page.FindName("OverviewHost");
+                    var view = (CharacterOverviewView)overview.Content;
+                    var button = (Button)view.FindName("BuildCardButton");
+                    var site = (Button)view.FindName("SitePageButton");
+                    Assert.AreEqual(Visibility.Visible, button.Visibility);
+                    Assert.AreEqual(site.ActualHeight, button.ActualHeight, 0.5, "the two header buttons share a height");
+                    written.Add(SaveReview(Snapshot(pageHost), $"build-card/characters-{tag}.png"));
+                    view.ShowBuildCardNote(L("card_Uid_NotRead", ""));
+                    Layout(pageHost, GuideWidth - 120, GuideHeight - 120);
+                    written.Add(SaveReview(Snapshot(pageHost), $"build-card/characters-not-read-{tag}.png"));
+                }
+            });
+            foreach (string p in written) Console.WriteLine(p);
+        }
+
+        /// <summary>The Characters tab as Settings hosts it, on a two-character fixture, with a build card that does nothing.</summary>
+        private static CharactersPage CharactersTabWithBuildCard(string palette, string lang, out Border host)
+        {
+            var catalog = GI_Subtitles.Services.Characters.CharacterCatalog.Load(
+                new MemoryStream(System.Text.Encoding.UTF8.GetBytes(CharacterCatalogTests.MinimalJson)), "starrail");
+            var page = new CharactersPage
+            {
+                GameSource = () => "StarRail", PackSource = () => null, PackReady = () => true, FetchImages = false,
+                BuildCardSource = _ => System.Threading.Tasks.Task.CompletedTask,
+            };
+            host = new Border { Padding = new Thickness(20, 16, 20, 12), UseLayoutRounding = true };
+            host.Resources.MergedDictionaries.Add(Dictionary($"Themes/Palette.{palette}.xaml"));
+            host.Resources.MergedDictionaries.Add(Dictionary("Resources/ModernStyles.xaml"));
+            host.Resources.MergedDictionaries.Add(Dictionary("Themes/Tokens.xaml"));
+            host.Resources.MergedDictionaries.Add(Dictionary("Themes/Shell.xaml"));
+            foreach (var d in Strings(lang)) host.Resources.MergedDictionaries.Add(d);
+            host.SetResourceReference(Border.BackgroundProperty, "BgBrush");
+            host.Child = page;
+            page.UsePalette(palette == "Dark");
+            var load = page.LoadAsync("StarRail", _ => System.Threading.Tasks.Task.FromResult(catalog));
+            CharacterOverviewRenderTests.Pump(() => load.IsCompleted);
+            var overview = (ContentControl)page.FindName("OverviewHost");
+            CharacterOverviewRenderTests.Pump(() => overview.Content is CharacterOverviewView);
+            return page;
+        }
+
         // ── fixture ─────────────────────────────────────────────────────────
 
         internal static string SceneSlug(Scene s) => s switch

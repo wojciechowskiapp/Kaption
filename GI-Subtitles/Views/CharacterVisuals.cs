@@ -37,13 +37,17 @@ namespace GI_Subtitles.Views
         public static Color For(string game, string element)
         {
             if (string.IsNullOrWhiteSpace(element)) return Neutral;
+            element = Canon(element);
             if (string.Equals(game, "zzz", StringComparison.OrdinalIgnoreCase) && ZzzHues.TryGetValue(element, out var z)) return z;
             return ByName.TryGetValue(element, out var e) ? e.Hue : Neutral;
         }
 
         /// <summary>Sort position in the game's own element order; unknown elements go last.</summary>
         public static int Order(string element) =>
-            element != null && ByName.TryGetValue(element, out var e) ? e.Order : int.MaxValue;
+            element != null && ByName.TryGetValue(Canon(element), out var e) ? e.Order : int.MaxValue;
+
+        /// <summary>The game's own text spells "Auric Ink" with a no-break space; the hue tables are keyed with plain spaces.</summary>
+        private static string Canon(string element) => element.Replace(' ', ' ').Trim();
 
         /// <summary>Dark or white text on <paramref name="fill"/>, whichever contrasts more.</summary>
         public static Color InkOn(Color fill)

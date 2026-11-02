@@ -1148,4 +1148,17 @@
     <sys:String x:Key="Char_Tabs_Forward" xmlns:sys="clr-namespace:System;assembly=mscorlib">Więcej sekcji</sys:String>
     <sys:String x:Key="Char_Untranslated" xmlns:sys="clr-namespace:System;assembly=mscorlib">Bez polskiego tłumaczenia</sys:String>
     <sys:Boolean x:Key="Char_MarkUntranslated" xmlns:sys="clr-namespace:System;assembly=mscorlib">True</sys:Boolean>
+    <!-- ═══ Karta buildu (2.5.1): kafelek w Skrótach na Starcie, nagłówek Postaci, Start › Zaawansowane ═══ -->
+    <sys:String x:Key="card_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">Karta buildu</sys:String>
+    <sys:String x:Key="card_Entry_Hint" xmlns:sys="clr-namespace:System;assembly=mscorlib">Otwiera kreator kart z Twoim UID z gry.</sys:String>
+    <sys:String x:Key="card_Entry_Tip" xmlns:sys="clr-namespace:System;assembly=mscorlib">Kaption odczyta Twój UID z rogu ekranu gry i otworzy kreator kart buildu na kaption.one. W Star Rail i ZZZ otwórz menu gry (Esc), tam widać UID. Jeśli gry nie ma na ekranie, wpiszesz UID na stronie.</sys:String>
+    <sys:String x:Key="card_Reading" xmlns:sys="clr-namespace:System;assembly=mscorlib">Odczytuję UID z ekranu gry…</sys:String>
+    <sys:String x:Key="card_Uid_NotRead" xmlns:sys="clr-namespace:System;assembly=mscorlib">Nie udało się odczytać UID z ekranu gry. Wpisz go na stronie.</sys:String>
+    <sys:String x:Key="card_Uid_MenuHint" xmlns:sys="clr-namespace:System;assembly=mscorlib">W Star Rail i ZZZ otwórz menu gry (Esc), tam widać UID.</sys:String>
+    <sys:String x:Key="card_Reader_Loading" xmlns:sys="clr-namespace:System;assembly=mscorlib">Czytnik tekstu jeszcze się ładuje. Spróbuj za chwilę.</sys:String>
+    <sys:String x:Key="card_Memory_Format" xmlns:sys="clr-namespace:System;assembly=mscorlib">Karta otwiera się z UID: {0}</sys:String>
+    <sys:String x:Key="card_Memory_None" xmlns:sys="clr-namespace:System;assembly=mscorlib">Nie ma zapamiętanego UID. Następnym razem Kaption odczyta go z ekranu gry.</sys:String>
+    <sys:String x:Key="card_Forget" xmlns:sys="clr-namespace:System;assembly=mscorlib">Zapomnij UID</sys:String>
+    <sys:String x:Key="card_Forget_Tip" xmlns:sys="clr-namespace:System;assembly=mscorlib">Kaption zapomni UID wszystkich gier i następnym razem odczyta go z ekranu gry.</sys:String>
+    <sys:String x:Key="card_Forget_Done" xmlns:sys="clr-namespace:System;assembly=mscorlib">Zapomniane. Następnym razem Kaption odczyta UID z ekranu gry.</sys:String>
 </ResourceDictionary>

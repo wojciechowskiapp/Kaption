@@ -4802,7 +4802,8 @@ namespace GI_Subtitles.Views
             }
             catch (Exception ex)
             {
-                Logger.Log.Warn($"OpenUrlInBrowser('{url}') failed: {ex.Message}");
+                // Logged without the query: the build card's carries the player's UID.
+                Logger.Log.Warn($"OpenUrlInBrowser('{url?.Split('?')[0]}') failed: {ex.Message}");
             }
         }
 

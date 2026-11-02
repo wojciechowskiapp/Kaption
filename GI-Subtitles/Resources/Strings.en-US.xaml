@@ -1283,4 +1283,17 @@ Answer: X: {0}   Y: {1}   W: {2}   H: {3}</sys:String>
     <sys:String x:Key="Char_Tabs_Forward" xmlns:sys="clr-namespace:System;assembly=mscorlib">More sections</sys:String>
     <sys:String x:Key="Char_Untranslated" xmlns:sys="clr-namespace:System;assembly=mscorlib">Not in Polish yet</sys:String>
     <sys:Boolean x:Key="Char_MarkUntranslated" xmlns:sys="clr-namespace:System;assembly=mscorlib">False</sys:Boolean>
+    <!-- ═══ Build card (2.5.1): Start's Skróty tile, the Characters header, Start › Advanced ═══ -->
+    <sys:String x:Key="card_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">Build card</sys:String>
+    <sys:String x:Key="card_Entry_Hint" xmlns:sys="clr-namespace:System;assembly=mscorlib">Opens the card maker with your UID from the game.</sys:String>
+    <sys:String x:Key="card_Entry_Tip" xmlns:sys="clr-namespace:System;assembly=mscorlib">Kaption reads your UID from the corner of the game screen and opens the build card maker on kaption.one. In Star Rail and ZZZ open the game menu (Esc), the UID is shown there. If the game isn't on screen, you type the UID on the page.</sys:String>
+    <sys:String x:Key="card_Reading" xmlns:sys="clr-namespace:System;assembly=mscorlib">Reading the UID from the game screen…</sys:String>
+    <sys:String x:Key="card_Uid_NotRead" xmlns:sys="clr-namespace:System;assembly=mscorlib">Couldn't read the UID from the game screen. Type it on the page.</sys:String>
+    <sys:String x:Key="card_Uid_MenuHint" xmlns:sys="clr-namespace:System;assembly=mscorlib">In Star Rail and ZZZ open the game menu (Esc), the UID is shown there.</sys:String>
+    <sys:String x:Key="card_Reader_Loading" xmlns:sys="clr-namespace:System;assembly=mscorlib">The text reader is still loading. Try again in a moment.</sys:String>
+    <sys:String x:Key="card_Memory_Format" xmlns:sys="clr-namespace:System;assembly=mscorlib">The card opens with: {0}</sys:String>
+    <sys:String x:Key="card_Memory_None" xmlns:sys="clr-namespace:System;assembly=mscorlib">No UID saved. Next time Kaption reads it from the game screen.</sys:String>
+    <sys:String x:Key="card_Forget" xmlns:sys="clr-namespace:System;assembly=mscorlib">Forget UID</sys:String>
+    <sys:String x:Key="card_Forget_Tip" xmlns:sys="clr-namespace:System;assembly=mscorlib">Kaption forgets the UID for every game and reads it from the game screen next time.</sys:String>
+    <sys:String x:Key="card_Forget_Done" xmlns:sys="clr-namespace:System;assembly=mscorlib">Forgotten. Next time Kaption reads the UID from the game screen.</sys:String>
 </ResourceDictionary>

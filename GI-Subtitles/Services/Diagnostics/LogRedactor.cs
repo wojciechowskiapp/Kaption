@@ -14,7 +14,8 @@
 //      very often the person's real name.
 //    - Bearer/session tokens. A device session JWT is a live credential; one
 //      pasted into a Discord thread is an account takeover.
-//    - Secret-shaped config values (tokens, keys, DSNs, passwords).
+//    - Secret-shaped config values (tokens, keys, DSNs, passwords), and the
+//      game UIDs the build card remembers (BuildCard.Uid.*), which name a player.
 //    - Email local parts. The domain is kept because it identifies the OAuth
 //      provider and is genuinely useful for triage; the local part is not.
 //
@@ -61,9 +62,11 @@ namespace GI_Subtitles.Services.Diagnostics
 
         // JSON or key=value pairs whose NAME suggests a secret. Captures the
         // key and the punctuation so we can rebuild the line with the value
-        // replaced, keeping the file parseable.
+        // replaced, keeping the file parseable. "buildcard.uid" is the build
+        // card's remembered game UIDs (BuildCard.Uid.Genshin and so on): not a
+        // secret, but it identifies a player, so the value goes as well.
         private static readonly Regex SecretAssignment = new Regex(
-            @"(""?[A-Za-z0-9_.\-]*(?:token|secret|password|passwd|apikey|api_key|dsn|cookie|auth|credential|fingerprint)[A-Za-z0-9_.\-]*""?)\s*([:=])\s*(""[^""]*""|'[^']*'|[^\s,;}\]]+)",
+            @"(""?[A-Za-z0-9_.\-]*(?:token|secret|password|passwd|apikey|api_key|dsn|cookie|auth|credential|fingerprint|buildcard\.uid)[A-Za-z0-9_.\-]*""?)\s*([:=])\s*(""[^""]*""|'[^']*'|[^\s,;}\]]+)",
             Opts, MatchTimeout);
 
         private static readonly Regex EmailPattern = new Regex(

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
@@ -80,16 +81,18 @@ namespace GI_Subtitles.Views
         // The page link follows the strings in use: Polish opens the Polish page, every other language the English one.
         private void SyncSiteLanguage() => Vm?.SetSiteLanguage(TryFindResource("Char_SiteLocale") as string);
 
-        // The title row (name, chips, the kaption.one button) stays clear of the art's opaque part; when it does not fit
-        // beside the title, the button wraps under it. Never narrower than the button or the title: wrap, never clip.
+        // The title row (name, chips, the actions) stays clear of the art's opaque part; when the actions do not fit
+        // beside the title, they wrap under it, and the build card under the kaption.one button. Never narrower than a
+        // button or the title: wrap, never clip.
         private void FitTitleRow()
         {
             double art = TryFindResource("Char_ArtWidth") is double w ? w : 300;
             double gutters = TitleRow.Margin.Left + TitleRow.Margin.Right;
             var unbounded = new Size(double.PositiveInfinity, double.PositiveInfinity);
             SitePageButton.Measure(unbounded);
+            BuildCardButton.Measure(unbounded);
             TitleBlock.Measure(unbounded);
-            double widest = Math.Max(SitePageButton.DesiredSize.Width, TitleBlock.DesiredSize.Width);
+            double widest = Math.Max(Math.Max(SitePageButton.DesiredSize.Width, BuildCardButton.DesiredSize.Width), TitleBlock.DesiredSize.Width);
             TitleRow.MaxWidth = Math.Max(widest, Hero.ActualWidth - gutters - art * 0.55);
         }
 
@@ -264,6 +267,46 @@ namespace GI_Subtitles.Views
         {
             _openCharacter = open;
             if (Vm != null) Vm.CanOpenCharacters = open != null;
+        }
+
+        private Func<Action<string>, Task> _openBuildCard;
+
+        /// <summary>
+        /// Shows "Karta buildu" next to the kaption.one button: <paramref name="open"/> opens the build card maker and gets
+        /// the line to show under the buttons (null hides it). Only the Characters tab calls this; elsewhere (the Ctrl+Q
+        /// popup) the button stays hidden. Null hides it again.
+        /// </summary>
+        public void EnableBuildCard(Func<Action<string>, Task> open)
+        {
+            _openBuildCard = open;
+            BuildCardButton.Visibility = open != null ? Visibility.Visible : Visibility.Collapsed;
+            if (open == null) ShowBuildCardNote(null);
+        }
+
+        /// <summary>The quiet line under the header's buttons: reading the UID, it could not be read, or none (null).</summary>
+        public void ShowBuildCardNote(string text)
+        {
+            BuildCardNote.Text = text ?? string.Empty;
+            BuildCardNote.Visibility = string.IsNullOrEmpty(text) ? Visibility.Collapsed : Visibility.Visible;
+        }
+
+        private async void BuildCard_Click(object sender, RoutedEventArgs e)
+        {
+            var open = _openBuildCard;
+            if (open == null) return;
+            BuildCardButton.IsEnabled = false;
+            try
+            {
+                await open(ShowBuildCardNote);
+            }
+            catch (Exception ex)
+            {
+                Logger.Log.Warn($"Build card from the Characters header: {ex.Message}");
+            }
+            finally
+            {
+                BuildCardButton.IsEnabled = true;
+            }
         }
 
         private void TeamHost_Click(object sender, RoutedEventArgs e)

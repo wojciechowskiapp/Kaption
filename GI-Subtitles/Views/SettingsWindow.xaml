@@ -448,6 +448,35 @@
                                 <DockPanel LastChildFill="False">
                                     <TextBlock DockPanel.Dock="Top" Style="{StaticResource CardTitle}" Text="{DynamicResource shell_Hotkeys_Title}" Margin="0,0,0,6"/>
                                     <ItemsControl x:Name="HotkeysCardList" DockPanel.Dock="Top" ItemTemplate="{StaticResource HotkeyCapsRow}" Focusable="False"/>
+                                    <!-- Karta buildu: the player's UID read off the game screen (or remembered), then the card maker on
+                                         kaption.one (SettingsWindow.BuildCard.cs). The line under it says when the UID could not be read. -->
+                                    <Button x:Name="BuildCardTile" DockPanel.Dock="Top" Style="{StaticResource ShortcutTile}" Margin="0,10,0,0"
+                                            Click="BuildCard_Click" ToolTip="{DynamicResource card_Entry_Tip}"
+                                            AutomationProperties.Name="{DynamicResource card_Title}"
+                                            AutomationProperties.HelpText="{DynamicResource card_Entry_Hint}">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <Border Width="32" Height="32" CornerRadius="8" Background="{DynamicResource AccentLightBrush}" VerticalAlignment="Center">
+                                                <Path Data="{StaticResource IconCard}" Width="16" Height="16" Stretch="None" StrokeThickness="1.6"
+                                                      Stroke="{DynamicResource AccentTextBrush}" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                                                      StrokeLineJoin="Round" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                            </Border>
+                                            <StackPanel Grid.Column="1" Margin="12,0,10,0" VerticalAlignment="Center">
+                                                <TextBlock Text="{DynamicResource card_Title}" FontSize="{StaticResource FontSizeBody}" FontWeight="SemiBold"
+                                                           Foreground="{DynamicResource TextBrush}" TextTrimming="CharacterEllipsis"/>
+                                                <TextBlock Text="{DynamicResource card_Entry_Hint}" Style="{StaticResource HintText}" Margin="0,1,0,0"/>
+                                            </StackPanel>
+                                            <Path Grid.Column="2" Data="{StaticResource IconExternal}" Width="16" Height="16" Stretch="None" StrokeThickness="1.6"
+                                                  Stroke="{DynamicResource TextSecondaryBrush}" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                                                  StrokeLineJoin="Round" VerticalAlignment="Center"/>
+                                        </Grid>
+                                    </Button>
+                                    <TextBlock x:Name="BuildCardNote" DockPanel.Dock="Top" Style="{StaticResource HintText}" Margin="2,8,0,0"
+                                               Visibility="Collapsed" AutomationProperties.LiveSetting="Polite"/>
                                     <Button DockPanel.Dock="Bottom" Style="{StaticResource LinkButton}" Margin="0,6,0,0" HorizontalAlignment="Left"
                                             Content="{DynamicResource shell_Action_AllHotkeys}" Click="GoToHotkeys_Click"/>
                                 </DockPanel>
@@ -481,11 +510,29 @@
                             </Grid>
                         </Border>
 
-                        <!-- Technical details for advanced users: what runs where, which revisions, how fast. -->
+                        <!-- Technical details for advanced users: what runs where, which revisions, how fast. Under them the
+                             build card's memory: the UID kept per game, and the small action that forgets it. -->
                         <Expander x:Name="HomeAdvancedExpander" Grid.Row="9" Style="{StaticResource AdvancedExpander}" Margin="0,20,0,0"
                                   Header="{DynamicResource shell_Advanced}" Expanded="AdvancedExpander_Changed" Collapsed="AdvancedExpander_Changed">
-                            <TextBlock x:Name="HomeAdvancedDetails" Style="{StaticResource HintText}" FontFamily="{StaticResource FontMono}"
-                                       Margin="2,4,0,0" LineHeight="19"/>
+                            <StackPanel>
+                                <TextBlock x:Name="HomeAdvancedDetails" Style="{StaticResource HintText}" FontFamily="{StaticResource FontMono}"
+                                           Margin="2,4,0,0" LineHeight="19"/>
+                                <Grid x:Name="BuildCardMemoryRow" Margin="2,14,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel VerticalAlignment="Center" Margin="0,0,16,0">
+                                        <TextBlock Text="{DynamicResource card_Title}" FontSize="{StaticResource FontSizeBody}" FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource TextBrush}"/>
+                                        <TextBlock x:Name="BuildCardMemoryText" Style="{StaticResource HintText}" Margin="0,2,0,0"
+                                                   Text="{DynamicResource card_Memory_None}" AutomationProperties.LiveSetting="Polite"/>
+                                    </StackPanel>
+                                    <Button x:Name="BuildCardForgetButton" Grid.Column="1" Style="{StaticResource SecondaryButton}" VerticalAlignment="Center"
+                                            Content="{DynamicResource card_Forget}" ToolTip="{DynamicResource card_Forget_Tip}"
+                                            Click="BuildCardForget_Click" IsEnabled="False"/>
+                                </Grid>
+                            </StackPanel>
                         </Expander>
                     </Grid>
                 </ScrollViewer>

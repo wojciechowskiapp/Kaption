@@ -220,4 +220,17 @@
     <sys:String x:Key="Char_Tips_MoreOnSite" xmlns:sys="clr-namespace:System;assembly=mscorlib">在 kaption.one 查看更多</sys:String>
     <sys:String x:Key="Char_SiteLocale" xmlns:sys="clr-namespace:System;assembly=mscorlib">en</sys:String>
     <sys:String x:Key="Char_SubStats" xmlns:sys="clr-namespace:System;assembly=mscorlib">副词条</sys:String>
+    <!-- Build card (2.5.1): the site has Polish and English pages, so Chinese opens the English one. -->
+    <sys:String x:Key="card_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">配装卡片</sys:String>
+    <sys:String x:Key="card_Entry_Hint" xmlns:sys="clr-namespace:System;assembly=mscorlib">用游戏中的 UID 打开卡片制作器。</sys:String>
+    <sys:String x:Key="card_Entry_Tip" xmlns:sys="clr-namespace:System;assembly=mscorlib">Kaption 会从游戏画面的角落读取你的 UID，并在 kaption.one 上打开配装卡片制作器。在星穹铁道和绝区零中，请打开游戏菜单（Esc），UID 会显示在那里。如果游戏不在屏幕上，请在页面上输入 UID。</sys:String>
+    <sys:String x:Key="card_Reading" xmlns:sys="clr-namespace:System;assembly=mscorlib">正在从游戏画面读取 UID…</sys:String>
+    <sys:String x:Key="card_Uid_NotRead" xmlns:sys="clr-namespace:System;assembly=mscorlib">无法从游戏画面读取 UID。请在页面上输入。</sys:String>
+    <sys:String x:Key="card_Uid_MenuHint" xmlns:sys="clr-namespace:System;assembly=mscorlib">在星穹铁道和绝区零中，请打开游戏菜单（Esc），UID 会显示在那里。</sys:String>
+    <sys:String x:Key="card_Reader_Loading" xmlns:sys="clr-namespace:System;assembly=mscorlib">文字读取功能仍在加载。请稍后再试。</sys:String>
+    <sys:String x:Key="card_Memory_Format" xmlns:sys="clr-namespace:System;assembly=mscorlib">卡片将使用此 UID 打开：{0}</sys:String>
+    <sys:String x:Key="card_Memory_None" xmlns:sys="clr-namespace:System;assembly=mscorlib">没有已保存的 UID。下次 Kaption 会从游戏画面读取。</sys:String>
+    <sys:String x:Key="card_Forget" xmlns:sys="clr-namespace:System;assembly=mscorlib">忘记 UID</sys:String>
+    <sys:String x:Key="card_Forget_Tip" xmlns:sys="clr-namespace:System;assembly=mscorlib">Kaption 会忘记所有游戏的 UID，下次重新从游戏画面读取。</sys:String>
+    <sys:String x:Key="card_Forget_Done" xmlns:sys="clr-namespace:System;assembly=mscorlib">已忘记。下次 Kaption 会从游戏画面读取 UID。</sys:String>
 </ResourceDictionary>
