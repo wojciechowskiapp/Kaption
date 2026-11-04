@@ -233,12 +233,9 @@ namespace GI_Subtitles.Views
         LRUCache<string, string> BitmapDict = new LRUCache<string, string>(30);
         // Cache for NPC names detected by color, keyed by image hash
         LRUCache<string, string> NpcNameCache = new LRUCache<string, string>(30);
-        // Consecutive empty-OCR frames since last non-empty dialogue detection.
-        // When this crosses EmptyOcrCacheClearThreshold, BitmapDict + NpcNameCache
-        // are flushed so FindSimilarImageHash (Hamming-distance fuzzy match) can't
-        // resurrect a prior dialog's translation on a visually-similar open-world
-        // frame. Without this, the Statue interaction prompt (and similar flavor
-        // text) kept ghost-popping up minutes after the dialogue ended.
+        // Consecutive empty frames since the last dialogue. Past EmptyOcrCacheClearThreshold both
+        // caches are flushed, so a finished dialogue's line can't come back on a later frame that
+        // hashes the same (the Statue prompt used to ghost-pop minutes after the dialogue ended).
         private int _consecutiveEmptyOcrFrames = 0;
         private const int EmptyOcrCacheClearThreshold = 3;
         // Sensible defaults match SettingsWindow. Reading Config without a
@@ -1163,6 +1160,8 @@ namespace GI_Subtitles.Views
             TimeSpan desiredCaptureInterval = MinOcrInterval;
             if (OCRTimer.Interval != desiredCaptureInterval)
                 OCRTimer.Interval = desiredCaptureInterval;
+
+            WarmDialogueContextIfNew();
 
             if (notify.isContextMenuOpen)
             {
@@ -2795,8 +2794,8 @@ namespace GI_Subtitles.Views
             Logger.Log.Info("OCR start blocked: startup language update still in flight.");
             GI_Subtitles.Views.ModernDialog.Info(
                 owner: this,
-                title: LocalizedString("Dialog_StillDownloading_Title", "Translations are being updated"),
-                body: LocalizedString("Dialog_StillDownloading_Body", "Kaption is checking and updating language data. Try again when the update finishes."));
+                title: LocalizedString("Dialog_StillDownloading_Title", "Subtitles are still downloading"),
+                body: LocalizedString("Dialog_StillDownloading_Body", "Kaption is checking for new subtitles and downloading them. Try again when it's done."));
             return false;
         }
 
@@ -2833,17 +2832,17 @@ namespace GI_Subtitles.Views
                 {
                     GI_Subtitles.Views.ModernDialog.Error(
                         owner: this,
-                        title: LocalizedString("Dash_EngineFailed_Runtime_Title", "Text recognition couldn't start"),
+                        title: LocalizedString("Dash_EngineFailed_Runtime_Title", "The text reader can't start"),
                         body: string.Format(
-                            LocalizedString("Dash_EngineFailed_Runtime_Body", "Windows couldn't load a component Kaption needs to read on-screen text (error {0}). Try restarting Kaption first."),
+                            LocalizedString("Dash_EngineFailed_Runtime_Body", "Windows couldn't load a component Kaption needs to read on-screen text (error {0}). Try restarting Kaption first. If it keeps happening, check that your antivirus hasn't quarantined any Kaption files, then reinstall from kaption.one."),
                             runtimeGone.ErrorCode),
                         technicalDetails: err.ToString());
                     return false;
                 }
                 GI_Subtitles.Views.ModernDialog.Error(
                     owner: this,
-                    title: LocalizedString("Dialog_EngineFailed_Title", "Translator didn't load"),
-                    body: LocalizedString("Dialog_EngineFailed_Body", "The dialogue reader hit an error while starting. Open the Home tab and click Retry; the banner at the top can also switch to the processor if the graphics card keeps failing."),
+                    title: LocalizedString("Dialog_EngineFailed_Title", "The text reader didn't start"),
+                    body: LocalizedString("Dialog_EngineFailed_Body", "Open Home and click Try again. If the graphics card keeps failing, click Run on the processor there instead."),
                     technicalDetails: err?.ToString());
                 return false;
             }
@@ -2851,8 +2850,8 @@ namespace GI_Subtitles.Views
             Logger.Log.Info("OCR start blocked: engine still initializing.");
             GI_Subtitles.Views.ModernDialog.Info(
                 owner: this,
-                title: LocalizedString("Dialog_EngineLoading_Title", "Translator still loading"),
-                body: LocalizedString("Dialog_EngineLoading_Body", "Give it a moment — the dialogue reader is still warming up. Click Start again when the badge under the button says Ready."));
+                title: LocalizedString("Dialog_EngineLoading_Title", "The text reader is still starting"),
+                body: LocalizedString("Dialog_EngineLoading_Body", "Kaption is still starting the text reader. It takes a few seconds, then you can start translating."));
             return false;
         }
 
@@ -2881,8 +2880,8 @@ namespace GI_Subtitles.Views
                 }
                 GI_Subtitles.Views.ModernDialog.Warn(
                     owner: this,
-                    title: LocalizedString("Dash_Status_TranslationDataMissing", "Translation data missing"),
-                    body: LocalizedString("Dialog_MatcherMissing_Body", "The selected translation pack is missing or empty. Open Translations, download it, then restart Kaption."));
+                    title: LocalizedString("Dash_Status_TranslationDataMissing", "No subtitles loaded"),
+                    body: LocalizedString("Dialog_MatcherMissing_Body", "The selected subtitle pack is missing or empty. Open Game and subtitles, download the pack, then restart Kaption."));
                 return false;
             }
 
@@ -2890,7 +2889,7 @@ namespace GI_Subtitles.Views
             GI_Subtitles.Views.ModernDialog.Info(
                 owner: this,
                 title: LocalizedString("Dialog_StillStarting_Title", "Still starting up"),
-                body: LocalizedString("Dialog_MatcherLoading_Body", "Kaption is still preparing translations. Please try again in a moment."));
+                body: LocalizedString("Dialog_MatcherLoading_Body", "Kaption is still loading the subtitles. Try again in a moment."));
             return false;
         }
 
@@ -2912,9 +2911,9 @@ namespace GI_Subtitles.Views
             Logger.Log.Info("OCR start blocked: no capture region configured.");
             GI_Subtitles.Views.ModernDialog.Warn(
                 owner: this,
-                title: LocalizedString("Dialog_RegionMissing_Title", "Capture region missing"),
-                body: LocalizedString("Dialog_RegionMissing_Body", "Pick the part of the screen where the game's dialogue appears before starting translation."),
-                details: LocalizedString("Dialog_RegionMissing_Details", "Go back to the wizard's Region step, or open Settings \u203A Regions and click \"Select Region\" — then try again."));
+                title: LocalizedString("Dialog_RegionMissing_Title", "No dialogue area yet"),
+                body: LocalizedString("Dialog_RegionMissing_Body", "Before you start translating, mark where the game's dialogue shows up on screen."),
+                details: LocalizedString("Dialog_RegionMissing_Details", "Open Game and subtitles and click Detect automatically, or Adjust the frame to draw it yourself. Then try again."));
             return false;
         }
 
@@ -3017,8 +3016,8 @@ namespace GI_Subtitles.Views
                 bool bypass = GI_Subtitles.Views.ModernDialog.Confirm(
                     owner: this,
                     title: LocalizedString("Dialog_GameNotFound_Title", "Game isn't running"),
-                    body: LocalizedString("Dialog_GameNotFound_Body", "Kaption can't find the game window. Start the game, wait for the main menu, then click Start."),
-                    details: LocalizedString("Dialog_GameNotFound_Details", "Playing via GeForce Now or another cloud gaming service? The game doesn't run on this PC — click Continue anyway to start."),
+                    body: LocalizedString("Dialog_GameNotFound_Body", "Kaption can't find the game window. Start the game, wait for the main menu, then click Start translating."),
+                    details: LocalizedString("Dialog_GameNotFound_Details", "Playing via GeForce Now or another cloud gaming service? The game doesn't run on this PC, so click Continue anyway to start."),
                     primaryText: LocalizedString("Dialog_GameNotFound_Primary", "Continue anyway"),
                     secondaryText: LocalizedString("Dialog_GameNotFound_Secondary", "Cancel"),
                     severity: GI_Subtitles.Views.DialogSeverity.Warn,
@@ -3116,8 +3115,22 @@ namespace GI_Subtitles.Views
         private void StartOcrTimers()
         {
             Logger.Log.Info(Services.Detection.GameOcrTuning.Describe());
+            WarmDialogueContextIfNew();
             OCRTimer.Start();
             UITimer.Start();
+        }
+
+        /// <summary>
+        /// Loads the dialogue graph on a pool thread instead of inside the first matched line's UI tick
+        /// (1.9-2.5 s on Genshin). Also called per OCR tick: a game or pack switch, or an engine that was
+        /// still preparing at start, hands over a new engine while OCR keeps running. Never before OCR runs,
+        /// so a session that never translates keeps the lazy-load RAM saving.
+        /// </summary>
+        /// <remarks>Holds no engine reference, so a replaced engine's graph can be collected. WarmUpAsync is
+        /// once per Load: on a resident graph it is one volatile read, mid-load it returns the running task.</remarks>
+        private void WarmDialogueContextIfNew()
+        {
+            _ = data?.ContextEngine?.WarmUpAsync();
         }
 
         private bool TryGateOverlayNotInRegion()
@@ -3136,10 +3149,10 @@ namespace GI_Subtitles.Views
                 bool bypass = GI_Subtitles.Views.ModernDialog.Confirm(
                     owner: this,
                     title: LocalizedString("Dialog_OverlayInRegion_Title", "⚠ Subtitles cover the game's dialogue"),
-                    body: LocalizedString("Dialog_OverlayInRegion_Body", "The subtitle box is sitting on top of the game's dialogue — Kaption would start reading its own translation and loop forever. Drag the subtitle box out of the way, or press Ctrl+Shift+R to redraw the dialogue area. Translation resumes as soon as the box is clear."),
-                    details: LocalizedString("Dialog_OverlayInRegion_Details", "Still overlapping after moving things around? In Settings → Display, lower Max subtitle height or raise vertical padding so the subtitle box sits further above the dialogue. Guide with diagrams: kaption.one/how-to/region#overlap"),
+                    body: LocalizedString("Dialog_OverlayInRegion_Body", "The subtitle box is sitting on top of the game's dialogue, so Kaption would start reading its own translation and loop forever. Drag the subtitle box out of the way, change its position in Subtitle style, or press Ctrl+Shift+R to redraw the dialogue area. Translation resumes as soon as the box is clear."),
+                    details: LocalizedString("Dialog_OverlayInRegion_Details", "Still overlapping after moving it? On Subtitle style, move the subtitles higher with Up and down, or lower Max height under Advanced. Guide with pictures: kaption.one/how-to/region#overlap"),
                     primaryText: LocalizedString("Dialog_OverlayInRegion_Primary", "Continue anyway"),
-                    secondaryText: LocalizedString("Dialog_OverlayInRegion_Secondary", "Reselect region"),
+                    secondaryText: LocalizedString("Dialog_OverlayInRegion_Secondary", "Pick the area again"),
                     severity: GI_Subtitles.Views.DialogSeverity.Warn,
                     dangerousPrimary: true);
 
@@ -3150,7 +3163,7 @@ namespace GI_Subtitles.Views
                     return true;
                 }
 
-                // User chose "Reselect region" — fire the region picker instead
+                // User chose "Pick the area again" — fire the region picker instead
                 // of just saying no. Cheaper than making them dig through menus
                 // to find the button after the dialog already told them what
                 // to do.
@@ -3503,7 +3516,7 @@ namespace GI_Subtitles.Views
             string title = LocalizedString("Dialog_OverlayInRegion_Title",
                 "⚠ Subtitles cover the game's dialogue");
             string body = LocalizedString("Dialog_OverlayInRegion_Body",
-                "The subtitle box is sitting on top of the game's dialogue — Kaption would start reading its own translation and loop forever. Drag the subtitle box out of the way, or press Ctrl+Shift+R to redraw the dialogue area. Translation resumes as soon as the box is clear.");
+                "The subtitle box is sitting on top of the game's dialogue, so Kaption would start reading its own translation and loop forever. Drag the subtitle box out of the way, change its position in Subtitle style, or press Ctrl+Shift+R to redraw the dialogue area. Translation resumes as soon as the box is clear.");
 
             _overlapAlertOverlay.Show(
                 regionScreenPx: check.RegionRect,
@@ -3659,8 +3672,8 @@ namespace GI_Subtitles.Views
                 GI_Subtitles.Views.ModernDialog.Warn(
                     owner: dialogOwner ?? this,
                     title: LocalizedString("Dialog_OverlayInRegion_Title", "⚠ Subtitles cover the game's dialogue"),
-                    body: LocalizedString("Dialog_OverlayInRegion_Body", "The subtitle box is sitting on top of the game's dialogue — Kaption would start reading its own translation and loop forever. Drag the subtitle box out of the way, or press Ctrl+Shift+R to redraw the dialogue area. Translation resumes as soon as the box is clear."),
-                    details: LocalizedString("Dialog_OverlayInRegion_Details", "Still overlapping after moving things around? In Settings → Display, lower Max subtitle height or raise vertical padding so the subtitle box sits further above the dialogue. Guide with diagrams: kaption.one/how-to/region#overlap"));
+                    body: LocalizedString("Dialog_OverlayInRegion_Body", "The subtitle box is sitting on top of the game's dialogue, so Kaption would start reading its own translation and loop forever. Drag the subtitle box out of the way, change its position in Subtitle style, or press Ctrl+Shift+R to redraw the dialogue area. Translation resumes as soon as the box is clear."),
+                    details: LocalizedString("Dialog_OverlayInRegion_Details", "Still overlapping after moving it? On Subtitle style, move the subtitles higher with Up and down, or lower Max height under Advanced. Guide with pictures: kaption.one/how-to/region#overlap"));
             }
             catch (Exception ex)
             {
@@ -4118,14 +4131,8 @@ namespace GI_Subtitles.Views
                         }
                         else
                         {
-                            // Fuzzy Hamming-distance match (FindSimilarImageHash) removed 2026-04-18.
-                            // It caused cross-dialog ghost subtitles: merchant frames from one
-                            // conversation kept fuzzy-matching visually-similar frames long after
-                            // the conversation ended, and every fuzzy hit touched the LRU entry
-                            // which refreshed its position — a positive feedback loop that kept
-                            // the stale entry alive indefinitely. The "4+ stable frames" gate
-                            // before OCR already guarantees bit-identical frames for the exact-
-                            // hash path above, so the fuzzy fallback was pure downside.
+                            // Exact hash only. A fuzzy fallback here kept touching stale LRU entries and
+                            // showed old lines on similar frames; the stability gate already makes frames identical.
                             inferenceAttempted = true;
                             OCRResult ocrResult = data.engine.DetectTextFromMat(frameToProcess, cts.Token);
 

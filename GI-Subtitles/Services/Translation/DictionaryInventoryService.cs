@@ -66,7 +66,10 @@ namespace GI_Subtitles.Services.Translation
         public int RemoteAvailable { get; internal set; }
         public int RemoteLocked { get; internal set; }
         public bool RemoteQueryOk { get; internal set; }
+        /// <summary>English, for the log. The banner shows the localized line for <see cref="RemoteStatus"/>.</summary>
         public string RemoteQueryError { get; internal set; }
+        /// <summary>Why the remote catalog is missing; Ok when it loaded.</summary>
+        public DictionarySyncStatus RemoteStatus { get; internal set; }
     }
 
     /// <summary>
@@ -340,6 +343,7 @@ namespace GI_Subtitles.Services.Translation
                 {
                     // Caller shows a "sign in again" banner instead of the list.
                     result.RemoteQueryError = "Session expired — sign in again to see the full catalog.";
+                    result.RemoteStatus = DictionarySyncStatus.NotSignedIn;
                     Logger.Log.Warn($"Inventory: /files returned 401 — {ex.Message}");
                     // Trigger the re-login UX flow — same reasoning as in
                     // DictionarySyncService: server-side revocation between
@@ -352,23 +356,28 @@ namespace GI_Subtitles.Services.Translation
                     // 403 = session is fine, tier just doesn't cover the catalog
                     // query. Show the catalog in "signed-in but no remote packs"
                     // mode so the user still sees their locally-built packs.
-                    result.RemoteQueryError = "No remote packs available on your current plan.";
+                    result.RemoteQueryError = "Listing returned 403: no remote packs for this account.";
+                    result.RemoteStatus = DictionarySyncStatus.NothingListed;
                     Logger.Log.Info($"Inventory: /files returned 403 — tier-gated. {ex.Message}");
                 }
                 catch (ApiUnavailableException ex)
                 {
                     result.RemoteQueryError = "Offline — showing local packs only.";
+                    result.RemoteStatus = DictionarySyncStatus.Offline;
                     Logger.Log.Warn($"Inventory: network unavailable: {ex.Message}");
                 }
                 catch (Exception ex)
                 {
                     result.RemoteQueryError = "Server temporarily unavailable.";
+                    // A read-only scan downloaded nothing, so "can't reach Kaption" is the honest line, not "download failed".
+                    result.RemoteStatus = DictionarySyncStatus.Offline;
                     Logger.Log.Warn($"Inventory: unexpected remote error: {ex.Message}");
                 }
             }
             else
             {
                 result.RemoteQueryError = "Not signed in — showing local packs only.";
+                result.RemoteStatus = DictionarySyncStatus.NotSignedIn;
             }
 
             // ── Finalize: order + counters + log summary ──

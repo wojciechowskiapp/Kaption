@@ -54,9 +54,48 @@ using GI_Subtitles.Services.Security;
 
 namespace GI_Subtitles.Services.Translation
 {
+    /// <summary>How a <see cref="DictionarySyncService.SyncAsync"/> call ended, for the player-facing line.</summary>
+    public enum DictionarySyncStatus
+    {
+        Ok,
+        NotConfigured,
+        NotSignedIn,
+        KeyMissing,
+        Offline,
+        NothingListed,
+        Failed,
+    }
+
+    /// <summary>
+    /// The localized line each status shows (string key plus English fallback). <see cref="DictionarySyncResult.Messages"/>
+    /// and the inventory's RemoteQueryError stay English for the log; players only ever see these. Ok shows nothing.
+    /// </summary>
+    public static class DictionarySyncNotice
+    {
+        /// <summary>
+        /// The Translations banner after an inventory scan. A download that left nothing installed keeps its line
+        /// across the scan that follows it; otherwise the scan's own remote state decides.
+        /// </summary>
+        public static (string Key, string Fallback)? ForBanner(DictionarySyncStatus? download, DictionarySyncStatus scan) =>
+            (download is { } d ? For(d) : null) ?? For(scan);
+
+        public static (string Key, string Fallback)? For(DictionarySyncStatus status) => status switch
+        {
+            DictionarySyncStatus.NotConfigured => ("Sync_Status_NotConfigured", "Pick a game and a language first, then try again."),
+            DictionarySyncStatus.NotSignedIn => ("Sync_Status_NotSignedIn", "Sign in to your Kaption account to download translation packs."),
+            DictionarySyncStatus.KeyMissing => ("Sync_Status_KeyMissing", "Your sign-in needs a refresh. Sign out, sign in again and retry."),
+            DictionarySyncStatus.Offline => ("Sync_Status_Offline", "Can't reach Kaption right now. The packs you already have still work."),
+            DictionarySyncStatus.NothingListed => ("Sync_Status_NothingListed", "No translation pack is out for this game and language yet. It will download on its own once it's ready."),
+            DictionarySyncStatus.Failed => ("Sync_Status_Failed", "The download didn't finish. Try again in a moment."),
+            _ => null,
+        };
+    }
+
     /// <summary>Outcome counters from one <see cref="DictionarySyncService.SyncAsync"/> call.</summary>
     public sealed class DictionarySyncResult
     {
+        /// <summary>Set at every early return; a failed pack in the download loop makes it Failed.</summary>
+        public DictionarySyncStatus Status { get; internal set; }
         public int Downloaded { get; internal set; }
         public int UpToDate { get; internal set; }
         /// <summary>A new version of a pack already installed: version rewritten, no download, no index rebuild, no restart.</summary>
@@ -67,6 +106,13 @@ namespace GI_Subtitles.Services.Translation
 
         /// <summary>True when nothing actually went wrong — failures = 0.</summary>
         public bool Ok => Failed == 0;
+
+        /// <summary>Every listed pack was skipped (removed or gated on download): the click got nothing, so say so.</summary>
+        internal void SettleAfterDownloads()
+        {
+            if (Status == DictionarySyncStatus.Ok && Skipped > 0 && Downloaded + UpToDate + Relabelled == 0)
+                Status = DictionarySyncStatus.NothingListed;
+        }
     }
 
     /// <summary>
@@ -199,6 +245,7 @@ namespace GI_Subtitles.Services.Translation
             {
                 Logger.Log.Info("DictionarySync: skipped — game or language not configured.");
                 result.Messages.Add("Sync skipped: game or language not configured.");
+                result.Status = DictionarySyncStatus.NotConfigured;
                 return result;
             }
 
@@ -218,6 +265,7 @@ namespace GI_Subtitles.Services.Translation
             {
                 Logger.Log.Info("DictionarySync: skipped — no active license session.");
                 result.Messages.Add("Sync skipped: not activated.");
+                result.Status = DictionarySyncStatus.NotSignedIn;
                 return result;
             }
 
@@ -237,6 +285,7 @@ namespace GI_Subtitles.Services.Translation
             if (distKey == null || distKey.Length != 32)
             {
                 result.Messages.Add("Sync skipped: distribution key missing — re-activate to refresh.");
+                result.Status = DictionarySyncStatus.KeyMissing;
                 Logger.Log.Warn(
                     "DictionarySync: ActivationData.DistributionKey is null/wrong-length — " +
                     "this account was activated against an older backend. Sign out + sign in.");
@@ -261,6 +310,7 @@ namespace GI_Subtitles.Services.Translation
                 // with zero UX feedback.
                 try { _license?.ReportRemoteRevocation($"DictionarySync 401: {ex.Message}"); } catch { /* best-effort */ }
                 result.Messages.Add("Sync failed: please sign in again.");
+                result.Status = DictionarySyncStatus.NotSignedIn;
                 result.Failed++;
                 return result;
             }
@@ -272,13 +322,15 @@ namespace GI_Subtitles.Services.Translation
                 // re-login dialog, which terrified free-tier users for no
                 // reason. Log quietly and show a neutral message.
                 Logger.Log.Info($"DictionarySync: /files returned 403 — tier-gated for this account. {ex.Message}");
-                result.Messages.Add("No paid dictionaries available on your current plan.");
+                result.Messages.Add("Listing returned 403: nothing this account can download.");
+                result.Status = DictionarySyncStatus.NothingListed;
                 return result;
             }
             catch (ApiUnavailableException ex)
             {
                 Logger.Log.Warn($"DictionarySync: network unavailable: {ex.Message}");
                 result.Messages.Add("Sync failed: offline. Cached dictionaries still work.");
+                result.Status = DictionarySyncStatus.Offline;
                 result.Failed++;
                 return result;
             }
@@ -286,6 +338,7 @@ namespace GI_Subtitles.Services.Translation
             {
                 Logger.Log.Error($"DictionarySync: unexpected listing failure: {ex}");
                 result.Messages.Add("Sync failed: " + ex.Message);
+                result.Status = DictionarySyncStatus.Failed;
                 result.Failed++;
                 return result;
             }
@@ -306,7 +359,8 @@ namespace GI_Subtitles.Services.Translation
                     $"DictionarySync: server returned no files for {game}/{language} " +
                     $"(tier={session.EffectiveTier ?? "?"}). " +
                     "Existing local packs come from the bundled seed data, not the backend.");
-                result.Messages.Add("No paid dictionaries available for your account yet.");
+                result.Messages.Add("No packs listed for this game and language yet.");
+                result.Status = DictionarySyncStatus.NothingListed;
                 return result;
             }
 
@@ -352,10 +406,12 @@ namespace GI_Subtitles.Services.Translation
                 {
                     Logger.Log.Error($"DictionarySync: sync of {meta.FileVersionId} threw: {ex}");
                     result.Messages.Add($"Failed to sync {meta.Game}/{meta.Language}: {ex.Message}");
+                    result.Status = DictionarySyncStatus.Failed;
                     result.Failed++;
                 }
             }
 
+            result.SettleAfterDownloads();
             SaveManifest(manifest);
 
             syncWatch.Stop();

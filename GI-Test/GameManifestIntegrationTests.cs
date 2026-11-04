@@ -75,16 +75,6 @@ namespace GI_Test
         }
 
         [TestMethod]
-        public void CommitFeed_FollowsTheManifestSource()
-        {
-            Assert.AreEqual("https://github.com/Arikatsu/WutheringWaves_Data/commits.atom", GameRegistry.Current.Find("WuWa").Source.CommitFeedUrl(),
-                "@default follows the default branch");
-            Assert.IsNull(GameRegistry.Current.Find("ZZZ").Source.CommitFeedUrl(), "ZZZ is on Gitea");
-            Assert.AreEqual("https://github.com/x/y/commits/main.atom", new GameSource { Host = "github", Repo = "x/y", Branch = "main" }.CommitFeedUrl());
-            Assert.IsNull(new GameSource { Host = "github", Repo = " " }.CommitFeedUrl());
-        }
-
-        [TestMethod]
         public void WuWa_IsAListedBetaGame_AfterTheThreeShippedOnes()
         {
             var registry = GameRegistry.Current;

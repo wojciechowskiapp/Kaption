@@ -23,6 +23,9 @@ namespace GI_Subtitles.Views
         /// <summary>The controller's own start is running the Start gates (TryGateGameRunning trusts the probe then).</summary>
         private bool _autoStartStarting;
         private readonly GameProbe _gameProbe = new();
+        /// <summary>This session's one try at filling a missing dialogue area when the game shows up.</summary>
+        private readonly RegionAutoFill _regionAutoFill = new();
+        private bool _gameSwitchHeld;
 
         private sealed class AutoStartHost : IAutoStartHost
         {
@@ -35,6 +38,8 @@ namespace GI_Subtitles.Views
 
             public bool StartThroughGates()
             {
+                // A switch waiting for the restart: the loaded data belongs to the other game.
+                if (_w.GameSwitchPending()) return false;
                 _w._autoStartStarting = true;
                 try
                 {
@@ -66,7 +71,8 @@ namespace GI_Subtitles.Views
                 NotifyUserToggled(was);
             };
 
-            bool enabled = Config.Get(SettingsWindow.AutoStartTranslationKey, true);
+            bool setting = Config.Get(SettingsWindow.AutoStartTranslationKey, true);
+            bool enabled = GameSwitchHold.AutoStartEnabled(setting, GameSwitchPending());
             _autoStart = new AutoStartController(new AutoStartHost(this), enabled);
             _autoStart.StateChanged += (_, __) =>
             {
@@ -78,13 +84,35 @@ namespace GI_Subtitles.Views
             data.AutoStartBlockedGate = AutoStartBlockingGateForCard;
             data.OnResolveGate = ResolveGate;
             data.GatesChanged = () => _autoStart?.OnGatesChanged();
-            data.AutoStartSettingChanged = on => _autoStart?.SetEnabled(on);
+            data.AutoStartSettingChanged = on => _autoStart?.SetEnabled(GameSwitchHold.AutoStartEnabled(on, GameSwitchPending()));
+            data.GameSwitchAwaitsRestart = GameSwitchPending;
+            data.LoadedGame = () => Game;
+            _regionAutoFill.Restore(Config.Get<string>(RegionAutoFill.FilledRegionKey, null));
+            data.GetRegionAutoFillNote = () => _regionAutoFill.NoteFor(Config.Get<string>("Region", ""), HasConfiguredRegion());
 
             _autoStartWatch = new DispatcherTimer(DispatcherPriority.Background) { Interval = TimeSpan.FromMilliseconds(1500) };
             _autoStartWatch.Tick += (_, __) => WatchGame();
             _autoStartWatch.Start();
             Closed += (_, __) => _autoStartWatch?.Stop();
             Logger.Log.Info($"Auto-start: {(enabled ? "on" : "off")} at launch.");
+        }
+
+        /// <summary>Config["Game"] names another game than the one this process loaded (a switch waiting for the restart).</summary>
+        private bool GameSwitchPending() => GameSwitchHold.AwaitsRestart(Game, Config.Get<string>("Game", "Genshin"));
+
+        // Every tick: a switch made on any page (pill, pack row, setup) holds auto-start until the restart.
+        private void ApplyGameSwitchHold()
+        {
+            bool pending = GameSwitchPending();
+            if (pending != _gameSwitchHeld)
+            {
+                _gameSwitchHeld = pending;
+                Logger.Log.Info(pending
+                    ? $"Auto-start: held, {Config.Get<string>("Game", "Genshin")} is selected but {Game} stays loaded until the restart."
+                    : "Auto-start: the loaded game is selected again.");
+                data?.UpdateDashboardStatus();
+            }
+            _autoStart.SetEnabled(GameSwitchHold.AutoStartEnabled(Config.Get(SettingsWindow.AutoStartTranslationKey, true), pending));
         }
 
         /// <summary>
@@ -142,6 +170,7 @@ namespace GI_Subtitles.Views
             _probing = true;
             try
             {
+                ApplyGameSwitchHold();
                 var profile = Services.Detection.GameRegionProfile.Get(Config.Get<string>("Game", "Genshin"));
                 string[] names = profile?.ProcessNames ?? Array.Empty<string>();
                 // A generic executable (WuWa's Unreal shell) counts only with one of the game's window titles.
@@ -162,6 +191,9 @@ namespace GI_Subtitles.Views
                     _autoStart.OnGameForeground(foreground);
                 }
                 _watchPrimed = true;
+                // The probe's own answer: with "running counts" on, a covered window still is not in front.
+                await TryAutoFillRegionAsync(profile, probe.Foreground);
+                if (_autoStart == null) return;
                 // Reader, pack, region and sign-in changes reach the controller here; its cooldown spaces the retries.
                 if (_autoStart.State == AutoStartState.Blocked) _autoStart.OnGatesChanged();
             }
@@ -173,6 +205,72 @@ namespace GI_Subtitles.Views
             {
                 _probing = false;
             }
+        }
+
+        /// <summary>
+        /// Auto-start waits on the dialogue area alone and the game is in front: once the game window has kept one size
+        /// for a few probes, save the area from the profile's ratios. Never replaces a saved area; a failure shows on the
+        /// Start card with the picker as its action. Logs stay Info/Warn: a best-effort step is not a GlitchTip event.
+        /// </summary>
+        private async Task TryAutoFillRegionAsync(Services.Detection.GameRegionProfile profile, bool gameInFront)
+        {
+            bool blockedOnRegion = _autoStart.State == AutoStartState.Blocked && _autoStart.BlockingGate == StartGate.Region;
+            bool busy = ChooseRegion || OCRTimer.IsEnabled || _quickTranslateBusy;
+            if (!RegionAutoFill.ShouldTry(HasConfiguredRegion(), blockedOnRegion, gameInFront, _regionAutoFill.Decided, busy))
+            {
+                if (!gameInFront) _regionAutoFill.Interrupt();
+                return;
+            }
+
+            RegionAutoFill.WindowRect? window = null;
+            try
+            {
+                // Lists processes and windows (tens of ms): off the UI thread, and only while the area is missing.
+                window = await Task.Run(() => Services.Detection.GameWindowDetector.FindGameWindow(profile) is { } w
+                    ? new RegionAutoFill.WindowRect(w.GameX, w.GameY, w.GameW, w.GameH)
+                    : (RegionAutoFill.WindowRect?)null);
+            }
+            catch (Exception ex)
+            {
+                Logger.Log.Warn($"Auto-fill dialogue area: window lookup failed: {ex.Message}");
+            }
+
+            RegionAutoFillStep step = _regionAutoFill.Observe(window);
+            if (step == RegionAutoFillStep.Wait) return;
+
+            // Back on the UI thread: the player may have drawn an area while the lookup ran.
+            bool savedNow = HasConfiguredRegion()
+                            || Services.Detection.CaptureRegionValidator.TryParse(Config.Get<string>("Region", ""), out _, out _, out _, out _);
+            if (savedNow) return;
+
+            string region = null;
+            if (step == RegionAutoFillStep.Fill && window is RegionAutoFill.WindowRect rect)
+            {
+                var desktop = System.Windows.Forms.SystemInformation.VirtualScreen;
+                region = RegionAutoFill.RegionFor(profile, rect, desktop.Left, desktop.Top, desktop.Width, desktop.Height);
+            }
+
+            if (RegionAutoFill.MaySave(savedNow, region))
+            {
+                Config.Set("Region", region);
+                notify.Region = region.Split(',');
+                _regionAutoFill.MarkSet(region);
+                Config.Set(RegionAutoFill.FilledRegionKey, region);
+                // No overlap dialog over the game: an overlap shows as the silent OverlayOverlap gate on the card.
+                NotifyRegionChanged();
+                ResetOcrPipelineState(clearImageCaches: true);
+                data?.UpdateDashboardRegionInfo();
+                Logger.Log.Info($"Auto-fill dialogue area: saved {region} from the {profile.GameId} profile ratios (game window {window?.Width}x{window?.Height}).");
+            }
+            else
+            {
+                _regionAutoFill.MarkFailed();
+                Logger.Log.Warn(window is RegionAutoFill.WindowRect last
+                    ? $"Auto-fill dialogue area: no steady, usable game window ({last.Width}x{last.Height}); the Start card offers the picker."
+                    : "Auto-fill dialogue area: the game window was not found; the Start card offers the picker.");
+            }
+            _autoStart?.OnGatesChanged();
+            data?.UpdateDashboardStatus();
         }
 
         private static string[] SelectedGameProcessNames() =>

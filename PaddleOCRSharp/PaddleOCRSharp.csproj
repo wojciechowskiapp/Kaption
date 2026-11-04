@@ -50,8 +50,8 @@
   <!-- PaddleOCR inference models. These live next to PaddleOCRSharp.dll at
        runtime (the engine resolves model paths via typeof(OCRModelConfig).Assembly.Location),
        so they ride along every time this project is copied to a consumer's
-       output directory. The reviewed PP-OCRv6 Small and PP-OCRv4 Mobile
-       weights are versioned so a clean checkout has both the recommended
+       output directory. The reviewed PP-OCRv6 Small, en_PP-OCRv5 and PP-OCRv4
+       Mobile weights are versioned so a clean checkout has both the recommended
        model and its compatibility fallback. `Condition="Exists(...)"` keeps the
        build from failing hard when the models are genuinely absent (early
        dev-machine setup). -->

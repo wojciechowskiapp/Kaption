@@ -356,6 +356,8 @@
     <sys:String x:Key="onb_Game_DetectedKept_Format" xmlns:sys="clr-namespace:System;assembly=mscorlib">{0} is running. Your saved dialogue area stays; Detect automatically replaces it.</sys:String>
     <sys:String x:Key="shell_Card_AutoStartBlocked" xmlns:sys="clr-namespace:System;assembly=mscorlib">Auto-start on hold</sys:String>
     <sys:String x:Key="shell_Status_AutoStartBlocked" xmlns:sys="clr-namespace:System;assembly=mscorlib">Auto-start on hold</sys:String>
+    <sys:String x:Key="shell_Card_GameSwitchPending_Detail_Format" xmlns:sys="clr-namespace:System;assembly=mscorlib">Subtitles for {0} are still loaded, so auto-start waits for the restart.</sys:String>
+    <sys:String x:Key="shell_Chip_Subtitles_AdvancedTip_Format" xmlns:sys="clr-namespace:System;assembly=mscorlib">{0:N0} lines · {1:N0} index entries</sys:String>
     <sys:String x:Key="shell_Blocked_Session" xmlns:sys="clr-namespace:System;assembly=mscorlib">Your sign-in has expired.</sys:String>
     <sys:String x:Key="shell_Blocked_Action_Session" xmlns:sys="clr-namespace:System;assembly=mscorlib">_Sign in</sys:String>
     <sys:String x:Key="shell_Blocked_Action_Region" xmlns:sys="clr-namespace:System;assembly=mscorlib">_Pick the dialogue area</sys:String>
@@ -488,12 +490,12 @@
     <sys:String x:Key="Config_UiRefresh" xmlns:sys="clr-namespace:System;assembly=mscorlib">UI Refresh (ms):</sys:String>
     <sys:String x:Key="Config_OcrSpeed_Hint" xmlns:sys="clr-namespace:System;assembly=mscorlib">Lower = faster subtitles, higher = less CPU usage</sys:String>
     <sys:String x:Key="Settings_OcrModel_Card_Label" xmlns:sys="clr-namespace:System;assembly=mscorlib">Text recognition model</sys:String>
-    <sys:String x:Key="Settings_OcrModel_Card_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">Choose how Kaption reads dialogue from the game. The recommended model gives better screen-text accuracy; the compatibility model keeps the previous, lighter engine.</sys:String>
+    <sys:String x:Key="Settings_OcrModel_Card_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">Choose how Kaption reads dialogue from the game. The recommended model gives better screen-text accuracy; the compatibility model is a lighter engine.</sys:String>
     <sys:String x:Key="Settings_OcrModel_Label" xmlns:sys="clr-namespace:System;assembly=mscorlib">Recognition model</sys:String>
     <sys:String x:Key="Settings_OcrModel_V6" xmlns:sys="clr-namespace:System;assembly=mscorlib">Newer model · recommended</sys:String>
     <sys:String x:Key="Settings_OcrModel_V4" xmlns:sys="clr-namespace:System;assembly=mscorlib">Older model · for compatibility</sys:String>
-    <sys:String x:Key="Settings_OcrModel_V6_Description" xmlns:sys="clr-namespace:System;assembly=mscorlib">Best balance for modern PCs. More accurate on screen text and supports English and Japanese with one model. Automatically falls back to V4 if it cannot load.</sys:String>
-    <sys:String x:Key="Settings_OcrModel_V4_Description" xmlns:sys="clr-namespace:System;assembly=mscorlib">Previous lightweight model. Use it if V6 is unusually slow or incompatible on this PC.</sys:String>
+    <sys:String x:Key="Settings_OcrModel_V6_Description" xmlns:sys="clr-namespace:System;assembly=mscorlib">Best balance for modern PCs. More accurate on screen text and supports English and Japanese with one model. Switches to the compatibility model by itself if it cannot load.</sys:String>
+    <sys:String x:Key="Settings_OcrModel_V4_Description" xmlns:sys="clr-namespace:System;assembly=mscorlib">Lighter model. Use it if V6 is unusually slow or incompatible on this PC.</sys:String>
     <sys:String x:Key="Settings_OcrModel_Restart" xmlns:sys="clr-namespace:System;assembly=mscorlib">Restart Kaption to switch models.</sys:String>
     <sys:String x:Key="Tip_Settings_OcrModel" xmlns:sys="clr-namespace:System;assembly=mscorlib">Changes the local ONNX models used to detect and read game dialogue.</sys:String>
     <sys:String x:Key="Settings_OcrGpu_Checkbox" xmlns:sys="clr-namespace:System;assembly=mscorlib">Use GPU acceleration (DirectML)</sys:String>
@@ -526,7 +528,7 @@
     <sys:String x:Key="Dash_Status_Loading" xmlns:sys="clr-namespace:System;assembly=mscorlib">Loading...</sys:String>
     <sys:String x:Key="Dash_Status_EngineLoading" xmlns:sys="clr-namespace:System;assembly=mscorlib">Starting the dialogue reader…</sys:String>
     <sys:String x:Key="Dash_Status_PreparingTranslations" xmlns:sys="clr-namespace:System;assembly=mscorlib">Preparing translations…</sys:String>
-    <sys:String x:Key="Dash_Status_TranslationDataMissing" xmlns:sys="clr-namespace:System;assembly=mscorlib">Translation data missing</sys:String>
+    <sys:String x:Key="Dash_Status_TranslationDataMissing" xmlns:sys="clr-namespace:System;assembly=mscorlib">No subtitles loaded</sys:String>
     <sys:String x:Key="Dash_Status_RestartRequired" xmlns:sys="clr-namespace:System;assembly=mscorlib">Selected, restart required</sys:String>
     <sys:String x:Key="Dash_Status_EngineFailed" xmlns:sys="clr-namespace:System;assembly=mscorlib">Translator failed to load</sys:String>
     <sys:String x:Key="Dash_EngineFailed_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">Translator didn't load</sys:String>
@@ -536,21 +538,21 @@
     <sys:String x:Key="Dash_EngineFailed_CpuFallback" xmlns:sys="clr-namespace:System;assembly=mscorlib">Fall back to CPU</sys:String>
     <sys:String x:Key="Dash_EngineFailed_CpuFallback_Tooltip" xmlns:sys="clr-namespace:System;assembly=mscorlib">Turn off GPU acceleration and try again. Reading is slower on the processor but skips the graphics card entirely.</sys:String>
     <sys:String x:Key="Dash_EngineFailed_UnknownDetails" xmlns:sys="clr-namespace:System;assembly=mscorlib">Unknown error.</sys:String>
-    <sys:String x:Key="Dash_EngineFailed_Runtime_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">Text recognition couldn't start</sys:String>
+    <sys:String x:Key="Dash_EngineFailed_Runtime_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">The text reader can't start</sys:String>
     <sys:String x:Key="Dash_EngineFailed_Runtime_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">Windows couldn't load a component Kaption needs to read on-screen text (error {0}). Try restarting Kaption first. If it keeps happening, check that your antivirus hasn't quarantined any Kaption files, then reinstall from kaption.one.</sys:String>
     <sys:String x:Key="Dash_EngineFailed_Restart" xmlns:sys="clr-namespace:System;assembly=mscorlib">Restart Kaption</sys:String>
     <sys:String x:Key="Dash_EngineFailed_Restart_Tooltip" xmlns:sys="clr-namespace:System;assembly=mscorlib">Close and reopen Kaption. Only a fresh start can load this component again.</sys:String>
     <sys:String x:Key="Overlay_EngineLoading" xmlns:sys="clr-namespace:System;assembly=mscorlib">Starting the dialogue reader…</sys:String>
     <sys:String x:Key="Overlay_EngineFailed" xmlns:sys="clr-namespace:System;assembly=mscorlib">Translator failed to load. See Settings.</sys:String>
-    <sys:String x:Key="Dialog_EngineLoading_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">Translator still loading</sys:String>
-    <sys:String x:Key="Dialog_EngineLoading_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">Give it a moment, the dialogue reader is still warming up. Click Start again when the badge under the button says Ready.</sys:String>
-    <sys:String x:Key="Dialog_EngineFailed_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">Translator didn't load</sys:String>
-    <sys:String x:Key="Dialog_EngineFailed_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">The text reader did not start. Open Start and click Try again; the card there can also run it on the processor if the graphics card keeps failing.</sys:String>
+    <sys:String x:Key="Dialog_EngineLoading_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">The text reader is still starting</sys:String>
+    <sys:String x:Key="Dialog_EngineLoading_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">Kaption is still starting the text reader. It takes a few seconds, then you can start translating.</sys:String>
+    <sys:String x:Key="Dialog_EngineFailed_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">The text reader didn't start</sys:String>
+    <sys:String x:Key="Dialog_EngineFailed_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">Open Home and click Try again. If the graphics card keeps failing, click Run on the processor there instead.</sys:String>
     <sys:String x:Key="Dash_Status_NotLoaded" xmlns:sys="clr-namespace:System;assembly=mscorlib">Not loaded</sys:String>
     <sys:String x:Key="Dash_Region_NotSet" xmlns:sys="clr-namespace:System;assembly=mscorlib">Not set yet. With the game on screen, click Detect automatically.</sys:String>
     <sys:String x:Key="Dash_QuickStart" xmlns:sys="clr-namespace:System;assembly=mscorlib">Quick Start: 1) Open the game  2) Click "Select Region"  3) Click "Start"</sys:String>
     <sys:String x:Key="Dialog_GameNotFound_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">Game isn't running</sys:String>
-    <sys:String x:Key="Dialog_GameNotFound_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">Kaption can't find the game window. Start the game, wait for the main menu, then click Start.</sys:String>
+    <sys:String x:Key="Dialog_GameNotFound_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">Kaption can't find the game window. Start the game, wait for the main menu, then click Start translating.</sys:String>
     <sys:String x:Key="Dialog_GameNotFound_Details" xmlns:sys="clr-namespace:System;assembly=mscorlib">Playing via GeForce Now or another cloud gaming service? The game doesn't run on this PC, so click Continue anyway to start.</sys:String>
     <sys:String x:Key="Dialog_GameNotFound_Primary" xmlns:sys="clr-namespace:System;assembly=mscorlib">Continue anyway</sys:String>
     <sys:String x:Key="Dialog_GameNotFound_Secondary" xmlns:sys="clr-namespace:System;assembly=mscorlib">Cancel</sys:String>
@@ -565,9 +567,9 @@
          Shorter variants for diagnostic overlays + inline hints below. -->
     <sys:String x:Key="Dialog_OverlayInRegion_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">⚠ Subtitles cover the game's dialogue</sys:String>
     <sys:String x:Key="Dialog_OverlayInRegion_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">The subtitle box is sitting on top of the game's dialogue, so Kaption would start reading its own translation and loop forever. Drag the subtitle box out of the way, change its position in Subtitle style, or press Ctrl+Shift+R to redraw the dialogue area. Translation resumes as soon as the box is clear.</sys:String>
-    <sys:String x:Key="Dialog_OverlayInRegion_Details" xmlns:sys="clr-namespace:System;assembly=mscorlib">Still overlapping after moving things around? In Subtitle style › Max Height / Vertical, lower the maximum subtitle height or raise the vertical offset so the subtitle box sits further above the dialogue. Guide with diagrams: kaption.one/how-to/region#overlap</sys:String>
+    <sys:String x:Key="Dialog_OverlayInRegion_Details" xmlns:sys="clr-namespace:System;assembly=mscorlib">Still overlapping after moving it? On Subtitle style, move the subtitles higher with Up and down, or lower Max height under Advanced. Guide with pictures: kaption.one/how-to/region#overlap</sys:String>
     <sys:String x:Key="Dialog_OverlayInRegion_Primary" xmlns:sys="clr-namespace:System;assembly=mscorlib">Continue anyway</sys:String>
-    <sys:String x:Key="Dialog_OverlayInRegion_Secondary" xmlns:sys="clr-namespace:System;assembly=mscorlib">Reselect region</sys:String>
+    <sys:String x:Key="Dialog_OverlayInRegion_Secondary" xmlns:sys="clr-namespace:System;assembly=mscorlib">Pick the area again</sys:String>
     <!-- Short label for Ctrl+Shift+D region outline when the subtitle box is inside it. -->
     <sys:String x:Key="Overlap_Badge_Warning" xmlns:sys="clr-namespace:System;assembly=mscorlib">⚠ Subtitles cover the dialogue. Translation won't work here.</sys:String>
     <!-- Text shown INSIDE the subtitle box itself in the two "please grab me" states. -->
@@ -581,8 +583,8 @@
     <sys:String x:Key="Restart_Prompt_Primary" xmlns:sys="clr-namespace:System;assembly=mscorlib">Restart now</sys:String>
     <sys:String x:Key="Restart_Prompt_Secondary" xmlns:sys="clr-namespace:System;assembly=mscorlib">Later</sys:String>
 
-    <sys:String x:Key="Dialog_StillDownloading_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">Translations are being updated</sys:String>
-    <sys:String x:Key="Dialog_StillDownloading_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">Kaption is checking and updating language data. Try again when the update finishes.</sys:String>
+    <sys:String x:Key="Dialog_StillDownloading_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">Subtitles are still downloading</sys:String>
+    <sys:String x:Key="Dialog_StillDownloading_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">Kaption is checking for new subtitles and downloading them. Try again when it's done.</sys:String>
     <sys:String x:Key="Dash_LangData_Section" xmlns:sys="clr-namespace:System;assembly=mscorlib">Language Data</sys:String>
 
     <!-- Crash reporting opt-in (Settings → General + first-run dialog) -->
@@ -705,15 +707,15 @@
     <sys:String x:Key="Dialog_OcrEngineFailed_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">Subtitle translation won't work until this is resolved. Try restarting Kaption; if the error persists, reinstalling usually fixes it.</sys:String>
     <sys:String x:Key="Dialog_StillStarting_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">Still starting up</sys:String>
     <sys:String x:Key="Dialog_StillStarting_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">Kaption is still getting ready. Please try again in a moment.</sys:String>
-    <sys:String x:Key="Dialog_MatcherLoading_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">Kaption is still preparing translations. Please try again in a moment.</sys:String>
+    <sys:String x:Key="Dialog_MatcherLoading_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">Kaption is still loading the subtitles. Try again in a moment.</sys:String>
     <sys:String x:Key="Dialog_MatcherMissing_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">The selected subtitle pack is missing or empty. Open Game and subtitles, download the pack, then restart Kaption.</sys:String>
     <sys:String x:Key="Dialog_RestartTranslation_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">Restart to apply translation</sys:String>
     <sys:String x:Key="Dialog_RestartTranslation_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">Kaption needs a restart to load the selected game language and translation index. Until then, the running translator keeps the previous choice.</sys:String>
     <sys:String x:Key="Dialog_SignInOpenFailed_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">Couldn't open sign-in</sys:String>
     <sys:String x:Key="Dialog_SignInOpenFailed_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">Kaption couldn't open the sign-in window. Please close the app and launch it again.</sys:String>
-    <sys:String x:Key="Dialog_RegionMissing_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">Capture region missing</sys:String>
-    <sys:String x:Key="Dialog_RegionMissing_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">Pick the part of the screen where the game's dialogue appears before starting translation.</sys:String>
-    <sys:String x:Key="Dialog_RegionMissing_Details" xmlns:sys="clr-namespace:System;assembly=mscorlib">Open Game and subtitles and click Detect automatically, or Adjust the frame to draw it yourself, then try again.</sys:String>
+    <sys:String x:Key="Dialog_RegionMissing_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">No dialogue area yet</sys:String>
+    <sys:String x:Key="Dialog_RegionMissing_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">Before you start translating, mark where the game's dialogue shows up on screen.</sys:String>
+    <sys:String x:Key="Dialog_RegionMissing_Details" xmlns:sys="clr-namespace:System;assembly=mscorlib">Open Game and subtitles and click Detect automatically, or Adjust the frame to draw it yourself. Then try again.</sys:String>
     <sys:String x:Key="Dialog_PackMissing_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">Translation pack missing</sys:String>
     <sys:String x:Key="Dialog_PackMissing_Details" xmlns:sys="clr-namespace:System;assembly=mscorlib">Subtitles stay in English until the pack is out. You can change the target language under Game and subtitles.</sys:String>
     <sys:String x:Key="Dialog_GameDataUpdated_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">Translation data updated</sys:String>
@@ -1416,4 +1418,25 @@ Answer: X: {0}   Y: {1}   W: {2}   H: {3}</sys:String>
     <sys:String x:Key="FarmCard_UnknownUid" xmlns:sys="clr-namespace:System;assembly=mscorlib">No player has this UID. Check it in Settings › Characters.</sys:String>
     <sys:String x:Key="FarmCard_CheckUid" xmlns:sys="clr-namespace:System;assembly=mscorlib">Check UID</sys:String>
     <sys:String x:Key="FarmCard_CatalogMissing" xmlns:sys="clr-namespace:System;assembly=mscorlib">Your characters will show once Kaption has downloaded the character data.</sys:String>
+    <!-- Session 58: language restart, pack sync lines, sign-in and download dialogs, dialogue-area auto-fill, status chips, startup and crash dialogs -->
+    <sys:String x:Key="Dialog_DownloadFailed_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">Download failed</sys:String>
+    <sys:String x:Key="Dialog_DownloadFailed_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">Couldn't download {0} for {1}. Check your connection and try again.</sys:String>
+    <sys:String x:Key="Dialog_SignInRequired_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">Sign in required</sys:String>
+    <sys:String x:Key="Dialog_SignInRequired_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">Sign in to your Kaption account to download subtitle packs.</sys:String>
+    <sys:String x:Key="Sync_Status_NotConfigured" xmlns:sys="clr-namespace:System;assembly=mscorlib">Pick a game and a subtitle language first.</sys:String>
+    <sys:String x:Key="Sync_Status_NotSignedIn" xmlns:sys="clr-namespace:System;assembly=mscorlib">Sign in to download subtitles.</sys:String>
+    <sys:String x:Key="Sync_Status_KeyMissing" xmlns:sys="clr-namespace:System;assembly=mscorlib">Sign out and sign in again to refresh your subtitles.</sys:String>
+    <sys:String x:Key="Sync_Status_Offline" xmlns:sys="clr-namespace:System;assembly=mscorlib">Can't reach Kaption right now. The subtitles you already have still work.</sys:String>
+    <sys:String x:Key="Sync_Status_NothingListed" xmlns:sys="clr-namespace:System;assembly=mscorlib">No subtitles for this game in this language yet. Kaption downloads them as soon as they're out.</sys:String>
+    <sys:String x:Key="Sync_Status_Failed" xmlns:sys="clr-namespace:System;assembly=mscorlib">Couldn't update the subtitles. Try again in a moment.</sys:String>
+    <sys:String x:Key="shell_Card_RegionAutoSet" xmlns:sys="clr-namespace:System;assembly=mscorlib">Kaption set the dialogue area for you. If subtitles miss the text, adjust the frame on Game and subtitles.</sys:String>
+    <sys:String x:Key="shell_Card_RegionAutoFailed" xmlns:sys="clr-namespace:System;assembly=mscorlib">Kaption couldn't find the dialogue area by itself. Mark it once and translation starts.</sys:String>
+    <sys:String x:Key="shell_Card_RegionAutoFailed_Action" xmlns:sys="clr-namespace:System;assembly=mscorlib">_Mark the dialogue area</sys:String>
+    <sys:String x:Key="shell_Chip_Subtitles" xmlns:sys="clr-namespace:System;assembly=mscorlib">Subtitles ready</sys:String>
+    <sys:String x:Key="shell_Chip_SubtitlesLoading" xmlns:sys="clr-namespace:System;assembly=mscorlib">Loading subtitles</sys:String>
+    <sys:String x:Key="Dialog_AppCrash_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">Kaption needs to close</sys:String>
+    <sys:String x:Key="Dialog_AppCrash_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">An unexpected error forced Kaption to quit. A copy of the full report was saved to:</sys:String>
+    <sys:String x:Key="Dialog_StartFailed_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">Kaption couldn't start</sys:String>
+    <sys:String x:Key="Dialog_StartFailed_Welcome_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">We couldn't show the welcome screen. Reinstall Kaption or write to us at contact@kaption.one.</sys:String>
+    <sys:String x:Key="Dialog_StartFailed_Account_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">Kaption couldn't prepare the sign-in to your account. Reinstalling the app usually fixes this.</sys:String>
 </ResourceDictionary>

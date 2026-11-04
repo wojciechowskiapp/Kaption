@@ -44,6 +44,12 @@ namespace GI_Subtitles.Views
         public Action<bool> AutoStartSettingChanged;
         /// <summary>The gate that keeps auto-start from starting, game aside (MainWindow's silent check); None when clear.</summary>
         public Func<Services.Automation.StartGate> AutoStartBlockedGate;
+        /// <summary>Another game is selected than the one this process loaded; the card offers the restart (MainWindow).</summary>
+        public Func<bool> GameSwitchAwaitsRestart;
+        /// <summary>The game this process loaded at launch, named on the card while a switch waits for the restart (MainWindow).</summary>
+        public Func<string> LoadedGame;
+        /// <summary>What happened to this session's automatic dialogue area, for the card's note (MainWindow).</summary>
+        public Func<RegionAutoFillNote> GetRegionAutoFillNote;
         /// <summary>A setting behind a Start gate changed here (MainWindow re-checks auto-start).</summary>
         public Action GatesChanged;
         /// <summary>Open what resolves a gate: the Start button's own dialog or page for it (MainWindow).</summary>
@@ -368,6 +374,7 @@ namespace GI_Subtitles.Views
             bool downloadingTab;
             lock (_activeDownloads) downloadingTab = _activeDownloads.Count > 0;
             var state = Engine;
+            bool switchPending = GameSwitchAwaitsRestart?.Invoke() ?? false;
             return new StartCardInputs
             {
                 Translating = IsOcrRunning?.Invoke() ?? false,
@@ -391,6 +398,9 @@ namespace GI_Subtitles.Views
                 WaitingForGame = IsWaitingForGame?.Invoke() ?? false,
                 GameName = GameRegionProfile.DisplayNameOf(Config.Get("Game", "Genshin")),
                 AutoStartBlockedBy = AutoStartBlockedGate?.Invoke() ?? Services.Automation.StartGate.None,
+                GameSwitchPending = switchPending,
+                LoadedGameName = switchPending && LoadedGame?.Invoke() is string loaded ? GameRegionProfile.DisplayNameOf(loaded) : null,
+                RegionAutoFill = GetRegionAutoFillNote?.Invoke() ?? RegionAutoFillNote.None,
             };
         }
 
@@ -467,11 +477,25 @@ namespace GI_Subtitles.Views
                     break;
                 case StartCardKind.AutoStartBlocked:
                     titleText = L("shell_Card_AutoStartBlocked", "Auto-start on hold");
-                    detail = GateReason(s.Gate, L);
+                    detail = s.RegionAutoFailed
+                        ? L("shell_Card_RegionAutoFailed", "Kaption couldn't find the dialogue area by itself. Mark it once and translation starts.")
+                        : GateReason(s.Gate, L);
+                    break;
+                case StartCardKind.GameSwitchPending:
+                    titleText = L("Dialog_RestartGame_Title", "Restart to switch games");
+                    // Without this line "Later" looked like nothing happened: say why auto-start waits.
+                    if (!string.IsNullOrEmpty(i.LoadedGameName))
+                        detail = string.Format(culture, L("shell_Card_GameSwitchPending_Detail_Format",
+                            "Subtitles for {0} are still loaded, so auto-start waits for the restart."), i.LoadedGameName);
                     break;
                 default:
                     titleText = L("shell_Card_Stopped", "Stopped · ready to start");
                     break;
+            }
+            if (s.ShowRegionAutoSetNote)
+            {
+                string note = L("shell_Card_RegionAutoSet", "Kaption set the dialogue area by itself. If subtitles miss the text, adjust the frame on Game and subtitles.");
+                detail = string.IsNullOrEmpty(detail) ? note : detail + "\n" + note;
             }
             // A new state (not a new line count) fades the hero's text in; the first fill and a repeat stay still.
             bool newState = title.Tag is StartCardKind shown && shown != s.Kind;
@@ -493,7 +517,9 @@ namespace GI_Subtitles.Views
                 StartCardAction.RestartApp => L("Dash_EngineFailed_Restart", "Restart Kaption"),
                 StartCardAction.OpenAccount => L("shell_Action_OpenAccount", "Open my _account"),
                 StartCardAction.OpenPacks => L("shell_Action_OpenPacks", "Go to the _packs"),
-                StartCardAction.ResolveGate => GateAction(s.Gate, L),
+                StartCardAction.ResolveGate => s.RegionAutoFailed
+                    ? L("shell_Card_RegionAutoFailed_Action", "_Mark the dialogue area")
+                    : GateAction(s.Gate, L),
                 _ => null,
             };
             if (find("DashToggleOcrButton") is Button primary)
@@ -555,6 +581,7 @@ namespace GI_Subtitles.Views
                 StartCardKind.Translating => (L("shell_Status_Translating", "Translating"), "SuccessBrush"),
                 StartCardKind.WaitingForGame => (L("shell_Status_WaitingForGame", "Waiting for the game"), "WarnBrush"),
                 StartCardKind.AutoStartBlocked => (L("shell_Status_AutoStartBlocked", "Auto-start on hold"), "WarnBrush"),
+                StartCardKind.GameSwitchPending => (L("shell_Status_Problem", "Needs attention"), "WarnBrush"),
                 StartCardKind.Downloading or StartCardKind.BuildingIndex or StartCardKind.StartingReader
                     => (L("shell_Status_Busy", "Getting ready"), "WarnBrush"),
                 StartCardKind.ReaderFailed or StartCardKind.ReaderUnavailable or StartCardKind.Offline or StartCardKind.DeviceLimit or StartCardKind.PackMissing
@@ -575,8 +602,8 @@ namespace GI_Subtitles.Views
             var culture = CultureInfo.CurrentUICulture;
             if (i.Reader == ReaderState.Ready)
             {
-                // "GPU · PP-OCRv6" and the card's product name; driver ids and memory stay in the log and Pomoc › Zaawansowane.
-                DashEngineStatus.Text = EngineLabels.Chip(!i.ReaderOnCpu, engine?.ModelName, L);
+                // "GPU" and the card's product name; the model, driver ids and memory stay in the log and Pomoc › Zaawansowane.
+                DashEngineStatus.Text = EngineLabels.Chip(!i.ReaderOnCpu, L);
                 EngineChip.ToolTip = i.ReaderOnCpu
                     ? string.Format(culture, L("shell_Chip_Cpu_Tip", "The text reader runs on the processor. It works, it is just slower. {0}"), GpuNoteText() ?? string.Empty).Trim()
                     : (EngineLabels.ProductName(AdapterName()) is string adapter
@@ -593,21 +620,12 @@ namespace GI_Subtitles.Views
             DashEngineStatus.SetResourceReference(TextBlock.ForegroundProperty,
                 i.Reader is ReaderState.Failed or ReaderState.Unavailable ? "ErrorBrush" : "TextSecondaryBrush");
 
-            if (IsMatcherReady)
-            {
-                DashDictStatus.Text = string.Format(culture, L("shell_Chip_Dict_Format", "Dictionary {0:N0}"), contentDict.Count);
-                string pack = $"{Config.Get("Game", "Genshin")} · {HumanLang(Config.Get("Output", "PL"))}";
-                DictChip.ToolTip = string.Format(culture, L("shell_Chip_Dict_Tip", "Translated lines in the {0} pack loaded right now."), pack);
-                if (IsAdvancedMode && Matcher != null) DictChip.ToolTip += $"\n{Matcher.EntryCount:N0} index entries";
-            }
-            else
-            {
-                bool coming = i.PackMissing && i.PackComing;
-                DashDictStatus.Text = coming ? L("shell_Chip_DictComing", "Subtitles on the way")
-                    : i.PackMissing ? L("Dash_Status_TranslationDataMissing", "Translation data missing")
-                    : L("shell_Chip_DictLoading", "Loading dictionary");
-                DictChip.ToolTip = null;
-            }
+            bool loaded = IsMatcherReady;
+            DashDictStatus.Text = EngineLabels.SubtitlesChip(loaded, i.PackMissing, i.PackComing, L);
+            DictChip.ToolTip = loaded
+                ? EngineLabels.SubtitlesTip(GameRegionProfile.DisplayNameOf(Config.Get("Game", "Genshin")), HumanLang(Config.Get("Output", "PL")),
+                    IsAdvancedMode, contentDict.Count, Matcher?.EntryCount ?? 0, culture, L)
+                : null;
             DashDictStatus.SetResourceReference(TextBlock.ForegroundProperty, i.PackMissing && !i.PackComing ? "ErrorBrush" : "TextSecondaryBrush");
         }
 
@@ -616,7 +634,7 @@ namespace GI_Subtitles.Views
         {
             StartCardKind.Translating => Core.UI.TrayState.Translating,
             StartCardKind.Downloading or StartCardKind.BuildingIndex or StartCardKind.StartingReader => Core.UI.TrayState.Busy,
-            StartCardKind.WaitingForGame or StartCardKind.AutoStartBlocked => Core.UI.TrayState.Waiting,
+            StartCardKind.WaitingForGame or StartCardKind.AutoStartBlocked or StartCardKind.GameSwitchPending => Core.UI.TrayState.Waiting,
             StartCardKind.ReaderFailed or StartCardKind.ReaderUnavailable or StartCardKind.Offline or StartCardKind.DeviceLimit
                 or StartCardKind.PackMissing => Core.UI.TrayState.Problem,
             _ => Core.UI.TrayState.Idle,
@@ -663,8 +681,10 @@ namespace GI_Subtitles.Views
                     OnRetryEngineLoad?.Invoke(false);
                     break;
                 case StartCardAction.RestartApp:
-                    // Only a new process can retry the native load; the click is the decision, so no second confirm.
-                    Logger.Log.Info("Restarting from the state card to retry loading ONNX Runtime.");
+                    // Only a new process can retry the native load or load another game; the click is the decision, so no second confirm.
+                    Logger.Log.Info(_cardState.Kind == StartCardKind.GameSwitchPending
+                        ? "Restarting from the state card to load the selected game."
+                        : "Restarting from the state card to retry loading ONNX Runtime.");
                     AppRestartPrompt.Restart();
                     break;
                 case StartCardAction.OpenAccount:

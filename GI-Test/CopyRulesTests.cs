@@ -179,6 +179,65 @@ namespace GI_Test
             Assert.AreEqual(0, hits.Count, string.Join("\n", hits));
         }
 
+        /// <summary>The dialogs the eight start gates open (MainWindow.TryGate*), the words a stuck player reads.</summary>
+        private static readonly string[] GateDialogKeys =
+        {
+            "Dialog_StillStarting_Title", "Dialog_StillStarting_Body", "Dialog_SignInOpenFailed_Title", "Dialog_SignInOpenFailed_Body",
+            "Dialog_StillDownloading_Title", "Dialog_StillDownloading_Body",
+            "Dash_EngineFailed_Runtime_Title", "Dash_EngineFailed_Runtime_Body", "Dialog_EngineFailed_Title", "Dialog_EngineFailed_Body",
+            "Dialog_EngineLoading_Title", "Dialog_EngineLoading_Body",
+            "Dialog_PackComing_Title", "Dialog_PackComing_Body_Format", "Dash_Status_TranslationDataMissing", "Dialog_MatcherMissing_Body",
+            "Dialog_MatcherLoading_Body",
+            "Dialog_RegionMissing_Title", "Dialog_RegionMissing_Body", "Dialog_RegionMissing_Details",
+            "Dialog_GameNotFound_Title", "Dialog_GameNotFound_Body", "Dialog_GameNotFound_Details",
+            "Dialog_GameNotFound_Primary", "Dialog_GameNotFound_Secondary",
+            "Dialog_OverlayInRegion_Title", "Dialog_OverlayInRegion_Body", "Dialog_OverlayInRegion_Details",
+            "Dialog_OverlayInRegion_Primary", "Dialog_OverlayInRegion_Secondary",
+        };
+
+        /// <summary>One name per thing: the text reader, the dialogue area, subtitles. No index, capture, OCR or removed UI.</summary>
+        [TestMethod]
+        [DataRow("Strings.en-US.xaml", @"\b(?:OCR|index|capture|region|badge|translator|wizard|recognition|dialogue reader)\b", @"\breader\b", @"\btext reader\b")]
+        [DataRow("Strings.pl-PL.xaml", @"\b(?:OCR|indeks\w*|przechwytyw\w*|rozpoznawani\w*|plakietk\w*|tłumacz|kreator\w*|czytnik\w* dialogów)\b|""", @"\bczytnik\w*", @"\bczytnik\w* tekstu\b")]
+        public void GateDialogs_UseOneVocabulary(string file, string banned, string readerWord, string readerName)
+        {
+            var copy = Strings(file).ToDictionary(s => s.Key, s => s.Value);
+            var hits = new List<string>();
+            foreach (string key in GateDialogKeys)
+            {
+                Assert.IsTrue(copy.ContainsKey(key), $"{file}: {key} is there");
+                // Guide links name their page ("how-to/region"); that is an address, not a word.
+                string text = Regex.Replace(copy[key], @"\S+\.\S+/\S*", "");
+                foreach (Match m in Regex.Matches(text, banned, RegexOptions.IgnoreCase)) hits.Add($"{key}: \"{m.Value}\"");
+                if (Regex.Matches(text, readerWord, RegexOptions.IgnoreCase).Count != Regex.Matches(text, readerName, RegexOptions.IgnoreCase).Count)
+                    hits.Add($"{key}: the reader is called something other than the text reader");
+            }
+            Assert.AreEqual(0, hits.Count, $"{file}:\n" + string.Join("\n", hits));
+        }
+
+        /// <summary>Gate dialogs quote controls by the label they carry today, so a renamed button breaks this, not the advice.</summary>
+        [TestMethod]
+        [DataRow("Strings.en-US.xaml")]
+        [DataRow("Strings.pl-PL.xaml")]
+        public void GateDialogs_NameControlsThatExist(string file)
+        {
+            var copy = Strings(file).ToDictionary(s => s.Key, s => s.Value);
+            string Label(string key) => copy[key].Replace("_", "");
+            var expect = new (string Dialog, string[] Controls)[]
+            {
+                ("Dialog_EngineFailed_Body", new[] { "shell_Nav_Home", "shell_Action_Retry", "shell_Action_RunOnCpu" }),
+                ("Dialog_MatcherMissing_Body", new[] { "shell_Nav_Game" }),
+                ("Dialog_RegionMissing_Details", new[] { "shell_Nav_Game", "shell_Region_Detect", "shell_Region_Fix" }),
+                ("Dialog_GameNotFound_Body", new[] { "shell_Action_Start" }),
+                ("Dialog_GameNotFound_Details", new[] { "Dialog_GameNotFound_Primary" }),
+                ("Dialog_OverlayInRegion_Details", new[] { "shell_Nav_Look", "look_Vertical", "look_MaxHeight", "shell_Advanced" }),
+            };
+            var hits = (from e in expect from c in e.Controls
+                        where copy[e.Dialog].IndexOf(Label(c), System.StringComparison.OrdinalIgnoreCase) < 0
+                        select $"{e.Dialog} does not name {c} (\"{Label(c)}\")").ToList();
+            Assert.AreEqual(0, hits.Count, $"{file}:\n" + string.Join("\n", hits));
+        }
+
         [TestMethod]
         public void EnglishAndPolishShellKeysMatch()
         {

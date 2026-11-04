@@ -157,7 +157,6 @@
          "System.Management", etc.) are not available as framework refs on
          net8. Replacements for the ones we actually use move to NuGet. -->
     <PackageReference Include="System.Management" Version="10.0.14" />
-    <PackageReference Include="System.ServiceModel.Syndication" Version="10.0.14" />
     <!-- System.Web dropped: LoopbackAuthListener.cs's HttpUtility.ParseQueryString +
          HttpUtility.HtmlEncode calls rewritten to System.Net.WebUtility +
          a 20-line ParseQueryString replacement. System.Web.HttpUtility as
@@ -197,7 +196,7 @@
     <GameManifestFile Include="..\games\*.json" Exclude="..\games\*.schema.json;..\games\candidates.json" />
     <EmbeddedResource Include="@(GameManifestFile)" LogicalName="Kaption.Games.%(Filename)%(Extension)" Link="games\%(Filename)%(Extension)" />
     <None Include="..\THIRD_PARTY_LICENSES.txt" Link="THIRD_PARTY_LICENSES.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
-    <!-- Licence texts THIRD_PARTY_LICENSES.txt points to "next to this one": LGPL-2.1 (PaddleOCRSharp, FFmpeg) and OFL-1.1 (fonts). -->
+    <!-- Licence texts THIRD_PARTY_LICENSES.txt points to "next to this one": LGPL-2.1 (PaddleOCRSharp) and OFL-1.1 (fonts). -->
     <None Include="..\LICENSE-LGPL-2.1" Link="LICENSE-LGPL-2.1" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <None Include="..\LICENSE-OFL-1.1" Link="LICENSE-OFL-1.1" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
@@ -308,6 +307,16 @@
       <_KaptionDirectMLExtras Include="$(PublishDir)onnxruntime.lib" Condition="'$(PublishDir)' != ''" />
     </ItemGroup>
     <Delete Files="@(_KaptionDirectMLExtras)" ContinueOnError="true" />
+  </Target>
+
+  <!-- OpenCV's FFmpeg videoio plugin (27 MB, LGPL) is only loaded by VideoCapture/VideoWriter, which Kaption
+       never uses. Removing it from the copy-local items, not deleting the file afterwards, also keeps it out
+       of Kaption.deps.json, so the host never looks for it. GI-Test and the benchmark keep their own copy. -->
+  <Target Name="DropOpenCvFfmpegPlugin" AfterTargets="ResolvePackageAssets">
+    <ItemGroup>
+      <_KaptionFfmpegPlugin Include="@(NativeCopyLocalItems)" Condition="$([System.String]::Copy('%(Filename)').StartsWith('opencv_videoio_ffmpeg'))" />
+      <NativeCopyLocalItems Remove="@(_KaptionFfmpegPlugin)" />
+    </ItemGroup>
   </Target>
 
   <!-- Microsoft.AI.DirectML copies DirectML.dll only when PlatformTarget is x64. Debug is AnyCPU and

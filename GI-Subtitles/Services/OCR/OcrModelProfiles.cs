@@ -41,8 +41,10 @@ namespace GI_Subtitles.Services.OCR
 
     /// <summary>
     /// Resolves the configured OCR profile and its language-specific assets.
-    /// PP-OCRv6 Small uses one unified 50-language recognizer for EN and JP;
-    /// the compatibility profile retains the separate PP-OCRv4 recognizers.
+    /// PP-OCRv6 Small uses one unified 50-language recognizer for EN and JP.
+    /// The compatibility profile keeps the PP-OCRv4 detector; English reads
+    /// with en_PP-OCRv5 (session 58: about half the wrong-line frames of v4 on
+    /// CPU, no slower), Japanese keeps the PP-OCRv4 Japanese recognizer.
     /// </summary>
     internal static class OcrModelProfiles
     {
@@ -82,20 +84,22 @@ namespace GI_Subtitles.Services.OCR
             }
 
             bool japanese = string.Equals(inputLanguage, "JP", StringComparison.OrdinalIgnoreCase);
-            string recognitionFolder = japanese
-                ? "jp_PP-OCRv4_mobile_rec_infer"
-                : "PP-OCRv4_mobile_rec_infer";
 
             return new OcrModelProfile
             {
+                // The id stays "ppocr-v4-mobile": it is the persisted Config value.
+                // ModelName must not contain "v6" (MainWindow's CPU recovery keys off it).
                 Id = CompatibilityId,
-                ModelName = japanese ? "PP-OCRv4 Mobile (Japanese)" : "PP-OCRv4 Mobile (English)",
+                ModelName = japanese ? "PP-OCRv4 Mobile (Japanese)" : "PP-OCRv5 Mobile (English)",
                 DetectionModelRelativePath = Path.Combine(
                     "Det", "V4", "PP-OCRv4_mobile_det_infer", "slim.onnx"),
-                RecognitionModelRelativePath = Path.Combine(
-                    "Rec", "V4", recognitionFolder, "slim.onnx"),
-                RecognitionDictionaryRelativePath = Path.Combine(
-                    "Rec", "V4", recognitionFolder, "dict.txt"),
+                RecognitionModelRelativePath = japanese
+                    ? Path.Combine("Rec", "V4", "jp_PP-OCRv4_mobile_rec_infer", "slim.onnx")
+                    : Path.Combine("Rec", "V5", "en_PP-OCRv5_mobile_rec_infer", "inference.onnx"),
+                // en_PP-OCRv5's official inference.yml carries its 436-character dictionary.
+                RecognitionDictionaryRelativePath = japanese
+                    ? Path.Combine("Rec", "V4", "jp_PP-OCRv4_mobile_rec_infer", "dict.txt")
+                    : null,
                 DetectionThreshold = 0.30f,
                 DetectionBoxThreshold = 0.60f,
                 DetectionUnclipRatio = 2.00f,

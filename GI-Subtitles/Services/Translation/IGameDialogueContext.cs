@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using GI_Subtitles.Services.Security;
 
 namespace GI_Subtitles.Services.Translation
@@ -81,6 +82,11 @@ namespace GI_Subtitles.Services.Translation
         void Load(string dataDir, string textMapEnPath,
             IProgress<(int percent, string message)> progress = null,
             FileProtectionHelper protectionHelper = null);
+
+        /// <summary>Start materialising the dialogue graph on a pool thread, so the first matched line
+        /// does not pay for it on the UI thread. Once per Load; already complete when there is nothing to
+        /// load. A hot-path call made meanwhile waits only for the rest of the load.</summary>
+        Task WarmUpAsync() => Task.CompletedTask;
 
         /// <summary>Fast-path hot cache lookup. Returns the translation for a
         /// known next-line prediction, or null when the input doesn't resolve.

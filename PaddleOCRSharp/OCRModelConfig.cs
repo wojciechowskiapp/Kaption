@@ -36,15 +36,14 @@ namespace PaddleOCRSharp
         {
             var root = GetRootDirectory();
             var modelPathRoot = Path.Combine(root, "inference");
-            // Keep this low-level default on the compatibility model so direct
-            // library consumers remain bootable. Kaption resolves the user-facing
-            // recommended PP-OCRv6 Small profile in OcrModelProfiles and falls
-            // back to these V4 paths when V6 cannot load.
+            // Keep this low-level default on the compatibility model's English
+            // pair so direct library consumers remain bootable. Kaption resolves
+            // its profiles in OcrModelProfiles. The dictionary is in inference.yml.
             det_infer = Path.Combine(modelPathRoot, "Det", "V4", "PP-OCRv4_mobile_det_infer", "slim.onnx");
-            model_name = "PP-OCRv4 Mobile";
+            model_name = "PP-OCRv5 Mobile (English)";
             cls_infer = Path.Combine(modelPathRoot, "ch_ppocr_mobile_v2.0_cls_infer"); // Optional, not used
-            rec_infer = Path.Combine(modelPathRoot, "Rec", "V4", "PP-OCRv4_mobile_rec_infer", "slim.onnx");
-            keys = Path.Combine(modelPathRoot, "Rec", "V4", "PP-OCRv4_mobile_rec_infer", "dict.txt");
+            rec_infer = Path.Combine(modelPathRoot, "Rec", "V5", "en_PP-OCRv5_mobile_rec_infer", "inference.onnx");
+            keys = null;
         }
 
         /// <summary>

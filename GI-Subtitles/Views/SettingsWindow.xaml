@@ -197,13 +197,9 @@
                             <Button x:Name="DownloadButton2" Click="DownloadButton2_Click"/>
                             <CheckBox x:Name="ShowSecondLangCheckBox" Checked="ShowSecondLangCheckBox_Checked" Unchecked="ShowSecondLangCheckBox_Checked"/>
                             <Image Name="Capture" HorizontalAlignment="Center"/>
-                            <Button x:Name="SyncButton" Click="SyncButton_Click"/>
                             <Button x:Name="RestartButton" Click="RestartButton_Click"/>
-                            <Button x:Name="VideoButton" Click="VideoButton_Click"/>
-                            <Button x:Name="ConvertButton" Click="ConvertButton_Click"/>
                             <Button x:Name="RegionButton" Click="RegionButton_Click"/>
                             <TextBlock Name="inputFilePathDate"/><TextBlock Name="outputFilePathDate"/>
-                            <TextBlock Name="RepoModifiedDate"/>
                             <!-- One item per registered game, filled from the game manifests (FillGameSelector). -->
                             <ComboBox Name="GameSelector"/>
                             <!-- No Chinese recognizer ships, so CHS stays out of the reading choice. -->
@@ -1626,7 +1622,7 @@
                         <TextBlock x:Name="DashEngineStatus" Style="{StaticResource ChipText}" Text="{DynamicResource shell_Chip_ReaderStarting}"/>
                     </Border>
                     <Border x:Name="DictChip" Style="{StaticResource Chip}" Margin="8,0,0,0">
-                        <TextBlock x:Name="DashDictStatus" Style="{StaticResource ChipText}" Text="{DynamicResource shell_Chip_DictLoading}"/>
+                        <TextBlock x:Name="DashDictStatus" Style="{StaticResource ChipText}" Text="{DynamicResource shell_Chip_SubtitlesLoading}"/>
                     </Border>
                 </StackPanel>
                 <!-- Right: Discord, then "Więcej" (Informacje, Zgłoś problem, kaption.one, Język). The setup guide, X and the

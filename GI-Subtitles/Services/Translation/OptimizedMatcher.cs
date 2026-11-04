@@ -477,10 +477,14 @@ namespace GI_Subtitles.Services.Translation
         /// </summary>
         /// <param name="input">Stream containing GSMX binary data (decrypted)</param>
         /// <param name="progress">Optional progress reporter (maps to 50-98%)</param>
+        /// <param name="shareStringsWith">The pack dictionary the app keeps alive alongside the matcher.
+        /// Entries whose original key and value are ordinal-equal to its own reuse its string instances
+        /// instead of holding a second copy (~200 MB on Genshin). Content, order and matching never change.</param>
         /// <returns>A fully initialized OptimizedMatcher ready for queries</returns>
         public static OptimizedMatcher DeserializeFromStream(
             Stream input,
-            IProgress<(int percent, string message)> progress = null)
+            IProgress<(int percent, string message)> progress = null,
+            Dictionary<string, string> shareStringsWith = null)
         {
             // CryptoStream pays a full read round trip per call and BinaryReader issues one per
             // primitive: 9 s for the 354 MB Genshin cache. Not disposed: that would close the caller's stream.
@@ -521,11 +525,23 @@ namespace GI_Subtitles.Services.Translation
 
                 progress?.Report((55, $"Loading {entryCount:N0} entries..."));
 
+                using var sharer = shareStringsWith != null && shareStringsWith.Count > 0
+                    ? new GsmxStringSharer(shareStringsWith)
+                    : null;
+
                 for (int i = 0; i < entryCount; i++)
                 {
                     string normKey = reader.ReadString();
-                    string origKey = reader.ReadString();
-                    string value = reader.ReadString();
+                    string origKey, value;
+                    if (sharer != null)
+                    {
+                        sharer.ReadEntry(reader, out origKey, out value);
+                    }
+                    else
+                    {
+                        origKey = reader.ReadString();
+                        value = reader.ReadString();
+                    }
 
                     entries[i] = new Entry
                     {
@@ -541,6 +557,10 @@ namespace GI_Subtitles.Services.Translation
                         progress.Report((pct, $"Loading entries... {i:N0}/{entryCount:N0}"));
                     }
                 }
+
+                if (sharer != null)
+                    Logger.Log.Info($"GSMX load reused the pack's strings for {sharer.SharedKeys:N0} keys and " +
+                                    $"{sharer.SharedValues:N0} values of {entryCount:N0} entries.");
 
                 progress?.Report((65, "Loading short key index..."));
 
@@ -612,6 +632,122 @@ namespace GI_Subtitles.Services.Translation
 
                 progress?.Report((98, "Search index loaded from cache"));
                 return matcher;
+            }
+        }
+
+        /// <summary>
+        /// Reads a GSMX entry's original key and value, handing back the instances the pack dictionary
+        /// already holds when the text is ordinal-equal. A hit decodes into pooled buffers and allocates
+        /// nothing. The dictionary is only read; a lookup that throws (a reload clearing it) ends sharing.
+        /// </summary>
+        private sealed class GsmxStringSharer : IDisposable
+        {
+            private readonly Dictionary<string, string> _dict;
+            private readonly Dictionary<string, string>.AlternateLookup<ReadOnlySpan<char>> _bySpan;
+            private readonly bool _hasSpanLookup;
+            private bool _enabled = true;
+            private byte[] _bytes = ArrayPool<byte>.Shared.Rent(1024);
+            private char[] _keyChars = ArrayPool<char>.Shared.Rent(512);
+            private char[] _valueChars = ArrayPool<char>.Shared.Rent(512);
+
+            public int SharedKeys;
+            public int SharedValues;
+
+            public GsmxStringSharer(Dictionary<string, string> dict)
+            {
+                _dict = dict;
+                // Default and ordinal string comparers support span lookups; anything else shares values only.
+                _hasSpanLookup = dict.TryGetAlternateLookup(out _bySpan);
+            }
+
+            public void ReadEntry(BinaryReader reader, out string key, out string value)
+            {
+                if (!_hasSpanLookup)
+                {
+                    key = reader.ReadString();
+                    value = reader.ReadString();
+                    if (_enabled)
+                    {
+                        try
+                        {
+                            if (_dict.TryGetValue(key, out string dictValue) &&
+                                string.Equals(dictValue, value, StringComparison.Ordinal))
+                            {
+                                value = dictValue;
+                                SharedValues++;
+                            }
+                        }
+                        catch (Exception) { _enabled = false; }
+                    }
+                    return;
+                }
+
+                int keyLength = ReadChars(reader, ref _keyChars);
+                int valueLength = ReadChars(reader, ref _valueChars);
+                ReadOnlySpan<char> keySpan = _keyChars.AsSpan(0, keyLength);
+                ReadOnlySpan<char> valueSpan = _valueChars.AsSpan(0, valueLength);
+                key = null;
+                value = null;
+
+                if (_enabled)
+                {
+                    try
+                    {
+                        if (_bySpan.TryGetValue(keySpan, out string actualKey, out string dictValue) &&
+                            actualKey != null && keySpan.SequenceEqual(actualKey))
+                        {
+                            key = actualKey;
+                            if (dictValue != null && valueSpan.SequenceEqual(dictValue))
+                                value = dictValue;
+                        }
+                    }
+                    catch (Exception)
+                    {
+                        _enabled = false;
+                        key = null;
+                        value = null;
+                    }
+                }
+
+                if (key != null) SharedKeys++;
+                else key = new string(keySpan);
+                if (value != null) SharedValues++;
+                else value = new string(valueSpan);
+            }
+
+            // The same bytes BinaryReader.ReadString consumes: a 7-bit length, then UTF-8. BinaryReader never
+            // reads ahead, so reading its base stream directly keeps the two in step (see ReadInt32s).
+            private int ReadChars(BinaryReader reader, ref char[] chars)
+            {
+                int byteLength = reader.Read7BitEncodedInt();
+                if (byteLength < 0)
+                    throw new IOException($"Invalid string length {byteLength} in GSMX entry.");
+                if (byteLength == 0)
+                    return 0;
+                if (_bytes.Length < byteLength)
+                {
+                    ArrayPool<byte>.Shared.Return(_bytes);
+                    _bytes = ArrayPool<byte>.Shared.Rent(byteLength);
+                }
+                reader.BaseStream.ReadExactly(_bytes, 0, byteLength);
+
+                int maxChars = Encoding.UTF8.GetMaxCharCount(byteLength);
+                if (chars.Length < maxChars)
+                {
+                    ArrayPool<char>.Shared.Return(chars);
+                    chars = ArrayPool<char>.Shared.Rent(maxChars);
+                }
+                return Encoding.UTF8.GetChars(_bytes, 0, byteLength, chars, 0);
+            }
+
+            public void Dispose()
+            {
+                if (_bytes != null) ArrayPool<byte>.Shared.Return(_bytes);
+                if (_keyChars != null) ArrayPool<char>.Shared.Return(_keyChars);
+                if (_valueChars != null) ArrayPool<char>.Shared.Return(_valueChars);
+                _bytes = null;
+                _keyChars = null;
+                _valueChars = null;
             }
         }
 

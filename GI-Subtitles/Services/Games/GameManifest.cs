@@ -123,14 +123,6 @@ namespace GI_Subtitles.Services.Games
         public string Branch { get; set; }
         public string KeySpace { get; set; }
 
-        /// <summary>The repository's commit feed (Atom), for the Translations tab's upstream date; null off GitHub.</summary>
-        public string CommitFeedUrl()
-        {
-            if (!string.Equals(Host, "github", System.StringComparison.Ordinal) || string.IsNullOrWhiteSpace(Repo)) return null;
-            return string.IsNullOrWhiteSpace(Branch) || Branch == "@default"
-                ? $"https://github.com/{Repo}/commits.atom"
-                : $"https://github.com/{Repo}/commits/{Branch}.atom";
-        }
     }
 
     /// <summary>The languages a game is translated into and by whom: "auto" (the updater), "community" (reviewed fixes).</summary>

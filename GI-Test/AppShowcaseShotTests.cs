@@ -240,7 +240,7 @@ namespace GI_Test
                 Row("Honkai: Star Rail", "GameStarRailBrush", "4.6.0-r8", "4.6.0-r10", active: false),
                 Row("Zenless Zone Zero", "GameZzzBrush", null, "3.3.0-r7", active: false),
             };
-            ((TextBlock)window.FindName("DashDictStatus")).Text = string.Format(culture, L("shell_Chip_Dict_Format", "{0:N0}"), 551_847);
+            ((TextBlock)window.FindName("DashDictStatus")).Text = EngineLabels.SubtitlesChip(loaded: true, packMissing: false, packComing: false, L);
         }
 
         private static void Select(Window window, string page)

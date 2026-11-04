@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Threading;
+using System.Threading.Tasks;
 using GI_Subtitles.Common;
 using GI_Subtitles.Services.Security;
 using GI_Subtitles.Services.Translation.Strategies;
@@ -166,6 +167,9 @@ namespace GI_Subtitles.Services.Translation
         // — neither may be readonly (both are passed by ref).
         private bool _loadInitialized;
         private object _loadInitLock = new object();
+
+        // The background load started by WarmUpAsync; null until then, reset by Load.
+        private Task _warmUpTask;
 
         /// <summary>Total hot-cache hits. Volatile counter — not thread-safe
         /// down to the last increment, but diagnostics only.</summary>
@@ -335,9 +339,9 @@ namespace GI_Subtitles.Services.Translation
         /// ever allocated. On a 1 GB-free cold boot this recovers 80-150 MB
         /// that the old eager-load burned unconditionally.
         ///
-        /// Blocking cost on first OCR match: 1-3 s on SSD to parse graph +
-        /// TextMapEN. That cost lives on the background OCR tick, never on
-        /// the UI thread.
+        /// Load cost: 1-3 s on SSD to parse graph + TextMapEN. MainWindow starts
+        /// it on a pool thread through <see cref="WarmUpAsync"/> once OCR runs;
+        /// without that, the first hot-path call (a UI-thread tick) pays it.
         /// </summary>
         public void Load(string dataDir, string textMapEnPath,
             IProgress<(int percent, string message)> progress = null,
@@ -377,6 +381,8 @@ namespace GI_Subtitles.Services.Translation
                 _loadSentinel = null;
                 _loadInitialized = false;
                 _isFullyLoaded = false;
+                // Production builds a new engine per Load; only tests re-Load one, never mid warm-up.
+                _warmUpTask = null;
 
                 // Flip the public gate. Hot-path call sites gated on
                 // `IsLoaded == true` now pass through; their internal
@@ -407,6 +413,37 @@ namespace GI_Subtitles.Services.Translation
         public void ForceLoadForTests()
         {
             EnsureLoadedCore();
+        }
+
+        /// <inheritdoc/>
+        public Task WarmUpAsync()
+        {
+            if (_isFullyLoaded || !IsLoaded || _pendingDataDir == null)
+                return Task.CompletedTask;
+            Task existing = Volatile.Read(ref _warmUpTask);
+            if (existing != null)
+                return existing;
+
+            var created = new Task(RunWarmUp);
+            existing = Interlocked.CompareExchange(ref _warmUpTask, created, null);
+            if (existing != null)
+                return existing;
+            created.Start(TaskScheduler.Default);
+            return created;
+        }
+
+        private void RunWarmUp()
+        {
+            try
+            {
+                Logger.Log.Info("DialogueContext warm-up started on a background thread.");
+                EnsureLoadedCore();
+            }
+            catch (Exception ex)
+            {
+                // The first match then loads it, as it did before warm-up existed: Warn, not a GlitchTip Error.
+                Logger.Log.Warn($"DialogueContext warm-up failed: {ex.GetType().Name}: {ex.Message}");
+            }
         }
 
         /// <summary>
@@ -597,7 +634,7 @@ namespace GI_Subtitles.Services.Translation
                                $"{_textToDialogIds?.Count ?? 0} text entries in {sw.ElapsedMilliseconds} ms " +
                                $"(residual textmap: {_textMapEN?.Count ?? 0} entries)");
                 GI_Subtitles.Core.Runtime.RamDiag.LogCheckpoint("DialogueContext after parse");
-                // Do NOT call AggressiveReclaim here. Post-lazy-init this runs on
+                // Do NOT call AggressiveReclaim here. Without a warm-up this runs on
                 // the FIRST hot-path call (PreloadForNpc / TryHotCacheMatch in the
                 // OCR tick), i.e. on the UI thread. A blocking Gen2 + LOH-compact
                 // stalls the UI for hundreds of ms right when the user is waiting

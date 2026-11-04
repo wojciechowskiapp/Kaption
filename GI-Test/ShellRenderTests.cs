@@ -31,7 +31,7 @@ namespace GI_Test
         public static string GuidesDir => Path.Combine(Path.GetTempPath(), "kaption-w15", "guides");
         private const double GuideWidth = 1280, GuideHeight = 800;
 
-        public enum Scene { Stopped, Translating, WaitingForGame, Downloading, Updated25, OnHold }
+        public enum Scene { Stopped, Translating, WaitingForGame, Downloading, Updated25, OnHold, AreaAutoSet, AreaAutoFailed, GameSwitch }
 
         [TestMethod]
         public void RendersTheStartPageInEveryState()
@@ -54,6 +54,47 @@ namespace GI_Test
                 }
             });
             foreach (string p in written) Console.WriteLine(p);
+        }
+
+        /// <summary>
+        /// The status bar speaks to players: the reader chip is GPU or CPU and the subtitles chip says ready or loading,
+        /// never a model name ("PP-OCRv6") or an entry count ("Słownik 536 737"). The new Start states carry their text.
+        /// </summary>
+        [TestMethod]
+        public void StatusChips_AndNewStartStates_SpeakToPlayers()
+        {
+            RunSta(() =>
+            {
+                foreach (string lang in new[] { "pl-PL", "en-US" })
+                foreach (Scene scene in Enum.GetValues(typeof(Scene)))
+                {
+                    var host = LoadLooseWindow("Views/SettingsWindow.xaml", lang, out var window, "Dark");
+                    Fill(host, window, scene, lang);
+                    foreach (string chip in new[] { "DashEngineStatus", "DashDictStatus" })
+                    {
+                        string text = ((TextBlock)window.FindName(chip)).Text ?? string.Empty;
+                        string what = $"{lang} {scene} {chip}: \"{text}\"";
+                        Assert.IsFalse(string.IsNullOrWhiteSpace(text), what + " is empty");
+                        Assert.IsFalse(System.Text.RegularExpressions.Regex.IsMatch(text, @"\bOCR\b|\d"), what + " names a model or a count");
+                    }
+                    string detail = ((TextBlock)window.FindName("StateCardDetail")).Text;
+                    string action = ((Button)window.FindName("DashToggleOcrButton")).Content as string;
+                    switch (scene)
+                    {
+                        case Scene.AreaAutoSet:
+                            Assert.IsFalse(string.IsNullOrEmpty(detail), $"{lang}: the card says the area was set by itself");
+                            break;
+                        case Scene.AreaAutoFailed:
+                            Assert.IsFalse(string.IsNullOrEmpty(detail), $"{lang}: a failed try is said, never a silent closed gate");
+                            Assert.IsFalse(string.IsNullOrEmpty(action), $"{lang}: the picker is one click away");
+                            break;
+                        case Scene.GameSwitch:
+                            Assert.AreEqual(host.TryFindResource("Dash_EngineFailed_Restart") as string, action, $"{lang}: the card offers the restart");
+                            StringAssert.Contains(detail ?? string.Empty, "Genshin Impact", $"{lang}: the card says whose subtitles are still loaded and why it waits");
+                            break;
+                    }
+                }
+            });
         }
 
         [TestMethod]
@@ -469,6 +510,9 @@ namespace GI_Test
             Scene.Downloading => "pobieram",
             Scene.Updated25 => "nowosc-25",
             Scene.OnHold => "wstrzymany",
+            Scene.AreaAutoSet => "obszar-sam",
+            Scene.AreaAutoFailed => "obszar-nie-wyszlo",
+            Scene.GameSwitch => "zmiana-gry",
             _ => "zatrzymano",
         };
 
@@ -504,15 +548,22 @@ namespace GI_Test
                 Scene.OnHold => new StartCardInputs { WaitingForGame = true, Reader = ReaderState.Ready, PackOnDisk = true, GameName = "Genshin Impact",
                     AutoStartBlockedBy = GI_Subtitles.Services.Automation.StartGate.DisplayModeTip },
                 Scene.Downloading => new StartCardInputs { Downloading = true, DownloadFraction = 0.42, DownloadBytesTotal = 100_663_296, Reader = ReaderState.Loading },
+                // Set up before the game was launched: the area filled by itself, or the try did not work.
+                Scene.AreaAutoSet => new StartCardInputs { Translating = true, LinesThisSession = 3, Reader = ReaderState.Ready, PackOnDisk = true,
+                    RegionAutoFill = RegionAutoFillNote.Set },
+                Scene.AreaAutoFailed => new StartCardInputs { Reader = ReaderState.Ready, PackOnDisk = true, GameName = "Genshin Impact",
+                    AutoStartBlockedBy = GI_Subtitles.Services.Automation.StartGate.Region, RegionAutoFill = RegionAutoFillNote.Failed },
+                // Star Rail picked, "Later" chosen: Genshin's data stays loaded until the restart.
+                Scene.GameSwitch => new StartCardInputs { Reader = ReaderState.Ready, PackOnDisk = true, GameName = "Honkai: Star Rail", GameSwitchPending = true,
+                    LoadedGameName = "Genshin Impact" },
                 _ => new StartCardInputs { Reader = ReaderState.Ready, PackOnDisk = true },
             };
             var state = StartCardModel.Compute(inputs);
             SettingsWindow.ApplyStartCardTo(Find, state, inputs, L, culture);
             SettingsWindow.ApplyStateChipTo(Find, state, L);
             if (scene == Scene.Downloading) ((TextBlock)Find("DashEngineStatus")).Text = L("shell_Chip_ReaderStarting", "");
-            ((TextBlock)Find("DashDictStatus")).Text = scene == Scene.Downloading
-                ? L("shell_Chip_DictLoading", "")
-                : string.Format(culture, L("shell_Chip_Dict_Format", "{0:N0}"), 536_737);
+            // The subtitles chip says ready or loading; the line count lives in the Advanced-mode tooltip only.
+            ((TextBlock)Find("DashDictStatus")).Text = EngineLabels.SubtitlesChip(loaded: scene != Scene.Downloading, packMissing: false, packComing: false, L);
 
             // Packs, reader, shortcuts: values from a real install (2026-11-02).
             Brush B(string key) => host.TryFindResource(key) as Brush;
@@ -531,10 +582,10 @@ namespace GI_Test
             };
             ((UIElement)Find("PacksCardList")).Visibility = Visibility.Visible;
             ((UIElement)Find("PacksCardSkeleton")).Visibility = Visibility.Collapsed;
-            // The reader is a status-bar chip now: "GPU · PP-OCRv6", the card's product name in its tooltip.
+            // The reader is a status-bar chip: "GPU", the card's product name in its tooltip, the model in Zaawansowane.
             if (scene != Scene.Downloading)
             {
-                ((TextBlock)Find("DashEngineStatus")).Text = EngineLabels.Chip(true, "PP-OCRv6 Small", L);
+                ((TextBlock)Find("DashEngineStatus")).Text = EngineLabels.Chip(true, L);
                 ((FrameworkElement)Find("EngineChip")).ToolTip = string.Format(culture, L("shell_Chip_Gpu_Tip", "{0}"),
                     EngineLabels.ProductName("NVIDIA GeForce RTX 5070 Ti (vendor 0x10DE, device 0x2C05, 15997 MB dedicated)"));
             }

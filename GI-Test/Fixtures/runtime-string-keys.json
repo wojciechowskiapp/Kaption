@@ -1,0 +1,25 @@
+{
+  "about": "String keys the desktop builds at runtime, so no literal names them. Read by GI-Test/ResourceParityTests.cs and tools/dev/list-unused-string-keys.cjs. Each pattern is a .NET and JavaScript regex over the key.",
+  "families": [
+    { "pattern": "^Game_", "builtBy": "L(\"Game_\" + tag), Views/SettingsWindow.xaml.cs" },
+    { "pattern": "^Char_Kind_", "builtBy": "\"Char_Kind_\" + kind, Services/Characters/CharacterOverviewBuilder.cs and Views/CharacterOverviewConverters.cs" },
+    { "pattern": "^Char_Slot_", "builtBy": "\"Char_Slot_\" + slot, Services/Characters/CharacterOverviewBuilder.cs" },
+    { "pattern": "^Char_Weapons_", "builtBy": "WeaponsKey, Views/CharacterOverviewViewModel.cs" },
+    { "pattern": "^Char_Tab_", "builtBy": "ProgressionKey, Views/CharacterOverviewViewModel.cs" },
+    { "pattern": "^Char_Tip_Weapon_", "builtBy": "\"Char_Tip_Weapon_\" + type, Views/CharacterOverviewViewModel.cs" },
+    { "pattern": "^FarmCard_(On|Tip|Talent)_", "builtBy": "$\"FarmCard_On_{twin}\", $\"FarmCard_Tip_{i}\", $\"FarmCard_Talent_{kind}\", Views/FarmCardViewModel.cs" },
+    { "pattern": "^onb_[A-Za-z]+_(Heading|Lead)$", "builtBy": "$\"onb_{step}_Heading\" and _Lead, Views/OnboardingWindow.xaml.cs" },
+    { "pattern": "^shell_Hotkey_Short_", "builtBy": "$\"shell_Hotkey_Short_{id}\", Views/SettingsWindow.Shell.cs and Views/OnboardingWindow.xaml.cs" },
+    { "pattern": "^look_Sample_", "builtBy": "$\"look_Sample_{id}_Speaker\" and _Line, Views/SettingsWindow.Look.cs" },
+    { "pattern": "^Hotkey_\\d+_(Description|Info)$", "builtBy": "$\"Hotkey_{id}_Description\" and _Info, Views/SettingsWindow.xaml.cs" },
+    { "pattern": "_One_Format$", "builtBy": "ReferralRules.CountKey (the singular of a _Format key), Services/Referrals/ReferralRules.cs" }
+  ],
+  "keepAbout": "Keys the unused-key report never lists: added in session 58 for the desktop-cleanup and desktop-flow branches, which read them. Drop an entry once its reader is merged (the report then finds the reference itself).",
+  "keep": [
+    "Dialog_DownloadFailed_Title", "Dialog_DownloadFailed_Body", "Dialog_SignInRequired_Title", "Dialog_SignInRequired_Body",
+    "Sync_Status_NotConfigured", "Sync_Status_NotSignedIn", "Sync_Status_KeyMissing", "Sync_Status_Offline",
+    "Sync_Status_NothingListed", "Sync_Status_Failed",
+    "shell_Card_RegionAutoSet", "shell_Card_RegionAutoFailed", "shell_Card_RegionAutoFailed_Action",
+    "shell_Chip_Subtitles", "shell_Chip_SubtitlesLoading"
+  ]
+}

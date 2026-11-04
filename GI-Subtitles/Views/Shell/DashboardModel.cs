@@ -23,6 +23,8 @@ namespace GI_Subtitles.Views.Shell
         PackComing,
         /// <summary>Auto-start is on, but a Start gate other than the game itself is closed: say which, offer the fix.</summary>
         AutoStartBlocked,
+        /// <summary>Another game was picked and "Later" chosen: the loaded data is still the old game's until the restart.</summary>
+        GameSwitchPending,
     }
 
     /// <summary>The card's single action (None hides the button).</summary>
@@ -56,6 +58,12 @@ namespace GI_Subtitles.Views.Shell
         public string GameName { get; init; }
         /// <summary>Auto-start is on and this gate (not the game) would stop it; None when nothing does.</summary>
         public StartGate AutoStartBlockedBy { get; init; }
+        /// <summary>Config["Game"] names another game than the one this process loaded.</summary>
+        public bool GameSwitchPending { get; init; }
+        /// <summary>With <see cref="GameSwitchPending"/>: the display name of the game whose data is still loaded.</summary>
+        public string LoadedGameName { get; init; }
+        /// <summary>This session's automatic dialogue area: still the saved one (Set), or it could not be found (Failed).</summary>
+        public RegionAutoFillNote RegionAutoFill { get; init; }
     }
 
     public sealed class StartCardState
@@ -69,6 +77,10 @@ namespace GI_Subtitles.Views.Shell
         public double Progress { get; init; }
         /// <summary>The closed gate behind <see cref="StartCardKind.AutoStartBlocked"/>.</summary>
         public StartGate Gate { get; init; }
+        /// <summary>Kaption saved the dialogue area by itself this session: the card says so, so a wrong frame gets fixed.</summary>
+        public bool ShowRegionAutoSetNote { get; init; }
+        /// <summary>With the Region gate: the automatic try did not work, the card says so and offers the picker.</summary>
+        public bool RegionAutoFailed { get; init; }
     }
 
     public static class StartCardModel
@@ -84,10 +96,14 @@ namespace GI_Subtitles.Views.Shell
         {
             bool cpuNote = i.ReaderOnCpu && i.Reader == ReaderState.Ready;
             bool offlineNote = i.Offline && i.PackOnDisk;
+            bool areaNote = i.RegionAutoFill == RegionAutoFillNote.Set;
             if (i.DeviceLimit)
                 return new StartCardState { Kind = StartCardKind.DeviceLimit, Action = StartCardAction.OpenAccount };
             if (i.Translating)
-                return new StartCardState { Kind = StartCardKind.Translating, Action = StartCardAction.Stop, ShowOfflineNote = offlineNote, ShowCpuNote = cpuNote };
+                return new StartCardState { Kind = StartCardKind.Translating, Action = StartCardAction.Stop, ShowOfflineNote = offlineNote, ShowCpuNote = cpuNote, ShowRegionAutoSetNote = areaNote };
+            // Before downloads and gates: whatever they say is about data this process will not use.
+            if (i.GameSwitchPending)
+                return new StartCardState { Kind = StartCardKind.GameSwitchPending, Action = StartCardAction.RestartApp };
             if (i.Offline && !i.PackOnDisk)
                 return new StartCardState { Kind = StartCardKind.Offline, Action = StartCardAction.Retry };
             if (i.Downloading)
@@ -114,11 +130,12 @@ namespace GI_Subtitles.Views.Shell
                 return new StartCardState
                 {
                     Kind = StartCardKind.AutoStartBlocked, Action = StartCardAction.ResolveGate, Gate = i.AutoStartBlockedBy,
-                    ShowOfflineNote = offlineNote, ShowCpuNote = cpuNote,
+                    ShowOfflineNote = offlineNote, ShowCpuNote = cpuNote, ShowRegionAutoSetNote = areaNote,
+                    RegionAutoFailed = i.AutoStartBlockedBy == StartGate.Region && i.RegionAutoFill == RegionAutoFillNote.Failed,
                 };
             if (i.WaitingForGame)
-                return new StartCardState { Kind = StartCardKind.WaitingForGame, Action = StartCardAction.StartAnyway, ShowOfflineNote = offlineNote, ShowCpuNote = cpuNote };
-            return new StartCardState { Kind = StartCardKind.Stopped, Action = StartCardAction.Start, ShowOfflineNote = offlineNote, ShowCpuNote = cpuNote };
+                return new StartCardState { Kind = StartCardKind.WaitingForGame, Action = StartCardAction.StartAnyway, ShowOfflineNote = offlineNote, ShowCpuNote = cpuNote, ShowRegionAutoSetNote = areaNote };
+            return new StartCardState { Kind = StartCardKind.Stopped, Action = StartCardAction.Start, ShowOfflineNote = offlineNote, ShowCpuNote = cpuNote, ShowRegionAutoSetNote = areaNote };
         }
     }
 

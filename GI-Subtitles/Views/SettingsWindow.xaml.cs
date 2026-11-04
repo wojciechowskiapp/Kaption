@@ -14,12 +14,10 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.IO;
 using System.Threading.Tasks;
-using System.Text.Json.Nodes;
 using static System.Windows.Forms.VisualStyles.VisualStyleElement.Window;
 using System.Net.Http;
 using System.Windows.Forms;
 using static System.Windows.Forms.VisualStyles.VisualStyleElement.StartPanel;
-using System.Text.RegularExpressions;
 using System.Collections.ObjectModel;
 using System.Reflection;
 using PaddleOCRSharp;
@@ -28,8 +26,6 @@ using System.Threading;
 using System.Windows.Markup;
 using System.Collections;
 using System.Globalization;
-using System.Xml;
-using System.ServiceModel.Syndication;
 using System.Runtime.InteropServices;
 using Microsoft.Win32;
 using GI_Subtitles.Core.Config;
@@ -40,7 +36,6 @@ using GI_Subtitles.Services.Data;
 using GI_Subtitles.Services.Rendering;
 using GI_Subtitles.Services.Security;
 using GI_Subtitles.Services.Translation;
-using GI_Subtitles.Services.Video;
 using GI_Subtitles.Common;
 using GI_Subtitles.Core.Logging;
 using GI_Subtitles.Services.Detection;
@@ -56,10 +51,6 @@ namespace GI_Subtitles.Views
     /// </summary>
     public partial class SettingsWindow : Window
     {
-        // GitHub's main branch mirrors Dimbreath's canonical GitLab repository
-        // and still provides the Atom feed shape consumed below.
-        private const string GenshinRepoUrl = "https://github.com/DimbreathBot/AnimeGameData/commits/main.atom";
-        public string repoUrl = GenshinRepoUrl;
         string Game = Config.Get<string>("Game") ?? "Genshin";
         // Read the OCR source language from config (persisted by the Dashboard's
         // InputLanguageCombo). Default "EN" — the English PaddleOCR model is the
@@ -912,7 +903,6 @@ namespace GI_Subtitles.Views
 
         public void RefreshUrl()
         {
-            repoUrl = GenshinRepoUrl; // the arms below override it; switching back to Genshin must not keep another game's
             InputLangDownloadUrl.Text = $"https://gitlab.com/Dimbreath/animegamedata2/-/raw/main/TextMap/TextMap{InputLanguage}.json";
             OutputLangDownloadUrl.Text = $"https://gitlab.com/Dimbreath/animegamedata2/-/raw/main/TextMap/TextMap{OutputLanguage}.json";
             // Second output language download url (if configured)
@@ -926,7 +916,6 @@ namespace GI_Subtitles.Views
             }
             if (Game == "StarRail")
             {
-                repoUrl = "https://gitlab.com/Dimbreath/turnbasedgamedata/-/refs/main/logs_tree/?format=json&offset=0&ref_type=HEADS";
                 InputLangDownloadUrl.Text = $"https://gitlab.com/Dimbreath/turnbasedgamedata/-/raw/main/TextMap/TextMap{InputLanguage}.json?inline=false";
                 OutputLangDownloadUrl.Text = $"https://gitlab.com/Dimbreath/turnbasedgamedata/-/raw/main/TextMap/TextMap{OutputLanguage}.json?inline=false";
                 if (!string.IsNullOrEmpty(OutputLanguage2))
@@ -940,7 +929,6 @@ namespace GI_Subtitles.Views
             }
             else if (Game == "ZZZ")
             {
-                repoUrl = ZenlessRepoUrl;
                 // Deliberately blank. ZZZ's on-disk TextMaps are keyed by ids
                 // that tools/build-gamedata-zzz.cjs mints; they arrive in the
                 // gamedata bundle's `textmap_en` section, not from any mirror.
@@ -954,72 +942,14 @@ namespace GI_Subtitles.Views
                 OutputLangDownloadUrl.Text = string.Empty;
                 OutputLangDownloadUrl2.Text = string.Empty;
             }
-            else if (Services.Games.GameRegistry.Current.Find(Game) is { } minted
-                     && minted.Desktop?.UpstreamTextMap == Services.Games.GameDesktop.MirrorNone)
+            else if (Services.Games.GameRegistry.Current.Find(Game)?.Desktop?.UpstreamTextMap == Services.Games.GameDesktop.MirrorNone)
             {
                 // Any other minted-key game (WuWa): as for ZZZ, TextMapEN.json comes only from the gamedata bundle.
                 // Left alone, these URLs stay Genshin's and the Download buttons would write Genshin data into its folder.
-                repoUrl = minted.Source?.CommitFeedUrl() ?? string.Empty;
                 InputLangDownloadUrl.Text = string.Empty;
                 OutputLangDownloadUrl.Text = string.Empty;
                 OutputLangDownloadUrl2.Text = string.Empty;
             }
-            else if (Game == "Wuthering")
-            {
-                repoUrl = "https://github.com/Dimbreath/WutheringData/commits/master.atom";
-                InputLangDownloadUrl.Text = WutheringUrl(InputLanguage);
-                OutputLangDownloadUrl.Text = WutheringUrl(OutputLanguage);
-                if (!string.IsNullOrEmpty(OutputLanguage2))
-                {
-                    OutputLangDownloadUrl2.Text = WutheringUrl(OutputLanguage2);
-                }
-                else
-                {
-                    OutputLangDownloadUrl2.Text = string.Empty;
-                }
-            }
-            else if (Game == "Endfield")
-            {
-                repoUrl = "https://github.com/XiaBei-cy/EndfieldData/commits/master.atom";
-                InputLangDownloadUrl.Text = EndfieldUrl(InputLanguage);
-                OutputLangDownloadUrl.Text = EndfieldUrl(OutputLanguage);
-                if (!string.IsNullOrEmpty(OutputLanguage2))
-                {
-                    OutputLangDownloadUrl2.Text = EndfieldUrl(OutputLanguage2);
-                }
-                else
-                {
-                    OutputLangDownloadUrl2.Text = string.Empty;
-                }
-            }
-        }
-
-        /// <summary>Gitea repo landing page — its first <c>datetime="…"</c>
-        /// attribute is the newest commit's timestamp.</summary>
-        private const string ZenlessRepoUrl = "https://git.mero.moe/dimbreath/ZenlessData";
-
-        private string WutheringUrl(string language)
-        {
-            string url = "https://raw.githubusercontent.com/Dimbreath/WutheringData/refs/heads/master/TextMap/zh-Hans/MultiText.json";
-            if (language != "CHS")
-            {
-                if (language == "JP")
-                {
-                    language = "JA";
-                }
-                url = $"https://raw.githubusercontent.com/Dimbreath/WutheringData/refs/heads/master/TextMap/{language.ToLower()}/MultiText.json";
-            }
-            return url;
-        }
-
-        private string EndfieldUrl(string language)
-        {
-            string url = "https://raw.githubusercontent.com/XiaBei-cy/EndfieldData/refs/heads/master/i18n/I18nTextTable_CN.json";
-            if (language != "CHS")
-            {
-                url = $"https://raw.githubusercontent.com/XiaBei-cy/EndfieldData/refs/heads/master/i18n/I18nTextTable_{language.ToUpper()}.json";
-            }
-            return url;
         }
 
         private async void OnGameSelectorChanged(object sender, SelectionChangedEventArgs e)
@@ -1552,8 +1482,9 @@ namespace GI_Subtitles.Views
                         // pre-verified by the service so any bytes we see here are authentic.
                         using (var decryptedStream = _protectionService.OpenDecryptStream(matcherIndexPath))
                         {
+                            // contentDict lives all session; reusing its strings drops the matcher's copy.
                             newMatcher = OptimizedMatcher.DeserializeFromStream(
-                                decryptedStream, matcherProgress);
+                                decryptedStream, matcherProgress, shareStringsWith: contentDict);
                         }
 
                         sw.Stop();
@@ -2012,107 +1943,6 @@ namespace GI_Subtitles.Views
         }
 
 
-        /// <summary>
-        /// Pull the newest-commit timestamp out of a Gitea repo landing page.
-        /// Gitea renders it as <c>&lt;relative-time datetime="2026-08-01T12:34:56Z"&gt;</c>
-        /// in the latest-commit row, so the first <c>datetime=</c> attribute on
-        /// the page is the one we want. Returns null (having logged) when the
-        /// attribute is absent or unparseable, so each caller keeps its own
-        /// "couldn't read it" behaviour.
-        ///
-        /// Only ZZZ uses this — the Dimbreath GitLab repos answer with JSON and
-        /// the GitHub ones with an Atom feed.
-        ///
-        /// Verified against a live git.mero.moe response on 2026-08-19: the
-        /// dimbreath/ZenlessData landing page returned 43,559 bytes carrying
-        /// exactly five <c>datetime=</c> attributes, all on
-        /// <c>&lt;relative-time&gt;</c> elements. The first four are the
-        /// latest-commit row, so taking the first match is correct, and the
-        /// offset form (<c>+02:00</c>) parses. If the repo-date line ever
-        /// renders blank, start here — Gitea markup is the likely change.
-        /// </summary>
-        private static string ParseGiteaCommitDate(string responseText)
-        {
-            Match match = Regex.Match(responseText ?? string.Empty, @"datetime=""([^""]*)""");
-            if (!match.Success)
-            {
-                Logger.Log.Warn("Upstream repo page carried no datetime attribute.");
-                return null;
-            }
-
-            try
-            {
-                DateTimeOffset dateTimeOffset = DateTimeOffset.Parse(match.Groups[1].Value);
-                return dateTimeOffset.LocalDateTime.ToString();
-            }
-            catch (Exception ex)
-            {
-                Logger.Log.Warn("Upstream repo datetime did not parse: " + ex.Message);
-                return null;
-            }
-        }
-
-        // Shorter than the shared client's 30 s: the probe is optional, so give up early.
-        private static readonly TimeSpan RepoProbeTimeout = TimeSpan.FromSeconds(10);
-
-        public async Task GetRepositoryModificationDateAsync()
-        {
-            using var probeTimeout = new CancellationTokenSource(RepoProbeTimeout);
-            if (string.IsNullOrEmpty(repoUrl)) return; // a game with no public upstream feed
-            try
-            {
-                Logger.Log.Info($"Load start.");
-                HttpResponseMessage response = await client.GetAsync(repoUrl, probeTimeout.Token);
-                response.EnsureSuccessStatusCode();
-                string responseText = await response.Content.ReadAsStringAsync();
-                if (Game == "ZZZ")
-                {
-                    // Leave the existing text alone when parsing fails — same
-                    // as before the dedupe; ParseGiteaCommitDate has already
-                    // logged whatever went wrong.
-                    string parsed = ParseGiteaCommitDate(responseText);
-                    if (parsed != null) RepoModifiedDate.Text = parsed;
-                }
-                else if (Game == "Wuthering" || Game == "Genshin" || repoUrl.EndsWith(".atom", StringComparison.OrdinalIgnoreCase))
-                {
-                    var reader = XmlReader.Create(new System.IO.StringReader(responseText));
-                    var feed = SyndicationFeed.Load(reader);
-                    var item = feed?.Items?.FirstOrDefault();
-                    var dateTime = item?.LastUpdatedTime ?? item?.PublishDate;
-                    RepoModifiedDate.Text = dateTime.ToString();
-                }
-                else
-                {
-                    JsonArray jsonArray = JsonNode.Parse(responseText)?.AsArray();
-                    if (jsonArray.Count > 0)
-                    {
-                        List<string> dateList = new List<string>();
-                        foreach (var date in jsonArray)
-                        {
-                            dateList.Add(date["commit"]?["committed_date"]?.ToString());
-                        }
-                        dateList.Sort();
-                        dateList.Reverse();
-                        RepoModifiedDate.Text = dateList.Count > 0 ? dateList[0] : "Unable to get committed_date";
-                    }
-                    else
-                    {
-                        RepoModifiedDate.Text = "No response";
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                Logger.Log.Warn(Services.Network.UpstreamProbeLog.ProbeFailed(repoUrl, ex, RepoProbeTimeout));
-                RepoModifiedDate.Text = "Error: " + Services.Network.UpstreamProbeLog.Describe(ex, RepoProbeTimeout);
-            }
-        }
-
-        private async void SyncButton_Click(object sender, RoutedEventArgs e)
-        {
-            await GetRepositoryModificationDateAsync();
-        }
-
         private async void DownloadAllButton_Click(object sender, RoutedEventArgs e)
         {
             DownloadAllButton.IsEnabled = false;
@@ -2545,45 +2375,6 @@ namespace GI_Subtitles.Views
                 }
             }
         }
-        private void TestButton_Click(object sender, RoutedEventArgs e)
-        {
-            LoadEngine();
-            string testFile = InputLanguage + ".jpg";
-            if (Game == "Wuthering")
-            {
-                testFile = "Wuthering.png";
-            }
-            string report = "";
-            try
-            {
-                while (contentDict.Count < 10)
-                {
-                    Thread.Sleep(1000);
-                    Logger.Log.Debug("Sleeping ...");
-                }
-                DateTime dateTime = DateTime.Now;
-                Bitmap target;
-                if (bitmap == null)
-                {
-                    target = (Bitmap)Bitmap.FromFile(testFile);
-                }
-                else
-                {
-                    target = bitmap;
-                }
-                OCRResult ocrResult = engine.DetectText(target);
-                string ocrText = ocrResult.Text;
-                dateTime = DateTime.Now;
-                string res = Matcher.FindClosestMatch(ocrText, out string key);
-                report = $"OCR: {ocrText}\nMatch: {key}\nTranslate: {res}";
-            }
-            catch (Exception ex)
-            {
-                report = ex.Message;
-            }
-            System.Windows.MessageBox.Show(report);
-        }
-
         public void SetImage(Bitmap bitmap)
         {
             using (MemoryStream ms = new MemoryStream())
@@ -2673,88 +2464,6 @@ namespace GI_Subtitles.Views
 
             // Directly open the explorer and locate to the directory
             Process.Start("explorer.exe", dir);
-        }
-
-        private void ConvertButton_Click(object sender, RoutedEventArgs e)
-        {
-            var dialog = new Microsoft.Win32.OpenFileDialog
-            {
-                Filter = "Subtitle file|*.srt|All files|*.*",
-                Multiselect = true,
-                Title = "Select the SRT file to convert"
-            };
-
-            if (dialog.ShowDialog() == true)
-            {
-                var processor = new SrtProcessor(this.contentDict);
-                int successCount = 0;
-                int failCount = 0;
-                var errors = new List<string>();
-
-                foreach (var file in dialog.FileNames)
-                {
-                    try
-                    {
-                        // Skip the file that has already been converted
-                        if (file.EndsWith(".convert.srt", StringComparison.OrdinalIgnoreCase))
-                        {
-                            continue;
-                        }
-
-                        var subtitles = processor.ReadSrtFile(file);
-                        var processedSubtitles = processor.ProcessSubtitles(Matcher, subtitles);
-
-                        // Output the file to the same directory, add the .convert suffix to the file name
-                        string outputPath = Path.Combine(
-                            Path.GetDirectoryName(file),
-                            Path.GetFileNameWithoutExtension(file) + ".convert.srt"
-                        );
-
-                        processor.WriteSrtFile(outputPath, processedSubtitles);
-                        successCount++;
-                    }
-                    catch (Exception ex)
-                    {
-                        failCount++;
-                        errors.Add($"{Path.GetFileName(file)}: {ex.Message}");
-                    }
-                }
-
-                // Display the conversion result
-                string message = $"Conversion completed!\nSuccess: {successCount} files";
-                if (failCount > 0)
-                {
-                    message += $"\nFailed: {failCount} files";
-                    if (errors.Count > 0)
-                    {
-                        message += "\n\nError details:\n" + string.Join("\n", errors.Take(5));
-                        if (errors.Count > 5)
-                        {
-                            message += $"\n... there are {errors.Count - 5} errors";
-                        }
-                    }
-                }
-                System.Windows.MessageBox.Show(message, "Conversion result", MessageBoxButton.OK,
-                    failCount > 0 ? MessageBoxImage.Warning : MessageBoxImage.Information);
-            }
-        }
-
-        private void VideoButton_Click(object sender, RoutedEventArgs e)
-        {
-            if (engine == null)
-            {
-                LoadEngine();
-            }
-            if (Matcher == null)
-            {
-                // Ensure dictionary is loaded before opening video window
-                System.Windows.MessageBox.Show("Please load/check data in the current window first, so that the translation dictionary can be built before opening the video extraction window.", "Note",
-                    MessageBoxButton.OK, MessageBoxImage.Information);
-                return;
-            }
-            var video = new Video(engine, Matcher);
-            this.Close();
-            video.ShowDialog();
         }
 
         // Modify the InitializeHotkeys method
@@ -3455,6 +3164,18 @@ namespace GI_Subtitles.Views
 
         private static string L(string key, string fallback)
             => System.Windows.Application.Current?.TryFindResource(key) as string ?? fallback;
+
+        /// <summary>L() with {0}, {1}… filled in; a translation whose placeholders don't parse falls back to the English.</summary>
+        private static string FormatL(string key, string fallback, params object[] args)
+        {
+            try { return string.Format(CultureInfo.CurrentCulture, L(key, fallback), args); }
+            catch (FormatException) { return string.Format(CultureInfo.CurrentCulture, fallback, args); }
+        }
+
+        private void ShowSignInRequired() => GI_Subtitles.Views.ModernDialog.Warn(
+            owner: this,
+            title: L("Dialog_SignInRequired_Title", "Sign in required"),
+            body: L("Dialog_SignInRequired_Body", "Sign in to your Kaption account to download translation packs."));
 
         /// <summary>
         /// Prompt the user to restart after a game switch, localized and
@@ -4592,6 +4313,8 @@ namespace GI_Subtitles.Views
 
         /// <summary>The last pack sync installed new content (false after a relabel: same pack, new version).</summary>
         private bool _lastPackSyncChangedContent;
+        // Set by a download that installed nothing; the next completed inventory refresh shows and clears it.
+        private Services.Translation.DictionarySyncStatus? _pendingSyncStatus;
 
         /// <summary>
         /// Wire up the list + kick off an initial background scan. Runs once
@@ -4699,9 +4422,12 @@ namespace GI_Subtitles.Views
                     }
                     SetTranslationsSummary(summary);
 
-                    if (!string.IsNullOrEmpty(scan.RemoteQueryError))
+                    // RemoteQueryError stays English for the log; a download that just failed keeps its line over the scan's.
+                    var notice = Services.Translation.DictionarySyncNotice.ForBanner(_pendingSyncStatus, scan.RemoteStatus);
+                    _pendingSyncStatus = null;
+                    if (notice is { } n)
                     {
-                        TranslationsNoticeText.Text = scan.RemoteQueryError;
+                        TranslationsNoticeText.Text = L(n.Key, n.Fallback);
                         TranslationsNoticeBanner.Visibility = Visibility.Visible;
                     }
                     else
@@ -5107,10 +4833,7 @@ namespace GI_Subtitles.Views
             var license = App.LicenseService;
             if (license?.CurrentActivation == null)
             {
-                GI_Subtitles.Views.ModernDialog.Warn(
-                    owner: this,
-                    title: "Sign in required",
-                    body: "Sign in to your Kaption account to download translation packs.");
+                ShowSignInRequired();
                 return false;
             }
 
@@ -5158,11 +4881,12 @@ namespace GI_Subtitles.Views
                         GameDataPaths.HasAnyTextMap(pack.Game, pack.Language);
                     // A relabelled pack (same content, new version) needs no restart: the loaded matcher is already it.
                     _lastPackSyncChangedContent = result.Downloaded > 0;
-                    if (result.Messages.Count > 0)
-                    {
-                        TranslationsNoticeText.Text = result.Messages[0];
-                        TranslationsNoticeBanner.Visibility = Visibility.Visible;
-                    }
+                    // Shown by the refresh below. Only a click that installed nothing needs a line; a clean status
+                    // without a map still left the player with nothing, so it reads as a failed download.
+                    _pendingSyncStatus = success ? null
+                        : result.Status == Services.Translation.DictionarySyncStatus.Ok
+                            ? Services.Translation.DictionarySyncStatus.Failed
+                            : result.Status;
                     if (!success)
                     {
                         Logger.Log.Warn(
@@ -5176,8 +4900,10 @@ namespace GI_Subtitles.Views
                 Logger.Log.Warn($"DownloadPackCore: {pack.Game}/{pack.Language} failed: {ex.Message}");
                 GI_Subtitles.Views.ModernDialog.Error(
                     owner: this,
-                    title: "Download failed",
-                    body: $"Couldn't download {pack.LanguageDisplayName} for {pack.GameDisplayName}. Check your connection and try again.",
+                    title: L("Dialog_DownloadFailed_Title", "Download failed"),
+                    body: FormatL("Dialog_DownloadFailed_Body",
+                        "Couldn't download {0} for {1}. Check your connection and try again.",
+                        pack.LanguageDisplayName, pack.GameDisplayName),
                     technicalDetails: ex.ToString());
             }
             finally
@@ -5212,10 +4938,7 @@ namespace GI_Subtitles.Views
             var license = App.LicenseService;
             if (license?.CurrentActivation == null)
             {
-                GI_Subtitles.Views.ModernDialog.Warn(
-                    owner: this,
-                    title: "Sign in required",
-                    body: "Sign in to your Kaption account to download translation packs.");
+                ShowSignInRequired();
                 return;
             }
 

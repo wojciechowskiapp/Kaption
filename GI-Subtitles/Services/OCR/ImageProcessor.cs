@@ -143,13 +143,6 @@ namespace GI_Subtitles.Services.OCR
             return $"{hash}-{contentSignature:X16}-{roi.Width:X4}{roi.Height:X4}";
         }
 
-        // CalculateHammingDistance + FindSimilarImageHash removed 2026-04-18
-        // (see MainWindow.xaml.cs:3339). The fuzzy Hamming-distance cache path
-        // caused cross-dialog ghost subtitles (LRU-touch feedback loop —
-        // project_ocr_cache_ghosts.md). Only the exact-hash lookup path
-        // survives. Methods deleted in net8 migration Phase 5 since every
-        // remaining reference was just a comment.
-
         /// <summary>
         /// Classify OCR text blocks into NPC name (colored/golden) vs dialogue (white) using HSV saturation.
         /// Genshin NPC names are rendered in warm gold (#FFD893-ish), while dialogue text is white.

@@ -448,8 +448,8 @@ namespace GI_Subtitles
                         // aren't greeted with a stack trace.
                         GI_Subtitles.Views.ModernDialog.Error(
                             owner: null,
-                            title: "Kaption needs to close",
-                            body: $"An unexpected error forced Kaption to quit. A copy of the full report was saved to:\n{CrashLogPath}",
+                            title: L("Dialog_AppCrash_Title", "Kaption needs to close"),
+                            body: L("Dialog_AppCrash_Body", "An unexpected error forced Kaption to quit. A copy of the full report was saved to:") + "\n" + CrashLogPath,
                             technicalDetails: ex?.ToString());
                     }
                     catch { }
@@ -682,8 +682,8 @@ namespace GI_Subtitles
                 {
                     GI_Subtitles.Views.ModernDialog.Error(
                         owner: null,
-                        title: "Kaption couldn't start",
-                        body: "We couldn't show the welcome screen. Please reinstall Kaption or contact contact@kaption.one.",
+                        title: L("Dialog_StartFailed_Title", "Kaption couldn't start"),
+                        body: L("Dialog_StartFailed_Welcome_Body", "We couldn't show the welcome screen. Reinstall Kaption or write to us at contact@kaption.one."),
                         technicalDetails: ex.ToString());
                 }
                 catch { /* best effort */ }
@@ -703,26 +703,25 @@ namespace GI_Subtitles
             try
             {
                 // Sentinel: if the user has already seen the dialog once, don't
-                // re-ask. They can change their mind in Settings → General.
+                // re-ask. They can change their mind in Help.
                 if (Config.Get("CrashReportingPromptShown", false))
                     return;
 
                 // Branded dialog, centered on screen with an upward nudge so
                 // the user notices it at first launch. Primary/Secondary are
                 // explicit verbs — "Yes/No" reads as a nagging question,
-                // "Help Kaption/Not now" reads as a friendly invite. The
+                // "Send crash reports/No thanks" reads as a friendly invite. The
                 // decision maps to a boolean:
                 //   primary    → CrashReportingEnabled = true
                 //   secondary/ → CrashReportingEnabled = false (explicit,
                 //   dismiss      not default)
                 bool optedIn = GI_Subtitles.Views.ModernDialog.Confirm(
                     owner: null,
-                    title: "Help improve Kaption",
-                    body: "Kaption can send anonymous crash reports when something goes wrong, so bugs get fixed faster. No personal data, no screen content — just the error and your OS version.",
-                    primaryText: "Help Kaption",
-                    secondaryText: "Not now",
-                    severity: GI_Subtitles.Views.DialogSeverity.Question,
-                    details: "You can change this any time from Settings \u203A Options.");
+                    title: L("CrashReporting_Prompt_Title", "Help improve Kaption"),
+                    body: L("CrashReporting_Prompt_Body", "Kaption can send anonymous crash reports so we can fix bugs faster. No personal data, no screen content, just the error and your Windows version. You can change this later in Help."),
+                    primaryText: L("CrashReporting_Prompt_Accept", "Send crash reports"),
+                    secondaryText: L("CrashReporting_Prompt_Decline", "No thanks"),
+                    severity: GI_Subtitles.Views.DialogSeverity.Question);
                 Config.Set("CrashReportingEnabled", optedIn);
                 Config.Set("CrashReportingPromptShown", true);
                 Config.Set("CrashReportingPromptShownAtUnix", DateTimeOffset.UtcNow.ToUnixTimeSeconds());
@@ -760,8 +759,8 @@ namespace GI_Subtitles
                 LicenseService = null;
                 GI_Subtitles.Views.ModernDialog.Error(
                     owner: null,
-                    title: "Kaption couldn't start",
-                    body: "We couldn't initialise Kaption's licensing layer. Reinstalling the app usually resolves this.",
+                    title: L("Dialog_StartFailed_Title", "Kaption couldn't start"),
+                    body: L("Dialog_StartFailed_Account_Body", "Kaption couldn't prepare the sign-in to your account. Reinstalling the app usually fixes this."),
                     technicalDetails: ex.ToString());
                 return false;
             }
@@ -788,8 +787,8 @@ namespace GI_Subtitles
                     Logger.Log.Error($"LoginWindow failed: {ex}");
                     GI_Subtitles.Views.ModernDialog.Error(
                         owner: null,
-                        title: "Couldn't open the sign-in window",
-                        body: "Kaption couldn't show the sign-in window. Please close Kaption and launch it again. If the problem persists, reinstalling usually fixes it.",
+                        title: L("Dialog_SignInOpenFailed_Title", "Couldn't open sign-in"),
+                        body: L("Dialog_SignInOpenFailed_Body", "Kaption couldn't open the sign-in window. Please close the app and launch it again."),
                         technicalDetails: ex.ToString());
                     return false;
                 }
@@ -885,8 +884,8 @@ namespace GI_Subtitles
                 Logger.Log.Error($"Could not construct LicenseService: {ex}");
                 GI_Subtitles.Views.ModernDialog.Error(
                     owner: null,
-                    title: "Kaption couldn't start",
-                    body: "We couldn't initialise Kaption's licensing layer. Reinstalling the app usually resolves this.",
+                    title: L("Dialog_StartFailed_Title", "Kaption couldn't start"),
+                    body: L("Dialog_StartFailed_Account_Body", "Kaption couldn't prepare the sign-in to your account. Reinstalling the app usually fixes this."),
                     technicalDetails: ex.ToString());
                 return 1;
             }
@@ -1267,6 +1266,14 @@ namespace GI_Subtitles
         {
             try { return new CultureInfo(GetUserDefaultUILanguage()).Name; }
             catch { return CultureInfo.InstalledUICulture.Name; }
+        }
+
+        /// <summary>The string in the UI language, or the English fallback before the dictionaries load (crash
+        /// handler) or when the lookup itself fails.</summary>
+        private static string L(string key, string fallback)
+        {
+            try { return Current?.TryFindResource(key) as string ?? fallback; }
+            catch { return fallback; }
         }
 
         /// <summary>

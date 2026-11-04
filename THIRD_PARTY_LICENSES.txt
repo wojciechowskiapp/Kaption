@@ -8,7 +8,7 @@ copyright notices are reproduced below.
 
 For the desktop app's own source license, see LICENSE in the repository root.
 
-Last reviewed: 2026-11-02
+Last reviewed: 2026-11-04
 
 Table of contents
 
@@ -25,9 +25,8 @@ Table of contents
    11.  DirectML                          Microsoft system library (notice)
    12.  qew21/Genshin-Subtitles           Apache-2.0  (upstream fork)
    13.  PaddleOCR model weights            Apache-2.0
-   14.  FFmpeg (OpenCV videoio plugin)     LGPL-2.1-or-later
-   15.  .NET 10.0.14 runtime               MIT
-   16.  Source Sans 3, Inter Tight         OFL-1.1  (subtitle fonts)
+   14.  .NET 10.0.14 runtime               MIT
+   15.  Source Sans 3, Inter Tight         OFL-1.1  (subtitle fonts)
 
 ================================================================================
 1. PaddleOCRSharp
@@ -429,37 +428,16 @@ Project:   https://github.com/PaddlePaddle/PaddleOCR
 Catalogue: https://paddlepaddle.github.io/PaddleOCR/main/version2.x/ppocr/model_list.html
 License:   Apache License, Version 2.0
 Copyright: Copyright (c) PaddlePaddle Authors
-Notice:    Kaption bundles ONNX runtime copies of the official PP-OCRv6 Small
-           and PP-OCRv4 Mobile detection/recognition model families. The exact
+Notice:    Kaption bundles ONNX runtime copies of the official PP-OCRv6 Small,
+           en_PP-OCRv5 Mobile and PP-OCRv4 Mobile detection/recognition model
+           families. The exact
            asset origins and SHA-256 hashes are recorded in
            PaddleOCRSharp/inference/README.md. The full Apache License 2.0 text
            is reproduced in section 2 above.
 
 
 ================================================================================
-14. FFmpeg (bundled as OpenCV's videoio plugin)
-================================================================================
-
-Project:   https://ffmpeg.org
-File:      opencv_videoio_ffmpeg4130_64.dll (from the OpenCvSharp4 runtime
-           package, built by the OpenCV project)
-License:   GNU Lesser General Public License, version 2.1 or later
-           (LGPL-2.1-or-later). The full text of version 2.1 is in the file
-           `LICENSE-LGPL-2.1` next to this one, and at
-           https://www.gnu.org/licenses/old-licenses/lgpl-2.1.txt
-Copyright: Copyright (c) the FFmpeg developers
-Source:    FFmpeg: https://ffmpeg.org/download.html
-           OpenCV's FFmpeg build (scripts and sources for this DLL):
-           https://github.com/opencv/opencv_3rdparty/tree/ffmpeg/4.x
-Notice:    Kaption uses this DLL, unmodified, to read local video files in its
-           video tools (VideoProcessor, the video window). It ships as a
-           separate DLL in the install directory, loaded at run time; you can
-           replace it with your own build of the same plugin. The source
-           availability offer at the end of this file covers it.
-
-
-================================================================================
-15. .NET 10.0.14 runtime
+14. .NET 10.0.14 runtime
 ================================================================================
 
 Project:   https://github.com/dotnet/runtime
@@ -497,7 +475,7 @@ Notice:    Kaption is published self-contained: the .NET 10.0.14 runtime
 
 
 ================================================================================
-16. Source Sans 3 and Inter Tight (subtitle overlay fonts)
+15. Source Sans 3 and Inter Tight (subtitle overlay fonts)
 ================================================================================
 
 Project:   https://github.com/adobe-fonts/source-sans (Source Sans 3 3.052)
