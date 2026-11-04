@@ -142,9 +142,12 @@ namespace GI_Subtitles.Views
             _probing = true;
             try
             {
-                string[] names = SelectedGameProcessNames();
+                var profile = Services.Detection.GameRegionProfile.Get(Config.Get<string>("Game", "Genshin"));
+                string[] names = profile?.ProcessNames ?? Array.Empty<string>();
+                // A generic executable (WuWa's Unreal shell) counts only with one of the game's window titles.
+                string[] titles = profile?.RequiresWindowTitle == true ? profile.WindowTitles ?? Array.Empty<string>() : null;
                 bool requireFocus = Config.Get(SettingsWindow.AutoStartFocusKey, true);
-                var probe = await Task.Run(() => _gameProbe.Probe(names, DateTime.UtcNow));
+                var probe = await Task.Run(() => _gameProbe.Probe(names, DateTime.UtcNow, titles));
                 if (_autoStart == null) return;
                 bool running = probe.Running;
                 bool foreground = requireFocus ? probe.Foreground : probe.Running;
@@ -187,7 +190,7 @@ namespace GI_Subtitles.Views
             bool gameOpen = assumeGameRunning || SelectedGameProcessNames().Length == 0 || _lastGameRunning
                             || Config.Get("DevSkipGameGate", false) || _gameGateBypassedThisSession;
 
-            bool genshin = string.Equals(Config.Get("Game", Game ?? "Genshin"), "Genshin", StringComparison.OrdinalIgnoreCase);
+            bool displayModeTip = Services.Games.GameRegistry.ShowsDisplayModeTip(Config.Get("Game", Game ?? "Genshin"));
             return AutoStartGates.FirstClosed(new GateSnapshot(
                 SessionActive: App.LicenseService?.IsActivated == true,
                 InitialSyncRunning: App.StartupStatus == App.InitialStartupStatus.DownloadingTranslations,
@@ -195,7 +198,7 @@ namespace GI_Subtitles.Views
                 MatcherReady: data?.IsMatcherReady == true,
                 RegionSet: HasConfiguredRegion(),
                 GameRunning: gameOpen,
-                DisplayModeTipPending: genshin && !Config.Get("FullscreenTipAcknowledged", false),
+                DisplayModeTipPending: displayModeTip && !Config.Get("FullscreenTipAcknowledged", false),
                 OverlayOverlapsRegion: overlap));
         }
     }

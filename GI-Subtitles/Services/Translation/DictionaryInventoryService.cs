@@ -77,8 +77,8 @@ namespace GI_Subtitles.Services.Translation
     {
         // Canonical game tags, matching Config["Game"] values — derived from
         // GameRegionProfile rather than duplicated here. Adding a new game is
-        // one entry in GameRegionProfile.ProfileList plus backend
-        // file_versions rows; this list and the Settings UI both follow.
+        // one manifest (games/<id>.json) plus backend file_versions rows;
+        // this list and the Settings UI both follow.
         //
         // Built once into a field (not a computed property): ScanAsync walks
         // this per game folder and the manifest/catalog loops used to scan it
@@ -499,6 +499,10 @@ namespace GI_Subtitles.Services.Translation
             // Nothing local, catalog offline.
             if (!remoteCatalogOk)
                 return $"No {langDisplay} translation for {gameDisplay} is installed, and Kaption couldn't reach the server to check what's available. Check your internet connection and try again.";
+
+            // A beta game (games/<id>.json) with nothing offered: its first pack is on the way, and the Start card
+            // says so (PackAvailability). No warning dialog on top of it.
+            if (Games.GameRegistry.IsBeta(configuredGame)) return null;
 
             // Nothing local, catalog accessible, nothing offered → we just
             // haven't published this pack yet. Be honest about it.

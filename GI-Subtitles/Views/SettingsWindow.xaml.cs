@@ -58,7 +58,8 @@ namespace GI_Subtitles.Views
     {
         // GitHub's main branch mirrors Dimbreath's canonical GitLab repository
         // and still provides the Atom feed shape consumed below.
-        public string repoUrl = "https://github.com/DimbreathBot/AnimeGameData/commits/main.atom";
+        private const string GenshinRepoUrl = "https://github.com/DimbreathBot/AnimeGameData/commits/main.atom";
+        public string repoUrl = GenshinRepoUrl;
         string Game = Config.Get<string>("Game") ?? "Genshin";
         // Read the OCR source language from config (persisted by the Dashboard's
         // InputLanguageCombo). Default "EN" — the English PaddleOCR model is the
@@ -305,6 +306,7 @@ namespace GI_Subtitles.Views
             _protectionHelper = new FileProtectionHelper(_protectionService);
             _version = version;
             InitializeComponent();
+            InitGamePickers();
             // Keep the Dashboard reactive to the initial dictionary sync kicked
             // off from App.OnStartup. While it's running the Start button shows
             // a "Downloading translations…" status and stays disabled; the moment
@@ -910,6 +912,7 @@ namespace GI_Subtitles.Views
 
         public void RefreshUrl()
         {
+            repoUrl = GenshinRepoUrl; // the arms below override it; switching back to Genshin must not keep another game's
             InputLangDownloadUrl.Text = $"https://gitlab.com/Dimbreath/animegamedata2/-/raw/main/TextMap/TextMap{InputLanguage}.json";
             OutputLangDownloadUrl.Text = $"https://gitlab.com/Dimbreath/animegamedata2/-/raw/main/TextMap/TextMap{OutputLanguage}.json";
             // Second output language download url (if configured)
@@ -947,6 +950,16 @@ namespace GI_Subtitles.Views
                 // dialogue engine that loads cleanly and resolves nothing.
                 // GameDataUpdateService.IsUpstreamMirrored says the same thing
                 // for the automatic path; this is the manual one.
+                InputLangDownloadUrl.Text = string.Empty;
+                OutputLangDownloadUrl.Text = string.Empty;
+                OutputLangDownloadUrl2.Text = string.Empty;
+            }
+            else if (Services.Games.GameRegistry.Current.Find(Game) is { } minted
+                     && minted.Desktop?.UpstreamTextMap == Services.Games.GameDesktop.MirrorNone)
+            {
+                // Any other minted-key game (WuWa): as for ZZZ, TextMapEN.json comes only from the gamedata bundle.
+                // Left alone, these URLs stay Genshin's and the Download buttons would write Genshin data into its folder.
+                repoUrl = minted.Source?.CommitFeedUrl() ?? string.Empty;
                 InputLangDownloadUrl.Text = string.Empty;
                 OutputLangDownloadUrl.Text = string.Empty;
                 OutputLangDownloadUrl2.Text = string.Empty;
@@ -1123,6 +1136,7 @@ namespace GI_Subtitles.Views
 
             Config.Set("Output", tag);
             Logger.Log.Info($"Output language changed: {previous} -> {tag}.");
+            RebindMyFixes();
 
             if (OutputLangRestartHint != null)
                 OutputLangRestartHint.Visibility = Visibility.Visible;
@@ -2044,6 +2058,7 @@ namespace GI_Subtitles.Views
         public async Task GetRepositoryModificationDateAsync()
         {
             using var probeTimeout = new CancellationTokenSource(RepoProbeTimeout);
+            if (string.IsNullOrEmpty(repoUrl)) return; // a game with no public upstream feed
             try
             {
                 Logger.Log.Info($"Load start.");
@@ -2058,7 +2073,7 @@ namespace GI_Subtitles.Views
                     string parsed = ParseGiteaCommitDate(responseText);
                     if (parsed != null) RepoModifiedDate.Text = parsed;
                 }
-                else if (Game == "Wuthering" || Game == "Genshin")
+                else if (Game == "Wuthering" || Game == "Genshin" || repoUrl.EndsWith(".atom", StringComparison.OrdinalIgnoreCase))
                 {
                     var reader = XmlReader.Create(new System.IO.StringReader(responseText));
                     var feed = SyndicationFeed.Load(reader);
@@ -2752,9 +2767,7 @@ namespace GI_Subtitles.Views
             // Digits are required: Force-OCR (id 9004) defaults to Ctrl+1, and
             // without digits in the pool its dropdown renders empty and any
             // save overwrites the stored SelectedKey with \0.
-            var availableKeys = Enumerable.Range(65, 26).Select(c => (char)c).ToList();          // A-Z
-            availableKeys.AddRange(Enumerable.Range(48, 10).Select(c => (char)c));               // 0-9
-            availableKeys.Add('`');
+            var availableKeys = HotkeySettingsManager.AvailableKeys();
 
             // Initialize the hotkey collection, prefer localized descriptions by Id
             _hotkeys = new ObservableCollection<HotkeyViewModel>(
@@ -2891,7 +2904,9 @@ namespace GI_Subtitles.Views
             var taken = new List<string>();
             foreach (var hotkey in _hotkeys)
             {
-                if (!RegisterHotkey(hotkey)) taken.Add(hotkey.DisplayText);
+                bool registered = RegisterHotkey(hotkey);
+                HotkeySettingsManager.ReportRegistration(hotkey.Id, registered);
+                if (!registered) taken.Add(hotkey.DisplayText);
             }
             SetHotkeyConflicts(taken);
         }
@@ -4862,13 +4877,8 @@ namespace GI_Subtitles.Views
                 string currentInput = Config.Get("Input", "EN") ?? "EN";
                 string currentOutput = Config.Get("Output", "PL") ?? "PL";
 
-                // Filter nulls instead of all-or-nothing: one pill missing from
-                // the visual tree shouldn't stop the others from repainting.
-                var gamePills = new[] { GamePillGenshin, GamePillStarRail, GamePillZZZ }
-                    .Where(p => p != null)
-                    .ToArray();
-                if (gamePills.Length > 0)
-                    ApplyPillSelection(gamePills, currentGame);
+                if (_gamePills.Count > 0)
+                    ApplyPillSelection(_gamePills, currentGame);
 
                 if (InputPillEN != null && InputPillJP != null && InputPillCHS != null)
                     ApplyPillSelection(new[] { InputPillEN, InputPillJP, InputPillCHS }, currentInput);
@@ -4888,6 +4898,7 @@ namespace GI_Subtitles.Views
                 // handlers didn't invoke. Every path that mutates the triple
                 // converges here, so do the dashboard repaint in one place.
                 UpdateDashboardActiveTranslation();
+                RebindMyFixes();
             }
             catch (Exception ex)
             {
@@ -4914,6 +4925,7 @@ namespace GI_Subtitles.Views
             Config.Set("Game", tag);
             Game = tag; // keep the SettingsWindow's cached copy in sync for other handlers
             SeedOcrPacingBoxes();   // per-game pacing — see the note on SeedOcrPacingBoxes
+            RebindMyFixes();        // My fixes follows the picked game; "Later" on the prompt keeps this page up
             Logger.Log.Info($"Translations: game switched to {tag}.");
 
             // Prompt immediately — if the user picks Restart, we skip the

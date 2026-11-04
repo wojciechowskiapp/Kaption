@@ -233,4 +233,5 @@
     <sys:String x:Key="card_Forget" xmlns:sys="clr-namespace:System;assembly=mscorlib">忘记 UID</sys:String>
     <sys:String x:Key="card_Forget_Tip" xmlns:sys="clr-namespace:System;assembly=mscorlib">Kaption 会忘记所有游戏的 UID，下次重新从游戏画面读取。</sys:String>
     <sys:String x:Key="card_Forget_Done" xmlns:sys="clr-namespace:System;assembly=mscorlib">已忘记。下次 Kaption 会从游戏画面读取 UID。</sys:String>
+    <sys:String x:Key="Game_WuWa" xmlns:sys="clr-namespace:System;assembly=mscorlib">鸣潮</sys:String>
 </ResourceDictionary>

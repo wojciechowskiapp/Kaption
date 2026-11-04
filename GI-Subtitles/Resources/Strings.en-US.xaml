@@ -1268,6 +1268,12 @@ Answer: X: {0}   Y: {1}   W: {2}   H: {3}</sys:String>
     <sys:String x:Key="Char_TeamSource_Other" xmlns:sys="clr-namespace:System;assembly=mscorlib">Source:</sys:String>
     <sys:String x:Key="Char_Teams_Fallback" xmlns:sys="clr-namespace:System;assembly=mscorlib">The game suggests these teammates.</sys:String>
     <sys:String x:Key="Char_Rotation" xmlns:sys="clr-namespace:System;assembly=mscorlib">Rotation</sys:String>
+    <sys:String x:Key="Char_Rotation_Suggested" xmlns:sys="clr-namespace:System;assembly=mscorlib">Suggested rotation</sys:String>
+    <sys:String x:Key="Char_Rotation_Per" xmlns:sys="clr-namespace:System;assembly=mscorlib">per {0}</sys:String>
+    <sys:String x:Key="Char_Rotation_TipGuideFrom" xmlns:sys="clr-namespace:System;assembly=mscorlib">From the {0} guide. Check it in play.</sys:String>
+    <sys:String x:Key="Char_Rotation_TipGuide" xmlns:sys="clr-namespace:System;assembly=mscorlib">From a guide. Check it in play.</sys:String>
+    <sys:String x:Key="Char_Rotation_TipSuggested" xmlns:sys="clr-namespace:System;assembly=mscorlib">Suggested from the team's kits. Check it in play.</sys:String>
+    <sys:String x:Key="Char_Rotation_TipSuggestedFrom" xmlns:sys="clr-namespace:System;assembly=mscorlib">Suggested from the {0} guide's rotation for a similar team. Check it in play.</sys:String>
     <sys:String x:Key="Char_Rotation_With" xmlns:sys="clr-namespace:System;assembly=mscorlib">with</sys:String>
     <sys:String x:Key="Char_Rotation_WithZe" xmlns:sys="clr-namespace:System;assembly=mscorlib">with</sys:String>
     <!-- A flagged rotation chip's tooltip ends with these: "(hold, optional)". "hold" is the game's own word. -->
@@ -1304,4 +1310,52 @@ Answer: X: {0}   Y: {1}   W: {2}   H: {3}</sys:String>
     <sys:String x:Key="card_Forget" xmlns:sys="clr-namespace:System;assembly=mscorlib">Forget UID</sys:String>
     <sys:String x:Key="card_Forget_Tip" xmlns:sys="clr-namespace:System;assembly=mscorlib">Kaption forgets the UID for every game and reads it from the game screen next time.</sys:String>
     <sys:String x:Key="card_Forget_Done" xmlns:sys="clr-namespace:System;assembly=mscorlib">Forgotten. Next time Kaption reads the UID from the game screen.</sys:String>
+    <sys:String x:Key="Game_WuWa" xmlns:sys="clr-namespace:System;assembly=mscorlib">Wuthering Waves</sys:String>
+    <sys:String x:Key="Char_Kind_liberation" xmlns:sys="clr-namespace:System;assembly=mscorlib">Liberation</sys:String>
+    <sys:String x:Key="Char_Kind_forte" xmlns:sys="clr-namespace:System;assembly=mscorlib">Forte</sys:String>
+    <sys:String x:Key="Char_Kind_intro" xmlns:sys="clr-namespace:System;assembly=mscorlib">Intro</sys:String>
+    <sys:String x:Key="Char_Kind_outro" xmlns:sys="clr-namespace:System;assembly=mscorlib">Outro</sys:String>
+    <sys:String x:Key="Char_Kind_tune_break" xmlns:sys="clr-namespace:System;assembly=mscorlib">Tune Break</sys:String>
+    <sys:String x:Key="Char_Kind_sequence" xmlns:sys="clr-namespace:System;assembly=mscorlib">Resonance Chain</sys:String>
+    <sys:String x:Key="Char_Tab_sequence" xmlns:sys="clr-namespace:System;assembly=mscorlib">Resonance Chain</sys:String>
+    <!-- ═══ Fix this line (S55): hotkey 9007, the fix window, the tray entry, My fixes on Game & subtitles ═══ -->
+    <sys:String x:Key="Hotkey_9007_Description" xmlns:sys="clr-namespace:System;assembly=mscorlib">Fix the last subtitle</sys:String>
+    <sys:String x:Key="Hotkey_9007_Info" xmlns:sys="clr-namespace:System;assembly=mscorlib">Opens a small window with the last translated line so you can write a better one. Your version works on this PC right away and goes to the community for review.</sys:String>
+    <sys:String x:Key="Tray_FixLine" xmlns:sys="clr-namespace:System;assembly=mscorlib">Fix the last subtitle…</sys:String>
+    <sys:String x:Key="fix_Window_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">Fix this line</sys:String>
+    <sys:String x:Key="fix_English_Label" xmlns:sys="clr-namespace:System;assembly=mscorlib">English</sys:String>
+    <sys:String x:Key="fix_Current_Label" xmlns:sys="clr-namespace:System;assembly=mscorlib">Current translation</sys:String>
+    <sys:String x:Key="fix_Yours_Label" xmlns:sys="clr-namespace:System;assembly=mscorlib">Your version</sys:String>
+    <sys:String x:Key="fix_Note_Label" xmlns:sys="clr-namespace:System;assembly=mscorlib">Note for reviewers (optional)</sys:String>
+    <sys:String x:Key="fix_Hint" xmlns:sys="clr-namespace:System;assembly=mscorlib">Your version replaces this line on this PC right away. It also goes to the community for review, and once it's approved, other players get it too.</sys:String>
+    <sys:String x:Key="fix_Save" xmlns:sys="clr-namespace:System;assembly=mscorlib">Save</sys:String>
+    <sys:String x:Key="fix_Save_Tip" xmlns:sys="clr-namespace:System;assembly=mscorlib">Save your version (Ctrl+Enter)</sys:String>
+    <sys:String x:Key="fix_Saving" xmlns:sys="clr-namespace:System;assembly=mscorlib">Saving…</sys:String>
+    <sys:String x:Key="fix_Error_Save" xmlns:sys="clr-namespace:System;assembly=mscorlib">Couldn't save your version. Try again.</sys:String>
+    <sys:String x:Key="fix_Nothing_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">No line to fix yet</sys:String>
+    <sys:String x:Key="fix_Nothing_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">Start translating. When a subtitle you want to fix is on screen, press {0}.</sys:String>
+    <sys:String x:Key="fix_Mine_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">My fixes</sys:String>
+    <sys:String x:Key="fix_Mine_Hint" xmlns:sys="clr-namespace:System;assembly=mscorlib">Your versions of lines in this game. On this PC you see them instead of the regular translation.</sys:String>
+    <sys:String x:Key="fix_Mine_Empty" xmlns:sys="clr-namespace:System;assembly=mscorlib">No fixes yet. When a subtitle reads wrong, press {0} and write your version.</sys:String>
+    <sys:String x:Key="fix_Mine_Pending" xmlns:sys="clr-namespace:System;assembly=mscorlib">Waiting to be sent: {0}</sys:String>
+    <sys:String x:Key="fix_Mine_Delete" xmlns:sys="clr-namespace:System;assembly=mscorlib">Remove</sys:String>
+    <sys:String x:Key="fix_Mine_Delete_Tip" xmlns:sys="clr-namespace:System;assembly=mscorlib">Go back to the regular translation for this line</sys:String>
+    <sys:String x:Key="fix_Error_Delete" xmlns:sys="clr-namespace:System;assembly=mscorlib">Couldn't remove the fix. Try again.</sys:String>
+    <sys:String x:Key="fix_Error_TooLong" xmlns:sys="clr-namespace:System;assembly=mscorlib">That's too long for this line. Make it shorter.</sys:String>
+    <sys:String x:Key="fix_Error_Breaks" xmlns:sys="clr-namespace:System;assembly=mscorlib">Keep as many line breaks as the English ({0}).</sys:String>
+    <sys:String x:Key="fix_Error_Markup" xmlns:sys="clr-namespace:System;assembly=mscorlib">Keep these exactly as in the English: {0}</sys:String>
+    <sys:String x:Key="fix_Error_Extra" xmlns:sys="clr-namespace:System;assembly=mscorlib">Remove {0}, the English line doesn't have it.</sys:String>
+    <sys:String x:Key="fix_Nothing_Body_Tray" xmlns:sys="clr-namespace:System;assembly=mscorlib">Start translating. When a subtitle you want to fix is on screen, right-click the Kaption icon by the clock and pick Fix the last subtitle.</sys:String>
+    <sys:String x:Key="fix_Mine_Empty_Tray" xmlns:sys="clr-namespace:System;assembly=mscorlib">No fixes yet. When a subtitle reads wrong, right-click the Kaption icon by the clock and pick Fix the last subtitle.</sys:String>
+    <sys:String x:Key="fix_Hint_OtherLanguage" xmlns:sys="clr-namespace:System;assembly=mscorlib">Your version replaces this line on this PC right away. It won't be shared, because the community only reviews Polish translations.</sys:String>
+    <sys:String x:Key="fix_Hint_LocalOnly" xmlns:sys="clr-namespace:System;assembly=mscorlib">Your version replaces this line on this PC right away. It won't be shared, because this line can't be sent for review.</sys:String>
+    <sys:String x:Key="Game_BetaBadge" xmlns:sys="clr-namespace:System;assembly=mscorlib">Beta</sys:String>
+    <sys:String x:Key="shell_Card_PackComing" xmlns:sys="clr-namespace:System;assembly=mscorlib">Subtitles for this game are on the way</sys:String>
+    <sys:String x:Key="shell_Card_PackComing_Detail_Format" xmlns:sys="clr-namespace:System;assembly=mscorlib">{0} is new in Kaption. When its subtitles are out, Kaption downloads them the next time you open it.</sys:String>
+    <sys:String x:Key="shell_Status_Coming" xmlns:sys="clr-namespace:System;assembly=mscorlib">Coming soon</sys:String>
+    <sys:String x:Key="shell_Chip_DictComing" xmlns:sys="clr-namespace:System;assembly=mscorlib">Subtitles on the way</sys:String>
+    <sys:String x:Key="Dialog_PackComing_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">Subtitles are on the way</sys:String>
+    <sys:String x:Key="Dialog_PackComing_Body_Format" xmlns:sys="clr-namespace:System;assembly=mscorlib">Subtitles for {0} are coming soon. When they're out, Kaption downloads them the next time you open it, and you can start translating.</sys:String>
+    <sys:String x:Key="onb_Prepare_Pack_Coming_Format" xmlns:sys="clr-namespace:System;assembly=mscorlib">Subtitles for {0} are on the way. When they're out, Kaption downloads them the next time you open it.</sys:String>
+    <sys:String x:Key="onb_Done_PackComing" xmlns:sys="clr-namespace:System;assembly=mscorlib">Subtitles: on the way</sys:String>
 </ResourceDictionary>

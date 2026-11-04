@@ -17,17 +17,27 @@
         /// <summary>
         /// Resolve the classifier for <paramref name="game"/>.
         ///
-        /// <para>Zenless Zone Zero (under any of its spellings) gets the geometry
-        /// classifier; null, empty and every other value get the accent classifier
-        /// that Genshin and Star Rail have always used.</para>
+        /// <para>The profile's capability flags decide: <c>UsesGeometryClassifier</c>
+        /// (Zenless Zone Zero) wins, then <c>UsesSpeakerRowClassifier</c> (Wuthering
+        /// Waves), else the accent classifier that Genshin and Star Rail have always
+        /// used, which is also what null, empty and unknown games get.
+        /// <c>FiltersOcrJunk</c> picks the junk-filtering instance of the latter two.</para>
         ///
         /// <para>Returns shared stateless instances, so this is safe to call once
         /// per OCR tick — no allocation, no lock.</para>
         /// </summary>
         public static ITextBlockClassifier Create(string game)
         {
-            return Detection.GameRegionProfile.Get(game).UsesGeometryClassifier
-                ? (ITextBlockClassifier)GeometryTextBlockClassifier.Instance
+            var profile = Detection.GameRegionProfile.Get(game);
+            if (profile.UsesGeometryClassifier) return GeometryTextBlockClassifier.Instance;
+            if (profile.UsesSpeakerRowClassifier)
+            {
+                return profile.FiltersOcrJunk
+                    ? SpeakerRowTextBlockClassifier.WithJunkFilter
+                    : SpeakerRowTextBlockClassifier.Instance;
+            }
+            return profile.FiltersOcrJunk
+                ? AccentColorTextBlockClassifier.WithJunkFilter
                 : AccentColorTextBlockClassifier.Instance;
         }
     }

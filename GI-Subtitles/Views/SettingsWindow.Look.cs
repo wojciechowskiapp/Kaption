@@ -95,6 +95,15 @@ namespace GI_Subtitles.Views
             }
         }
 
+        /// <summary>The game's own sample line (look_Sample_&lt;GameId&gt;_Speaker / _Line) when its strings exist, else the default.</summary>
+        internal static (string Speaker, string Line) LookSample(string game, Func<string, string, string> L)
+        {
+            var registry = GI_Subtitles.Services.Games.GameRegistry.Current;
+            string id = (registry.FindLoose(game) ?? registry.Default)?.GameId;
+            return (L($"look_Sample_{id}_Speaker", null) ?? L("look_Sample_Speaker", "Paimon"),
+                    L($"look_Sample_{id}_Line", null) ?? L("look_Sample_Line", "Ej, poczekaj!"));
+        }
+
         /// <summary>
         /// Fills the page's named elements for a style and a scene: the miniature (the screen, the dialogue area, the
         /// panel where the app puts it), the 1:1 strip, the game's sample line and art, which look card is chosen, the
@@ -103,9 +112,7 @@ namespace GI_Subtitles.Views
         internal static void ApplyLookTo(Func<string, object> find, OverlayStyle look, string game, LookScene scene, int defaultPad,
                                          int maxOverlayWidth, ImageSource art, Func<string, string, string> L)
         {
-            string g = AmbienceArt.ForGame(game);
-            string speaker = L(g switch { "starrail" => "look_Sample_StarRail_Speaker", "zzz" => "look_Sample_ZZZ_Speaker", _ => "look_Sample_Speaker" }, "Paimon");
-            string line = L(g switch { "starrail" => "look_Sample_StarRail_Line", "zzz" => "look_Sample_ZZZ_Line", _ => "look_Sample_Line" }, "Ej, poczekaj!");
+            var (speaker, line) = LookSample(game, L);
             double textWidth = LookGeometry.TextWidth(scene, maxOverlayWidth);
             if (find("LookPreview") is SubtitlePreview preview)
             {

@@ -19,6 +19,8 @@ namespace GI_Subtitles.Views.Shell
         Offline,
         DeviceLimit,
         PackMissing,
+        /// <summary>A beta game whose first pack the server does not list yet: nothing to download, it is on the way.</summary>
+        PackComing,
         /// <summary>Auto-start is on, but a Start gate other than the game itself is closed: say which, offer the fix.</summary>
         AutoStartBlocked,
     }
@@ -45,6 +47,8 @@ namespace GI_Subtitles.Views.Shell
         public bool Offline { get; init; }
         public bool PackOnDisk { get; init; }
         public bool PackMissing { get; init; }
+        /// <summary>With <see cref="PackMissing"/>: the game is beta and the server lists no pack for it yet.</summary>
+        public bool PackComing { get; init; }
         public bool DeviceLimit { get; init; }
         /// <summary>Auto-start is armed and the game is not on screen yet.</summary>
         public bool WaitingForGame { get; init; }
@@ -97,6 +101,8 @@ namespace GI_Subtitles.Views.Shell
                 return new StartCardState { Kind = StartCardKind.ReaderUnavailable, Action = StartCardAction.RestartApp };
             if (i.Reader == ReaderState.Failed)
                 return new StartCardState { Kind = StartCardKind.ReaderFailed, Action = StartCardAction.RetryReader };
+            if (i.PackMissing && i.PackComing)
+                return new StartCardState { Kind = StartCardKind.PackComing, Action = StartCardAction.None, ShowOfflineNote = offlineNote };
             if (i.PackMissing)
                 return new StartCardState { Kind = StartCardKind.PackMissing, Action = StartCardAction.OpenPacks, ShowOfflineNote = offlineNote };
             if (i.IndexBuilding)

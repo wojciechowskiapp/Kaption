@@ -290,6 +290,9 @@ namespace GI_Subtitles.Services.Translation
                 return result;
             }
 
+            // A beta game with nothing listed yet: its first pack is on the way (PackAvailability).
+            PackAvailability.Record(game, language, remoteFiles?.Count ?? 0);
+
             if (remoteFiles == null || remoteFiles.Count == 0)
             {
                 // This log line is LOUD intentionally — users kept asking

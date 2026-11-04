@@ -198,7 +198,9 @@ namespace GI_Subtitles.Services.Cards
                     GameId = profile.GameId,
                     DisplayName = profile.DisplayName,
                     ProcessNames = profile.ProcessNames ?? Array.Empty<string>(),
-                    WindowTitles = Array.Empty<string>(),
+                    // No title fallback; a generic executable still needs its titles to tell the game apart.
+                    WindowTitles = profile.RequiresWindowTitle ? profile.WindowTitles ?? Array.Empty<string>() : Array.Empty<string>(),
+                    RequiresWindowTitle = profile.RequiresWindowTitle,
                 });
             }
             catch (Exception ex)

@@ -39,12 +39,6 @@ namespace GI_Subtitles.Views
     /// </summary>
     public sealed class CharacterOverviewViewModel : INotifyPropertyChanged
     {
-        private static readonly Dictionary<string, string> ProgressionLetters =
-            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-            {
-                ["constellation"] = "C", ["eidolon"] = "E", ["mindscape"] = "M",
-            };
-
         /// <summary>"Gra też w drużynach" shows this many hosts until "Pokaż więcej".</summary>
         public const int TeamHostCap = 6;
 
@@ -70,13 +64,13 @@ namespace GI_Subtitles.Views
             HeroWash = Wash(_hue);
             HeroTint = Tint(_hue);
 
-            var skills = model.Skills.Where(s => !ProgressionLetters.ContainsKey(s.Kind ?? "")).ToList();
+            var skills = model.Skills.Where(s => !SkillMarkers.IsRankKind(s.Kind)).ToList();
             Skills = skills.Select((s, i) => SkillRow.From(s, showKind: i == 0 || skills[i - 1].Kind != s.Kind)).ToList();
             HasAiSummaries = skills.Any(s => s.AiSummary.Length > 0);
 
-            var progression = model.Skills.Where(s => ProgressionLetters.ContainsKey(s.Kind ?? "")).ToList();
+            var progression = model.Skills.Where(s => SkillMarkers.IsRankKind(s.Kind)).ToList();
             Progression = progression
-                .Select((s, i) => new ProgressionRow(ProgressionLetters[s.Kind] + (i + 1), s,
+                .Select((s, i) => new ProgressionRow(SkillMarkers.RankLetterOfKind(s.Kind) + (i + 1), s,
                     isFirst: i == 0, isLast: i == progression.Count - 1))
                 .ToList();
             ProgressionKey = progression.Count > 0 ? "Char_Tab_" + progression[0].Kind.ToLowerInvariant() : "";
@@ -153,7 +147,7 @@ namespace GI_Subtitles.Views
             IconImages.Load(model.IconPath, OverviewImageSizes.Portrait);
             IconImages.LoadLarge(model.AmbiencePath, OverviewImageSizes.HeroAmbienceDecodeHeight);
             foreach (var s in model.Skills)
-                IconImages.Load(s.IconPath, ProgressionLetters.ContainsKey(s.Kind ?? "") ? OverviewImageSizes.Rank : OverviewImageSizes.Skill);
+                IconImages.Load(s.IconPath, SkillMarkers.IsRankKind(s.Kind) ? OverviewImageSizes.Rank : OverviewImageSizes.Skill);
             foreach (var o in model.SetGroups.SelectMany(g => g.Options)) IconImages.Load(o.IconPath, OverviewImageSizes.Set);
             foreach (var w in model.Weapons) IconImages.Load(w.IconPath, OverviewImageSizes.Weapon);
             foreach (var m in model.Teams.SelectMany(t => t.Members)) IconImages.Load(m.IconPath, OverviewImageSizes.Member);
@@ -405,7 +399,7 @@ namespace GI_Subtitles.Views
             return list;
         }
 
-        // Role, the signature skill (ultimate, else the skill) and what to level first.
+        // Role, the signature skill (ultimate or WuWa's Liberation, else the skill) and what to level first.
         private static IReadOnlyList<FactTile> BuildFacts(CharacterOverviewModel model, IReadOnlyList<SkillRow> skills)
         {
             var facts = new List<FactTile>();
@@ -413,6 +407,7 @@ namespace GI_Subtitles.Views
                 facts.Add(new FactTile("Char_Fact_Role", Flatten(model.Role), null));
             var signature = skills.FirstOrDefault(s => s.Kind == "ultimate")
                             ?? skills.FirstOrDefault(s => s.Kind == "chain" && s.Title.StartsWith("Ultimate", StringComparison.OrdinalIgnoreCase))
+                            ?? skills.FirstOrDefault(s => s.Kind == "liberation")
                             ?? skills.FirstOrDefault(s => s.Kind == "skill");
             if (signature != null)
                 facts.Add(new FactTile("Char_Fact_Signature", SkillMarkers.WithMarker(signature.Title, signature.Marker), signature));
@@ -519,6 +514,7 @@ namespace GI_Subtitles.Views
             if (kinds.Contains("constellation") || slots.Contains("sands") || slots.Contains("goblet")) return "genshin";
             if (kinds.Contains("eidolon") || kinds.Contains("technique") || slots.Contains("rope")) return "starrail";
             if (kinds.Contains("mindscape") || kinds.Contains("dodge") || slots.Contains("disc4")) return "zzz";
+            if (kinds.Contains("sequence") || kinds.Contains("forte") || kinds.Contains("liberation")) return "wuwa";
             return "";
         }
     }
@@ -927,6 +923,17 @@ namespace GI_Subtitles.Views
     {
         internal RotationRow(OverviewRotation rotation, RotationWords words = null)
         {
+            IsSuggested = rotation.IsSuggested;
+            SourceUrl = RotationSource.Normalize(rotation.SourceUrl);
+            SourceName = RotationSource.SiteName(SourceUrl);
+            SourceHost = RotationSource.Host(SourceUrl);
+            var w = words ?? RotationWords.English;
+            var en = RotationWords.English;
+            Heading = IsSuggested ? w.Suggested : w.Guide;
+            SourceLink = HasSource ? RotationWords.Fill(w.Per, en.Per, SourceName) : "";
+            HeadingTip = IsSuggested
+                ? HasSource ? RotationWords.Fill(w.TipSuggestedFrom, en.TipSuggestedFrom, SourceName) : w.TipSuggested
+                : HasSource ? RotationWords.Fill(w.TipGuideFrom, en.TipGuideFrom, SourceName) : w.TipGuide;
             Variant = rotation.Variant ?? "";
             VariantTakesZe = RotationNotation.TakesPolishZe(Variant);
             Steps = rotation.Steps.Select((s, i) => new RotationStepRow(s, showSeparator: i > 0, words)).ToList();
@@ -935,6 +942,26 @@ namespace GI_Subtitles.Views
             Text = string.Join(" > ", Steps.Select(s => s.Text));
         }
 
+        /// <summary>Composed from the team's kits: the heading reads "Suggested rotation" instead of "Rotation".</summary>
+        public bool IsSuggested { get; }
+        /// <summary>"Rotation" for a guide's rotation, "Suggested rotation" for one composed from the kits.</summary>
+        public string Heading { get; }
+        /// <summary>"From the KQM guide. Check it in play.", "From a guide. ...", "Suggested from the team's kits. ...", or for a
+        /// suggested rotation adapted from a guide "Suggested from the KQM guide's rotation for a similar team. ...".</summary>
+        public string HeadingTip { get; }
+        /// <summary>The guide page, opened in the browser; never shown as text. "" for none.</summary>
+        public string SourceUrl { get; }
+        public bool HasSource => SourceUrl.Length > 0;
+        /// <summary>The site's name, "KQM", or the bare host for a site the table does not know.</summary>
+        public string SourceName { get; }
+        /// <summary>"keqingmains.com": the link's accessible help text.</summary>
+        public string SourceHost { get; }
+        /// <summary>The link after the heading, "per KQM" / "wg KQM"; "" without a source.</summary>
+        public string SourceLink { get; }
+        /// <summary>" · " between the heading and the link; "" without a source.</summary>
+        public string SourceSeparator => HasSource ? " \u00B7 " : "";
+        /// <summary>The link's external-page glyph; "" without a source.</summary>
+        public string SourceGlyph => HasSource ? " \u2197" : "";
         /// <summary>The member this rotation is for, "with Prune" / "z Prune"; "" when the page offers no alternative.</summary>
         public string Variant { get; }
         public bool HasVariant => Variant.Length > 0;

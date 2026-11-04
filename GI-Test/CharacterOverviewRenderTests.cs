@@ -271,7 +271,8 @@ namespace GI_Test
         /// <summary>
         /// Rotations from a built-in fixture (no tools/out): Varka's card with the owner's example and a second rotation, popup
         /// and page, both palettes, PL and EN; Chiori's Geo card with the skill icons the app's cache holds. Writes
-        /// char-rotations-*.png and a -team close-up of each; checks "ze Skirk" / "with Skirk".
+        /// char-rotations-*.png and a -team close-up of each; checks "ze Skirk" / "with Skirk", the headings with their tooltips and
+        /// source link ("Rotacja · wg KQM ↗"), and Chiori's card with a rotation suggested from the kits (char-rotations-model-*.png).
         /// </summary>
         [TestMethod]
         public void RendersTeamRotations()
@@ -307,7 +308,26 @@ namespace GI_Test
                     Assert.IsTrue(Shown(strip), $"{name}: the rotations show under the team's why");
                     var texts = Descendants<TextBlock>(strip).Where(Shown).Select(TextOf).ToList();
                     string all = string.Join(" | ", texts);
-                    Assert.AreEqual(2, texts.Count(t => t == (polish ? "Rotacja" : "Rotation")), $"{name}: a heading per rotation: {all}");
+                    // One heading per rotation; Varka's first names its guide in the heading ("Rotacja · wg KQM ↗"), the second has none.
+                    var headings = Headings(strip);
+                    string guide = polish ? "Rotacja" : "Rotation";
+                    bool varkaPage = id == CharacterRotationTests.Varka;
+                    CollectionAssert.AreEqual(varkaPage ? new[] { guide + (polish ? " \u00B7 wg KQM \u2197" : " \u00B7 per KQM \u2197"), guide } : new[] { guide, guide },
+                        headings.Select(FullText).ToArray(), name);
+                    string tipFrom = polish ? "Rotacja z poradnika KQM. Sprawdź ją w grze." : "From the KQM guide. Check it in play.";
+                    string tipGuide = polish ? "Rotacja z poradnika. Sprawdź ją w grze." : "From a guide. Check it in play.";
+                    CollectionAssert.AreEqual(varkaPage ? new[] { tipFrom, tipGuide } : new[] { tipGuide, tipGuide },
+                        headings.Select(h => h.ToolTip as string).ToArray(), name);
+                    var links = headings.Select(h => h.Inlines.OfType<System.Windows.Documents.Hyperlink>().Single()).ToList();
+                    CollectionAssert.AreEqual(varkaPage ? new[] { true, false } : new[] { false, false }, links.Select(l => l.IsEnabled).ToArray(),
+                        $"{name}: only a named guide is a link");
+                    if (varkaPage)
+                    {
+                        Assert.AreEqual("keqingmains.com", links[0].Tag is string u ? new Uri(u).Host : "", name);
+                        Assert.AreEqual(12.0, links[0].FontSize, $"{name}: the link is 12 px");
+                        Assert.IsFalse(texts.Concat(headings.Select(FullText)).Any(t => t.Contains("https://") || t.Contains("keqingmains")),
+                            $"{name}: the URL never shows: {all}");
+                    }
                     Assert.AreEqual(5, texts.Count(t => t == ">"), $"{name}: a > between turns (3 + 2): {all}");
                     if (id == CharacterRotationTests.Varka)
                     {
@@ -345,10 +365,66 @@ namespace GI_Test
                     var tags = Descendants<TextBlock>(strip).Where(Shown).Select(TextOf).ToList();
                     CollectionAssert.Contains(tags, expected, string.Join(" | ", tags));
                 }
+
+                // A rotation composed from the kits (origin "model"): "Suggested rotation", its own tooltip, the same chips; adapted
+                // from a guide's rotation for a similar team, that guide follows the heading ("Proponowana rotacja · wg KQM ↗").
+                var suggested = CharacterRotationOriginTests.Mixed();
+                var adaptedCatalog = CharacterRotationOriginTests.Adapted();
+                foreach (var (name, dark, popup, lang, fromGuide) in new[]
+                         {
+                             ("char-rotations-model-popup-pl", true, true, "pl-PL", false),
+                             ("char-rotations-model-page-pl", false, false, "pl-PL", false),
+                             ("char-rotations-model-page-en", false, false, "en-US", false),
+                             ("char-rotations-model-adapted-popup-pl", true, true, "pl-PL", true),
+                             ("char-rotations-model-adapted-page-pl", false, false, "pl-PL", true),
+                             ("char-rotations-model-adapted-page-en", false, false, "en-US", true),
+                         })
+                {
+                    var catalog2 = fromGuide ? adaptedCatalog : suggested;
+                    var model = CharacterOverviewBuilder.Build(catalog2.Find(CharacterRotationTests.Chiori), catalog2, null);
+                    CharacterIcons.ApplyCached(model, cache);
+                    CharacterOverviewViewModel.PrepareVisuals(model);
+                    var (host, view) = GoalHost(model, dark, popup, lang);
+                    bool polish = lang == "pl-PL";
+                    var teams = (FrameworkElement)view.FindName("Section_Teams");
+                    var strip = Descendants<ItemsControl>(teams).Single(i => i.Name == "TeamRotations");
+                    Assert.IsTrue(Shown(strip), $"{name}: the suggested rotation shows");
+                    var texts = Descendants<TextBlock>(strip).Where(Shown).Select(TextOf).ToList();
+                    string all = string.Join(" | ", texts);
+                    var headings = Headings(strip);
+                    string heading = polish ? "Proponowana rotacja" : "Suggested rotation";
+                    Assert.AreEqual(fromGuide ? heading + (polish ? " \u00B7 wg KQM \u2197" : " \u00B7 per KQM \u2197") : heading,
+                        FullText(headings.Single()), $"{name}: {all}");
+                    Assert.AreEqual(fromGuide
+                            ? polish ? "Propozycja na podstawie rotacji z poradnika KQM dla podobnej drużyny. Sprawdź ją w grze."
+                                     : "Suggested from the KQM guide's rotation for a similar team. Check it in play."
+                            : polish ? "Propozycja na podstawie umiejętności drużyny. Sprawdź ją w grze." : "Suggested from the team's kits. Check it in play.",
+                        headings[0].ToolTip as string, name);
+                    var link = headings[0].Inlines.OfType<System.Windows.Documents.Hyperlink>().Single();
+                    Assert.AreEqual(fromGuide, link.IsEnabled, $"{name}: a link only when adapted from a named guide");
+                    if (fromGuide) Assert.AreEqual("keqingmains.com", link.Tag is string u ? new Uri(u).Host : "", name);
+                    Assert.AreEqual(3, texts.Count(t => t == ">"), $"{name}: the same chips: {all}");
+                    CollectionAssert.Contains(texts, "Combo*", all);
+
+                    var full = Snapshot(host);
+                    written.Add(Save(full, name + ".png"));
+                    written.Add(Save(Crop(full, teams, host), name + "-team.png"));
+                }
             });
             foreach (string line in icons) Console.WriteLine(line);
             foreach (string p in written) Console.WriteLine(p);
         }
+
+        // The strip's headings: the TextBlocks that carry the source link (empty and disabled when there is none).
+        private static List<TextBlock> Headings(FrameworkElement strip) =>
+            Descendants<TextBlock>(strip).Where(Shown).Where(t => t.Name == "RotationHeading").ToList();
+
+        // The runs' text, links included.
+        private static string FullText(TextBlock t) => InlineText(t.Inlines);
+
+        private static string InlineText(IEnumerable<System.Windows.Documents.Inline> inlines) =>
+            string.Concat(inlines.Select(i => i is System.Windows.Documents.Run r ? r.Text
+                : i is System.Windows.Documents.Span s ? InlineText(s.Inlines) : ""));
 
         /// <summary>
         /// Round 4 flags from a built-in fixture (no tools/out): held skills ("H" on the icon), optional inputs (dashed, a whole

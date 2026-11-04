@@ -1,0 +1,41 @@
+{
+  "$schema": "./game.schema.json",
+  "schema": 1,
+  "id": "starrail",
+  "gameId": "StarRail",
+  "name": "Honkai: Star Rail",
+  "shortName": "Star Rail",
+  "publisher": "HoYoverse",
+  "status": "live",
+  "order": 2,
+  "aliases": [],
+  "legacyIds": ["hsr"],
+  "steamAppId": null,
+  "detect": {
+    "processNames": ["StarRail"],
+    "windowTitles": ["Honkai: Star Rail"]
+  },
+  "desktop": {
+    "dialogue": { "x": 0.15, "y": 0.75, "w": 0.70, "h": 0.20 },
+    "answer": { "x": 0.55, "y": 0.38, "w": 0.38, "h": 0.30 },
+    "pacing": { "ocrIntervalMs": 60, "stabilityWindowFrames": 2, "stableFramesChain": 2, "stableFramesDefault": 2, "forceOcrAfterSeconds": 0.15 },
+    "vision": {},
+    "dialogueContext": "passthrough",
+    "upstreamTextMap": "dimbreath-starrail",
+    "displayModeTip": false
+  },
+  "look": { "accent": "#6FD6E8", "accentDark": "#0B7C90", "glow": "#4F8DFF", "ambience": "starrail" },
+  "site": {
+    "hub": "honkai-star-rail",
+    "guideKey": "honkai",
+    "guide": { "pl": "/pl/honkai-star-rail-tlumaczenie/", "en": "/honkai-star-rail-translator/" },
+    "ogBackground": "src/assets/og/ai/starrail.jpg"
+  },
+  "source": { "kind": "datamine", "host": "gitlab", "repo": "Dimbreath/turnbasedgamedata", "branch": "main", "keySpace": "upstream-hash" },
+  "translation": { "targets": ["pl"], "sources": ["auto", "community"] },
+  "news": {
+    "hoyolabGid": 6,
+    "officialFeeds": [{ "kind": "youtube", "channelId": "UC2PeMPA8PAOp-bynLoCeMLA" }],
+    "codes": { "kind": "hoyolab", "redeemUrl": "https://hsr.hoyoverse.com/gift?code={code}" }
+  }
+}

@@ -50,12 +50,7 @@ namespace GI_Subtitles.Views.Shell
         }
 
         /// <summary>The palette key of a game's rail indicator (the game's accent, deepened on the light palette).</summary>
-        public static string AccentKeyFor(string game) => AmbienceArt.ForGame(game) switch
-        {
-            "starrail" => "RailIndicatorStarRailBrush",
-            "zzz" => "RailIndicatorZzzBrush",
-            _ => "RailIndicatorGenshinBrush",
-        };
+        public static string AccentKeyFor(string game) => GI_Subtitles.Themes.GameLook.RailIndicatorKey(game);
 
         /// <summary>Points the rail's indicator at the game's accent; follows a palette switch.</summary>
         public static void UseGameAccent(TabControl rail, string game) => rail?.SetResourceReference(AccentProperty, AccentKeyFor(game));

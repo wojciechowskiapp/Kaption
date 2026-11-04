@@ -18,7 +18,7 @@ namespace GI_Test
         // Config key (or what it controlled) → control → page → under Zaawansowane?
         private static readonly (string Setting, string Control, string Page, bool Advanced)[] Map =
         {
-            ("Game", "GamePillGenshin", SettingsNavigation.Game, false),
+            ("Game", "GamePills", SettingsNavigation.Game, false),
             ("Input", "InputPillEN", SettingsNavigation.Game, false),
             ("Output (pack)", "TranslationsList", SettingsNavigation.Game, false),
             ("AutoStartTranslation", "AutoTranslateToggle", SettingsNavigation.Game, false),

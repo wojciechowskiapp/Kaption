@@ -25,7 +25,14 @@ namespace GI_Subtitles.Services.Characters
         public const string HoldTag = "H";
         public const string HoldWord = "hold";
 
+        /// <summary>A rotation's origin: transcribed from a guide page, or composed from the members' kits ("Suggested rotation").</summary>
+        public const string OriginGuide = "guide";
+        public const string OriginModel = "model";
+
         private static readonly string[] Tokens = { Skill, Burst, Normal, Charged, Plunge, Dash, Combo };
+
+        /// <summary>"guide" or "model", case as written.</summary>
+        public static bool IsOrigin(string origin) => origin == OriginGuide || origin == OriginModel;
 
         /// <summary>The grammar's tokens, case as written in the data.</summary>
         public static IReadOnlyList<string> Actions => Tokens;
@@ -140,10 +147,42 @@ namespace GI_Subtitles.Services.Characters
         public static bool TakesPolishZe(string name) => !string.IsNullOrEmpty(name) && PolishZe.IsMatch(name);
     }
 
-    /// <summary>A flagged chip's tooltip words in the interface's language (the site's rotationFlags); the view reads its strings.</summary>
+    /// <summary>
+    /// The strip's words in the interface's language: a flagged chip's tooltip words (the site's rotationFlags), the heading
+    /// per origin, the source link and the heading's tooltip ({0} = the site's name). The view reads its strings.
+    /// </summary>
     public sealed record RotationWords(string Hold, string Optional, string Either)
     {
-        /// <summary>Char_Rotation_Hold / _Optional / _Either in English, for rows built without a view.</summary>
+        /// <summary>The English strings, for rows built without a view.</summary>
         public static readonly RotationWords English = new RotationWords("hold", "optional", "either");
+
+        /// <summary>Char_Rotation: a guide's rotation.</summary>
+        public string Guide { get; init; } = "Rotation";
+        /// <summary>Char_Rotation_Suggested: composed from the team's kits.</summary>
+        public string Suggested { get; init; } = "Suggested rotation";
+        /// <summary>Char_Rotation_Per: the source link after the heading, "per KQM".</summary>
+        public string Per { get; init; } = "per {0}";
+        /// <summary>Char_Rotation_TipGuideFrom: the heading's tooltip for a guide's rotation with a source.</summary>
+        public string TipGuideFrom { get; init; } = "From the {0} guide. Check it in play.";
+        /// <summary>Char_Rotation_TipGuide: a guide's rotation without a usable source.</summary>
+        public string TipGuide { get; init; } = "From a guide. Check it in play.";
+        /// <summary>Char_Rotation_TipSuggested: a rotation composed from the kits.</summary>
+        public string TipSuggested { get; init; } = "Suggested from the team's kits. Check it in play.";
+        /// <summary>Char_Rotation_TipSuggestedFrom: a suggested rotation adapted from a guide's rotation for a similar team.</summary>
+        public string TipSuggestedFrom { get; init; } = "Suggested from the {0} guide's rotation for a similar team. Check it in play.";
+
+        /// <summary>
+        /// <paramref name="pattern"/> with the site's name for {0}; a translation without {0}, or not a valid format, falls back
+        /// to <paramref name="english"/> so the name is never lost and a bad string never throws.
+        /// </summary>
+        public static string Fill(string pattern, string english, string name)
+        {
+            if (!string.IsNullOrEmpty(pattern) && pattern.Contains("{0}"))
+            {
+                try { return string.Format(CultureInfo.InvariantCulture, pattern, name ?? ""); }
+                catch (FormatException) { }
+            }
+            return string.Format(CultureInfo.InvariantCulture, english, name ?? "");
+        }
     }
 }

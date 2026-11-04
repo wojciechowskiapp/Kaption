@@ -1,0 +1,55 @@
+{
+  "schema": 1,
+  "id": "wuwa",
+  "gameId": "WuWa",
+  "name": "Wuthering Waves",
+  "shortName": "WuWa",
+  "publisher": "Kuro Games",
+  "status": "beta",
+  "order": 4,
+  "aliases": ["WutheringWaves", "Wuthering Waves", "Wuthering-Waves"],
+  "steamAppId": 3513350,
+  "detect": { "processNames": ["Client-Win64-Shipping"], "windowTitles": ["Wuthering Waves"], "requireTitle": true },
+  "desktop": {
+    "dialogue": { "x": 0.165, "y": 0.63, "w": 0.67, "h": 0.365 },
+    "answer":   { "x": 0.645, "y": 0.33, "w": 0.26, "h": 0.42 },
+    "pacing": { "ocrIntervalMs": 100, "stabilityWindowFrames": 5, "stableFramesChain": 2, "stableFramesDefault": 2, "forceOcrAfterSeconds": 0.15 },
+    "vision": {
+      "classifier": "speaker-row",
+      "ocrJunkFilter": true,
+      "regionMinWidthFraction": 0.55,
+      "strictRegionJunkFilter": true
+    },
+    "dialogueContext": "passthrough",
+    "upstreamTextMap": "none",
+    "displayModeTip": false,
+    "playerNameTokens": ["Rover"],
+    "notes": [
+      "Regions measured 2026-11-04 on footage from six creators (WuWa 3.4-3.7) at 16:9, 16:10 (one creator, 2304x1440) and 21:9 (3440x1440). 4:3, 5:4 and Steam Deck are not measured; at 4:3 NPC text falls below any band rectangle.",
+      "answer holds one- and two-option menus at 16:9 and 16:10; menus with three or more options are estimated, and 21:9 options sit outside the band.",
+      "Pacing and the speaker-row classifier with ocrJunkFilter are measured by replaying 12 recorded scenes with the 3.7.0 Polish map at 1x, 2x and 3x the recorded GPU OCR cost (.plan/in-progress/WUWA-STAGE-B.md).",
+      "regionMinWidthFraction and strictRegionJunkFilter (Detect automatically) are reasoned from the measured positions, not tested on the detector. subtitlePadVertical is the default."
+    ]
+  },
+  "look": { "accent": "#F2E6A6", "accentDark": "#806A10", "glow": "#2FC7B4", "ambience": "wuwa" },
+  "site": {
+    "hub": "wuthering-waves",
+    "guideKey": "wuwa",
+    "guide": { "pl": "/pl/wuthering-waves-tlumaczenie/", "en": "/wuthering-waves-translator/" },
+    "ogBackground": "src/assets/og/ai/wuwa.jpg"
+  },
+  "source": {
+    "kind": "datamine",
+    "host": "github", "repo": "Arikatsu/WutheringWaves_Data", "branch": "@default",
+    "keySpace": "minted"
+  },
+  "translation": { "targets": ["pl"], "sources": ["auto", "community"] },
+  "news": {
+    "hoyolabGid": null,
+    "officialFeeds": [
+      { "kind": "youtube", "channelId": "UC0Bi5KMcECRVYis5Gb_ZYZQ" },
+      { "kind": "kuro", "url": "https://hw-media-cdn-mingchao.kurogame.com/akiwebsite/website2.0/json/G152/en/ArticleMenu.json" }
+    ],
+    "codes": { "kind": "ingame", "redeemUrl": null }
+  }
+}

@@ -36,6 +36,7 @@ namespace GI_Subtitles.Services.Characters
                 case "genshin": return "genshin-impact";
                 case "starrail": case "hsr": return "honkai-star-rail";
                 case "zzz": case "zenless": return "zenless-zone-zero";
+                case "wuwa": return "wuthering-waves";
                 default: return "";
             }
         }

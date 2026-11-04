@@ -1,0 +1,35 @@
+{
+  "$schema": "../../../games/game.schema.json",
+  "schema": 1,
+  "id": "fixturegame",
+  "gameId": "FixtureGame",
+  "name": "Fixture Game",
+  "shortName": "Fixture",
+  "publisher": "Kaption tests",
+  "status": "beta",
+  "order": 90,
+  "aliases": ["Fixture-Game"],
+  "steamAppId": null,
+  "detect": {
+    "processNames": ["FixtureGame-Win64-Shipping"],
+    "windowTitles": ["Fixture Game"]
+  },
+  "desktop": {
+    "dialogue": { "x": 0.12, "y": 0.66, "w": 0.76, "h": 0.29 },
+    "answer": { "x": 0.58, "y": 0.38, "w": 0.35, "h": 0.38 },
+    "pacing": { "ocrIntervalMs": 100, "forceOcrAfterSeconds": 0.25 },
+    "vision": { "classifier": "accent" },
+    "dialogueContext": "passthrough",
+    "upstreamTextMap": "none",
+    "displayModeTip": false
+  },
+  "look": { "accent": "#7FE0A8", "accentDark": "#1F7A4D", "ambience": "fixturegame" },
+  "site": {
+    "hub": "fixture-game",
+    "guideKey": "fixture",
+    "guide": { "pl": "/pl/fixture-game-tlumaczenie/", "en": "/fixture-game-translator/" }
+  },
+  "source": { "kind": "datamine", "host": "github", "repo": "example/FixtureData", "branch": "@default", "keySpace": "minted" },
+  "translation": { "targets": ["pl"], "sources": ["auto"] },
+  "news": { "hoyolabGid": null, "officialFeeds": [], "codes": null }
+}

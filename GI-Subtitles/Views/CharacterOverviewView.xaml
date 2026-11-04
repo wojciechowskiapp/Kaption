@@ -230,6 +230,17 @@
                 </StackPanel>
             </DockPanel>
         </DataTemplate>
+        <!-- The heading's source link ("per KQM ↗"): muted like the heading, the text colour under the pointer; underlined. -->
+        <Style x:Key="RotationSourceLink" TargetType="Hyperlink">
+            <Setter Property="Foreground" Value="{DynamicResource Char_FgMuted}"/>
+            <Setter Property="TextDecorations" Value="Underline"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Foreground" Value="{DynamicResource Char_Fg}"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
         <!-- The rotation's variant tag: "z" or "ze" before the name in Polish, "with" in English. -->
         <Style x:Key="RotationWith" TargetType="Run">
             <Setter Property="Text" Value="{DynamicResource Char_Rotation_With}"/>
@@ -1238,7 +1249,7 @@
                                                 </ItemsControl>
                                                 <TextBlock Text="{Binding Why}" Style="{StaticResource Muted}" Margin="0,14,0,0"
                                                            Visibility="{Binding Why, Converter={StaticResource EmptyCollapsed}}"/>
-                                                <!-- Rotations a guide states for the team: a heading with the member it is for when the page
+                                                <!-- The team's rotations, from a guide (its source linked by name) or suggested from the kits: a heading with the member it is for when the page
                                                      offers alternatives, the turns as one wrapping strip, the named combo spelled out under it. -->
                                                 <ItemsControl x:Name="TeamRotations" ItemsSource="{Binding Rotations}" Focusable="False" Margin="0,14,0,0"
                                                               Visibility="{Binding HasRotations, Converter={StaticResource BoolVis}}">
@@ -1247,8 +1258,18 @@
                                                             <Border BorderBrush="{DynamicResource Char_Divider}" BorderThickness="0,1,0,0" Padding="0,12,0,4">
                                                                 <StackPanel>
                                                                     <WrapPanel>
-                                                                        <TextBlock Text="{DynamicResource Char_Rotation}" FontSize="12.5" FontWeight="SemiBold"
-                                                                                   Foreground="{DynamicResource Char_FgMuted}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                                                        <!-- "Rotacja · wg KQM ↗": one TextBlock, so the link shares the heading's baseline. A
+                                                                             rotation without a usable source has no link (empty, disabled). -->
+                                                                        <TextBlock x:Name="RotationHeading" FontSize="12.5" Foreground="{DynamicResource Char_FgMuted}"
+                                                                                   VerticalAlignment="Center" Margin="0,0,8,0" TextWrapping="Wrap"
+                                                                                   ToolTip="{Binding HeadingTip, Mode=OneWay}" AutomationProperties.HelpText="{Binding HeadingTip, Mode=OneWay}"><Run
+                                                                                   Text="{Binding Heading, Mode=OneWay}" FontWeight="SemiBold"/><Run
+                                                                                   Text="{Binding SourceSeparator, Mode=OneWay}" FontSize="12"/><Hyperlink
+                                                                                   Style="{StaticResource RotationSourceLink}" FontSize="12" Tag="{Binding SourceUrl, Mode=OneWay}"
+                                                                                   Click="Hyperlink_Click" IsEnabled="{Binding HasSource, Mode=OneWay}" Focusable="{Binding HasSource, Mode=OneWay}"
+                                                                                   AutomationProperties.Name="{Binding SourceLink, Mode=OneWay}"
+                                                                                   AutomationProperties.HelpText="{Binding SourceHost, Mode=OneWay}"><Run
+                                                                                   Text="{Binding SourceLink, Mode=OneWay}"/><Run Text="{Binding SourceGlyph, Mode=OneWay}" FontSize="10"/></Hyperlink></TextBlock>
                                                                         <Border Style="{DynamicResource KTag}" Visibility="{Binding HasVariant, Converter={StaticResource BoolVis}}">
                                                                             <!-- "z Prune", but "ze Skirk" (VariantTakesZe); English says "with" either way. -->
                                                                             <TextBlock Style="{DynamicResource KTagText}"><Run Style="{StaticResource RotationWith}"/><Run

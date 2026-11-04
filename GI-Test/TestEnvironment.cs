@@ -19,6 +19,8 @@ namespace GI_Test
             if (Directory.Exists(ConfigDir)) Directory.Delete(ConfigDir, recursive: true);
             Directory.CreateDirectory(ConfigDir);
             Environment.SetEnvironmentVariable("KAPTION_CONFIG_DIR", ConfigDir);
+            // Fix-this-line files (overrides, community cache, send queue) go to the same temporary profile.
+            GI_Subtitles.Services.Community.TranslationLayerRegistry.TestRoot = Path.Combine(ConfigDir, "data");
             // Renders capture a frame, not a timeline: the shell's micro-motion stays off unless a test turns it on.
             GI_Subtitles.Views.Shell.Motion.Override = false;
         }

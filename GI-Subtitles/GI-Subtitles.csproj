@@ -190,6 +190,9 @@
     <!-- Subtitle overlay faces (OFL-1.1): Source Sans 3 Semibold/Bold unmodified, Inter Tight 600/700 cut to Latin and
          Latin Extended (tools/fonts/build_overlay_fonts.py). Resolved by Services/Rendering/OverlayFonts. -->
     <Resource Include="Assets\Fonts\*.ttf" />
+    <!-- Game manifests (games/<id>.json, the registry of supported games), read by Services/Games/GameRegistry. -->
+    <GameManifestFile Include="..\games\*.json" Exclude="..\games\*.schema.json;..\games\candidates.json" />
+    <EmbeddedResource Include="@(GameManifestFile)" LogicalName="Kaption.Games.%(Filename)%(Extension)" Link="games\%(Filename)%(Extension)" />
     <None Include="..\THIRD_PARTY_LICENSES.txt" Link="THIRD_PARTY_LICENSES.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <!-- Licence texts THIRD_PARTY_LICENSES.txt points to "next to this one": LGPL-2.1 (PaddleOCRSharp, FFmpeg) and OFL-1.1 (fonts). -->
     <None Include="..\LICENSE-LGPL-2.1" Link="LICENSE-LGPL-2.1" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
@@ -311,6 +314,11 @@
           Condition="'$(PlatformTarget)' != 'x64' AND '$(Prefer32Bit)' != 'true' AND '$(Microsoft_AI_DirectML_Bin_Dir_Windows_x64)' != '' AND !$(MSBuildProjectFile.Contains('_wpftmp'))">
     <Copy SourceFiles="$(Microsoft_AI_DirectML_Bin_Dir_Windows_x64)\DirectML.dll" DestinationFolder="$(OutputPath)"
           SkipUnchangedFiles="true" ContinueOnError="true" />
+  </Target>
+
+  <!-- Without the manifests the app would start with no games at all: fail the build instead. -->
+  <Target Name="RequireGameManifests" BeforeTargets="BeforeBuild" Condition="!$(MSBuildProjectFile.Contains('_wpftmp'))">
+    <Error Condition="'@(GameManifestFile)' == ''" Text="No game manifests found in $(MSBuildProjectDirectory)\..\games\ (games/&lt;id&gt;.json). They are embedded into Kaption.exe and define the supported games." />
   </Target>
 
   <!-- Pre-build guard: catch {StaticResource X} typos before they become

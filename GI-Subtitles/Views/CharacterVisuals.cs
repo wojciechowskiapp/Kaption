@@ -24,22 +24,38 @@ namespace GI_Subtitles.Views
             ("Imaginary", Rgb(0xE6, 0xC5, 0x40)),
             ("Electric", Rgb(0x3E, 0x9B, 0xF0)), ("Ether", Rgb(0xE8, 0x55, 0x8E)), ("Frost", Rgb(0x9A, 0xD8, 0xEC)),
             ("Auric Ink", Rgb(0xC9, 0xA1, 0x4A)), ("Honed Edge", Rgb(0xB8, 0xBE, 0xC8)), ("Lumiflux", Rgb(0xD9, 0x8A, 0xE8)),
-        };
-
-        // ZZZ draws Physical in yellow, not Star Rail's grey.
-        private static readonly Dictionary<string, Color> ZzzHues = new Dictionary<string, Color>(StringComparer.OrdinalIgnoreCase)
-        {
-            ["Physical"] = Rgb(0xE6, 0xB8, 0x3A),
+            // Wuthering Waves, the game's own colours toned to mid-tones; its Electro is the shared purple above.
+            ("Glacio", Rgb(0x3E, 0x9F, 0xE0)), ("Fusion", Rgb(0xE6, 0x6B, 0x47)), ("Aero", Rgb(0x38, 0xC2, 0x8E)),
+            ("Spectro", Rgb(0xD8, 0xBE, 0x48)), ("Havoc", Rgb(0xD4, 0x47, 0x98)),
         };
 
         private static readonly Dictionary<string, (int Order, Color Hue)> ByName = Index();
+
+        // A game's own element colours (its manifest's look.elementHues: ZZZ draws Physical in yellow), parsed once.
+        private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<GI_Subtitles.Services.Games.GameManifest, Dictionary<string, Color>> GameHues =
+            new System.Runtime.CompilerServices.ConditionalWeakTable<GI_Subtitles.Services.Games.GameManifest, Dictionary<string, Color>>();
 
         public static Color For(string game, string element)
         {
             if (string.IsNullOrWhiteSpace(element)) return Neutral;
             element = Canon(element);
-            if (string.Equals(game, "zzz", StringComparison.OrdinalIgnoreCase) && ZzzHues.TryGetValue(element, out var z)) return z;
+            var manifest = GI_Subtitles.Services.Games.GameRegistry.Current.FindLoose(game);
+            if (manifest?.Look?.ElementHues != null && GameHues.GetValue(manifest, ParseHues).TryGetValue(element, out var own)) return own;
             return ByName.TryGetValue(element, out var e) ? e.Hue : Neutral;
+        }
+
+        private static Dictionary<string, Color> ParseHues(GI_Subtitles.Services.Games.GameManifest manifest)
+        {
+            var hues = new Dictionary<string, Color>(StringComparer.OrdinalIgnoreCase);
+            foreach (var kv in manifest.Look.ElementHues)
+            {
+                try { hues[Canon(kv.Key)] = (Color)ColorConverter.ConvertFromString(kv.Value); }
+                catch (Exception ex) when (ex is FormatException || ex is NotSupportedException)
+                {
+                    GI_Subtitles.Common.Logger.Log.Warn($"Game manifest {manifest.Id}: element hue {kv.Key} is not a colour.");
+                }
+            }
+            return hues;
         }
 
         /// <summary>Sort position in the game's own element order; unknown elements go last.</summary>
@@ -116,6 +132,12 @@ namespace GI_Subtitles.Views
             ["chain"] = G("M7,9 L9,7 M6.2,6 L4.4,7.8 A2.4,2.4 0 0 0 7.8,11.2 L9.6,9.4 M9.8,10 L11.6,8.2 A2.4,2.4 0 0 0 8.2,4.8 L6.4,6.6"),
             ["special"] = G("M9.5,1.5 L3.5,9 H8 L6.5,14.5 L12.5,7 H8 Z"),
             ["core"] = G("M8,1.5 L13.6,4.75 V11.25 L8,14.5 L2.4,11.25 V4.75 Z M9.5,8 A1.5,1.5 0 1 1 6.5,8 A1.5,1.5 0 1 1 9.5,8 Z"),
+            // Wuthering Waves: Liberation as the burst star, Forte as the core hexagon, Intro/Outro as arrows in and out.
+            ["liberation"] = G("M8,1.5 L9.9,6.1 L14.5,8 L9.9,9.9 L8,14.5 L6.1,9.9 L1.5,8 L6.1,6.1 Z"),
+            ["forte"] = G("M8,1.5 L13.6,4.75 V11.25 L8,14.5 L2.4,11.25 V4.75 Z M9.5,8 A1.5,1.5 0 1 1 6.5,8 A1.5,1.5 0 1 1 9.5,8 Z"),
+            ["intro"] = G("M1.5,8 H10 M7,5 L10,8 L7,11 M12.5,2.5 V13.5"),
+            ["outro"] = G("M3.5,2.5 V13.5 M6,8 H14.5 M11.5,5 L14.5,8 L11.5,11"),
+            ["tune_break"] = G("M9.5,1.5 L3.5,9 H8 L6.5,14.5 L12.5,7 H8 Z"),
         };
 
         private static readonly Geometry Unknown = G("M4,4 H12 V12 H4 Z");
@@ -131,29 +153,11 @@ namespace GI_Subtitles.Views
         }
     }
 
-    /// <summary>Per-game accents from kaption.one (landing/src/data/games.ts), used only on game items.</summary>
+    /// <summary>Per-game accents from the game manifests (the site's colours too), used only on game items.</summary>
     public static class GameAccents
     {
-        private static readonly Color Genshin = Color.FromRgb(0xF2, 0xB8, 0x4B);
-        private static readonly Color StarRail = Color.FromRgb(0x6F, 0xD6, 0xE8);
-        private static readonly Color Zzz = Color.FromRgb(0xC9, 0xCE, 0xDC);
-
-        /// <param name="game">Profile id ("StarRail") or wire id ("starrail"); unknown gives Genshin's gold.</param>
-        public static Color For(string game)
-        {
-            switch ((game ?? "").Trim().ToLowerInvariant())
-            {
-                case "starrail":
-                case "hsr":
-                    return StarRail;
-                case "zzz":
-                case "zenless":
-                case "zenlesszonezero":
-                    return Zzz;
-                default:
-                    return Genshin;
-            }
-        }
+        /// <param name="game">Profile id ("StarRail"), wire id ("starrail") or alias; unknown gives the first game's.</param>
+        public static Color For(string game) => GI_Subtitles.Themes.GameLook.AccentOf(game);
     }
 
     /// <summary>Line icons for gear slots, drawn on a 16×16 grid. Our own shapes, no game artwork.</summary>

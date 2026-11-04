@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
+using GI_Subtitles.Services.Detection;
 
 namespace GI_Subtitles.Views.Shell
 {
@@ -27,10 +28,12 @@ namespace GI_Subtitles.Views.Shell
         public uint GamePid => _gamePid;
 
         /// <param name="processNames">The selected game's process names (GameRegionProfile.ProcessNames).</param>
-        public Result Probe(IReadOnlyCollection<string> processNames, DateTime nowUtc)
+        /// <param name="requiredTitles">For a generic executable (GameRegionProfile.RequiresWindowTitle): a process is the
+        /// game only while one of its windows has one of these titles. Null when the name alone decides.</param>
+        public Result Probe(IReadOnlyCollection<string> processNames, DateTime nowUtc, IReadOnlyCollection<string> requiredTitles = null)
         {
             if (processNames == null || processNames.Count == 0) return default;
-            string key = string.Join("|", processNames);
+            string key = string.Join("|", processNames) + "#" + (requiredTitles == null ? "" : string.Join("|", requiredTitles));
             if (!string.Equals(key, _namesKey, StringComparison.OrdinalIgnoreCase))
             {
                 // Another game was selected: forget the old one's process and look again at once.
@@ -38,7 +41,11 @@ namespace GI_Subtitles.Views.Shell
                 _gamePid = 0;
                 _lastFullScanUtc = DateTime.MinValue;
             }
-            uint fgPid = ForegroundProcessId();
+            IntPtr fg = GetForegroundWindow();
+            uint fgPid = ProcessIdOf(fg);
+            // The window in front is a game window: the game's executable and, when required, the game's title.
+            bool GameInFront() => fgPid != 0 && Matches(ImageNameOf(fgPid), processNames)
+                                  && (requiredTitles == null || GameProcessMatch.TitleMatches(requiredTitles, TitleOf(fg)));
 
             // The game seen before: still alive?
             if (_gamePid != 0)
@@ -46,14 +53,13 @@ namespace GI_Subtitles.Views.Shell
                 bool? alive = IsAlive(_gamePid);
                 // A live process under that id must still be the game: Windows reuses the ids of exited processes.
                 if (alive == true && ImageNameOf(_gamePid) is string image && !Matches(image, processNames)) alive = false;
-                if (alive == true) return new Result(true, fgPid == _gamePid || (fgPid != 0 && Matches(ImageNameOf(fgPid), processNames)));
+                if (alive == true) return new Result(true, fgPid == _gamePid || GameInFront());
                 if (alive == false) _gamePid = 0; // exited, or the id now belongs to something else
                 // null: Windows will not open it (a protected process). Trust the last listing until the next one is due.
                 else if (nowUtc - _lastFullScanUtc < FullScanInterval) return new Result(true, fgPid == _gamePid);
             }
 
-            // The window in front belongs to the game.
-            if (fgPid != 0 && Matches(ImageNameOf(fgPid), processNames))
+            if (GameInFront())
             {
                 _gamePid = fgPid;
                 return new Result(true, true);
@@ -63,6 +69,7 @@ namespace GI_Subtitles.Views.Shell
             if (nowUtc - _lastFullScanUtc < FullScanInterval) return default;
             _lastFullScanUtc = nowUtc;
             var pids = ListGameProcesses(processNames);
+            if (requiredTitles != null && pids.Count > 0) pids = GameProcessMatch.WithTitledWindow(requiredTitles, pids);
             if (pids.Count == 0)
             {
                 _gamePid = 0;
@@ -100,12 +107,18 @@ namespace GI_Subtitles.Views.Shell
             return pids;
         }
 
-        private static uint ForegroundProcessId()
+        private static uint ProcessIdOf(IntPtr window)
         {
-            IntPtr fg = GetForegroundWindow();
-            if (fg == IntPtr.Zero) return 0;
-            GetWindowThreadProcessId(fg, out uint pid);
+            if (window == IntPtr.Zero) return 0;
+            GetWindowThreadProcessId(window, out uint pid);
             return pid;
+        }
+
+        private static string TitleOf(IntPtr window)
+        {
+            var sb = new StringBuilder(256);
+            GetWindowText(window, sb, sb.Capacity);
+            return sb.ToString();
         }
 
         /// <summary>The process's file name without ".exe", or null when Windows will not say.</summary>
@@ -146,6 +159,7 @@ namespace GI_Subtitles.Views.Shell
 
         [DllImport("user32.dll")] private static extern IntPtr GetForegroundWindow();
         [DllImport("user32.dll")] private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint processId);
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern int GetWindowText(IntPtr hWnd, StringBuilder text, int maxCount);
         [DllImport("kernel32.dll", SetLastError = true)] private static extern IntPtr OpenProcess(uint access, bool inherit, uint processId);
         [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
         private static extern bool QueryFullProcessImageName(IntPtr process, int flags, StringBuilder exeName, ref int size);

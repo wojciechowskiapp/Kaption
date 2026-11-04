@@ -85,6 +85,7 @@ namespace GI_Subtitles.Views
             _license = license;
             _flow = new OnboardingFlow(mode);
             InitializeComponent();
+            _gameRadios = BuildGameRadios(GameRadios, GameRegionProfile.RegisteredProfiles, Game_Checked);
             foreach (string key in RailKeys) _rail.Add(new RailItem { Label = L(key, key) });
             StepList.ItemsSource = _rail;
 
@@ -245,7 +246,7 @@ namespace GI_Subtitles.Views
                     Config.Set(SettingsWindow.AutoStartTranslationKey, auto);
                     if (auto != autoBefore) AutoStartChanged?.Invoke(auto);
                     // They read the display-mode notice here; the start gate's one-time tip is done.
-                    if (string.Equals(_flow.Game, "Genshin", StringComparison.OrdinalIgnoreCase))
+                    if (GI_Subtitles.Services.Games.GameRegistry.ShowsDisplayModeTip(_flow.Game))
                         Config.Set("FullscreenTipAcknowledged", true);
                     break;
             }
@@ -316,11 +317,31 @@ namespace GI_Subtitles.Views
 
         private void CheckAgain_Click(object sender, RoutedEventArgs e) => _ = DetectAsync();
 
+        private IReadOnlyList<RadioButton> _gameRadios = Array.Empty<RadioButton>();
+
+        /// <summary>The game step's radios, one per registered game. Static so the render tests build the same row.</summary>
+        internal static List<RadioButton> BuildGameRadios(Panel host, IEnumerable<GameRegionProfile> games, RoutedEventHandler onChecked)
+        {
+            host.Children.Clear();
+            var radios = new List<RadioButton>();
+            foreach (GameRegionProfile game in games)
+            {
+                var radio = new RadioButton { GroupName = "OnbGame", Tag = game.GameId };
+                GamePickerContent.Apply(radio, game);   // a beta game carries a Beta badge
+                radio.SetResourceReference(StyleProperty, "SegmentRadio");
+                if (onChecked != null) radio.Checked += onChecked;
+                host.Children.Add(radio);
+                radios.Add(radio);
+            }
+            return radios;
+        }
+
         private void SelectGame(string id, bool persist)
         {
             string gameId = GameRegionProfile.Get(id ?? "Genshin").GameId;
-            var radio = new[] { GameGenshin, GameStarRail, GameZzz }
-                .FirstOrDefault(r => string.Equals(r.Tag as string, gameId, StringComparison.OrdinalIgnoreCase)) ?? GameGenshin;
+            var radio = _gameRadios.FirstOrDefault(r => string.Equals(r.Tag as string, gameId, StringComparison.OrdinalIgnoreCase))
+                        ?? _gameRadios.FirstOrDefault();
+            if (radio == null) return;
             _syncingRadios = !persist;
             try
             {
@@ -342,7 +363,7 @@ namespace GI_Subtitles.Views
         private void OnGameChosen(string id, bool persist)
         {
             _flow.Game = id;
-            DisplayModeNotice.Visibility = Vis(string.Equals(id, "Genshin", StringComparison.OrdinalIgnoreCase));
+            DisplayModeNotice.Visibility = Vis(GI_Subtitles.Services.Games.GameRegistry.ShowsDisplayModeTip(id));
             if (persist && !string.Equals(GameRegionProfile.Get(Config.Get("Game", "Genshin")).GameId, id, StringComparison.OrdinalIgnoreCase))
             {
                 if (Mode == OnboardingMode.FirstRun) Config.Set("Game", id); // nothing is loaded yet: no restart needed
@@ -432,12 +453,7 @@ namespace GI_Subtitles.Views
         private static bool SavedRegionValid() =>
             CaptureRegionValidator.TryParse(Config.Get<string>("Region", ""), out _, out _, out _, out _);
 
-        private static string AccentKey(string game) => AmbienceArt.ForGame(game) switch
-        {
-            "starrail" => "GameStarRailBrush",
-            "zzz" => "GameZzzBrush",
-            _ => "GameGenshinBrush",
-        };
+        private static string AccentKey(string game) => GI_Subtitles.Themes.GameLook.AccentBrushKey(game);
 
         private void Borderless_Click(object sender, RoutedEventArgs e) =>
             OpenUrl(L("shell_Url_Guide_Borderless", "https://kaption.one/borderless-mode/"));
@@ -571,10 +587,7 @@ namespace GI_Subtitles.Views
                 }
                 bool onDisk = PackOnDisk();
                 PackBar.Visibility = Visibility.Collapsed;
-                PackMark.State = onDisk ? MarkState.Done : MarkState.Warning;
-                PackText.Text = onDisk
-                    ? string.Format(CultureInfo.CurrentUICulture, L("onb_Prepare_Pack_Done_Format", "Polish subtitles for {0} are ready"), game)
-                    : L("onb_Prepare_Pack_Failed", "Couldn't download the subtitles. Kaption tries again after start.");
+                ShowPackResult(onDisk, game);
                 _flow.PackSettled = true;
                 UpdateFooter();
                 await Task.Delay(900).ConfigureAwait(true);
@@ -635,6 +648,31 @@ namespace GI_Subtitles.Views
             }));
         }
 
+        /// <summary>Ready, on the way (a beta game whose first pack is not out), or a failed download.</summary>
+        private void ShowPackResult(bool onDisk, string game)
+        {
+            var culture = CultureInfo.CurrentUICulture;
+            if (onDisk)
+            {
+                PackMark.State = MarkState.Done;
+                PackText.Text = string.Format(culture, L("onb_Prepare_Pack_Done_Format", "Polish subtitles for {0} are ready"), game);
+            }
+            else if (PackComing())
+            {
+                PackMark.State = MarkState.Pending;
+                PackText.Text = string.Format(culture, L("onb_Prepare_Pack_Coming_Format",
+                    "Subtitles for {0} are on the way. When they're out, Kaption downloads them the next time you open it."), game);
+            }
+            else
+            {
+                PackMark.State = MarkState.Warning;
+                PackText.Text = L("onb_Prepare_Pack_Failed", "Couldn't download the subtitles. Kaption tries again after start.");
+            }
+        }
+
+        private bool PackComing() =>
+            PackAvailability.IsComing(_flow.Game ?? Config.Get("Game", "Genshin"), Config.Get("Output", "PL"));
+
         private bool PackOnDisk()
         {
             string game = (_flow.Game ?? Config.Get("Game", "Genshin")).ToLowerInvariant();
@@ -649,10 +687,7 @@ namespace GI_Subtitles.Views
             var state = ReadyState?.Invoke() ?? (false, false, false);
             bool onDisk = PackOnDisk();
             string game = GameRegionProfile.DisplayNameOf(_flow.Game ?? Config.Get("Game", "Genshin"));
-            PackMark.State = onDisk ? MarkState.Done : MarkState.Warning;
-            PackText.Text = onDisk
-                ? string.Format(CultureInfo.CurrentUICulture, L("onb_Prepare_Pack_Done_Format", "Polish subtitles for {0} are ready"), game)
-                : L("onb_Prepare_Pack_Failed", "Couldn't download the subtitles. Kaption tries again after start.");
+            ShowPackResult(onDisk, game);
             IndexMark.State = state.IndexReady ? MarkState.Done : MarkState.Working;
             IndexText.Text = L(state.IndexReady ? "onb_Prepare_Index_Done" : "onb_Prepare_Index", "Index");
             IndexNote.Visibility = Visibility.Collapsed;
@@ -674,8 +709,11 @@ namespace GI_Subtitles.Views
             DoneRegionMark.State = regionSet ? MarkState.Done : MarkState.Warning;
             DoneRegionText.Text = L(regionSet ? "onb_Done_Region_Set" : "onb_Done_Region_None", regionSet ? "Dialogue area: set" : "Dialogue area: not set");
             bool pack = PackOnDisk();
-            DonePackMark.State = pack ? MarkState.Done : MarkState.Warning;
-            DonePackText.Text = L(pack ? "onb_Done_Pack" : "onb_Done_PackMissing", pack ? "Subtitles: Polish" : "Subtitles: not downloaded yet");
+            bool coming = !pack && PackComing();
+            DonePackMark.State = pack ? MarkState.Done : coming ? MarkState.Pending : MarkState.Warning;
+            DonePackText.Text = pack ? L("onb_Done_Pack", "Subtitles: Polish")
+                : coming ? L("onb_Done_PackComing", "Subtitles: on the way")
+                : L("onb_Done_PackMissing", "Subtitles: not downloaded yet");
             bool auto = Config.Get(SettingsWindow.AutoStartTranslationKey, true);
             DoneStartText.Text = L(auto ? "onb_Done_AutoStart" : "onb_Done_Manual", "");
             DoneIndexText.Text = Mode == OnboardingMode.FirstRun ? L(auto ? "onb_Done_Index" : "onb_Done_IndexManual", "") : string.Empty;

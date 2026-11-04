@@ -27,23 +27,34 @@ namespace GI_Subtitles.Services.Characters
     /// </summary>
     public static class SkillMarkers
     {
-        // Words that already name the type in a skill's own name ("Ultimate: Lingering Snow", "Basic Attack: …").
+        // Words that already name the type in a skill's own name ("Ultimate: Lingering Snow", "Basic Attack: …",
+        // Wuthering Waves' "Tune Break: Sword").
         private static readonly string[] TypeWords =
-            { "Attack", "Ultimate", "Dodge", "Dash", "Assist", "Counter", "Passive", "Ability", "Technique", "Talent" };
+            { "Attack", "Ultimate", "Dodge", "Dash", "Assist", "Counter", "Passive", "Ability", "Technique", "Talent", "Tune Break" };
 
-        /// <summary>"(E)", "(Q)", "(Atak)", "(Skill)", "(C3)", …; "" for kinds the game has no shorthand for.</summary>
-        /// <param name="game">Wire id: "genshin", "starrail" or "zzz".</param>
-        /// <param name="rank">1-based position among the character's constellations / eidolons / mindscapes.</param>
+        // The rank kinds and their letters: constellations, eidolons, mindscapes and Resonance Chain nodes.
+        private static readonly Dictionary<string, string> RankKindLetters =
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["constellation"] = "C", ["eidolon"] = "E", ["mindscape"] = "M", ["sequence"] = "S",
+            };
+
+        /// <summary>"C", "E", "M" or "S" for a rank kind; "" for a skill.</summary>
+        public static string RankLetterOfKind(string kind) =>
+            kind != null && RankKindLetters.TryGetValue(kind, out var letter) ? letter : "";
+
+        /// <summary>True for a rank: a constellation, eidolon, mindscape or Resonance Chain node.</summary>
+        public static bool IsRankKind(string kind) => RankLetterOfKind(kind).Length > 0;
+
+        /// <summary>"(E)", "(Q)", "(Atak)", "(Skill)", "(C3)", "(S2)", …; "" for kinds the game has no shorthand for.</summary>
+        /// <param name="game">Wire id: "genshin", "starrail", "zzz" or "wuwa".</param>
+        /// <param name="rank">1-based position among the character's constellations / eidolons / mindscapes / chain nodes.</param>
         /// <param name="englishName">The skill's name; a name that already states its type gets no marker.</param>
         public static string For(string game, string kind, int rank = 0, string englishName = null)
         {
             string k = (kind ?? "").ToLowerInvariant();
-            switch (k)
-            {
-                case "constellation": return rank > 0 ? $"(C{rank})" : "";
-                case "eidolon": return rank > 0 ? $"(E{rank})" : "";
-                case "mindscape": return rank > 0 ? $"(M{rank})" : "";
-            }
+            string letter = RankLetterOfKind(k);
+            if (letter.Length > 0) return rank > 0 ? $"({letter}{rank})" : "";
             string label = Label((game ?? "").ToLowerInvariant(), k);
             if (label.Length == 0 || NamesItsType(englishName)) return "";
             return "(" + label + ")";
@@ -61,6 +72,10 @@ namespace GI_Subtitles.Services.Characters
                 case "zzz":
                     return kind == "basic" ? "Basic" : kind == "special" ? "Special" : kind == "dodge" ? "Dodge"
                         : kind == "chain" ? "Chain" : kind == "assist" ? "Assist" : "";
+                case "wuwa":
+                    return kind == "basic" ? "Basic" : kind == "skill" ? "Skill" : kind == "liberation" ? "Liberation"
+                        : kind == "forte" ? "Forte" : kind == "intro" ? "Intro" : kind == "outro" ? "Outro"
+                        : kind == "tune_break" ? "Tune Break" : "";
                 default:
                     return "";
             }
@@ -92,7 +107,10 @@ namespace GI_Subtitles.Services.Characters
             return markers;
         }
 
-        /// <summary>The game's letter for a rank: Genshin C(onstellation), Star Rail E(idolon), ZZZ M(indscape); "" otherwise.</summary>
+        /// <summary>
+        /// The game's letter for a rank: Genshin C(onstellation), Star Rail E(idolon), ZZZ M(indscape), Wuthering Waves
+        /// S (Resonance Chain); "" otherwise.
+        /// </summary>
         public static string RankLetter(string game)
         {
             switch ((game ?? "").ToLowerInvariant())
@@ -100,6 +118,7 @@ namespace GI_Subtitles.Services.Characters
                 case "genshin": return "C";
                 case "starrail": return "E";
                 case "zzz": return "M";
+                case "wuwa": return "S";
                 default: return "";
             }
         }

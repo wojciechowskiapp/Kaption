@@ -33,7 +33,21 @@ namespace GI_Subtitles.Services.OCR.Classification
     {
         /// <summary>Shared stateless instance — safe to reuse across threads.</summary>
         public static readonly AccentColorTextBlockClassifier Instance =
-            new AccentColorTextBlockClassifier();
+            new AccentColorTextBlockClassifier(filterJunk: false);
+
+        /// <summary>
+        /// The same split after dropping <see cref="OcrTextJunkFilter"/> blocks (HUD readouts, watermarks, single
+        /// glyphs), for a profile with <c>FiltersOcrJunk</c>. A frame of nothing but junk has no dialogue.
+        /// </summary>
+        public static readonly AccentColorTextBlockClassifier WithJunkFilter =
+            new AccentColorTextBlockClassifier(filterJunk: true);
+
+        private readonly bool _filterJunk;
+
+        private AccentColorTextBlockClassifier(bool filterJunk)
+        {
+            _filterJunk = filterJunk;
+        }
 
         /// <inheritdoc/>
         public DetectedTextResult Classify(Mat colorFrame, List<TextBlock> textBlocks)
@@ -49,6 +63,7 @@ namespace GI_Subtitles.Services.OCR.Classification
                 foreach (var block in textBlocks)
                 {
                     if (string.IsNullOrWhiteSpace(block.Text)) continue;
+                    if (_filterJunk && OcrTextJunkFilter.IsJunk(block.Text)) continue;
                     result.DialogueBlocks.Add(OcrBlockGeometry.ToTextBlockInfo(block, isNpc: false));
                 }
                 return result;
@@ -61,6 +76,8 @@ namespace GI_Subtitles.Services.OCR.Classification
             foreach (var block in textBlocks)
             {
                 if (block.BoxPoints == null || block.BoxPoints.Length < 4 || string.IsNullOrWhiteSpace(block.Text))
+                    continue;
+                if (_filterJunk && OcrTextJunkFilter.IsJunk(block.Text))
                     continue;
 
                 bool isNpcColor = IsColoredTextBlock(hsvFrame, block.BoxPoints);

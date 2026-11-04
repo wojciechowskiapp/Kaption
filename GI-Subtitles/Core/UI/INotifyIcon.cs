@@ -34,6 +34,7 @@ namespace GI_Subtitles.Core.UI
         ToolStripMenuItem exitItem;
         ToolStripMenuItem startStopItem;
         ToolStripMenuItem charactersItem;
+        ToolStripMenuItem fixLineItem;
         private TrayState _trayState = TrayState.Idle;
         private int Size = Config.Config.Get<int>("Size");
         private bool AutoStart = Config.Config.Get("AutoStart", false);
@@ -89,6 +90,13 @@ namespace GI_Subtitles.Core.UI
             {
                 try { data?.ShowCharactersPage(); }
                 catch (Exception ex) { Logger.Log.Warn($"Tray characters failed: {ex.Message}"); }
+            };
+            // Same window as the fix hotkey (9007), for the last subtitle shown.
+            fixLineItem = new ToolStripMenuItem(GetLocalizedString("Tray_FixLine", "Fix the last subtitle…"));
+            fixLineItem.Click += (sender, e) =>
+            {
+                try { (System.Windows.Application.Current?.MainWindow as Views.MainWindow)?.OpenSuggestFix(fromHotkey: false); }
+                catch (Exception ex) { Logger.Log.Warn($"Tray fix line failed: {ex.Message}"); }
             };
             string trayFeedback = GetLocalizedString("Tray_Feedback", "Send feedback\u2026");
             feedbackItem = new ToolStripMenuItem(trayFeedback);
@@ -147,6 +155,7 @@ namespace GI_Subtitles.Core.UI
             contextMenuStrip.Items.Add(new ToolStripSeparator());
             contextMenuStrip.Items.Add(startStopItem);
             contextMenuStrip.Items.Add(charactersItem);
+            contextMenuStrip.Items.Add(fixLineItem);
             contextMenuStrip.Items.Add(settingItem);
             contextMenuStrip.Items.Add(new ToolStripSeparator());
             contextMenuStrip.Items.Add(exitItem);
@@ -320,6 +329,7 @@ namespace GI_Subtitles.Core.UI
                 settingItem.Text = GetLocalizedString("shell_Tray_Settings", "Settings");
                 exitItem.Text = GetLocalizedString("shell_Tray_Exit", "Quit Kaption");
                 if (charactersItem != null) charactersItem.Text = GetLocalizedString("shell_Tray_Characters", "Characters");
+                if (fixLineItem != null) fixLineItem.Text = GetLocalizedString("Tray_FixLine", "Fix the last subtitle…");
                 if (startStopItem != null)
                     startStopItem.Text = (data?.IsOcrRunning?.Invoke() ?? false)
                         ? GetLocalizedString("shell_Tray_Stop", "Stop translating")

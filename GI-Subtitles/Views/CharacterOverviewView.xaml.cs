@@ -79,7 +79,7 @@ namespace GI_Subtitles.Views
         }
 
         // The page link follows the strings in use: Polish opens the Polish page, every other language the English one. The
-        // rotation chips' flag words ("opcjonalnie") follow them too.
+        // rotation strips' words (flags, headings, the source link and tooltips) follow them too.
         private void SyncSiteLanguage()
         {
             var vm = Vm;
@@ -88,7 +88,16 @@ namespace GI_Subtitles.Views
             var en = RotationWords.English;
             string Word(string key, string fallback) => TryFindResource(key) is string s && s.Length > 0 ? s : fallback;
             vm.SetRotationWords(new RotationWords(Word("Char_Rotation_Hold", en.Hold), Word("Char_Rotation_Optional", en.Optional),
-                Word("Char_Rotation_Either", en.Either)));
+                Word("Char_Rotation_Either", en.Either))
+            {
+                Guide = Word("Char_Rotation", en.Guide),
+                Suggested = Word("Char_Rotation_Suggested", en.Suggested),
+                Per = Word("Char_Rotation_Per", en.Per),
+                TipGuideFrom = Word("Char_Rotation_TipGuideFrom", en.TipGuideFrom),
+                TipGuide = Word("Char_Rotation_TipGuide", en.TipGuide),
+                TipSuggested = Word("Char_Rotation_TipSuggested", en.TipSuggested),
+                TipSuggestedFrom = Word("Char_Rotation_TipSuggestedFrom", en.TipSuggestedFrom),
+            });
         }
 
         // The title row (name, chips, the actions) stays clear of the art's opaque part; when the actions do not fit
@@ -252,9 +261,13 @@ namespace GI_Subtitles.Views
         }
 
         // Links come from game data verified at build time, and only https ever reaches the UI.
-        private void Link_Click(object sender, RoutedEventArgs e)
+        private void Link_Click(object sender, RoutedEventArgs e) => OpenHttps((sender as ButtonBase)?.Tag as string);
+
+        // A rotation's source link after its heading: the same rule, https only.
+        private void Hyperlink_Click(object sender, RoutedEventArgs e) => OpenHttps((sender as FrameworkContentElement)?.Tag as string);
+
+        private static void OpenHttps(string url)
         {
-            string url = (sender as ButtonBase)?.Tag as string;
             if (string.IsNullOrEmpty(url) || !Uri.TryCreate(url, UriKind.Absolute, out var uri) || uri.Scheme != Uri.UriSchemeHttps)
                 return;
             try

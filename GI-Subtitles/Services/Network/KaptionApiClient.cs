@@ -134,7 +134,7 @@ namespace GI_Subtitles.Services.Network
     /// would trip the 30-second limit. Separate client for downloads, cancellation
     /// via CancellationToken only.
     /// </summary>
-    public sealed class KaptionApiClient : IFileProtectionKeyClient
+    public sealed partial class KaptionApiClient : IFileProtectionKeyClient
     {
         // ── File-protection policy ────────────────────────────────────────
         // Bounds the client trusts on the server-returned pbkdf2_iterations.

@@ -101,7 +101,8 @@ namespace GI_Subtitles.Views.Shell
         {
             try
             {
-                foreach (string name in GameRegionProfile.Get(game)?.ProcessNames ?? Array.Empty<string>())
+                var profile = GameRegionProfile.Get(game);
+                foreach (string name in profile?.ProcessNames ?? Array.Empty<string>())
                 {
                     if (string.IsNullOrWhiteSpace(name)) continue;
                     foreach (var p in Process.GetProcessesByName(name))
@@ -111,6 +112,8 @@ namespace GI_Subtitles.Views.Shell
                             IntPtr hwnd;
                             try { hwnd = p.MainWindowHandle; } catch { continue; }
                             if (hwnd == IntPtr.Zero || !IsWindowVisible(hwnd) || IsIconic(hwnd)) continue;
+                            // A generic executable (WuWa's Unreal shell) is the game only with the game's title.
+                            if (profile.RequiresWindowTitle && !GameProcessMatch.TitleMatches(profile.WindowTitles, MainTitleOf(p))) continue;
                             if (DwmGetWindowAttribute(hwnd, DwmaExtendedFrameBounds, out RECT r, Marshal.SizeOf<RECT>()) != 0
                                 && !GetWindowRect(hwnd, out r)) continue;
                             if (r.Right - r.Left > 200 && r.Bottom - r.Top > 150)
@@ -124,6 +127,11 @@ namespace GI_Subtitles.Views.Shell
                 // No game window: the monitor is the frame.
             }
             return null;
+        }
+
+        private static string MainTitleOf(Process p)
+        {
+            try { return p.MainWindowTitle; } catch (InvalidOperationException) { return null; }
         }
 
         private const int DwmaExtendedFrameBounds = 9;

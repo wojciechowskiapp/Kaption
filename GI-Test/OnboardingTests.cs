@@ -210,7 +210,7 @@ namespace GI_Test
                 case OnboardingStep.Game:
                     ((StatusMark)Find("DetectMark")).State = MarkState.Done;
                     ((TextBlock)Find("DetectText")).Text = string.Format(culture, L("onb_Game_Detected_Format", "{0}"), "Genshin Impact");
-                    ((RadioButton)Find("GameGenshin")).IsChecked = true;
+                    GamePicker<RadioButton>(Find, "GameRadios", "Genshin").IsChecked = true;
                     ((TextBlock)Find("RegionStatus")).Text = L("onb_Region_Auto");
                     ((TextBlock)Find("RegionMonitor")).Text = string.Format(culture, L("shell_Region_Monitor_Format", "{0}"), 1, 2560, 1440);
                     ((UIElement)Find("DisplayModeNotice")).Visibility = Visibility.Visible;

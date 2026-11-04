@@ -184,15 +184,9 @@
                                 </Grid>
                             </Border>
                             <TextBlock Text="{DynamicResource onb_Game_Pick}" Style="{StaticResource FieldLabel}" Margin="0,0,0,8"/>
-                            <WrapPanel Margin="0,0,0,16">
-                                <RadioButton x:Name="GameGenshin" Style="{StaticResource SegmentRadio}" GroupName="OnbGame" Content="Genshin Impact"
-                                             Tag="Genshin" Checked="Game_Checked"/>
-                                <RadioButton x:Name="GameStarRail" Style="{StaticResource SegmentRadio}" GroupName="OnbGame" Content="Honkai: Star Rail"
-                                             Tag="StarRail" Checked="Game_Checked"/>
-                                <RadioButton x:Name="GameZzz" Style="{StaticResource SegmentRadio}" GroupName="OnbGame" Content="Zenless Zone Zero"
-                                             Tag="ZZZ" Checked="Game_Checked"/>
-                            </WrapPanel>
-                            <!-- Genshin in exclusive full screen hides the overlay: said here, inline, instead of a modal later. -->
+                            <!-- One radio per registered game, built from the game manifests (BuildGameRadios). -->
+                            <WrapPanel x:Name="GameRadios" Margin="0,0,0,16"/>
+                            <!-- A game whose manifest asks for the display-mode tip (Genshin): said here, inline, instead of a modal later. -->
                             <Border x:Name="DisplayModeNotice" Style="{StaticResource Callout}" Background="{DynamicResource WarnLightBrush}"
                                     Margin="0,0,0,16" Visibility="Collapsed">
                                 <Grid>

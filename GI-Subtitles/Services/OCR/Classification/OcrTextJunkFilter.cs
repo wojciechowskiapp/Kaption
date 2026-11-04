@@ -20,9 +20,10 @@ namespace GI_Subtitles.Services.OCR.Classification
     /// to treat "everything was junk" as "keep the original set" rather than as
     /// an empty frame — see <see cref="GeometryTextBlockClassifier"/>.</para>
     ///
-    /// <para><b>Not applied to the accent path.</b> Genshin and Star Rail must
-    /// stay byte-identical across the classifier refactor, and neither has ever
-    /// had a junk filter.</para>
+    /// <para><b>On the accent path only when the profile asks</b>
+    /// (<c>FiltersOcrJunk</c>, Wuthering Waves: its free-roam region holds the HP
+    /// and level readouts). Genshin and Star Rail never set it and stay
+    /// byte-identical; there an all-junk frame is simply an empty frame.</para>
     /// </summary>
     public static class OcrTextJunkFilter
     {

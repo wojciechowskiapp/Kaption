@@ -158,9 +158,73 @@ namespace GI_Subtitles.Core.Input
                     {
                         Id = 9006, IsCtrl = true, IsShift = true, SelectedKey = 'Q',
                         Description = GetLocalizedString("Hotkey_9006_Description", "Translate the last area again")
+                    },
+                    new HotkeyData
+                    {
+                        Id = FixLineHotkeyId, IsCtrl = true, IsShift = true, SelectedKey = 'E',
+                        Description = GetLocalizedString("Hotkey_9007_Description", "Fix the last subtitle")
                     }
                 }
             };
+        }
+
+        /// <summary>"Fix this line": opens the fix window for the last subtitle shown.</summary>
+        public const int FixLineHotkeyId = 9007;
+
+        /// <summary>Keys a hotkey can use in Settings: A-Z, 0-9 and the backtick.</summary>
+        public static List<char> AvailableKeys()
+        {
+            var keys = new List<char>(37);
+            for (char c = 'A'; c <= 'Z'; c++) keys.Add(c);
+            for (char c = '0'; c <= '9'; c++) keys.Add(c);
+            keys.Add('`');
+            return keys;
+        }
+
+        private static readonly object RegistrationGate = new object();
+        private static readonly HashSet<int> NotRegistered = new HashSet<int>();
+
+        /// <summary>Settings reports each RegisterHotKey result, so copy never names a shortcut another app owns.</summary>
+        public static void ReportRegistration(int id, bool registered)
+        {
+            lock (RegistrationGate)
+            {
+                if (registered) NotRegistered.Remove(id);
+                else NotRegistered.Add(id);
+            }
+        }
+
+        /// <summary>
+        /// "Ctrl+Shift+E" for the binding with <paramref name="id"/> in the saved settings; null when it is not bound
+        /// (the merge leaves a default out when the user already uses its combination for something else) or when
+        /// Windows refused to register it.
+        /// </summary>
+        public static string DescribeBinding(int id)
+        {
+            lock (RegistrationGate)
+            {
+                if (NotRegistered.Contains(id)) return null;
+            }
+            try
+            {
+                var hotkey = LoadSettings().Hotkeys?.Find(h => h.Id == id);
+                return hotkey == null || hotkey.SelectedKey == '\0' ? null : Describe(hotkey);
+            }
+            catch (Exception ex)
+            {
+                Logger.Log.Warn($"Could not read the hotkey settings: {ex.Message}");
+                return null;
+            }
+        }
+
+        public static string Describe(HotkeyData hotkey)
+        {
+            var parts = new List<string>(4);
+            if (hotkey.IsCtrl) parts.Add("Ctrl");
+            if (hotkey.IsShift) parts.Add("Shift");
+            if (hotkey.IsAlt) parts.Add("Alt");
+            if (hotkey.SelectedKey != '\0') parts.Add(char.ToUpperInvariant(hotkey.SelectedKey).ToString());
+            return string.Join("+", parts);
         }
     }
 

@@ -44,7 +44,7 @@ namespace GI_Test
             var merged = HotkeySettingsManager.MergeMissingDefaults(OldSave(), HotkeySettingsManager.GetDefaultSettings());
             var added = merged.Hotkeys.Single(h => h.Id == 9006);
             Assert.AreEqual('Q', added.SelectedKey);
-            Assert.AreEqual(7, merged.Hotkeys.Count);
+            Assert.AreEqual(HotkeySettingsManager.GetDefaultSettings().Hotkeys.Count, merged.Hotkeys.Count, "every later default arrives too");
         }
 
         [TestMethod]

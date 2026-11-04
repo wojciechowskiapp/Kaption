@@ -1,0 +1,286 @@
+{
+  "registeredGameIds": [
+    "Genshin",
+    "StarRail",
+    "ZZZ"
+  ],
+  "profiles": [
+    {
+      "GameId": "Genshin",
+      "DisplayName": "Genshin Impact",
+      "Aliases": null,
+      "ProcessNames": [
+        "GenshinImpact",
+        "YuanShen"
+      ],
+      "WindowTitles": [
+        "Genshin Impact"
+      ],
+      "RequiresWindowTitle": false,
+      "DialogueXPct": 0.1,
+      "DialogueYPct": 0.66,
+      "DialogueWPct": 0.8,
+      "DialogueHPct": 0.29,
+      "AnswerXPct": 0.58,
+      "AnswerYPct": 0.38,
+      "AnswerWPct": 0.35,
+      "AnswerHPct": 0.38,
+      "OcrIntervalMs": 100,
+      "StabilityWindowFrames": 5,
+      "StableFramesChain": 2,
+      "StableFramesDefault": 2,
+      "ForceOcrAfterSeconds": 0.25,
+      "UsesGeometryClassifier": false,
+      "StripsSpeakerNameDecoration": false,
+      "SubtitlePadVertical": -140,
+      "RegionSplitXFraction": 0.55,
+      "RegionMinWidthFraction": 0.7,
+      "StrictRegionJunkFilter": false,
+      "UsesSpeakerRowClassifier": false,
+      "FiltersOcrJunk": false
+    },
+    {
+      "GameId": "StarRail",
+      "DisplayName": "Honkai: Star Rail",
+      "Aliases": null,
+      "ProcessNames": [
+        "StarRail"
+      ],
+      "WindowTitles": [
+        "Honkai: Star Rail"
+      ],
+      "RequiresWindowTitle": false,
+      "DialogueXPct": 0.15,
+      "DialogueYPct": 0.75,
+      "DialogueWPct": 0.7,
+      "DialogueHPct": 0.2,
+      "AnswerXPct": 0.55,
+      "AnswerYPct": 0.38,
+      "AnswerWPct": 0.38,
+      "AnswerHPct": 0.3,
+      "OcrIntervalMs": 60,
+      "StabilityWindowFrames": 2,
+      "StableFramesChain": 2,
+      "StableFramesDefault": 2,
+      "ForceOcrAfterSeconds": 0.15,
+      "UsesGeometryClassifier": false,
+      "StripsSpeakerNameDecoration": false,
+      "SubtitlePadVertical": -140,
+      "RegionSplitXFraction": 0.55,
+      "RegionMinWidthFraction": 0.7,
+      "StrictRegionJunkFilter": false,
+      "UsesSpeakerRowClassifier": false,
+      "FiltersOcrJunk": false
+    },
+    {
+      "GameId": "ZZZ",
+      "DisplayName": "Zenless Zone Zero",
+      "Aliases": [
+        "Zenless",
+        "ZenlessZoneZero",
+        "Zenless Zone Zero",
+        "Zenless-Zone-Zero"
+      ],
+      "ProcessNames": [
+        "ZenlessZoneZero"
+      ],
+      "WindowTitles": [
+        "Zenless Zone Zero",
+        "ZenlessZoneZero"
+      ],
+      "RequiresWindowTitle": false,
+      "DialogueXPct": 0.13,
+      "DialogueYPct": 0.7,
+      "DialogueWPct": 0.74,
+      "DialogueHPct": 0.27,
+      "AnswerXPct": 0.55,
+      "AnswerYPct": 0.38,
+      "AnswerWPct": 0.38,
+      "AnswerHPct": 0.3,
+      "OcrIntervalMs": 60,
+      "StabilityWindowFrames": 2,
+      "StableFramesChain": 2,
+      "StableFramesDefault": 2,
+      "ForceOcrAfterSeconds": 0.15,
+      "UsesGeometryClassifier": true,
+      "StripsSpeakerNameDecoration": true,
+      "SubtitlePadVertical": -180,
+      "RegionSplitXFraction": 0.55,
+      "RegionMinWidthFraction": 0.55,
+      "StrictRegionJunkFilter": true,
+      "UsesSpeakerRowClassifier": false,
+      "FiltersOcrJunk": false
+    }
+  ],
+  "fallback": {
+    "GameId": "NotAGame",
+    "DisplayName": "NotAGame",
+    "Aliases": null,
+    "ProcessNames": [],
+    "WindowTitles": [],
+    "RequiresWindowTitle": false,
+    "DialogueXPct": 0.15,
+    "DialogueYPct": 0.75,
+    "DialogueWPct": 0.7,
+    "DialogueHPct": 0.2,
+    "AnswerXPct": 0.55,
+    "AnswerYPct": 0.38,
+    "AnswerWPct": 0.38,
+    "AnswerHPct": 0.3,
+    "OcrIntervalMs": null,
+    "StabilityWindowFrames": null,
+    "StableFramesChain": null,
+    "StableFramesDefault": null,
+    "ForceOcrAfterSeconds": null,
+    "UsesGeometryClassifier": false,
+    "StripsSpeakerNameDecoration": false,
+    "SubtitlePadVertical": -140,
+    "RegionSplitXFraction": 0.55,
+    "RegionMinWidthFraction": 0.7,
+    "StrictRegionJunkFilter": false,
+    "UsesSpeakerRowClassifier": false,
+    "FiltersOcrJunk": false
+  },
+  "fallbackForNull": {
+    "GameId": "Unknown",
+    "DisplayName": "Unknown",
+    "Aliases": null,
+    "ProcessNames": [],
+    "WindowTitles": [],
+    "RequiresWindowTitle": false,
+    "DialogueXPct": 0.15,
+    "DialogueYPct": 0.75,
+    "DialogueWPct": 0.7,
+    "DialogueHPct": 0.2,
+    "AnswerXPct": 0.55,
+    "AnswerYPct": 0.38,
+    "AnswerWPct": 0.38,
+    "AnswerHPct": 0.3,
+    "OcrIntervalMs": null,
+    "StabilityWindowFrames": null,
+    "StableFramesChain": null,
+    "StableFramesDefault": null,
+    "ForceOcrAfterSeconds": null,
+    "UsesGeometryClassifier": false,
+    "StripsSpeakerNameDecoration": false,
+    "SubtitlePadVertical": -140,
+    "RegionSplitXFraction": 0.55,
+    "RegionMinWidthFraction": 0.7,
+    "StrictRegionJunkFilter": false,
+    "UsesSpeakerRowClassifier": false,
+    "FiltersOcrJunk": false
+  },
+  "resolve": {
+    "[Genshin]": {
+      "gameId": "Genshin",
+      "registered": true
+    },
+    "[genshin]": {
+      "gameId": "Genshin",
+      "registered": true
+    },
+    "[GENSHIN]": {
+      "gameId": "Genshin",
+      "registered": true
+    },
+    "[ Genshin ]": {
+      "gameId": "Genshin",
+      "registered": true
+    },
+    "[Genshin Impact]": {
+      "gameId": "Genshin Impact",
+      "registered": false
+    },
+    "[StarRail]": {
+      "gameId": "StarRail",
+      "registered": true
+    },
+    "[starrail]": {
+      "gameId": "StarRail",
+      "registered": true
+    },
+    "[Star Rail]": {
+      "gameId": "Star Rail",
+      "registered": false
+    },
+    "[HSR]": {
+      "gameId": "HSR",
+      "registered": false
+    },
+    "[hsr]": {
+      "gameId": "hsr",
+      "registered": false
+    },
+    "[Honkai: Star Rail]": {
+      "gameId": "Honkai: Star Rail",
+      "registered": false
+    },
+    "[ZZZ]": {
+      "gameId": "ZZZ",
+      "registered": true
+    },
+    "[zzz]": {
+      "gameId": "ZZZ",
+      "registered": true
+    },
+    "[ ZZZ ]": {
+      "gameId": "ZZZ",
+      "registered": true
+    },
+    "[Zenless]": {
+      "gameId": "ZZZ",
+      "registered": true
+    },
+    "[zenless]": {
+      "gameId": "ZZZ",
+      "registered": true
+    },
+    "[ZenlessZoneZero]": {
+      "gameId": "ZZZ",
+      "registered": true
+    },
+    "[Zenless Zone Zero]": {
+      "gameId": "ZZZ",
+      "registered": true
+    },
+    "[Zenless-Zone-Zero]": {
+      "gameId": "ZZZ",
+      "registered": true
+    },
+    "[zenless zone zero]": {
+      "gameId": "ZZZ",
+      "registered": true
+    },
+    "[NotAGame]": {
+      "gameId": "NotAGame",
+      "registered": false
+    },
+    "[Genshin1TypoFromConfig]": {
+      "gameId": "Genshin1TypoFromConfig",
+      "registered": false
+    },
+    "[]": {
+      "gameId": "",
+      "registered": false
+    },
+    "[   ]": {
+      "gameId": "   ",
+      "registered": false
+    },
+    "(null)": {
+      "gameId": "Unknown",
+      "registered": false
+    }
+  },
+  "displayNameOf": {
+    "[Genshin]": "Genshin Impact",
+    "[starrail]": "Honkai: Star Rail",
+    "[ZZZ]": "Zenless Zone Zero",
+    "[Zenless]": "Zenless Zone Zero",
+    "[ Genshin ]": " Genshin ",
+    "[hsr]": "hsr",
+    "[NotAGame]": "NotAGame",
+    "[]": "",
+    "(null)": null
+  }
+}

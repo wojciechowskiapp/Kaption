@@ -41,12 +41,12 @@ namespace GI_Subtitles.Services.Detection
             // its available non-game name must win.
             if (isKnownGameProcessId && string.IsNullOrEmpty(normalizedProcess))
                 return ForegroundTarget.Game;
-            if (profile?.ProcessNames?.Any(name =>
-                    string.Equals(NormalizeProcessName(name), normalizedProcess,
-                        StringComparison.OrdinalIgnoreCase)) == true)
-            {
+            // The start gate checked this process, title included; the game's name on it means the id wasn't reused.
+            if (isKnownGameProcessId && GameProcessMatch.NameMatches(profile, normalizedProcess))
                 return ForegroundTarget.Game;
-            }
+            // A generic engine executable (RequiresWindowTitle) counts only with the game's title in front.
+            if (GameProcessMatch.Matches(profile, normalizedProcess, windowTitle))
+                return ForegroundTarget.Game;
 
             // Cloud gaming is an explicit, session-only user choice. Only in
             // that mode may a known cloud host or the expected game title stand

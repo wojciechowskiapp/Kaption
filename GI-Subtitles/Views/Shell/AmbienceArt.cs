@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Threading.Tasks;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using GI_Subtitles.Services.Games;
 using Logger = GI_Subtitles.Common.Logger;
 
 namespace GI_Subtitles.Views.Shell
@@ -17,13 +18,11 @@ namespace GI_Subtitles.Views.Shell
         public const string Welcome = "creators-hero";
         private static readonly ConcurrentDictionary<string, Task<ImageSource>> Cache = new(StringComparer.OrdinalIgnoreCase);
 
-        /// <summary>Asset name for a game tag (Genshin, StarRail, ZZZ and their aliases).</summary>
+        /// <summary>Asset name for any spelling of a listed game (its manifest's look.ambience); the first game's otherwise.</summary>
         public static string ForGame(string gameTag)
         {
-            string g = (gameTag ?? string.Empty).Replace(" ", "").Replace("-", "").ToLowerInvariant();
-            if (g is "starrail" or "hsr" or "honkaistarrail") return "starrail";
-            if (g is "zzz" or "zenless" or "zenlesszonezero") return "zzz";
-            return "genshin";
+            var registry = GameRegistry.Current;
+            return (registry.FindLoose(gameTag) ?? registry.Default)?.Look?.Ambience ?? "genshin";
         }
 
         public static Task<ImageSource> LoadAsync(string asset) =>

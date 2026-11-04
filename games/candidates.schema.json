@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kaption.one/schemas/candidates.schema.json",
+  "title": "Kaption game candidates",
+  "description": "Games players can vote for on the supported-games page. A key is the wire id the game would get: when a candidate becomes games/<key>.json, delete it here and its votes carry over.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "candidates"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "schema": { "const": 1 },
+    "candidates": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["key", "name", "steamAppId", "pitch"],
+        "properties": {
+          "key": { "type": "string", "pattern": "^[a-z][a-z0-9]{1,31}$" },
+          "name": { "type": "string", "minLength": 2, "maxLength": 60 },
+          "steamAppId": { "type": ["integer", "null"], "minimum": 1 },
+          "pitch": {
+            "description": "One line for the vote card. Player-facing: no mention of how the site is made.",
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["pl", "en"],
+            "properties": {
+              "pl": { "type": "string", "minLength": 10, "maxLength": 140 },
+              "en": { "type": "string", "minLength": 10, "maxLength": 140 }
+            }
+          }
+        }
+      }
+    }
+  }
+}

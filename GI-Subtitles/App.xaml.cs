@@ -1141,6 +1141,10 @@ namespace GI_Subtitles
 
                         if (license?.IsActivated == true)
                         {
+                            // Accepted community fixes and fixes still waiting to be sent, alongside the pack. Not
+                            // awaited: the Start button waits for this task, and the fixes are not needed to start.
+                            _ = GI_Subtitles.Services.Community.CommunitySync.SyncAsync(
+                                license.CurrentActivation?.DeviceSessionJwt, game, outputLang, cts);
                             var sync = new GI_Subtitles.Services.Translation.DictionarySyncService(
                                 new GI_Subtitles.Services.Network.KaptionApiClient(),
                                 license,

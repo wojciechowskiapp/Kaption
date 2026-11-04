@@ -112,10 +112,13 @@ namespace GI_Subtitles.Services.Detection
                 }
             }
 
+            // A generic executable (RequiresWindowTitle): only the window carrying the game's title is the game.
+            string[] requiredTitles = profile.RequiresWindowTitle ? profile.WindowTitles ?? Array.Empty<string>() : null;
+
             // Strategy 1: match by process ID (reliable)
             if (targetPids.Count > 0)
             {
-                var result = FindWindowByPids(targetPids);
+                var result = FindWindowByPids(targetPids, requiredTitles);
                 if (result != null)
                 {
                     if (Logger.IsDebugEnabled)
@@ -128,8 +131,9 @@ namespace GI_Subtitles.Services.Detection
                 }
             }
 
-            // Strategy 2: match by window title substring (fallback)
-            if (profile.WindowTitles != null && profile.WindowTitles.Length > 0)
+            // Strategy 2: match by window title substring (fallback). Not for a generic executable: a title alone
+            // would accept any window naming the game (a browser tab), and strategy 1 already looked for the titled one.
+            if (requiredTitles == null && profile.WindowTitles != null && profile.WindowTitles.Length > 0)
             {
                 var result = FindWindowByTitles(profile.WindowTitles);
                 if (result != null)
@@ -207,11 +211,13 @@ namespace GI_Subtitles.Services.Detection
 
         /// <summary>
         /// Enumerate all visible top-level windows and return the first one whose
-        /// owning process ID is in the target set.
+        /// owning process ID is in the target set and, when <paramref name="requiredTitles"/>
+        /// is given, whose title contains one of them.
         /// </summary>
-        private static WindowInfo? FindWindowByPids(HashSet<uint> targetPids)
+        private static WindowInfo? FindWindowByPids(HashSet<uint> targetPids, string[] requiredTitles)
         {
             WindowInfo? found = null;
+            var title = requiredTitles != null ? new StringBuilder(256) : null;
 
             EnumWindows((hWnd, _) =>
             {
@@ -221,6 +227,14 @@ namespace GI_Subtitles.Services.Detection
                 GetWindowThreadProcessId(hWnd, out uint pid);
                 if (!targetPids.Contains(pid))
                     return true; // continue
+
+                if (title != null)
+                {
+                    title.Clear();
+                    GetWindowText(hWnd, title, title.Capacity);
+                    if (!GameProcessMatch.TitleMatches(requiredTitles, title.ToString()))
+                        return true; // another window of the process (a launcher, a splash)
+                }
 
                 var info = GetWindowClientInfo(hWnd);
                 if (info != null && info.Value.GameW > 100 && info.Value.GameH > 100)

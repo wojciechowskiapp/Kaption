@@ -28,13 +28,15 @@ namespace GI_Subtitles.Views
         public static string GetText(DependencyObject d) => (string)d.GetValue(TextProperty);
         public static void SetText(DependencyObject d, string value) => d.SetValue(TextProperty, value);
 
-        // The markers SkillMarkers writes: game shorthands and the rank markers of constellations, eidolons, mindscapes.
+        // The markers SkillMarkers writes: game shorthands and the rank markers of constellations, eidolons, mindscapes
+        // and Wuthering Waves' Resonance Chain (S1-S6).
         private static readonly Regex Marker = new(
-            @" \((Q|E|Atak|Basic|Skill|Ult|Special|Chain|Dodge|Assist|Talent|Technique|[CEM]\d)\)", RegexOptions.CultureInvariant);
+            @" \((Q|E|Atak|Basic|Skill|Ult|Special|Chain|Dodge|Assist|Talent|Technique|Liberation|Forte|Intro|Outro|Tune Break|[CEMS]\d)\)",
+            RegexOptions.CultureInvariant);
 
         public static SkillChipKind KindOf(string marker) => marker switch
         {
-            "Q" or "Ult" or "Chain" => SkillChipKind.Burst,
+            "Q" or "Ult" or "Chain" or "Liberation" => SkillChipKind.Burst,
             "E" or "Skill" or "Special" => SkillChipKind.Skill,
             "Atak" or "Basic" => SkillChipKind.Normal,
             _ => SkillChipKind.Other,

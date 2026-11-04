@@ -119,5 +119,22 @@ namespace GI_Test
             Assert.AreEqual(-1, CharacterDetector.SkillIndexFor(record, "Fluttering Hasode deals damage"), "a sentence is not a title");
             Assert.AreEqual(-1, CharacterDetector.SkillIndexFor(null, "Fluttering Hasode"));
         }
+
+        [TestMethod]
+        public void Wuwa_AResonanceChainNodeOpensTheRanks_ASkillOpensTheSkills()
+        {
+            var catalog = CharacterCatalog.Load(new MemoryStream(Encoding.UTF8.GetBytes(CharacterWuwaTests.Json)), "WuWa");
+            var record = catalog.Find("1404");
+            var model = CharacterOverviewBuilder.Build(record, catalog, null);
+
+            var node = new QuickTranslateContext(model, record, new[] { "Versatility" });
+            Assert.AreEqual("Ranks", node.SectionToOpen, "a Resonance Chain node sits on the ladder");
+            Assert.AreEqual("Versatility (S2)", node.SkillTitle);
+            Assert.AreEqual("Skills", new QuickTranslateContext(model, record, new[] { "Windqueller" }).SectionToOpen);
+
+            Assert.AreEqual("S", SkillMarkers.RankLetterOfKind("Sequence"), "one rank table for markers, the ladder and the popup");
+            Assert.IsTrue(new[] { "constellation", "eidolon", "mindscape", "sequence" }.All(SkillMarkers.IsRankKind));
+            Assert.IsFalse(SkillMarkers.IsRankKind("forte") || SkillMarkers.IsRankKind(null));
+        }
     }
 }

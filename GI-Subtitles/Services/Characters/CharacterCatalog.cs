@@ -80,7 +80,7 @@ namespace GI_Subtitles.Services.Characters
         public AiLocalized Why { get; set; } = AiLocalized.Empty;
         /// <summary>Member id → the constellation / eidolon / mindscape (0..6) the team assumes; only members it matters for.</summary>
         public IReadOnlyDictionary<string, int> Ranks { get; set; } = new Dictionary<string, int>();
-        /// <summary>The rotations a guide states for this team (one or two), in the data's order; empty when none does.</summary>
+        /// <summary>The team's rotations (one or two), from a guide or suggested from the kits, in the data's order; empty when none.</summary>
         public IReadOnlyList<TeamRotation> Rotations { get; set; } = Array.Empty<TeamRotation>();
     }
 
@@ -109,9 +109,11 @@ namespace GI_Subtitles.Services.Characters
         public string Note { get; set; } = "";
     }
 
-    /// <summary>A rotation as a guide page states it for the team (the updater transcribes, never composes one).</summary>
+    /// <summary>A rotation for the team: as a guide page states it, or composed from the members' kits (<see cref="Origin"/>).</summary>
     public sealed class TeamRotation
     {
+        /// <summary><see cref="RotationNotation.OriginGuide"/> (also when the data says nothing) or <see cref="RotationNotation.OriginModel"/>.</summary>
+        public string Origin { get; set; } = RotationNotation.OriginGuide;
         /// <summary>The English name of the member this rotation is for when the page offers alternatives ("Prune"), else "".</summary>
         public string Variant { get; set; } = "";
         public IReadOnlyList<RotationStep> Steps { get; set; } = Array.Empty<RotationStep>();
@@ -119,6 +121,11 @@ namespace GI_Subtitles.Services.Characters
         public IReadOnlyDictionary<string, string> Combo { get; set; } = new Dictionary<string, string>();
         /// <summary>Every member has a turn (true) or someone sits out (false); null when the data does not say. Not shown.</summary>
         public bool? Covers { get; set; }
+        /// <summary>The guide page's https URL (<see cref="RotationSource"/>); "" when the data has none or a bad one. A suggested
+        /// rotation carries one when it was adapted from that guide's rotation for a similar team.</summary>
+        public string Source { get; set; } = "";
+        /// <summary>A suggested rotation adapted from a guide's rotation for a near-identical team; null when the data does not say. Not shown.</summary>
+        public bool? Adapted { get; set; }
     }
 
     /// <summary>
@@ -600,7 +607,14 @@ namespace GI_Subtitles.Services.Characters
                 variant = Squash(v.GetString());
                 if (variant.Length > MaxVariantLength) return null;
             }
-            if (!Flag(r, "covers", out bool? covers)) return null;
+            if (!Flag(r, "covers", out bool? covers) || !Flag(r, "adapted", out bool? adapted)) return null;
+            // Absent or null reads as a guide's (older bundles); any other value than "guide" / "model" skips the rotation.
+            string origin = RotationNotation.OriginGuide;
+            if (r.TryGetProperty("origin", out var o) && o.ValueKind != JsonValueKind.Null)
+            {
+                origin = o.ValueKind == JsonValueKind.String ? (o.GetString() ?? "").Trim() : "";
+                if (!RotationNotation.IsOrigin(origin)) return null;
+            }
             if (!r.TryGetProperty("steps", out var s) || s.ValueKind != JsonValueKind.Array) return null;
             int count = s.GetArrayLength();
             if (count == 0 || count > MaxRotationSteps) return null;
@@ -618,7 +632,9 @@ namespace GI_Subtitles.Services.Characters
                 string text = p.Value.ValueKind == JsonValueKind.String ? Squash(p.Value.GetString()) : "";
                 if (members.Contains(p.Name) && text.Length > 0 && text.Length <= MaxComboLength) combo[p.Name] = text;
             }
-            return new TeamRotation { Variant = variant, Steps = steps, Combo = combo, Covers = covers };
+            // A bad source is no source: the rotation still shows, its heading without the link.
+            string source = r.TryGetProperty("source", out var src) && src.ValueKind == JsonValueKind.String ? RotationSource.Normalize(src.GetString()) : "";
+            return new TeamRotation { Origin = origin, Variant = variant, Steps = steps, Combo = combo, Covers = covers, Source = source, Adapted = adapted };
         }
 
         private static RotationStep ReadRotationStep(JsonElement e, IReadOnlyCollection<string> members)

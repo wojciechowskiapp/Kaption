@@ -1,0 +1,78 @@
+{
+  "$schema": "./candidates.schema.json",
+  "schema": 1,
+  "candidates": [
+    {
+      "key": "endfield",
+      "name": "Arknights: Endfield",
+      "steamAppId": 4732690,
+      "pitch": {
+        "pl": "Fabularne RPG sci-fi ze świata Arknights. Polskiej wersji nie ma.",
+        "en": "Story-driven sci-fi RPG set in the Arknights world. There's no Polish option."
+      }
+    },
+    {
+      "key": "wherewindsmeet",
+      "name": "Where Winds Meet",
+      "steamAppId": 3564740,
+      "pitch": {
+        "pl": "Wuxia z otwartym światem i masą dialogów. W polskich recenzjach na Steamie gracze proszą o napisy.",
+        "en": "Open-world wuxia RPG with a mountain of dialogue. Polish players ask for subtitles in their Steam reviews."
+      }
+    },
+    {
+      "key": "poe2",
+      "name": "Path of Exile 2",
+      "steamAppId": 2694490,
+      "pitch": {
+        "pl": "Action RPG bez polskiej wersji. Mało która gra zbiera na Steamie tyle polskich próśb o spolszczenie.",
+        "en": "Action RPG with no Polish version. Few games on Steam get as many Polish reviews asking for a translation."
+      }
+    },
+    {
+      "key": "yakuza",
+      "name": "Yakuza / Like a Dragon",
+      "steamAppId": 638970,
+      "pitch": {
+        "pl": "Kryminalna saga Segi, od Yakuzy 0 po Like a Dragon. Żadna część nie ma polskiego.",
+        "en": "Sega's crime saga, Yakuza 0 through Like a Dragon. Not one of the games has Polish."
+      }
+    },
+    {
+      "key": "nte",
+      "name": "Neverness to Everness",
+      "steamAppId": 4508340,
+      "pitch": {
+        "pl": "Miejskie RPG z otwartym światem, nowe rozdziały fabuły co sześć tygodni. Polskiego brak.",
+        "en": "Urban open-world RPG that gets new story chapters every six weeks. No Polish."
+      }
+    },
+    {
+      "key": "umamusume",
+      "name": "Umamusume: Pretty Derby",
+      "steamAppId": 3224770,
+      "pitch": {
+        "pl": "Symulator treningu pełen scenek fabularnych. Jedyny język w grze to angielski.",
+        "en": "Training sim full of story events, and English is its only language."
+      }
+    },
+    {
+      "key": "limbus",
+      "name": "Limbus Company",
+      "steamAppId": 1973530,
+      "pitch": {
+        "pl": "Turowe RPG, a fabuła to długie rozdziały w stylu visual novel. Polskiego nie ma.",
+        "en": "Turn-based RPG told in long visual-novel chapters. No Polish."
+      }
+    },
+    {
+      "key": "ffxiv",
+      "name": "Final Fantasy XIV",
+      "steamAppId": 39210,
+      "pitch": {
+        "pl": "MMO od Square Enix z fabułą rozpisaną na kolejne dodatki. Oficjalnie bez polskiego.",
+        "en": "Square Enix's story MMO, with years of expansions to read. No official Polish."
+      }
+    }
+  ]
+}

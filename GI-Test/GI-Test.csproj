@@ -72,6 +72,13 @@
   <ItemGroup>
     <ProjectReference Include="..\GI-Subtitles\GI-Subtitles.csproj" />
     <ProjectReference Include="..\PaddleOCRSharp\PaddleOCRSharp.csproj" />
+    <!-- Publish Studio's source helpers (commit-pinned URLs, version checks) are tested here too. The public source
+         mirror has no Publish Studio (scripts/publish-source.sh), so there the reference and its tests drop out. -->
+    <ProjectReference Include="..\Kaption.PublishStudio\Kaption.PublishStudio.csproj" Condition="Exists('..\Kaption.PublishStudio\Kaption.PublishStudio.csproj')" />
+  </ItemGroup>
+
+  <ItemGroup Condition="!Exists('..\Kaption.PublishStudio\Kaption.PublishStudio.csproj')">
+    <Compile Remove="PublishStudioSourceTests.cs" />
   </ItemGroup>
 
 </Project>

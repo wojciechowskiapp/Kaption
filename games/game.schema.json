@@ -1,0 +1,284 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kaption.one/schemas/game.schema.json",
+  "title": "Kaption game manifest",
+  "description": "One file per game: games/<id>.json, where the file name is the wire id. Read by the desktop (embedded at build time), the site, the backend catalog and the updater tests. Validate with: node tools/games/validate.cjs",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "id", "gameId", "name", "shortName", "publisher", "status", "order", "aliases", "steamAppId", "look", "source", "translation", "news"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "schema": { "const": 1 },
+    "id": {
+      "description": "Wire id: R2 keys, D1 `game`, CLI --game, the bundle's game. Always gameId lower-cased. Never changes.",
+      "$ref": "#/$defs/wireId"
+    },
+    "gameId": {
+      "description": "Desktop GameId: Config[\"Game\"], the %APPDATA%\\Kaption\\<gameId>\\ folder and the Game_<gameId> string key. Never changes.",
+      "type": "string",
+      "pattern": "^[A-Za-z][A-Za-z0-9]{1,31}$"
+    },
+    "name": { "type": "string", "minLength": 2, "maxLength": 60 },
+    "shortName": { "description": "Label for tight spots (the site's game chips).", "type": "string", "minLength": 2, "maxLength": 24 },
+    "publisher": { "type": "string", "minLength": 2, "maxLength": 60 },
+    "status": {
+      "description": "planned: catalog and vote only. beta, live: desktop and site. withdrawn: nowhere.",
+      "enum": ["planned", "beta", "live", "withdrawn"]
+    },
+    "order": { "description": "UI order, unique across manifests.", "type": "integer", "minimum": 1, "maximum": 999 },
+    "aliases": {
+      "description": "Other spellings of gameId that Config.json may hold. They resolve to this game's desktop profile.",
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 2, "maxLength": 64, "pattern": "^\\S(.*\\S)?$" }
+    },
+    "legacyIds": {
+      "description": "Other wire ids older tools used for this game (starrail was hsr). Only the loose lookups (art, accents) read them; desktop profile lookup never does.",
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/wireId" }
+    },
+    "steamAppId": { "type": ["integer", "null"], "minimum": 1 },
+    "detect": { "$ref": "#/$defs/detect" },
+    "desktop": { "$ref": "#/$defs/desktop" },
+    "look": { "$ref": "#/$defs/look" },
+    "site": { "$ref": "#/$defs/site" },
+    "source": { "$ref": "#/$defs/source" },
+    "translation": { "$ref": "#/$defs/translation" },
+    "news": { "$ref": "#/$defs/news" }
+  },
+  "allOf": [
+    {
+      "if": { "required": ["status"], "properties": { "status": { "enum": ["beta", "live"] } } },
+      "then": { "required": ["detect", "desktop", "site"] }
+    }
+  ],
+  "$defs": {
+    "wireId": { "type": "string", "pattern": "^[a-z][a-z0-9]{1,31}$" },
+    "fraction": { "type": "number", "minimum": 0, "maximum": 1 },
+    "rect": {
+      "description": "A region as fractions of the 16:9 reference area inside the game window.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["x", "y", "w", "h"],
+      "properties": {
+        "x": { "$ref": "#/$defs/fraction" },
+        "y": { "$ref": "#/$defs/fraction" },
+        "w": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 },
+        "h": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 }
+      }
+    },
+    "colour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+    "detect": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["processNames", "windowTitles"],
+      "properties": {
+        "processNames": {
+          "description": "Win32 process names without .exe.",
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1, "maxLength": 64, "pattern": "^[^\\\\/:*?\"<>|]+$" }
+        },
+        "windowTitles": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1, "maxLength": 120 }
+        },
+        "requireTitle": {
+          "description": "true: a process counts as the game only while one of its windows has a title from windowTitles. For generic engine executables such as Unreal's Client-Win64-Shipping. Absent means false.",
+          "type": "boolean"
+        }
+      }
+    },
+    "desktop": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["dialogue", "answer", "dialogueContext", "upstreamTextMap", "displayModeTip"],
+      "properties": {
+        "dialogue": { "$ref": "#/$defs/rect" },
+        "answer": { "$ref": "#/$defs/rect" },
+        "pacing": {
+          "description": "Per-game OCR pacing defaults. A key left out means the global default (GameOcrTuning). Bounds are the resolver's clamp.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "ocrIntervalMs": { "type": "integer", "minimum": 50, "maximum": 1000 },
+            "stabilityWindowFrames": { "type": "integer", "minimum": 1, "maximum": 30 },
+            "stableFramesChain": { "type": "integer", "minimum": 1, "maximum": 30 },
+            "stableFramesDefault": { "type": "integer", "minimum": 1, "maximum": 30 },
+            "forceOcrAfterSeconds": { "type": "number", "minimum": 0.1, "maximum": 10 }
+          }
+        },
+        "vision": {
+          "description": "Every key optional; a key left out keeps the shipping (accent) default.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "classifier": {
+              "description": "Speaker/body split. accent: the name is in an accent colour. geometry: the name is the narrow top row (name and body share a colour). speaker-row: the name is the top row of a centred dialogue column, accent-coloured or in a larger font; rows that start right of the column are side panels.",
+              "enum": ["accent", "geometry", "speaker-row"]
+            },
+            "stripsSpeakerNameDecoration": { "type": "boolean" },
+            "subtitlePadVertical": { "type": "integer", "minimum": -1000, "maximum": 1000 },
+            "regionSplitXFraction": { "type": "number", "exclusiveMinimum": 0, "exclusiveMaximum": 1 },
+            "regionMinWidthFraction": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 },
+            "strictRegionJunkFilter": { "type": "boolean" },
+            "ocrJunkFilter": { "description": "Drop HUD readouts, watermarks and stray glyphs (OcrTextJunkFilter) before the speaker/body split on every frame. The geometry classifier always does.", "type": "boolean" }
+          }
+        },
+        "dialogueContext": {
+          "description": "Dialogue strategy set. Only passthrough exists; anything else fails closed like an unknown game.",
+          "enum": ["passthrough"]
+        },
+        "upstreamTextMap": {
+          "description": "Runtime TextMap mirror for the source languages. none: the bundle carries the map (minted key space).",
+          "enum": ["dimbreath-genshin", "dimbreath-starrail", "none"]
+        },
+        "displayModeTip": { "description": "The one-time display-mode tip before the first start.", "type": "boolean" },
+        "playerNameTokens": {
+          "description": "The player's default name as the subtitle text spells it, each replaced by the name set in Settings. Left out: Traveler and traveler, the app's behaviour before manifests.",
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 4,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 2, "maxLength": 30, "pattern": "^[\\p{L}][\\p{L} '-]*[\\p{L}]$" }
+        },
+        "notes": {
+          "description": "For maintainers: which values are measured and which are provisional. No consumer reads it.",
+          "type": "array",
+          "items": { "type": "string", "minLength": 1, "maxLength": 400 }
+        }
+      }
+    },
+    "look": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["accent", "ambience"],
+      "properties": {
+        "accent": { "description": "The game's accent on dark surfaces (site, desktop dark palette).", "$ref": "#/$defs/colour" },
+        "accentDark": { "description": "The accent deepened for light surfaces (desktop light palette). Defaults to accent.", "$ref": "#/$defs/colour" },
+        "glow": { "description": "The Start hero's glow behind the art. Defaults to accent.", "$ref": "#/$defs/colour" },
+        "ambience": { "description": "Ambience art name: GI-Subtitles/Assets/Ambience/<ambience>.jpg.", "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+        "elementHues": {
+          "description": "Element colours this game draws differently from the shared table, or adds (English element names).",
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/colour" }
+        }
+      }
+    },
+    "site": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["hub", "guideKey", "guide"],
+      "properties": {
+        "hub": { "description": "Public URL slug. Never changes for an existing game.", "$ref": "#/$defs/slug" },
+        "guideKey": { "description": "guide-pages.ts key of the game's guide (honkai for Star Rail).", "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+        "guide": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["pl", "en"],
+          "properties": {
+            "pl": { "type": "string", "pattern": "^/pl/[a-z0-9]+(?:-[a-z0-9]+)*/$" },
+            "en": { "type": "string", "pattern": "^/[a-z0-9]+(?:-[a-z0-9]+)*/$" }
+          }
+        },
+        "ogBackground": { "description": "Key art for generated update images, relative to landing/.", "type": "string", "pattern": "^src/assets/[A-Za-z0-9_./-]+\\.(?:jpg|jpeg|png|webp)$" }
+      }
+    },
+    "slug": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$", "maxLength": 80 },
+    "source": {
+      "description": "Where the English comes from.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind"],
+      "properties": {
+        "kind": { "enum": ["datamine", "local", "live", "licensed"] },
+        "host": { "enum": ["github", "gitlab", "gitea"] },
+        "repo": { "type": "string", "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$" },
+        "branch": { "description": "@default follows the remote HEAD.", "type": "string", "pattern": "^(?:@default|[A-Za-z0-9._/-]+)$" },
+        "keySpace": { "enum": ["upstream-hash", "minted"] }
+      },
+      "allOf": [
+        {
+          "if": { "required": ["kind"], "properties": { "kind": { "const": "datamine" } } },
+          "then": { "required": ["host", "repo", "branch", "keySpace"] }
+        }
+      ]
+    },
+    "translation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["targets", "sources"],
+      "properties": {
+        "targets": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "pattern": "^[a-z]{2}$" } },
+        "sources": {
+          "description": "auto: the VPS updater's packs. community: accepted player suggestions.",
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "enum": ["auto", "community"] }
+        }
+      }
+    },
+    "news": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["hoyolabGid", "officialFeeds", "codes"],
+      "properties": {
+        "hoyolabGid": { "description": "HoYoLAB game id; null off HoYoLAB.", "type": ["integer", "null"], "minimum": 1 },
+        "officialFeeds": {
+          "description": "Official news sources the news worker reads, keyed by kind.",
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {
+                "description": "An official YouTube channel (its RSS feed).",
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["kind", "channelId"],
+                "properties": {
+                  "kind": { "const": "youtube" },
+                  "channelId": { "type": "string", "pattern": "^UC[A-Za-z0-9_-]{22}$" }
+                }
+              },
+              {
+                "description": "Kuro Games' official site news list (JSON).",
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["kind", "url"],
+                "properties": {
+                  "kind": { "const": "kuro" },
+                  "url": { "type": "string", "pattern": "^https://[^\\s]+$" }
+                }
+              }
+            ]
+          }
+        },
+        "codes": {
+          "description": "null: the game has no redeem codes. hoyolab: the news worker reads the HoYoLAB codes panel and the site has a codes page with a redeem link. ingame: codes are redeemed only inside the game and no source is read yet, so there is no codes page.",
+          "oneOf": [
+            { "type": "null" },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["kind", "redeemUrl"],
+              "properties": {
+                "kind": { "const": "hoyolab" },
+                "redeemUrl": { "type": "string", "pattern": "^https://[^\\s]*\\{code\\}[^\\s]*$" }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["kind", "redeemUrl"],
+              "properties": {
+                "kind": { "const": "ingame" },
+                "redeemUrl": { "type": "null" }
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}

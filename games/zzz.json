@@ -1,0 +1,46 @@
+{
+  "$schema": "./game.schema.json",
+  "schema": 1,
+  "id": "zzz",
+  "gameId": "ZZZ",
+  "name": "Zenless Zone Zero",
+  "shortName": "ZZZ",
+  "publisher": "HoYoverse",
+  "status": "live",
+  "order": 3,
+  "aliases": ["Zenless", "ZenlessZoneZero", "Zenless Zone Zero", "Zenless-Zone-Zero"],
+  "steamAppId": null,
+  "detect": {
+    "processNames": ["ZenlessZoneZero"],
+    "windowTitles": ["Zenless Zone Zero", "ZenlessZoneZero"]
+  },
+  "desktop": {
+    "dialogue": { "x": 0.13, "y": 0.70, "w": 0.74, "h": 0.27 },
+    "answer": { "x": 0.55, "y": 0.38, "w": 0.38, "h": 0.30 },
+    "pacing": { "ocrIntervalMs": 60, "stabilityWindowFrames": 2, "stableFramesChain": 2, "stableFramesDefault": 2, "forceOcrAfterSeconds": 0.15 },
+    "vision": {
+      "classifier": "geometry",
+      "stripsSpeakerNameDecoration": true,
+      "subtitlePadVertical": -180,
+      "regionMinWidthFraction": 0.55,
+      "strictRegionJunkFilter": true
+    },
+    "dialogueContext": "passthrough",
+    "upstreamTextMap": "none",
+    "displayModeTip": false
+  },
+  "look": { "accent": "#C9CEDC", "accentDark": "#5B6272", "glow": "#FF8A2B", "ambience": "zzz", "elementHues": { "Physical": "#E6B83A" } },
+  "site": {
+    "hub": "zenless-zone-zero",
+    "guideKey": "zzz",
+    "guide": { "pl": "/pl/zenless-zone-zero-tlumaczenie/", "en": "/zenless-zone-zero-translator/" },
+    "ogBackground": "src/assets/og/ai/zzz.jpg"
+  },
+  "source": { "kind": "datamine", "host": "gitea", "repo": "dimbreath/ZenlessData", "branch": "master", "keySpace": "minted" },
+  "translation": { "targets": ["pl"], "sources": ["auto", "community"] },
+  "news": {
+    "hoyolabGid": 8,
+    "officialFeeds": [{ "kind": "youtube", "channelId": "UC2SpC8rL9LaeQriE4YNdyzA" }],
+    "codes": { "kind": "hoyolab", "redeemUrl": "https://zenless.hoyoverse.com/redemption?code={code}" }
+  }
+}

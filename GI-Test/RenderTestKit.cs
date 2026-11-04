@@ -13,6 +13,7 @@ using System.Windows.Markup;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
+using GI_Subtitles.Services.Detection;
 using GI_Subtitles.Views;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
@@ -249,6 +250,18 @@ namespace GI_Test
         private static readonly Regex LocalNamespace = new Regex(
             "(xmlns:\\w+=\"clr-namespace:[\\w.]+)\"", RegexOptions.CultureInvariant);
 
+        /// <summary>The game pickers the windows' constructors build from the registered games, built the same way.</summary>
+        public static void BuildGamePickers(Window window)
+        {
+            if (window.FindName("GamePills") is Panel pills) SettingsWindow.BuildGamePills(pills, GameRegionProfile.RegisteredProfiles, null);
+            if (window.FindName("GameSelector") is ComboBox selector) SettingsWindow.FillGameSelector(selector, GameRegionProfile.RegisteredProfiles);
+            if (window.FindName("GameRadios") is Panel radios) OnboardingWindow.BuildGameRadios(radios, GameRegionProfile.RegisteredProfiles, null);
+        }
+
+        /// <summary>The picker entry for <paramref name="gameId"/> inside a named panel (GamePills, GameRadios).</summary>
+        public static T GamePicker<T>(Func<string, object> find, string panel, string gameId) where T : FrameworkElement =>
+            ((Panel)find(panel)).Children.OfType<T>().First(e => string.Equals(e.Tag as string, gameId, StringComparison.Ordinal));
+
         /// <summary>
         /// Parses GI-Subtitles/&lt;viewPath&gt; without x:Class and event handlers, then moves the content into a
         /// plain host that carries the window's background, its resources and the UI strings. Code-behind never
@@ -265,6 +278,7 @@ namespace GI_Test
 
             var context = new ParserContext { BaseUri = Pack(viewPath) };
             window = (Window)XamlReader.Parse(xaml, context);
+            BuildGamePickers(window);
             var content = (UIElement)window.Content;
             var resources = window.Resources;
             window.Content = null;

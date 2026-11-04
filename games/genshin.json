@@ -1,0 +1,40 @@
+{
+  "$schema": "./game.schema.json",
+  "schema": 1,
+  "id": "genshin",
+  "gameId": "Genshin",
+  "name": "Genshin Impact",
+  "shortName": "Genshin",
+  "publisher": "HoYoverse",
+  "status": "live",
+  "order": 1,
+  "aliases": [],
+  "steamAppId": null,
+  "detect": {
+    "processNames": ["GenshinImpact", "YuanShen"],
+    "windowTitles": ["Genshin Impact"]
+  },
+  "desktop": {
+    "dialogue": { "x": 0.10, "y": 0.66, "w": 0.80, "h": 0.29 },
+    "answer": { "x": 0.58, "y": 0.38, "w": 0.35, "h": 0.38 },
+    "pacing": { "ocrIntervalMs": 100, "stabilityWindowFrames": 5, "stableFramesChain": 2, "stableFramesDefault": 2, "forceOcrAfterSeconds": 0.25 },
+    "vision": {},
+    "dialogueContext": "passthrough",
+    "upstreamTextMap": "dimbreath-genshin",
+    "displayModeTip": true
+  },
+  "look": { "accent": "#F2B84B", "accentDark": "#A86A05", "glow": "#F2B84B", "ambience": "genshin" },
+  "site": {
+    "hub": "genshin-impact",
+    "guideKey": "genshin",
+    "guide": { "pl": "/pl/genshin-impact-tlumaczenie/", "en": "/genshin-impact-translator/" },
+    "ogBackground": "src/assets/og/ai/genshin.jpg"
+  },
+  "source": { "kind": "datamine", "host": "gitlab", "repo": "Dimbreath/animegamedata2", "branch": "main", "keySpace": "upstream-hash" },
+  "translation": { "targets": ["pl"], "sources": ["auto", "community"] },
+  "news": {
+    "hoyolabGid": 2,
+    "officialFeeds": [{ "kind": "youtube", "channelId": "UCiS882YPwZt1NfaM0gR0D9Q" }],
+    "codes": { "kind": "hoyolab", "redeemUrl": "https://genshin.hoyoverse.com/en/gift?code={code}" }
+  }
+}

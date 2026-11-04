@@ -555,7 +555,8 @@ namespace GI_Test
                     "a release note from yesterday shows the card");
 
             // Game page: pills, packs list, the dialogue area on a real Genshin frame.
-            ((Button)Find("GamePillGenshin")).Style = host.TryFindResource("ModernButton") as Style ?? ((Button)Find("GamePillGenshin")).Style;
+            var genshinPill = GamePicker<Button>(Find, "GamePills", "Genshin");
+            genshinPill.Style = host.TryFindResource("ModernButton") as Style ?? genshinPill.Style;
             ((Button)Find("InputPillEN")).Style = host.TryFindResource("ModernButton") as Style ?? ((Button)Find("InputPillEN")).Style;
             TranslationPackInfo.Lookup = key => host.TryFindResource(key);
             var packs = new List<TranslationPackInfo>

@@ -204,11 +204,8 @@
                             <Button x:Name="RegionButton" Click="RegionButton_Click"/>
                             <TextBlock Name="inputFilePathDate"/><TextBlock Name="outputFilePathDate"/>
                             <TextBlock Name="RepoModifiedDate"/>
-                            <ComboBox Name="GameSelector">
-                                <ComboBoxItem Content="Genshin Impact" Tag="Genshin" IsSelected="True"/>
-                                <ComboBoxItem Content="Honkai: Star Rail" Tag="StarRail"/>
-                                <ComboBoxItem Content="Zenless Zone Zero" Tag="ZZZ"/>
-                            </ComboBox>
+                            <!-- One item per registered game, filled from the game manifests (FillGameSelector). -->
+                            <ComboBox Name="GameSelector"/>
                             <!-- No Chinese recognizer ships, so CHS stays out of the reading choice. -->
                             <ComboBox x:Name="InputLanguageCombo" SelectionChanged="InputLanguageCombo_SelectionChanged">
                                 <ComboBoxItem Content="English" Tag="EN" IsSelected="True"/>
@@ -550,17 +547,8 @@
                         <Border Style="{StaticResource Card}">
                             <StackPanel>
                                 <TextBlock Style="{StaticResource CardTitle}" Text="{DynamicResource shell_Game_Card_Title}" Margin="0,0,0,12"/>
-                                <WrapPanel>
-                                    <Button x:Name="GamePillGenshin" Tag="Genshin" Style="{StaticResource SecondaryButton}"
-                                            Content="Genshin Impact" MinWidth="140" Padding="14,0" Margin="0,0,8,8"
-                                            Click="TranslationsGamePill_Click" ToolTip="{DynamicResource Tip_Translations_Game}"/>
-                                    <Button x:Name="GamePillStarRail" Tag="StarRail" Style="{StaticResource SecondaryButton}"
-                                            Content="Honkai: Star Rail" MinWidth="140" Padding="14,0" Margin="0,0,8,8"
-                                            Click="TranslationsGamePill_Click" ToolTip="{DynamicResource Tip_Translations_Game}"/>
-                                    <Button x:Name="GamePillZZZ" Tag="ZZZ" Style="{StaticResource SecondaryButton}"
-                                            Content="Zenless Zone Zero" MinWidth="140" Padding="14,0" Margin="0,0,8,8"
-                                            Click="TranslationsGamePill_Click" ToolTip="{DynamicResource Tip_Translations_Game}"/>
-                                </WrapPanel>
+                                <!-- One pill per registered game, built from the game manifests (BuildGamePills). -->
+                                <WrapPanel x:Name="GamePills"/>
                                 <TextBlock Text="{DynamicResource shell_Game_SwitchRestarts}" FontSize="{StaticResource FontSizeSmall}"
                                            Foreground="{DynamicResource TextTertiaryBrush}" TextWrapping="Wrap" Margin="0,0,0,4"/>
                                 <!-- Another supported game is on screen: one click to switch to it. -->
@@ -741,6 +729,48 @@
                                                     <Setter TargetName="version" Property="Visibility" Value="Collapsed"/>
                                                 </DataTrigger>
                                             </DataTemplate.Triggers>
+                                        </DataTemplate>
+                                    </ListView.ItemTemplate>
+                                </ListView>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- My fixes: the player's own versions of lines for this game, over the pack on this PC only. -->
+                        <Border x:Name="MyFixesCard" Style="{StaticResource Card}" Padding="0" ClipToBounds="True"
+                                Loaded="MyFixesCard_Loaded" Unloaded="MyFixesCard_Unloaded">
+                            <StackPanel>
+                                <StackPanel Margin="20,16,20,10">
+                                    <TextBlock Style="{StaticResource CardTitle}" Text="{DynamicResource fix_Mine_Title}" Margin="0"/>
+                                    <TextBlock Style="{StaticResource HintText}" Text="{DynamicResource fix_Mine_Hint}" Margin="0,4,0,0"/>
+                                    <TextBlock x:Name="MyFixesPending" Style="{StaticResource HintText}" Margin="0,4,0,0" Visibility="Collapsed"/>
+                                </StackPanel>
+                                <TextBlock x:Name="MyFixesEmpty" Style="{StaticResource BodyText}" Margin="20,0,20,16"/>
+                                <ListView x:Name="MyFixesList" Background="Transparent" BorderThickness="0" MaxHeight="360"
+                                          ScrollViewer.HorizontalScrollBarVisibility="Disabled" Visibility="Collapsed"
+                                          Foreground="{DynamicResource TextBrush}" Margin="0,0,0,6">
+                                    <ListView.ItemContainerStyle>
+                                        <Style TargetType="ListViewItem" BasedOn="{StaticResource PlainListItem}"/>
+                                    </ListView.ItemContainerStyle>
+                                    <ListView.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border BorderBrush="{DynamicResource HairlineBrush}" BorderThickness="0,1,0,0">
+                                                <Grid Margin="20,10,16,10">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <StackPanel VerticalAlignment="Center">
+                                                        <TextBlock Text="{Binding Text}" TextWrapping="Wrap" Foreground="{DynamicResource TextBrush}"
+                                                                   FontSize="{StaticResource FontSizeBody}"/>
+                                                        <TextBlock Text="{Binding English}" TextWrapping="Wrap" TextTrimming="CharacterEllipsis" MaxHeight="36"
+                                                                   Foreground="{DynamicResource TextTertiaryBrush}" FontSize="{StaticResource FontSizeSmall}"
+                                                                   Margin="0,3,0,0" ToolTip="{Binding English}"/>
+                                                    </StackPanel>
+                                                    <Button Grid.Column="1" Style="{StaticResource SecondaryButton}" Content="{DynamicResource fix_Mine_Delete}"
+                                                            ToolTip="{DynamicResource fix_Mine_Delete_Tip}" Tag="{Binding Key}" Click="MyFixDelete_Click"
+                                                            VerticalAlignment="Center" Margin="14,0,0,0"/>
+                                                </Grid>
+                                            </Border>
                                         </DataTemplate>
                                     </ListView.ItemTemplate>
                                 </ListView>

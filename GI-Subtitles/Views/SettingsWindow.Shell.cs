@@ -86,6 +86,7 @@ namespace GI_Subtitles.Views
             ThemeService.ThemeChanged += OnThemeChanged;
             NetworkChange.NetworkAvailabilityChanged += OnNetworkAvailabilityChanged;
             DictionarySyncService.DownloadProgress += OnPackDownloadProgress;
+            PackAvailability.Changed += OnPackAvailabilityChanged;
 
             if (LogListView != null)
                 ((INotifyCollectionChanged)LogListView.Items).CollectionChanged += (_, __) => UpdateLogsEmptyState();
@@ -115,6 +116,7 @@ namespace GI_Subtitles.Views
                 ThemeService.ThemeChanged -= OnThemeChanged;
                 NetworkChange.NetworkAvailabilityChanged -= OnNetworkAvailabilityChanged;
                 DictionarySyncService.DownloadProgress -= OnPackDownloadProgress;
+                PackAvailability.Changed -= OnPackAvailabilityChanged;
             };
         }
 
@@ -176,10 +178,54 @@ namespace GI_Subtitles.Views
         /// <summary>Switch game the way the game buttons do (writes Config, offers the restart).</summary>
         internal void SwitchGame(string gameId)
         {
-            string id = GameRegionProfile.Get(gameId).GameId;
-            var pill = new[] { GamePillGenshin, GamePillStarRail, GamePillZZZ }
-                .FirstOrDefault(b => string.Equals(b?.Tag as string, id, StringComparison.OrdinalIgnoreCase));
+            Button pill = GamePillFor(GameRegionProfile.Get(gameId).GameId);
             if (pill != null) TranslationsGamePill_Click(pill, new RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent, pill));
+        }
+
+        // ── Game pickers: one entry per registered game (games/<id>.json) ───
+
+        private IReadOnlyList<Button> _gamePills = Array.Empty<Button>();
+
+        private void InitGamePickers()
+        {
+            _gamePills = BuildGamePills(GamePills, GameRegionProfile.RegisteredProfiles, TranslationsGamePill_Click);
+            FillGameSelector(GameSelector, GameRegionProfile.RegisteredProfiles);
+        }
+
+        private Button GamePillFor(string gameId) =>
+            _gamePills.FirstOrDefault(b => string.Equals(b.Tag as string, gameId, StringComparison.OrdinalIgnoreCase));
+
+        /// <summary>The game pills on Gra i napisy, one per registered game. Static so the render tests build the same row.</summary>
+        internal static List<Button> BuildGamePills(Panel host, IEnumerable<GameRegionProfile> games, RoutedEventHandler onClick)
+        {
+            host.Children.Clear();
+            var pills = new List<Button>();
+            foreach (GameRegionProfile game in games)
+            {
+                var pill = new Button
+                {
+                    Tag = game.GameId,
+                    MinWidth = 140,
+                    Padding = new Thickness(14, 0, 14, 0),
+                    Margin = new Thickness(0, 0, 8, 8),
+                };
+                GamePickerContent.Apply(pill, game);   // a beta game carries a Beta badge
+                pill.SetResourceReference(StyleProperty, "SecondaryButton");
+                pill.SetResourceReference(ToolTipProperty, "Tip_Translations_Game");
+                if (onClick != null) pill.Click += onClick;
+                host.Children.Add(pill);
+                pills.Add(pill);
+            }
+            return pills;
+        }
+
+        /// <summary>The hidden compatibility game combo, one item per registered game, the first selected.</summary>
+        internal static void FillGameSelector(ComboBox selector, IEnumerable<GameRegionProfile> games)
+        {
+            selector.Items.Clear();
+            foreach (GameRegionProfile game in games)
+                selector.Items.Add(new ComboBoxItem { Content = game.DisplayName, Tag = game.GameId });
+            if (selector.Items.Count > 0) selector.SelectedIndex = 0;
         }
 
         /// <summary>The one-time Genshin display-mode tip, inline on Start (the start gate calls this).</summary>
@@ -340,6 +386,7 @@ namespace GI_Subtitles.Views
                 Offline = !_online,
                 PackOnDisk = dictLoaded || _packOnDisk,
                 PackMissing = Matcher?.Loaded == true && !dictLoaded,
+                PackComing = PackAvailability.IsComing(Config.Get("Game", "Genshin"), Config.Get("Output", "PL")),
                 DeviceLimit = SessionNotices.DeviceLimitReached,
                 WaitingForGame = IsWaitingForGame?.Invoke() ?? false,
                 GameName = GameRegionProfile.DisplayNameOf(Config.Get("Game", "Genshin")),
@@ -411,6 +458,12 @@ namespace GI_Subtitles.Views
                 case StartCardKind.PackMissing:
                     titleText = L("shell_Card_PackMissing", "No subtitles for this game yet");
                     detail = L("shell_Card_PackMissing_Detail", "Download the pack on Game and subtitles, then start again.");
+                    break;
+                case StartCardKind.PackComing:
+                    titleText = L("shell_Card_PackComing", "Subtitles for this game are on the way");
+                    detail = string.Format(culture, L("shell_Card_PackComing_Detail_Format",
+                        "{0} is new in Kaption. When its subtitles are out, Kaption downloads them the next time you open it."),
+                        i.GameName ?? string.Empty);
                     break;
                 case StartCardKind.AutoStartBlocked:
                     titleText = L("shell_Card_AutoStartBlocked", "Auto-start on hold");
@@ -506,6 +559,7 @@ namespace GI_Subtitles.Views
                     => (L("shell_Status_Busy", "Getting ready"), "WarnBrush"),
                 StartCardKind.ReaderFailed or StartCardKind.ReaderUnavailable or StartCardKind.Offline or StartCardKind.DeviceLimit or StartCardKind.PackMissing
                     => (L("shell_Status_Problem", "Needs attention"), "ErrorBrush"),
+                StartCardKind.PackComing => (L("shell_Status_Coming", "Coming soon"), "TextTertiaryBrush"),
                 _ => (L("shell_Status_Stopped", "Stopped"), "TextTertiaryBrush"),
             };
             if (find("DashOcrDetailStatus") is TextBlock label) label.Text = text;
@@ -548,12 +602,13 @@ namespace GI_Subtitles.Views
             }
             else
             {
-                DashDictStatus.Text = i.PackMissing
-                    ? L("Dash_Status_TranslationDataMissing", "Translation data missing")
+                bool coming = i.PackMissing && i.PackComing;
+                DashDictStatus.Text = coming ? L("shell_Chip_DictComing", "Subtitles on the way")
+                    : i.PackMissing ? L("Dash_Status_TranslationDataMissing", "Translation data missing")
                     : L("shell_Chip_DictLoading", "Loading dictionary");
                 DictChip.ToolTip = null;
             }
-            DashDictStatus.SetResourceReference(TextBlock.ForegroundProperty, i.PackMissing ? "ErrorBrush" : "TextSecondaryBrush");
+            DashDictStatus.SetResourceReference(TextBlock.ForegroundProperty, i.PackMissing && !i.PackComing ? "ErrorBrush" : "TextSecondaryBrush");
         }
 
         /// <summary>The tray icon's state for the Start card's state: the same groups (and colours) as the status chip.</summary>
@@ -638,6 +693,10 @@ namespace GI_Subtitles.Views
         private void OnPackDownloadProgress(DictionarySyncService.DownloadProgressInfo info) =>
             Dispatcher.BeginInvoke(new Action(UpdateDashboardStatus), DispatcherPriority.Background);
 
+        // A listing came back: a beta game's empty list turns "download the pack" into "on the way".
+        private void OnPackAvailabilityChanged() =>
+            Dispatcher.BeginInvoke(new Action(UpdateDashboardStatus), DispatcherPriority.Background);
+
         private void OnThemeChanged(object sender, EventArgs e)
         {
             SyncThemeRadios();
@@ -688,13 +747,7 @@ namespace GI_Subtitles.Views
             string asset = AmbienceArt.ForGame(game);
             if (find("StateCardArt") is ImageBrush art) art.Viewbox = ArtFrame(asset);
             if (!(find("StateCardGlow") is Border glowLayer)) return;
-            string key = asset switch
-            {
-                "starrail" => "GameStarRailGlowColor",
-                "zzz" => "GameZzzGlowColor",
-                _ => "GameGenshinGlowColor",
-            };
-            glowLayer.Background = resource(key) is Color c ? GlowBrush(c) : null;
+            glowLayer.Background = resource(GI_Subtitles.Themes.GameLook.GlowColorKey(game)) is Color c ? GlowBrush(c) : null;
         }
 
         /// <summary>
@@ -725,12 +778,7 @@ namespace GI_Subtitles.Views
             return glow;
         }
 
-        private static string AccentKeyFor(string game) => AmbienceArt.ForGame(game) switch
-        {
-            "starrail" => "GameStarRailBrush",
-            "zzz" => "GameZzzBrush",
-            _ => "GameGenshinBrush",
-        };
+        private static string AccentKeyFor(string game) => GI_Subtitles.Themes.GameLook.AccentBrushKey(game);
 
         private async Task ApplyCardArtAsync(string game)
         {
@@ -1131,9 +1179,7 @@ namespace GI_Subtitles.Views
         private void GameDetectedSwitch_Click(object sender, RoutedEventArgs e)
         {
             if (_detectedGame == null) return;
-            string id = GameRegionProfile.Get(_detectedGame).GameId;
-            var pill = new[] { GamePillGenshin, GamePillStarRail, GamePillZZZ }
-                .FirstOrDefault(b => string.Equals(b?.Tag as string, id, StringComparison.OrdinalIgnoreCase));
+            Button pill = GamePillFor(GameRegionProfile.Get(_detectedGame).GameId);
             if (pill != null) TranslationsGamePill_Click(pill, new RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent, pill));
             GameDetectedHint.Visibility = Visibility.Collapsed;
         }

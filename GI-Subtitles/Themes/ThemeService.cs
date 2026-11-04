@@ -34,6 +34,8 @@ namespace GI_Subtitles.Themes
         public static void Initialize()
         {
             Preference = Parse(Config.Get<string>(ConfigKey, null));
+            // Colour keys for listed games that Tokens.xaml doesn't define (a game added by manifest only).
+            if (Application.Current != null) GameLook.AddMissingTokens(Application.Current.Resources);
             Refresh();
             if (_listening) return;
             _listening = true;
@@ -80,6 +82,10 @@ namespace GI_Subtitles.Themes
             }
         }
 
+        /// <summary>A palette with the rail indicator of every listed game, the manifest-only ones included.</summary>
+        public static ResourceDictionary LoadPalette(bool dark) =>
+            GameLook.AddMissingPaletteKeys(new ResourceDictionary { Source = PaletteUri(dark) }, dark);
+
         public static Uri PaletteUri(bool dark) =>
             new Uri($"pack://application:,,,/Themes/Palette.{(dark ? "Dark" : "Light")}.xaml", UriKind.Absolute);
 
@@ -116,9 +122,9 @@ namespace GI_Subtitles.Themes
             AppTheme next = Resolve(Preference, ReadWindowsAppsUseLightTheme(), SystemParameters.HighContrast);
             ResourceDictionary palette = next switch
             {
-                AppTheme.Light => _light ??= new ResourceDictionary { Source = PaletteUri(false) },
-                AppTheme.HighContrast => HighContrastPalette(_light ??= new ResourceDictionary { Source = PaletteUri(false) }),
-                _ => _dark ??= new ResourceDictionary { Source = PaletteUri(true) },
+                AppTheme.Light => _light ??= LoadPalette(dark: false),
+                AppTheme.HighContrast => HighContrastPalette(_light ??= LoadPalette(dark: false)),
+                _ => _dark ??= LoadPalette(dark: true),
             };
             bool changed = next != Current;
             try

@@ -66,6 +66,7 @@ using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
 using GI_Subtitles.Common;
+using GI_Subtitles.Services.Games;
 
 namespace GI_Subtitles.Services.Translation
 {
@@ -241,26 +242,25 @@ namespace GI_Subtitles.Services.Translation
         /// both pull it from Gitea at publish time), never a runtime
         /// download.</para>
         ///
-        /// <para>An unregistered game returns false, which matches what
-        /// <see cref="ResolveUpstream"/> already did for it.</para>
+        /// <para>Which mirror a game has is its manifest's
+        /// <c>desktop.upstreamTextMap</c>. An unregistered game returns false,
+        /// which matches what <see cref="ResolveUpstream"/> already did for it.</para>
         /// </summary>
         public static bool IsUpstreamMirrored(string game, string lang)
         {
             if (string.IsNullOrEmpty(game) || string.IsNullOrEmpty(lang)) return false;
 
-            switch (game.ToLowerInvariant())
-            {
-                case "genshin":
-                case "starrail":
-                    return MirroredDimbreath.Contains(lang);
-                case "zzz":
-                    // Not an oversight, and not a claim about what ZenlessData
-                    // carries — see the remarks above.
-                    return false;
-                default:
-                    return false;
-            }
+            // The manifest's desktop.upstreamTextMap ("none" for ZZZ, see above); matched on the wire id only.
+            return UpstreamMirrorOf(game) is GameDesktop.MirrorGenshin or GameDesktop.MirrorStarRail
+                   && MirroredDimbreath.Contains(lang);
         }
+
+        private static string UpstreamMirrorOf(string game) =>
+            GameRegistry.Current.FindByWireId(game.ToLowerInvariant())?.Desktop?.UpstreamTextMap;
+
+        // The Genshin mirror splits each TextMap into a Small and a Medium shard; the others ship one file.
+        private static bool HasMediumShard(string game) =>
+            !string.IsNullOrEmpty(game) && UpstreamMirrorOf(game) == GameDesktop.MirrorGenshin;
 
         /// <summary>
         /// Resolve the upstream URL + source label for (game, lang).
@@ -274,14 +274,14 @@ namespace GI_Subtitles.Services.Translation
 
             // Keep the URL shapes in one place so this auto-check path and any
             // manual re-download path someone adds later cannot drift.
-            switch ((game ?? string.Empty).ToLowerInvariant())
+            switch (UpstreamMirrorOf(game))
             {
-                case "genshin":
+                case GameDesktop.MirrorGenshin:
                     return (
                         $"https://gitlab.com/Dimbreath/animegamedata2/-/raw/main/TextMap/TextMap{lang.ToUpperInvariant()}.json",
                         "gitlab:Dimbreath/animegamedata2"
                     );
-                case "starrail":
+                case GameDesktop.MirrorStarRail:
                     return (
                         $"https://gitlab.com/Dimbreath/turnbasedgamedata/-/raw/main/TextMap/TextMap{lang.ToUpperInvariant()}.json?inline=false",
                         "gitlab:Dimbreath/turnbasedgamedata"
@@ -370,7 +370,7 @@ namespace GI_Subtitles.Services.Translation
                     // Medium-shard merge once if the file looks like the
                     // Small-only shard (<30 MB). Subsequent launches are
                     // cheap because the Medium shard has its own sidecar.
-                    if (string.Equals(game, "Genshin", StringComparison.OrdinalIgnoreCase))
+                    if (HasMediumShard(game))
                     {
                         long sizeOnDisk = new FileInfo(jsonPath).Length;
                         if (sizeOnDisk < 30L * 1024 * 1024)
@@ -553,7 +553,7 @@ namespace GI_Subtitles.Services.Translation
                         // non-fatal — matcher still works on the Small
                         // shard's corpus, just without full dialogue
                         // coverage.
-                        if (string.Equals(game, "Genshin", StringComparison.OrdinalIgnoreCase))
+                        if (HasMediumShard(game))
                         {
                             try
                             {
@@ -602,7 +602,7 @@ namespace GI_Subtitles.Services.Translation
         private async Task<bool> RefreshGenshinMediumAfterUnchangedSmallAsync(
             string game, string lang, string jsonPath, string gameDir, CancellationToken ct)
         {
-            if (!string.Equals(game, "Genshin", StringComparison.OrdinalIgnoreCase))
+            if (!HasMediumShard(game))
                 return false;
 
             try

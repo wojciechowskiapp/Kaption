@@ -171,6 +171,10 @@ namespace GI_Subtitles.Views
         readonly int distant = Config.Get<int>("Distant", 3);
         [DllImport("user32.dll", CharSet = CharSet.Auto)]
         public static extern int SetWindowPos(IntPtr hWnd, int hWndInsertAfter, int x, int y, int Width, int Height, int flags);
+        // SWP_NOSIZE | SWP_NOMOVE | SWP_NOACTIVATE: keep the overlay topmost without taking the game's focus. Without
+        // NOACTIVATE the OCR tick activated the overlay while Kaption still held foreground rights, e.g. ~0.1 s after
+        // the fix window (Ctrl+Shift+E) handed focus back to the game.
+        private const int TopmostNoActivate = 0x0001 | 0x0002 | 0x0010;
         [DllImport("User32.dll")]
         private static extern int GetDpiForSystem();
         [DllImport("user32.dll")]
@@ -696,7 +700,7 @@ namespace GI_Subtitles.Views
                 Logger.Log.Warn($"Could not wire active-seconds reporter: {ex.Message}");
             }
 
-            SetWindowPos(new WindowInteropHelper(this).Handle, -1, 0, 0, 0, 0, 1 | 2);
+            SetWindowPos(new WindowInteropHelper(this).Handle, -1, 0, 0, 0, 0, TopmostNoActivate);
             this.Width = screenBounds.Width;
             this.Top = screenBounds.Bottom / Scale - this.Height;
             this.Left = screenBounds.Left / Scale;
@@ -1334,7 +1338,7 @@ namespace GI_Subtitles.Views
                             {
                                 if (IsOcrIntervalReady())
                                 {
-                                    SetWindowPos(new WindowInteropHelper(this).Handle, -1, 0, 0, 0, 0, 1 | 2);
+                                    SetWindowPos(new WindowInteropHelper(this).Handle, -1, 0, 0, 0, 0, TopmostNoActivate);
                                     TriggerOcrAsync(frameMat.Clone(), target, answerTarget, null);
                                     passedToOcr = true;
                                 }
@@ -1488,7 +1492,8 @@ namespace GI_Subtitles.Views
                                 var pred = data.ContextEngine.GetSingleChainPrediction();
                                 if (pred != null && !string.IsNullOrEmpty(pred.Value.Translation))
                                 {
-                                    _predictedContent = pred.Value.Translation;
+                                    _predictedContent = SubtitleComposer.Prediction(
+                                        LayersFor(data.Matcher), pred.Value.EnText, pred.Value.Translation);
                                     if (Logger.IsDebugEnabled)
                                     {
                                         Logger.Log.Debug($"Predictive pre-display: \"{pred.Value.Translation}\"");
@@ -1515,7 +1520,7 @@ namespace GI_Subtitles.Views
                                                 ? "Subtitle stable over window, start OCR"
                                                 : $"Subtitle eager preview ({gateDecision.StableFramesNeeded}+ stable frames), start OCR");
                                     }
-                                    SetWindowPos(new WindowInteropHelper(this).Handle, -1, 0, 0, 0, 0, 1 | 2);
+                                    SetWindowPos(new WindowInteropHelper(this).Handle, -1, 0, 0, 0, 0, TopmostNoActivate);
                                     TriggerOcrAsync(frameMat.Clone(), target, answerTarget, currentBinary.Clone());
                                     passedToOcr = true;
                                 }
@@ -1930,52 +1935,33 @@ namespace GI_Subtitles.Views
             {
                 try
                 {
-                    string res = "";
-                    string key = "";
-                    string header = "";
-                    string content = "";
-
-                    if (ocrText.Length > 1 && !GameUiTextFilter.IsLikelyGameUI(ocrText))
+                    var layers = LayersFor(data?.Matcher);
+                    bool hasOcrText = ocrText.Length > 1;
+                    SubtitleResolution resolution = default;
+                    if (hasOcrText && !GameUiTextFilter.IsLikelyGameUI(ocrText))
                     {
-                        var resolution = _subtitleResolver.Resolve(
+                        resolution = _subtitleResolver.Resolve(
                             ocrText, _detectedNpcName, data.ContextEngine, data.Matcher, data.contentDict);
-                        res = resolution.Result ?? "";
-                        key = resolution.Key ?? "";
-                        header = resolution.Header ?? "";
-                        content = resolution.Content ?? "";
                     }
 
-                    // If no translation found, check predictive pre-display
-                    bool displayingPrediction = false;
-                    if (string.IsNullOrEmpty(content) && ocrText.Length <= 1)
-                    {
-                        // No OCR text yet — use chain prediction if available
-                        string predicted = _predictedContent;
-                        if (!string.IsNullOrEmpty(predicted))
-                        {
-                            content = predicted;
-                            header = "";
-                            displayingPrediction = true;
-                        }
-                    }
-                    else if (string.IsNullOrEmpty(content) && ocrText.Length > 1)
-                    {
-                        content = "";
-                        header = "";
-                    }
+                    // Community fixes, then the player's own, over the pack (exact key, no allocation); with no text
+                    // read yet the chain prediction; the player's name last.
+                    string playerName = Config.Get<string>("PlayerName", "");
+                    var nameTokens = Services.Games.GameRegistry.PlayerNameTokens(Config.Get("Game", Game));
+                    var shown = SubtitleComposer.Compose(resolution, hasOcrText, _predictedContent, layers, playerName, nameTokens);
+                    string header = shown.Header;
+                    string content = shown.Content;
+                    bool displayingPrediction = shown.IsPrediction;
 
                     // Clear prediction once OCR confirms (content is set from OCR match)
-                    if (!string.IsNullOrEmpty(content) && _predictedContent != null && ocrText.Length > 1)
+                    if (!string.IsNullOrEmpty(content) && _predictedContent != null && hasOcrText)
                         _predictedContent = null;
 
                     _isFallbackText = false;
 
-                    // Replace "Traveler" with player's custom name in translations
-                    string playerName = Config.Get<string>("PlayerName", "");
-                    if (!string.IsNullOrEmpty(playerName) && !string.IsNullOrEmpty(content))
-                    {
-                        content = content.Replace("Traveler", playerName).Replace("traveler", playerName);
-                    }
+                    // For "fix this line": a matched line, before the player's name goes in.
+                    if (shown.Records)
+                        RememberShownLine(layers, shown.Key, shown.Layered, shown.PackText);
 
                     // When content becomes empty but subtitle is visible, keep showing
                     // the current text to prevent flicker from brief empty OCR frames.
@@ -2877,6 +2863,19 @@ namespace GI_Subtitles.Views
                 Logger.Log.Info("OCR start blocked: translation matcher has zero entries.");
                 try { if (!data.IsVisible) data.Show(); }
                 catch { /* non-fatal */ }
+                string game = Config.Get("Game", Game);
+                if (GI_Subtitles.Services.Translation.PackAvailability.IsComing(game, Config.Get("Output", "PL")))
+                {
+                    // A beta game whose first pack is not out: nothing to download, so no "download it" advice.
+                    GI_Subtitles.Views.ModernDialog.Info(
+                        owner: this,
+                        title: LocalizedString("Dialog_PackComing_Title", "Subtitles are on the way"),
+                        body: string.Format(System.Globalization.CultureInfo.CurrentUICulture,
+                            LocalizedString("Dialog_PackComing_Body_Format",
+                                "Subtitles for {0} are coming soon. When they're out, Kaption downloads them the next time you open it, and you can start translating."),
+                            Services.Detection.GameRegionProfile.DisplayNameOf(game)));
+                    return false;
+                }
                 GI_Subtitles.Views.ModernDialog.Warn(
                     owner: this,
                     title: LocalizedString("Dash_Status_TranslationDataMissing", "Translation data missing"),
@@ -2982,6 +2981,10 @@ namespace GI_Subtitles.Views
                             foreach (var process in processes) process.Dispose();
                         }
 
+                        // A generic executable (WuWa's Unreal shell) is the game only with one of the game's titles.
+                        if (profile.RequiresWindowTitle && _knownGameProcessIds.Count > 0)
+                            _knownGameProcessIds.IntersectWith(GI_Subtitles.Services.Detection.GameProcessMatch.GameProcesses(profile, _knownGameProcessIds));
+
                         if (_knownGameProcessIds.Count > 0)
                             return true;
                     }
@@ -3006,7 +3009,8 @@ namespace GI_Subtitles.Views
                     return true;
                 }
 
-                Logger.Log.Info($"OCR start blocked: no process match for '{gameKey}' ({string.Join(", ", profile.ProcessNames)}).");
+                string titled = profile.RequiresWindowTitle ? $" with a window titled {string.Join(" / ", profile.WindowTitles ?? Array.Empty<string>())}" : "";
+                Logger.Log.Info($"OCR start blocked: no process match for '{gameKey}' ({string.Join(", ", profile.ProcessNames)}){titled}.");
                 bool bypass = GI_Subtitles.Views.ModernDialog.Confirm(
                     owner: this,
                     title: LocalizedString("Dialog_GameNotFound_Title", "Game isn't running"),
@@ -3053,10 +3057,8 @@ namespace GI_Subtitles.Views
         {
             try
             {
-                // This dialog contains Genshin-specific menu paths and labels.
-                // Showing it for Star Rail/custom profiles is misleading.
-                if (!string.Equals(Config.Get("Game", Game ?? "Genshin"), "Genshin",
-                        StringComparison.OrdinalIgnoreCase))
+                // The tip names one game's menu paths and labels; its manifest says which (desktop.displayModeTip).
+                if (!Services.Games.GameRegistry.ShowsDisplayModeTip(Config.Get("Game", Game ?? "Genshin")))
                     return true;
 
                 if (Config.Get("FullscreenTipAcknowledged", false))
@@ -3794,7 +3796,7 @@ namespace GI_Subtitles.Views
                 }
 
                 _lastOcrTime = DateTime.UtcNow;
-                SetWindowPos(new WindowInteropHelper(this).Handle, -1, 0, 0, 0, 0, 1 | 2);
+                SetWindowPos(new WindowInteropHelper(this).Handle, -1, 0, 0, 0, 0, TopmostNoActivate);
                 TriggerOcrAsync(frameMat, target, null, null);
                 frameMat = null;
                 target = null;
@@ -3901,11 +3903,12 @@ namespace GI_Subtitles.Views
 
                 var engine = data.engine;
                 var matcher = data.Matcher;
+                var layers = LayersFor(matcher); // the player's and community fixes, as in the overlay
                 var mat = frameMat;
                 var bitmap = target;
                 frameMat = null; // ownership moves to the worker, which releases both
                 target = null;
-                var (segments, lines) = await Task.Run(() => RecognizeQuickTranslate(engine, matcher, mat, bitmap));
+                var (segments, lines) = await Task.Run(() => RecognizeQuickTranslate(engine, matcher, layers, mat, bitmap));
 
                 ShowQuickTranslatePopup(segments, selection);
                 if (lines.Count > 0) _ = AttachCharacterOverviewAsync(_quickTranslatePopup, lines);
@@ -3922,7 +3925,8 @@ namespace GI_Subtitles.Views
         }
 
         private (IReadOnlyList<QuickTranslateSegment> segments, IReadOnlyList<string> lines) RecognizeQuickTranslate(
-            PaddleOCREngine engine, OptimizedMatcher matcher, OpenCvSharp.Mat frame, System.Drawing.Bitmap captured)
+            PaddleOCREngine engine, OptimizedMatcher matcher, GI_Subtitles.Services.Community.TranslationLayers layers,
+            OpenCvSharp.Mat frame, System.Drawing.Bitmap captured)
         {
             var none = (Array.Empty<QuickTranslateSegment>(), (IReadOnlyList<string>)Array.Empty<string>());
             try
@@ -3936,7 +3940,8 @@ namespace GI_Subtitles.Views
                     return (new[] { QuickTranslateSegment.Unmatched(string.Join("\n", lines)) }, lines);
 
                 var clock = Stopwatch.StartNew();
-                var segments = QuickTranslateSegmenter.Segment(lines, QuickTranslateSegmenter.ProbeWith(matcher));
+                var probe = QuickTranslateSegmenter.ProbeWith(matcher);
+                var segments = QuickTranslateSegmenter.Segment(lines, layers?.Over(probe) ?? probe);
                 Logger.Log.Info($"QuickTranslate: {lines.Count} lines → {segments.Count} segments " +
                                 $"({segments.Count(s => s.IsMatched)} matched) in {clock.ElapsedMilliseconds} ms");
                 return (segments, lines);
@@ -4742,6 +4747,12 @@ namespace GI_Subtitles.Views
                         _ = RepeatQuickTranslateArea();
                     handled = true;
                 }
+                else if (wParam.ToInt32() == HOTKEY_ID_8)
+                {
+                    // Fix the last subtitle (Ctrl+Shift+E): no OCR, so no start gates.
+                    OpenSuggestFix(fromHotkey: true);
+                    handled = true;
+                }
             }
             return IntPtr.Zero;
         }
@@ -4830,6 +4841,9 @@ namespace GI_Subtitles.Views
                             license,
                             GI_Subtitles.Services.Security.FileProtectionFactory.Create());
 
+                        // Community fixes alongside the pack; never throws.
+                        _ = GI_Subtitles.Services.Community.CommunitySync.SyncAsync(
+                            license.CurrentActivation?.DeviceSessionJwt, Game, OutputLanguage, ct);
                         var result = await sync.SyncAsync(Game, OutputLanguage, ct).ConfigureAwait(false);
                         Logger.Log.Info(
                             $"DictionarySync (fallback): done — downloaded={result.Downloaded} " +

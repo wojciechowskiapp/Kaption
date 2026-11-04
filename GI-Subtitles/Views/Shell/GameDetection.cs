@@ -8,11 +8,15 @@ namespace GI_Subtitles.Views.Shell
 {
     /// <summary>
     /// Which supported game is running right now: one process-list pass matched against every profile's process
-    /// names, in profile order. For UI moments only (setup, opening the Game page); never on a timer or the
+    /// names, in profile order. A profile with RequiresWindowTitle (a generic executable) also needs one of its titles
+    /// on a window of that process. For UI moments only (setup, opening the Game page); never on a timer or the
     /// capture path.
     /// </summary>
     public static class GameDetection
     {
+        /// <summary>A running process: its name (no ".exe") and id.</summary>
+        public readonly record struct RunningProcess(string Name, uint Id);
+
         public static string FindRunningGame()
         {
             Process[] all;
@@ -25,24 +29,31 @@ namespace GI_Subtitles.Views.Shell
                 Logger.Log.Info($"GameDetection: process list unavailable: {ex.Message}");
                 return null;
             }
-            var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var running = new List<RunningProcess>(all.Length);
             foreach (var p in all)
             {
-                try { names.Add(p.ProcessName); }
+                try { running.Add(new RunningProcess(p.ProcessName, (uint)p.Id)); }
                 catch { /* exited while listing */ }
                 finally { p.Dispose(); }
             }
-            return Match(names);
+            return Match(running);
         }
 
-        /// <summary>The first profile (in UI order) with a process name in <paramref name="running"/>.</summary>
-        public static string Match(ICollection<string> running)
+        /// <summary>
+        /// The first profile (in UI order) with a process in <paramref name="running"/>. <paramref name="windows"/> is
+        /// for tests; by default a title-checked profile reads the desktop's windows.
+        /// </summary>
+        public static string Match(IReadOnlyCollection<RunningProcess> running, IEnumerable<GameProcessMatch.TopWindow> windows = null)
         {
             if (running == null || running.Count == 0) return null;
             foreach (var profile in GameRegionProfile.RegisteredProfiles)
-                foreach (string name in profile.ProcessNames ?? Array.Empty<string>())
-                    if (!string.IsNullOrWhiteSpace(name) && running.Contains(name))
-                        return profile.GameId;
+            {
+                var pids = new List<uint>();
+                foreach (var p in running)
+                    if (GameProcessMatch.NameMatches(profile, p.Name)) pids.Add(p.Id);
+                if (pids.Count > 0 && GameProcessMatch.GameProcesses(profile, pids, windows).Count > 0)
+                    return profile.GameId;
+            }
             return null;
         }
     }

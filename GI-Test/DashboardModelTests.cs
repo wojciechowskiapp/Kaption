@@ -105,6 +105,17 @@ namespace GI_Test
         }
 
         [TestMethod]
+        public void ABetaGamesFirstPackOnTheWay_IsNoProblem_AndOffersNoDownload()
+        {
+            var s = StartCardModel.Compute(new StartCardInputs { PackMissing = true, PackComing = true, Reader = ReaderState.Ready });
+            Assert.AreEqual(StartCardKind.PackComing, s.Kind);
+            Assert.AreEqual(StartCardAction.None, s.Action, "there is no pack to download yet");
+            Assert.AreEqual(GI_Subtitles.Core.UI.TrayState.Idle, GI_Subtitles.Views.SettingsWindow.TrayStateFor(s.Kind), "not a problem in the tray");
+            Assert.AreEqual(StartCardKind.Stopped, StartCardModel.Compute(new StartCardInputs { PackComing = true, Reader = ReaderState.Ready, PackOnDisk = true }).Kind,
+                "a pack on disk wins: the listing said nothing about it");
+        }
+
+        [TestMethod]
         public void WaitingForGame_OffersStartAnyway_AndCpuNoteOnlyWhenReaderReady()
         {
             var s = StartCardModel.Compute(new StartCardInputs { WaitingForGame = true, Reader = ReaderState.Ready, ReaderOnCpu = true, PackOnDisk = true });

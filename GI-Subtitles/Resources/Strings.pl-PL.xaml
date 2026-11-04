@@ -1133,6 +1133,12 @@
     <sys:String x:Key="Char_TeamSource_Other" xmlns:sys="clr-namespace:System;assembly=mscorlib">Źródło:</sys:String>
     <sys:String x:Key="Char_Teams_Fallback" xmlns:sys="clr-namespace:System;assembly=mscorlib">Gra podpowiada tych towarzyszy.</sys:String>
     <sys:String x:Key="Char_Rotation" xmlns:sys="clr-namespace:System;assembly=mscorlib">Rotacja</sys:String>
+    <sys:String x:Key="Char_Rotation_Suggested" xmlns:sys="clr-namespace:System;assembly=mscorlib">Proponowana rotacja</sys:String>
+    <sys:String x:Key="Char_Rotation_Per" xmlns:sys="clr-namespace:System;assembly=mscorlib">wg {0}</sys:String>
+    <sys:String x:Key="Char_Rotation_TipGuideFrom" xmlns:sys="clr-namespace:System;assembly=mscorlib">Rotacja z poradnika {0}. Sprawdź ją w grze.</sys:String>
+    <sys:String x:Key="Char_Rotation_TipGuide" xmlns:sys="clr-namespace:System;assembly=mscorlib">Rotacja z poradnika. Sprawdź ją w grze.</sys:String>
+    <sys:String x:Key="Char_Rotation_TipSuggested" xmlns:sys="clr-namespace:System;assembly=mscorlib">Propozycja na podstawie umiejętności drużyny. Sprawdź ją w grze.</sys:String>
+    <sys:String x:Key="Char_Rotation_TipSuggestedFrom" xmlns:sys="clr-namespace:System;assembly=mscorlib">Propozycja na podstawie rotacji z poradnika {0} dla podobnej drużyny. Sprawdź ją w grze.</sys:String>
     <sys:String x:Key="Char_Rotation_With" xmlns:sys="clr-namespace:System;assembly=mscorlib">z</sys:String>
     <sys:String x:Key="Char_Rotation_WithZe" xmlns:sys="clr-namespace:System;assembly=mscorlib">ze</sys:String>
     <sys:String x:Key="Char_Rotation_Hold" xmlns:sys="clr-namespace:System;assembly=mscorlib">hold</sys:String>
@@ -1168,4 +1174,52 @@
     <sys:String x:Key="card_Forget" xmlns:sys="clr-namespace:System;assembly=mscorlib">Zapomnij UID</sys:String>
     <sys:String x:Key="card_Forget_Tip" xmlns:sys="clr-namespace:System;assembly=mscorlib">Kaption zapomni UID wszystkich gier i następnym razem odczyta go z ekranu gry.</sys:String>
     <sys:String x:Key="card_Forget_Done" xmlns:sys="clr-namespace:System;assembly=mscorlib">Zapomniane. Następnym razem Kaption odczyta UID z ekranu gry.</sys:String>
+    <sys:String x:Key="Game_WuWa" xmlns:sys="clr-namespace:System;assembly=mscorlib">Wuthering Waves</sys:String>
+    <sys:String x:Key="Char_Kind_liberation" xmlns:sys="clr-namespace:System;assembly=mscorlib">Liberation</sys:String>
+    <sys:String x:Key="Char_Kind_forte" xmlns:sys="clr-namespace:System;assembly=mscorlib">Forte</sys:String>
+    <sys:String x:Key="Char_Kind_intro" xmlns:sys="clr-namespace:System;assembly=mscorlib">Intro</sys:String>
+    <sys:String x:Key="Char_Kind_outro" xmlns:sys="clr-namespace:System;assembly=mscorlib">Outro</sys:String>
+    <sys:String x:Key="Char_Kind_tune_break" xmlns:sys="clr-namespace:System;assembly=mscorlib">Tune Break</sys:String>
+    <sys:String x:Key="Char_Kind_sequence" xmlns:sys="clr-namespace:System;assembly=mscorlib">Resonance Chain</sys:String>
+    <sys:String x:Key="Char_Tab_sequence" xmlns:sys="clr-namespace:System;assembly=mscorlib">Resonance Chain</sys:String>
+    <!-- ═══ Popraw tę linię (S55): skrót 9007, okno poprawki, pozycja w zasobniku, Moje poprawki na Gra i napisy ═══ -->
+    <sys:String x:Key="Hotkey_9007_Description" xmlns:sys="clr-namespace:System;assembly=mscorlib">Popraw ostatni napis</sys:String>
+    <sys:String x:Key="Hotkey_9007_Info" xmlns:sys="clr-namespace:System;assembly=mscorlib">Otwiera okienko z ostatnią przetłumaczoną linią, w którym wpiszesz lepszą wersję. Od razu zadziała na tym komputerze, a społeczność dostanie ją do sprawdzenia.</sys:String>
+    <sys:String x:Key="Tray_FixLine" xmlns:sys="clr-namespace:System;assembly=mscorlib">Popraw ostatni napis…</sys:String>
+    <sys:String x:Key="fix_Window_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">Popraw tę linię</sys:String>
+    <sys:String x:Key="fix_English_Label" xmlns:sys="clr-namespace:System;assembly=mscorlib">Po angielsku</sys:String>
+    <sys:String x:Key="fix_Current_Label" xmlns:sys="clr-namespace:System;assembly=mscorlib">Obecne tłumaczenie</sys:String>
+    <sys:String x:Key="fix_Yours_Label" xmlns:sys="clr-namespace:System;assembly=mscorlib">Twoja wersja</sys:String>
+    <sys:String x:Key="fix_Note_Label" xmlns:sys="clr-namespace:System;assembly=mscorlib">Komentarz dla sprawdzających (opcjonalnie)</sys:String>
+    <sys:String x:Key="fix_Hint" xmlns:sys="clr-namespace:System;assembly=mscorlib">Twoja wersja od razu zastąpi tę linię na tym komputerze. Trafi też do sprawdzenia przez społeczność, a po zatwierdzeniu zobaczą ją inni gracze.</sys:String>
+    <sys:String x:Key="fix_Save" xmlns:sys="clr-namespace:System;assembly=mscorlib">Zapisz</sys:String>
+    <sys:String x:Key="fix_Save_Tip" xmlns:sys="clr-namespace:System;assembly=mscorlib">Zapisz swoją wersję (Ctrl+Enter)</sys:String>
+    <sys:String x:Key="fix_Saving" xmlns:sys="clr-namespace:System;assembly=mscorlib">Zapisuję…</sys:String>
+    <sys:String x:Key="fix_Error_Save" xmlns:sys="clr-namespace:System;assembly=mscorlib">Nie udało się zapisać twojej wersji. Spróbuj jeszcze raz.</sys:String>
+    <sys:String x:Key="fix_Nothing_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">Na razie nie ma czego poprawiać</sys:String>
+    <sys:String x:Key="fix_Nothing_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">Włącz tłumaczenie. Gdy na ekranie pojawi się napis do poprawy, wciśnij {0}.</sys:String>
+    <sys:String x:Key="fix_Mine_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">Moje poprawki</sys:String>
+    <sys:String x:Key="fix_Mine_Hint" xmlns:sys="clr-namespace:System;assembly=mscorlib">Twoje wersje linii z tej gry. Na tym komputerze widzisz je zamiast zwykłego tłumaczenia.</sys:String>
+    <sys:String x:Key="fix_Mine_Empty" xmlns:sys="clr-namespace:System;assembly=mscorlib">Nie masz jeszcze poprawek. Gdy jakiś napis brzmi źle, wciśnij {0} i wpisz swoją wersję.</sys:String>
+    <sys:String x:Key="fix_Mine_Pending" xmlns:sys="clr-namespace:System;assembly=mscorlib">Czeka na wysłanie: {0}</sys:String>
+    <sys:String x:Key="fix_Mine_Delete" xmlns:sys="clr-namespace:System;assembly=mscorlib">Usuń</sys:String>
+    <sys:String x:Key="fix_Mine_Delete_Tip" xmlns:sys="clr-namespace:System;assembly=mscorlib">Przywróć zwykłe tłumaczenie tej linii</sys:String>
+    <sys:String x:Key="fix_Error_Delete" xmlns:sys="clr-namespace:System;assembly=mscorlib">Nie udało się usunąć poprawki. Spróbuj jeszcze raz.</sys:String>
+    <sys:String x:Key="fix_Error_TooLong" xmlns:sys="clr-namespace:System;assembly=mscorlib">To za długie jak na tę linię. Skróć trochę.</sys:String>
+    <sys:String x:Key="fix_Error_Breaks" xmlns:sys="clr-namespace:System;assembly=mscorlib">Zostaw tyle samo podziałów linii co w angielskim ({0}).</sys:String>
+    <sys:String x:Key="fix_Error_Markup" xmlns:sys="clr-namespace:System;assembly=mscorlib">Zostaw bez zmian, tak jak w angielskim: {0}</sys:String>
+    <sys:String x:Key="fix_Error_Extra" xmlns:sys="clr-namespace:System;assembly=mscorlib">Usuń {0}, w angielskim tego nie ma.</sys:String>
+    <sys:String x:Key="fix_Nothing_Body_Tray" xmlns:sys="clr-namespace:System;assembly=mscorlib">Włącz tłumaczenie. Gdy na ekranie pojawi się napis do poprawy, kliknij prawym przyciskiem ikonę Kaption przy zegarze i wybierz Popraw ostatni napis.</sys:String>
+    <sys:String x:Key="fix_Mine_Empty_Tray" xmlns:sys="clr-namespace:System;assembly=mscorlib">Nie masz jeszcze poprawek. Gdy jakiś napis brzmi źle, kliknij prawym przyciskiem ikonę Kaption przy zegarze i wybierz Popraw ostatni napis.</sys:String>
+    <sys:String x:Key="fix_Hint_OtherLanguage" xmlns:sys="clr-namespace:System;assembly=mscorlib">Twoja wersja od razu zastąpi tę linię na tym komputerze. Zostanie tylko u ciebie, bo społeczność sprawdza wyłącznie polskie tłumaczenia.</sys:String>
+    <sys:String x:Key="fix_Hint_LocalOnly" xmlns:sys="clr-namespace:System;assembly=mscorlib">Twoja wersja od razu zastąpi tę linię na tym komputerze. Zostanie tylko u ciebie, bo tej linii nie da się wysłać do sprawdzenia.</sys:String>
+    <sys:String x:Key="Game_BetaBadge" xmlns:sys="clr-namespace:System;assembly=mscorlib">Beta</sys:String>
+    <sys:String x:Key="shell_Card_PackComing" xmlns:sys="clr-namespace:System;assembly=mscorlib">Napisy do tej gry są w drodze</sys:String>
+    <sys:String x:Key="shell_Card_PackComing_Detail_Format" xmlns:sys="clr-namespace:System;assembly=mscorlib">{0} to nowość w Kaption. Gdy napisy będą gotowe, Kaption pobierze je sam przy następnym uruchomieniu.</sys:String>
+    <sys:String x:Key="shell_Status_Coming" xmlns:sys="clr-namespace:System;assembly=mscorlib">Wkrótce</sys:String>
+    <sys:String x:Key="shell_Chip_DictComing" xmlns:sys="clr-namespace:System;assembly=mscorlib">Napisy w drodze</sys:String>
+    <sys:String x:Key="Dialog_PackComing_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">Napisy są w drodze</sys:String>
+    <sys:String x:Key="Dialog_PackComing_Body_Format" xmlns:sys="clr-namespace:System;assembly=mscorlib">Napisy do {0} pojawią się wkrótce. Gdy będą gotowe, Kaption pobierze je sam przy następnym uruchomieniu i wtedy włączysz tłumaczenie.</sys:String>
+    <sys:String x:Key="onb_Prepare_Pack_Coming_Format" xmlns:sys="clr-namespace:System;assembly=mscorlib">Napisy do {0} są w drodze. Gdy będą gotowe, Kaption pobierze je sam przy następnym uruchomieniu.</sys:String>
+    <sys:String x:Key="onb_Done_PackComing" xmlns:sys="clr-namespace:System;assembly=mscorlib">Napisy: w drodze</sys:String>
 </ResourceDictionary>

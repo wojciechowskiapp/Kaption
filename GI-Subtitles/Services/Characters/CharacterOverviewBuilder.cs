@@ -122,6 +122,10 @@ namespace GI_Subtitles.Services.Characters
     /// <summary>A rotation on a team card: the members' turns in order and the named combos spelled out.</summary>
     public sealed class OverviewRotation
     {
+        /// <summary>Composed from the members' kits ("model"), not transcribed from a guide: headed "Suggested rotation".</summary>
+        public bool IsSuggested { get; set; }
+        /// <summary>The guide page (https), "" for none; on a suggested rotation, the guide it was adapted from. Shown by its site's name only.</summary>
+        public string SourceUrl { get; set; } = "";
         /// <summary>The English name of the member this rotation is for ("Prune"), "" when the page offers no alternative.</summary>
         public string Variant { get; set; } = "";
         public IReadOnlyList<OverviewRotationStep> Steps { get; set; } = Array.Empty<OverviewRotationStep>();
@@ -770,7 +774,12 @@ namespace GI_Subtitles.Services.Characters
                         Note = GameTextFormatter.StripMarkup(r.Steps[i].Note ?? "").Trim(),
                     });
                 }
-                list.Add(new OverviewRotation { Variant = GameTextFormatter.StripMarkup(r.Variant ?? "").Trim(), Steps = steps, Combos = combos });
+                bool suggested = r.Origin == RotationNotation.OriginModel;
+                list.Add(new OverviewRotation
+                {
+                    IsSuggested = suggested, SourceUrl = RotationSource.Normalize(r.Source),
+                    Variant = GameTextFormatter.StripMarkup(r.Variant ?? "").Trim(), Steps = steps, Combos = combos,
+                });
             }
             return list;
         }

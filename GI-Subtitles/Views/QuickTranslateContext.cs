@@ -66,7 +66,7 @@ namespace GI_Subtitles.Views
         /// <summary>The section to open the page at: where the recognised skill sits.</summary>
         public string SectionToOpen =>
             Skill == null ? null
-            : Skill.Kind == "constellation" || Skill.Kind == "eidolon" || Skill.Kind == "mindscape" ? "Ranks"
+            : SkillMarkers.IsRankKind(Skill.Kind) ? "Ranks"
             : "Skills";
 
         public bool IsExpanded
