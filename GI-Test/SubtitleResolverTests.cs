@@ -151,6 +151,9 @@ namespace GI_Test
             public void Load(string dir, string map, IProgress<(int percent, string message)> progress = null,
                 FileProtectionHelper protectionHelper = null) => throw new NotSupportedException();
             public long FindNodeByText(string text, string npcFilter = null) => 0;
+            public bool CanVouchForLines => false;
+            public bool IsDialogueLine(string text) => false;
+            public bool IsKnownSpeaker(string npc) => false;
             public void SetCurrentDialog(long id, Dictionary<string, string> dict) { }
             public void Reset() { }
             public PredictionResult? GetSingleChainPrediction() => null;

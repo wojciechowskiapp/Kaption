@@ -17,6 +17,7 @@ Data controller: Michał Wojciechowski DEV, ul. Wałowa 3a/10, 37-450 Stalowa Wo
 - **Subtitle pack downloads.** Each download is logged with the account, device, file, time and a hash of the IP address with a salt that changes daily. The entries are deleted after 90 days.
 - **Crash reports, only if you turn them on.** They are off by default; the switch is in Pomoc › Prywatność (Help › Privacy). A report has the error, recent error-level log lines (which can include a short piece of game text), the app and system versions and a random activation ID, with no email and no screen image. GlitchTip keeps reports for 90 days.
 - **Feedback you send** from the app. It is deleted from our database after 90 days.
+- **Your Genshin UID, only if you save it** for the "Co dziś farmić" card. The app then reads that UID's public showcase through our server (the same read as the "Mój build" page) at most once a day and keeps the result, names and talent levels only, on your PC. "Usuń UID i dane" removes both.
 - **Public game data and icons** come straight from gitlab.com, enka.network, yatta.moe and nanoka.cc. Those servers see your IP address and get nothing else from us.
 
 ## The website

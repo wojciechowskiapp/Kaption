@@ -1222,4 +1222,62 @@
     <sys:String x:Key="Dialog_PackComing_Body_Format" xmlns:sys="clr-namespace:System;assembly=mscorlib">Napisy do {0} pojawią się wkrótce. Gdy będą gotowe, Kaption pobierze je sam przy następnym uruchomieniu i wtedy włączysz tłumaczenie.</sys:String>
     <sys:String x:Key="onb_Prepare_Pack_Coming_Format" xmlns:sys="clr-namespace:System;assembly=mscorlib">Napisy do {0} są w drodze. Gdy będą gotowe, Kaption pobierze je sam przy następnym uruchomieniu.</sys:String>
     <sys:String x:Key="onb_Done_PackComing" xmlns:sys="clr-namespace:System;assembly=mscorlib">Napisy: w drodze</sys:String>
+    <sys:String x:Key="FarmCard_Eyebrow" xmlns:sys="clr-namespace:System;assembly=mscorlib">Co dziś farmić</sys:String>
+    <sys:String x:Key="FarmCard_ResetIn_Format" xmlns:sys="clr-namespace:System;assembly=mscorlib">Reset za {0}</sys:String>
+    <sys:String x:Key="FarmCard_Hours_Format" xmlns:sys="clr-namespace:System;assembly=mscorlib">{0} godz.</sys:String>
+    <sys:String x:Key="FarmCard_Minutes_Format" xmlns:sys="clr-namespace:System;assembly=mscorlib">{0} min</sys:String>
+    <sys:String x:Key="FarmCard_WeekLetters" xmlns:sys="clr-namespace:System;assembly=mscorlib">Pn,Wt,Śr,Cz,Pt,So,Nd</sys:String>
+    <sys:String x:Key="FarmCard_Twin_Format" xmlns:sys="clr-namespace:System;assembly=mscorlib">Te same książki wracają {0} i w niedzielę</sys:String>
+    <sys:String x:Key="FarmCard_On_1" xmlns:sys="clr-namespace:System;assembly=mscorlib">w poniedziałek</sys:String>
+    <sys:String x:Key="FarmCard_On_2" xmlns:sys="clr-namespace:System;assembly=mscorlib">we wtorek</sys:String>
+    <sys:String x:Key="FarmCard_On_3" xmlns:sys="clr-namespace:System;assembly=mscorlib">w środę</sys:String>
+    <sys:String x:Key="FarmCard_On_4" xmlns:sys="clr-namespace:System;assembly=mscorlib">w czwartek</sys:String>
+    <sys:String x:Key="FarmCard_On_5" xmlns:sys="clr-namespace:System;assembly=mscorlib">w piątek</sys:String>
+    <sys:String x:Key="FarmCard_On_6" xmlns:sys="clr-namespace:System;assembly=mscorlib">w sobotę</sys:String>
+    <sys:String x:Key="FarmCard_Sunday" xmlns:sys="clr-namespace:System;assembly=mscorlib">W niedzielę otwarte są wszystkie domeny</sys:String>
+    <sys:String x:Key="FarmCard_Books" xmlns:sys="clr-namespace:System;assembly=mscorlib">Książki na dziś</sys:String>
+    <sys:String x:Key="FarmCard_BooksMine" xmlns:sys="clr-namespace:System;assembly=mscorlib">Książki dla Twoich postaci</sys:String>
+    <sys:String x:Key="FarmCard_Characters" xmlns:sys="clr-namespace:System;assembly=mscorlib">Twoje postacie</sys:String>
+    <sys:String x:Key="FarmCard_Mine_Format" xmlns:sys="clr-namespace:System;assembly=mscorlib">Twoje postacie: {0}</sys:String>
+    <sys:String x:Key="FarmCard_Level_Format" xmlns:sys="clr-namespace:System;assembly=mscorlib">Lv. {0}</sys:String>
+    <sys:String x:Key="FarmCard_InGame_Format" xmlns:sys="clr-namespace:System;assembly=mscorlib">W grze {0} → {1}</sys:String>
+    <sys:String x:Key="FarmCard_Top" xmlns:sys="clr-namespace:System;assembly=mscorlib">Ten talent leveluj najpierw</sys:String>
+    <sys:String x:Key="FarmCard_Talent_basic" xmlns:sys="clr-namespace:System;assembly=mscorlib">Normal Attack</sys:String>
+    <sys:String x:Key="FarmCard_Talent_skill" xmlns:sys="clr-namespace:System;assembly=mscorlib">Elemental Skill</sys:String>
+    <sys:String x:Key="FarmCard_Talent_ultimate" xmlns:sys="clr-namespace:System;assembly=mscorlib">Elemental Burst</sys:String>
+    <sys:String x:Key="FarmCard_More_Format" xmlns:sys="clr-namespace:System;assembly=mscorlib">+{0} więcej na pełnej liście</sys:String>
+    <sys:String x:Key="FarmCard_NoUid" xmlns:sys="clr-namespace:System;assembly=mscorlib">Podaj UID, żeby zobaczyć tu swoje postacie</sys:String>
+    <sys:String x:Key="FarmCard_AddUid" xmlns:sys="clr-namespace:System;assembly=mscorlib">Dodaj UID</sys:String>
+    <sys:String x:Key="FarmCard_Unavailable" xmlns:sys="clr-namespace:System;assembly=mscorlib">Nie udało się teraz odczytać Twojej gabloty. Książki na dziś masz wyżej.</sys:String>
+    <sys:String x:Key="FarmCard_ShowcaseEmpty" xmlns:sys="clr-namespace:System;assembly=mscorlib">Twoja gablota jest pusta albo ukryta. W grze: Profile › Character Showcase.</sys:String>
+    <sys:String x:Key="FarmCard_NothingToday" xmlns:sys="clr-namespace:System;assembly=mscorlib">Dziś żadna postać z Twojej gabloty nie potrzebuje tych książek.</sys:String>
+    <sys:String x:Key="FarmCard_Tip_1" xmlns:sys="clr-namespace:System;assembly=mscorlib">Każdą serię książek zdobędziesz w dwa dni tygodnia i w niedzielę. Pasek u góry pokazuje, w które.</sys:String>
+    <sys:String x:Key="FarmCard_Tip_2" xmlns:sys="clr-namespace:System;assembly=mscorlib">Trzy książki jednego poziomu skrafcisz w jedną wyższą przy stole alchemicznym.</sys:String>
+    <sys:String x:Key="FarmCard_Tip_3" xmlns:sys="clr-namespace:System;assembly=mscorlib">Talent na 10 wymaga też Crown of Insight. Zostaw je dla głównego DPS-a.</sys:String>
+    <sys:String x:Key="FarmCard_Tip_4" xmlns:sys="clr-namespace:System;assembly=mscorlib">Na wyższym World Level z jednego przejścia wpada więcej Guide i Philosophies.</sys:String>
+    <sys:String x:Key="FarmCard_FullList" xmlns:sys="clr-namespace:System;assembly=mscorlib">Pełna lista</sys:String>
+    <sys:String x:Key="FarmCard_DontShow" xmlns:sys="clr-namespace:System;assembly=mscorlib">Nie pokazuj</sys:String>
+    <sys:String x:Key="FarmCard_DontShow_Tip" xmlns:sys="clr-namespace:System;assembly=mscorlib">Wyłącza kartę. Włączysz ją z powrotem w Ustawienia › Postacie.</sys:String>
+    <sys:String x:Key="FarmCard_Close" xmlns:sys="clr-namespace:System;assembly=mscorlib">Zamknij</sys:String>
+    <sys:String x:Key="Tray_FarmToday" xmlns:sys="clr-namespace:System;assembly=mscorlib">Co dziś farmić</sys:String>
+    <sys:String x:Key="FarmBlock_Lead" xmlns:sys="clr-namespace:System;assembly=mscorlib">Karta nad grą raz dziennie, gdy włączasz Genshin Impact.</sys:String>
+    <sys:String x:Key="FarmBlock_Show" xmlns:sys="clr-namespace:System;assembly=mscorlib">Pokaż kartę</sys:String>
+    <sys:String x:Key="FarmBlock_Settings" xmlns:sys="clr-namespace:System;assembly=mscorlib">Ustawienia</sys:String>
+    <sys:String x:Key="FarmBlock_Enabled" xmlns:sys="clr-namespace:System;assembly=mscorlib">Pokazuj po uruchomieniu gry</sys:String>
+    <sys:String x:Key="FarmBlock_Uid_Label" xmlns:sys="clr-namespace:System;assembly=mscorlib">Twój UID w Genshin Impact</sys:String>
+    <sys:String x:Key="FarmBlock_Uid_Consent" xmlns:sys="clr-namespace:System;assembly=mscorlib">UID trafia tylko do odczytu Twojej publicznej gabloty; wynik zostaje na tym komputerze.</sys:String>
+    <sys:String x:Key="FarmBlock_Save" xmlns:sys="clr-namespace:System;assembly=mscorlib">Zapisz</sys:String>
+    <sys:String x:Key="FarmBlock_Forget" xmlns:sys="clr-namespace:System;assembly=mscorlib">Usuń UID i dane</sys:String>
+    <sys:String x:Key="FarmBlock_Region" xmlns:sys="clr-namespace:System;assembly=mscorlib">Serwer</sys:String>
+    <sys:String x:Key="FarmBlock_Region_Europe" xmlns:sys="clr-namespace:System;assembly=mscorlib">Europa</sys:String>
+    <sys:String x:Key="FarmBlock_Region_America" xmlns:sys="clr-namespace:System;assembly=mscorlib">Ameryka</sys:String>
+    <sys:String x:Key="FarmBlock_Region_Asia" xmlns:sys="clr-namespace:System;assembly=mscorlib">Azja</sys:String>
+    <sys:String x:Key="FarmBlock_Saved" xmlns:sys="clr-namespace:System;assembly=mscorlib">Zapisane. Karta pokazuje teraz Twoje postacie.</sys:String>
+    <sys:String x:Key="FarmBlock_Invalid" xmlns:sys="clr-namespace:System;assembly=mscorlib">UID ma 9 albo 10 cyfr.</sys:String>
+    <sys:String x:Key="FarmBlock_Forgotten" xmlns:sys="clr-namespace:System;assembly=mscorlib">Usunięte. Kaption nie czyta już Twojej gabloty.</sys:String>
+    <sys:String x:Key="FarmBlock_Suggested_Format" xmlns:sys="clr-namespace:System;assembly=mscorlib">Kaption odczytał z ekranu gry UID {0}. Zapisz go, żeby użyć go tutaj.</sys:String>
+    <sys:String x:Key="FarmBlock_Unavailable" xmlns:sys="clr-namespace:System;assembly=mscorlib">Książki na dziś pojawią się, gdy Kaption połączy się z kaption.one.</sys:String>
+    <sys:String x:Key="FarmCard_UnknownUid" xmlns:sys="clr-namespace:System;assembly=mscorlib">Nie ma gracza z takim UID. Sprawdź go w Ustawienia › Postacie.</sys:String>
+    <sys:String x:Key="FarmCard_CheckUid" xmlns:sys="clr-namespace:System;assembly=mscorlib">Sprawdź UID</sys:String>
+    <sys:String x:Key="FarmCard_CatalogMissing" xmlns:sys="clr-namespace:System;assembly=mscorlib">Twoje postacie pojawią się, gdy Kaption pobierze dane postaci.</sys:String>
 </ResourceDictionary>

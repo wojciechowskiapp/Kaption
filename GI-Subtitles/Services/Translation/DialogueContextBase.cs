@@ -26,6 +26,9 @@ namespace GI_Subtitles.Services.Translation
 
         private Dictionary<long, DialogNode> _dialogGraph;
         private Dictionary<string, List<long>> _textToDialogIds;
+        // Graph lines whose pack key (PackKeyText.Clean) normalizes differently from the raw text: gender
+        // branches, colour tags, placeholders. The matcher hands back pack keys, so evidence checks need both.
+        private HashSet<string> _packKeyOnlyLines;
         private Dictionary<string, string> _npcNames;
         private Dictionary<long, TalkNode> _talkIndex;
         // Post phase-3: a slim residual map that carries ONLY the hashes still
@@ -1082,6 +1085,32 @@ namespace GI_Subtitles.Services.Translation
             }
         }
 
+        /// <inheritdoc/>
+        public bool CanVouchForLines => EnsureLoadedCore() && _textToDialogIds != null && _textToDialogIds.Count > 0;
+
+        /// <inheritdoc/>
+        public bool IsDialogueLine(string enText)
+        {
+            if (string.IsNullOrEmpty(enText) || !EnsureLoadedCore() || _textToDialogIds == null)
+                return false;
+            string normalized = OptimizedMatcher.NormalizeInput(enText, true);
+            if (normalized.Length == 0) return false;
+            lock (_lock)
+                return (_textToDialogIds.TryGetValue(normalized, out var ids) && ids != null && ids.Count > 0) ||
+                       _packKeyOnlyLines?.Contains(normalized) == true;
+        }
+
+        /// <inheritdoc/>
+        public bool IsKnownSpeaker(string detectedNpcName)
+        {
+            if (string.IsNullOrWhiteSpace(detectedNpcName) || !EnsureLoadedCore() || _npcNameToRoleIds == null)
+                return false;
+            string normName = ExtractNpcFirstName(detectedNpcName);
+            if (string.IsNullOrEmpty(normName)) return false;
+            lock (_lock)
+                return _npcNameToRoleIds.ContainsKey(normName);
+        }
+
         /// <summary>
         /// Explicitly set the active dialogue node and populate the hot cache
         /// from its immediate and deep-lookahead successors.
@@ -1851,6 +1880,7 @@ namespace GI_Subtitles.Services.Translation
             _textToDialogIds = new Dictionary<string, List<long>>(
                 _dialogGraph?.Count ?? 0, StringComparer.OrdinalIgnoreCase);
             _npcToDialogIds = new Dictionary<string, List<long>>();
+            _packKeyOnlyLines = new HashSet<string>(StringComparer.Ordinal);
 
             if (_dialogGraph == null)
                 return;
@@ -1865,6 +1895,12 @@ namespace GI_Subtitles.Services.Translation
 
                 string normalized = OptimizedMatcher.NormalizeInput(enText, true);
                 if (string.IsNullOrEmpty(normalized)) continue;
+
+                if (PackKeyText.MayDiffer(enText))
+                {
+                    string packKey = OptimizedMatcher.NormalizeInput(PackKeyText.Clean(enText), true);
+                    if (packKey.Length > 0 && packKey != normalized) _packKeyOnlyLines.Add(packKey);
+                }
 
                 if (!_textToDialogIds.TryGetValue(normalized, out var list))
                 {

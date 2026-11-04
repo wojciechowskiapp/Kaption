@@ -155,6 +155,7 @@ namespace GI_Subtitles.Views
             if (!(e.NewValue is bool visible) || !visible) return;
             _host = _host ?? Window.GetWindow(this) as ICharacterPageHost;
             string game = CurrentGame();
+            FarmBlock.Refresh(game);
             if (!string.Equals(_loadedFor, game, StringComparison.OrdinalIgnoreCase) ||
                 NeedsRetranslation(_translatedWith, Pack, IsPackReady))
                 _ = LoadAsync(game);

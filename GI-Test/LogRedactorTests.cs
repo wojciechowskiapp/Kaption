@@ -59,6 +59,7 @@ namespace GI_Test
         [DataRow("\"machine_fingerprint\": \"a1b2c3d4e5f6\"", "a1b2c3d4e5f6")]
         [DataRow("  \"BuildCard.Uid.Genshin\": \"735366201\",", "735366201")]
         [DataRow("\"BuildCard.Uid.ZZZ\":\"1300025292\"", "1300025292")]
+        [DataRow("  \"ShowcaseUid_Genshin\": \"735366201\",", "735366201")]
         public void Scrub_SecretShapedAssignments_LoseTheirValue(string input, string secret)
         {
             string result = LogRedactor.Scrub(input);

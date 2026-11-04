@@ -63,10 +63,11 @@ namespace GI_Subtitles.Services.Diagnostics
         // JSON or key=value pairs whose NAME suggests a secret. Captures the
         // key and the punctuation so we can rebuild the line with the value
         // replaced, keeping the file parseable. "buildcard.uid" is the build
-        // card's remembered game UIDs (BuildCard.Uid.Genshin and so on): not a
-        // secret, but it identifies a player, so the value goes as well.
+        // card's remembered game UIDs (BuildCard.Uid.Genshin and so on), and
+        // "showcaseuid" the farm card's (ShowcaseUid_Genshin): not secrets, but
+        // they identify a player, so the value goes as well.
         private static readonly Regex SecretAssignment = new Regex(
-            @"(""?[A-Za-z0-9_.\-]*(?:token|secret|password|passwd|apikey|api_key|dsn|cookie|auth|credential|fingerprint|buildcard\.uid)[A-Za-z0-9_.\-]*""?)\s*([:=])\s*(""[^""]*""|'[^']*'|[^\s,;}\]]+)",
+            @"(""?[A-Za-z0-9_.\-]*(?:token|secret|password|passwd|apikey|api_key|dsn|cookie|auth|credential|fingerprint|buildcard\.uid|showcaseuid)[A-Za-z0-9_.\-]*""?)\s*([:=])\s*(""[^""]*""|'[^']*'|[^\s,;}\]]+)",
             Opts, MatchTimeout);
 
         private static readonly Regex EmailPattern = new Regex(

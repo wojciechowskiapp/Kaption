@@ -50,6 +50,8 @@ namespace GI_Subtitles.Services.Games
             if (v.RegionMinWidthFraction is double minWidth) p.RegionMinWidthFraction = minWidth;
             if (v.StrictRegionJunkFilter is bool strict) p.StrictRegionJunkFilter = strict;
             if (v.OcrJunkFilter is bool junk) p.FiltersOcrJunk = junk;
+            if (v.DialogueEvidence is bool evidence) p.RequiresDialogueEvidence = evidence;
+            if (v.FadedReadFilter is bool faded) p.RejectsFadedReads = faded;
             return p;
         }
     }

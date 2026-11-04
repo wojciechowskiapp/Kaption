@@ -119,7 +119,14 @@
     </UserControl.Resources>
 
     <Grid>
-        <Grid x:Name="Browser">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+        <!-- Genshin only: what to farm today, and the farm card's settings. -->
+        <local:FarmTodayBlock x:Name="FarmBlock" Margin="0,0,0,14" Visibility="Collapsed"/>
+
+        <Grid x:Name="Browser" Grid.Row="1">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="252"/>
                 <ColumnDefinition Width="*"/>
@@ -266,10 +273,10 @@
         </Grid>
 
         <!-- ── Whole-page states: the shared state component, one sentence and one action each ── -->
-        <shell:StateMessage x:Name="EmptyState" Visibility="Collapsed" Icon="{StaticResource IconPeople}"
+        <shell:StateMessage x:Name="EmptyState" Grid.Row="1" Visibility="Collapsed" Icon="{StaticResource IconPeople}"
                             Text="{DynamicResource state_Char_Empty}" ActionText="{DynamicResource state_CheckAgain}" ActionClick="Retry_Click"/>
 
-        <shell:StateMessage x:Name="ErrorState" Visibility="Collapsed" Tone="Problem" Icon="{StaticResource IconWarning}"
+        <shell:StateMessage x:Name="ErrorState" Grid.Row="1" Visibility="Collapsed" Tone="Problem" Icon="{StaticResource IconWarning}"
                             Text="{DynamicResource state_Char_Error}" ActionText="{DynamicResource Char_Error_Retry}" ActionClick="Retry_Click"/>
     </Grid>
 </UserControl>

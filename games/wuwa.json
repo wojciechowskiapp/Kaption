@@ -36,7 +36,8 @@
     "hub": "wuthering-waves",
     "guideKey": "wuwa",
     "guide": { "pl": "/pl/wuthering-waves-tlumaczenie/", "en": "/wuthering-waves-translator/" },
-    "ogBackground": "src/assets/og/ai/wuwa.jpg"
+    "ogBackground": "src/assets/og/ai/wuwa.jpg",
+    "guessName": "Wuwdle"
   },
   "source": {
     "kind": "datamine",
@@ -50,6 +51,11 @@
       { "kind": "youtube", "channelId": "UC0Bi5KMcECRVYis5Gb_ZYZQ" },
       { "kind": "kuro", "url": "https://hw-media-cdn-mingchao.kurogame.com/akiwebsite/website2.0/json/G152/en/ArticleMenu.json" }
     ],
-    "codes": { "kind": "ingame", "redeemUrl": null }
+    "codes": {
+      "kind": "ingame",
+      "redeemUrl": null,
+      "redeemHow": { "path": ["Terminal", "Settings", "Other Settings", "Redemption Code"], "unlock": "Union Level 2" },
+      "officialDiscord": "963760374543450182"
+    }
   }
 }

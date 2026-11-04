@@ -29,13 +29,14 @@
     "hub": "honkai-star-rail",
     "guideKey": "honkai",
     "guide": { "pl": "/pl/honkai-star-rail-tlumaczenie/", "en": "/honkai-star-rail-translator/" },
-    "ogBackground": "src/assets/og/ai/starrail.jpg"
+    "ogBackground": "src/assets/og/ai/starrail.jpg",
+    "guessName": "Stardle"
   },
   "source": { "kind": "datamine", "host": "gitlab", "repo": "Dimbreath/turnbasedgamedata", "branch": "main", "keySpace": "upstream-hash" },
   "translation": { "targets": ["pl"], "sources": ["auto", "community"] },
   "news": {
     "hoyolabGid": 6,
     "officialFeeds": [{ "kind": "youtube", "channelId": "UC2PeMPA8PAOp-bynLoCeMLA" }],
-    "codes": { "kind": "hoyolab", "redeemUrl": "https://hsr.hoyoverse.com/gift?code={code}" }
+    "codes": { "kind": "hoyolab", "redeemUrl": "https://hsr.hoyoverse.com/gift?code={code}", "officialDiscord": "884849473329692723" }
   }
 }

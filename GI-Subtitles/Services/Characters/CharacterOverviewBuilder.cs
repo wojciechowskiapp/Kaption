@@ -461,7 +461,7 @@ namespace GI_Subtitles.Services.Characters
                 RarityText = RarityText(catalog.Game, record.Rarity),
                 Element = T(record.Element),
                 WeaponType = T(record.WeaponType),
-                Role = F(record.Role),
+                Role = F(record.Role) is { Length: > 0 } own ? own : TeamRole(record, catalog),
                 GameVersion = catalog.GameVersion,
                 Variant = chosen,
                 Variants = variants,
@@ -883,6 +883,21 @@ namespace GI_Subtitles.Services.Characters
                     RankLabel = RankLabelOf(h.Team, record.Id, catalog.Game),
                 })
                 .ToList();
+
+        private static readonly string[] SlotOrder = { "best", "budget", "alternative", "upcoming", "earlier" };
+
+        // Genshin and Star Rail have no role text: the character's role in its best team stands in (slot order, then data
+        // order), as on the site (tools/landing-characters/transform.cjs teamRoleOf).
+        private static string TeamRole(CharacterRecord record, CharacterCatalog catalog)
+        {
+            if (record.Ai == null) return "";
+            int Rank(string slot) { int i = Array.IndexOf(SlotOrder, slot); return i < 0 ? SlotOrder.Length : i; }
+            var team = record.Ai.Teams
+                .Where(t => t.Members.Count(id => catalog.Find(id) != null) >= 2 && t.Roles.TryGetValue(record.Id, out var r) && r.En.Length > 0)
+                .OrderBy(t => Rank(t.Slot))
+                .FirstOrDefault();
+            return team == null ? "" : GameTextFormatter.StripMarkup(team.Roles[record.Id].Pick());
+        }
 
         // Polish first (the only target language today), English as the fallback.
         private static AiText PickAiText(CharacterAi ai, Func<AiText, bool> has) =>

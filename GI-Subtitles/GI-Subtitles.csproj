@@ -114,6 +114,9 @@
          runtime even when an older feature-band SDK performs the publish. -->
     <RuntimeFrameworkVersion Condition="'$(Configuration)' == 'Release'">10.0.14</RuntimeFrameworkVersion>
     <PublishTrimmed>false</PublishTrimmed>
+    <!-- Only the satellite resources of languages the UI ships (EN, PL): the self-contained runtime otherwise brings
+         WPF/WinForms framework messages in 13 languages (~18 MB on disk). The app's own strings are XAML dictionaries. -->
+    <SatelliteResourceLanguages>en;pl</SatelliteResourceLanguages>
 
     <!-- Re-enable Microsoft.AI.DirectML's own .targets copy of the newer
          DirectML.dll. OnnxRuntime.DirectML's .props sets

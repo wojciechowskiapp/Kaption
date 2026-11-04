@@ -58,6 +58,19 @@ Auto-start checks the same things as the Start button before it starts. If you s
 
 Only 9 or 10 digits without a leading zero count; anything else in these keys is ignored. The UID leaves your PC only in the address the browser opens (`kaption.one/pl/moj-build/?game=genshin&uid=...`, or `/my-build/` with an English interface). The log never names it, and diagnostic bundles mask it.
 
+## Farm today (2.5.5)
+
+"Co dziś farmić" ("What to farm today") is a card over Genshin Impact: today's talent book series and, with a UID, which of your showcase characters can level a talent with them. It shows by itself the first time Genshin is in front in a new server day (after the 04:00 reset), and on demand from the tray menu and Postacie (Characters) › Co dziś farmić. Only Genshin rotates its domains by weekday, so the other games have no card.
+
+| Key | Default | What it does |
+|---|---|---|
+| `FarmCardEnabled` | `true` | Shows the card when Genshin starts. "Nie pokazuj" ("Don't show") on the card sets it to `false`; the switch under Postacie › Co dziś farmić › Ustawienia turns it back on. |
+| `ShowcaseUid_Genshin` | none | The UID you saved under Postacie › Co dziś farmić › Ustawienia. Kaption reads that UID's public showcase through `api.kaption.one/api/cards/genshin/<uid>` at most once per server day. "Usuń UID i dane" ("Remove UID and data") clears it and the cached showcase. |
+| `FarmCardRegion` | `"europe"` | Your server, for the reset hour: `"europe"`, `"america"` or `"asia"`. |
+| `FarmCardLastShownDay` | none | Written by Kaption: the server day the card last showed by itself. |
+
+The domain schedule comes from `kaption.one/data/today/genshin.json` and is kept in `%APPDATA%\Kaption\Genshin\today.json`; the showcase is kept, trimmed to names, levels and talent levels, in `showcase.json` next to it. A UID the build card read from the game screen is offered in the field but saved only when you click Save. The log never names the UID, and diagnostic bundles mask it.
+
 ## OCR and translation
 
 The per-game defaults come from `GameRegionProfile`. Override them only for specific hardware or custom text.

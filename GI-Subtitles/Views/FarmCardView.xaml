@@ -1,0 +1,322 @@
+<UserControl x:Class="GI_Subtitles.Views.FarmCardView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:GI_Subtitles.Views"
+             Width="404" UseLayoutRounding="True" TextOptions.TextFormattingMode="Display">
+    <!-- "What to farm today" (Genshin): the day, its open book series as the game's own item tiles, and the player's
+         characters with the talent levels worth taking. Colours: the Char_* palette (dark or light, UsePalette) plus
+         Char_Accent per game; tier frames are the game's 2/3/4-star item colours (FarmCardViewModel.TierBrush). -->
+    <UserControl.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="../Resources/CharacterPaletteDark.xaml"/>
+                <ResourceDictionary Source="../Resources/CharacterLayoutPopup.xaml"/>
+            </ResourceDictionary.MergedDictionaries>
+            <local:IconImageConverter x:Key="FcIconImage"/>
+            <local:MissingIconConverter x:Key="FcMissingIcon"/>
+            <BooleanToVisibilityConverter x:Key="FcBoolVis"/>
+
+            <!-- Our own line shapes on a 16 grid; no game artwork. -->
+            <Geometry x:Key="FcBookGlyph">M3,3.5 C5,2.6 6.8,2.8 8,3.8 C9.2,2.8 11,2.6 13,3.5 V12.6 C11,11.8 9.2,12 8,13 C6.8,12 5,11.8 3,12.6 Z M8,3.8 V13</Geometry>
+            <Geometry x:Key="FcClockGlyph">M8,2.5 A5.5,5.5 0 1 1 7.99,2.5 Z M8,5 V8.2 L10.2,9.6</Geometry>
+            <Geometry x:Key="FcCloseGlyph">M4.5,4.5 L11.5,11.5 M11.5,4.5 L4.5,11.5</Geometry>
+            <Geometry x:Key="FcOutGlyph">M6,3.5 H12.5 V10 M12.5,3.5 L5,11 M3.5,6 V12.5 H10</Geometry>
+            <Geometry x:Key="FcTipGlyph">M8,2.5 C10.6,2.5 12,4.4 12,6.4 C12,8.2 10.8,9 10.2,10.1 V11.2 H5.8 V10.1 C5.2,9 4,8.2 4,6.4 C4,4.4 5.4,2.5 8,2.5 Z M6.2,13.4 H9.8</Geometry>
+            <Geometry x:Key="FcCrownGlyph">M2.8,11.8 L3.6,5.4 L6.2,8 L8,4 L9.8,8 L12.4,5.4 L13.2,11.8 Z</Geometry>
+            <Geometry x:Key="FcPersonGlyph">M8,2.8 A2.6,2.6 0 1 1 7.99,2.8 Z M3.2,13.4 C3.6,10.6 5.6,9.2 8,9.2 C10.4,9.2 12.4,10.6 12.8,13.4</Geometry>
+
+            <!-- A flat text action in the header and footer. -->
+            <Style x:Key="FcTextButton" TargetType="Button">
+                <Setter Property="Foreground" Value="{DynamicResource Char_FgMuted}"/>
+                <Setter Property="FontSize" Value="12.5"/>
+                <Setter Property="FontWeight" Value="SemiBold"/>
+                <Setter Property="Height" Value="30"/>
+                <Setter Property="Padding" Value="8,0"/>
+                <Setter Property="Cursor" Value="Hand"/>
+                <Setter Property="Focusable" Value="False"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="Button">
+                            <Border x:Name="Bd" Background="Transparent" CornerRadius="8" Padding="{TemplateBinding Padding}">
+                                <ContentPresenter VerticalAlignment="Center"/>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="Bd" Property="Background" Value="{DynamicResource Char_Selected}"/>
+                                    <Setter Property="Foreground" Value="{DynamicResource Char_Fg}"/>
+                                </Trigger>
+                                <Trigger Property="IsPressed" Value="True">
+                                    <Setter TargetName="Bd" Property="Background" Value="{DynamicResource Char_Pressed}"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <!-- The week strip: today filled in the accent, the days with the same books ringed. -->
+            <DataTemplate x:Key="FcWeekCell">
+                <Border x:Name="Cell" Width="28" Height="24" Margin="0,0,3,0" CornerRadius="7" BorderThickness="1"
+                        BorderBrush="Transparent" Background="{DynamicResource Char_ChipBg}">
+                    <TextBlock x:Name="Letter" Text="{Binding Letter}" FontSize="11" FontWeight="SemiBold"
+                               Foreground="{DynamicResource Char_FgSubtle}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Border>
+                <DataTemplate.Triggers>
+                    <DataTrigger Binding="{Binding IsSame}" Value="True">
+                        <Setter TargetName="Cell" Property="BorderBrush" Value="{DynamicResource Char_Accent}"/>
+                        <Setter TargetName="Cell" Property="Background" Value="Transparent"/>
+                        <Setter TargetName="Letter" Property="Foreground" Value="{DynamicResource Char_Accent}"/>
+                    </DataTrigger>
+                    <DataTrigger Binding="{Binding IsToday}" Value="True">
+                        <Setter TargetName="Cell" Property="Background" Value="{DynamicResource Char_Accent}"/>
+                        <Setter TargetName="Letter" Property="Foreground" Value="{DynamicResource Char_Surface}"/>
+                    </DataTrigger>
+                </DataTemplate.Triggers>
+            </DataTemplate>
+
+            <!-- A book series: the Philosophies tile in its 4-star frame, the series, the region; a badge counts the
+                 player's characters that take it today. -->
+            <DataTemplate x:Key="FcBookTile">
+                <StackPanel Margin="0,0,0,10" ToolTip="{Binding Tooltip}" Background="Transparent">
+                    <Grid Width="52" Height="52" HorizontalAlignment="Center">
+                        <Border CornerRadius="12" Background="{Binding Frame}" SnapsToDevicePixels="True"/>
+                        <Border CornerRadius="12" BorderThickness="1" BorderBrush="#33FFFFFF"/>
+                        <Path Data="{StaticResource FcBookGlyph}" Width="26" Height="26" Stretch="Uniform" Stroke="White"
+                              StrokeThickness="1.4" StrokeLineJoin="Round" Opacity="0.9"
+                              Visibility="{Binding IconPath, Converter={StaticResource FcMissingIcon}, ConverterParameter=44}"/>
+                        <Image Width="44" Height="44" RenderOptions.BitmapScalingMode="HighQuality"
+                               Source="{Binding IconPath, Converter={StaticResource FcIconImage}, ConverterParameter=44}"/>
+                        <Border Width="20" Height="20" CornerRadius="10" HorizontalAlignment="Right" VerticalAlignment="Top"
+                                Margin="0,-6,-6,0" Background="{DynamicResource Char_Accent}" BorderThickness="2"
+                                BorderBrush="{DynamicResource Char_Surface}"
+                                Visibility="{Binding HasMine, Converter={StaticResource FcBoolVis}}">
+                            <TextBlock Text="{Binding Mine}" FontSize="10.5" FontWeight="Bold" Foreground="{DynamicResource Char_Surface}"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                    </Grid>
+                    <TextBlock Text="{Binding Series}" Margin="2,6,2,0" FontSize="12.5" FontWeight="SemiBold" TextAlignment="Center"
+                               TextTrimming="CharacterEllipsis" Foreground="{DynamicResource Char_Fg}"/>
+                    <TextBlock Text="{Binding Region}" Margin="2,1,2,0" FontSize="11" TextAlignment="Center"
+                               TextTrimming="CharacterEllipsis" Foreground="{DynamicResource Char_FgSubtle}"/>
+                </StackPanel>
+            </DataTemplate>
+
+            <!-- One talent level: kind, base level now → next, the book tile and how many. The first in the
+                 character's leveling order gets the accent ring. -->
+            <DataTemplate x:Key="FcStep">
+                <Border x:Name="Pill" Height="30" Margin="6,0,0,0" Padding="8,0,8,0" CornerRadius="9" BorderThickness="1"
+                        Background="{DynamicResource Char_ChipBg}" BorderBrush="{DynamicResource Char_Ring}"
+                        ToolTip="{Binding Tooltip}" SnapsToDevicePixels="True">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock x:Name="Kind" Text="{Binding Short}" FontFamily="{DynamicResource FontDisplay}" FontSize="13"
+                                   FontWeight="SemiBold" Foreground="{DynamicResource Char_FgMuted}" VerticalAlignment="Center"/>
+                        <TextBlock Text="{Binding Levels}" Margin="6,0,0,0" FontFamily="{DynamicResource FontDisplay}" FontSize="13"
+                                   Foreground="{DynamicResource Char_Fg}" VerticalAlignment="Center"/>
+                        <TextBlock Text="{Binding BonusText}" Margin="3,0,0,6" FontSize="9.5" FontWeight="SemiBold"
+                                   Foreground="{DynamicResource Char_Brand}" VerticalAlignment="Center"
+                                   Visibility="{Binding HasBonus, Converter={StaticResource FcBoolVis}}"/>
+                        <Grid Width="22" Height="22" Margin="8,0,0,0">
+                            <Border CornerRadius="5" Background="{Binding Frame}"/>
+                            <Path Data="{StaticResource FcBookGlyph}" Width="13" Height="13" Stretch="Uniform" Stroke="White"
+                                  StrokeThickness="1.3" Visibility="{Binding IconPath, Converter={StaticResource FcMissingIcon}, ConverterParameter=20}"/>
+                            <Image Width="20" Height="20" RenderOptions.BitmapScalingMode="HighQuality"
+                                   Source="{Binding IconPath, Converter={StaticResource FcIconImage}, ConverterParameter=20}"/>
+                        </Grid>
+                        <TextBlock Text="{Binding CountText}" Margin="4,0,0,0" FontSize="11.5" FontWeight="SemiBold"
+                                   Foreground="{DynamicResource Char_FgMuted}" VerticalAlignment="Center"/>
+                        <Path Data="{StaticResource FcCrownGlyph}" Width="14" Height="14" Margin="5,0,0,0" Stretch="Uniform"
+                              Fill="{DynamicResource Char_Rarity5}" VerticalAlignment="Center"
+                              Visibility="{Binding Crown, Converter={StaticResource FcBoolVis}}"/>
+                    </StackPanel>
+                </Border>
+                <DataTemplate.Triggers>
+                    <DataTrigger Binding="{Binding IsTop}" Value="True">
+                        <Setter TargetName="Pill" Property="BorderBrush" Value="{DynamicResource Char_Accent}"/>
+                        <Setter TargetName="Kind" Property="Foreground" Value="{DynamicResource Char_Accent}"/>
+                    </DataTrigger>
+                </DataTemplate.Triggers>
+            </DataTemplate>
+
+            <!-- A character: portrait in its element ring, name and level, its steps under the name. -->
+            <DataTemplate x:Key="FcRow">
+                <Grid Margin="0,0,0,10" Background="Transparent">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <Grid Grid.RowSpan="2" Width="44" Height="44" VerticalAlignment="Center">
+                        <Ellipse Fill="{DynamicResource Char_ChipBg}"/>
+                        <TextBlock Text="{Binding Initial}" FontFamily="{DynamicResource FontDisplay}" FontSize="17" FontWeight="SemiBold"
+                                   Foreground="{DynamicResource Char_FgMuted}" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                   Visibility="{Binding AvatarPath, Converter={StaticResource FcMissingIcon}, ConverterParameter=40}"/>
+                        <Image Width="40" Height="40" Stretch="UniformToFill" RenderOptions.BitmapScalingMode="HighQuality"
+                               Source="{Binding AvatarPath, Converter={StaticResource FcIconImage}, ConverterParameter=40}">
+                            <Image.Clip>
+                                <EllipseGeometry Center="20,20" RadiusX="20" RadiusY="20"/>
+                            </Image.Clip>
+                        </Image>
+                        <Ellipse Stroke="{Binding ElementBrush}" StrokeThickness="2"/>
+                    </Grid>
+                    <TextBlock Grid.Column="1" Margin="12,0,0,4" TextTrimming="CharacterEllipsis" VerticalAlignment="Bottom">
+                        <Run Text="{Binding Name, Mode=OneWay}" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource Char_Fg}"/><Run
+                             Text="   "/><Run Text="{Binding LevelText, Mode=OneWay}" FontSize="11.5" Foreground="{DynamicResource Char_FgSubtle}"/>
+                    </TextBlock>
+                    <ItemsControl Grid.Column="1" Grid.Row="1" Margin="6,0,0,0" ItemsSource="{Binding Steps}" ItemTemplate="{StaticResource FcStep}"
+                                  Focusable="False">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <StackPanel Orientation="Horizontal"/>
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                    </ItemsControl>
+                </Grid>
+            </DataTemplate>
+        </ResourceDictionary>
+    </UserControl.Resources>
+
+    <Border x:Name="Shell" Background="{DynamicResource Char_Overlay}" CornerRadius="14" BorderThickness="1"
+            BorderBrush="{DynamicResource Char_OverlayRing}" ClipToBounds="True">
+        <Grid>
+            <!-- The game's accent as a low glow behind the day: the one flourish. -->
+            <Ellipse x:Name="Glow" Width="300" Height="200" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,-120,-110,0"
+                     IsHitTestVisible="False" Opacity="0.22"/>
+
+            <StackPanel x:Name="Body">
+                <!-- Header: what this is, the reset, close. -->
+                <Grid x:Name="Header" Margin="18,12,8,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <Ellipse Width="7" Height="7" Fill="{DynamicResource Char_Accent}" VerticalAlignment="Center"/>
+                        <TextBlock Text="{DynamicResource FarmCard_Eyebrow}" Margin="8,0,0,0" FontSize="12" FontWeight="SemiBold"
+                                   Foreground="{DynamicResource Char_Accent}" VerticalAlignment="Center"/>
+                    </StackPanel>
+                    <Border Grid.Column="1" Height="24" Padding="7,0,9,0" CornerRadius="12" Background="{DynamicResource Char_ChipBg}"
+                            VerticalAlignment="Center" Margin="0,0,4,0">
+                        <StackPanel Orientation="Horizontal">
+                            <Path Data="{StaticResource FcClockGlyph}" Width="13" Height="13" Stretch="Uniform" StrokeThickness="1.4"
+                                  Stroke="{DynamicResource Char_FgSubtle}" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                                  VerticalAlignment="Center"/>
+                            <TextBlock Text="{Binding ResetText}" Margin="5,0,0,0" FontSize="11.5" Foreground="{DynamicResource Char_FgMuted}"
+                                       VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Border>
+                    <Button x:Name="CloseButton" Grid.Column="2" Style="{StaticResource FcTextButton}" Width="30" Padding="0"
+                            ToolTip="{DynamicResource FarmCard_Close}" AutomationProperties.Name="{DynamicResource FarmCard_Close}"
+                            Click="CloseButton_Click">
+                        <Path Data="{StaticResource FcCloseGlyph}" Width="16" Height="16" Stretch="None" StrokeThickness="1.6"
+                              Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                              StrokeStartLineCap="Round" StrokeEndLineCap="Round" HorizontalAlignment="Center"/>
+                    </Button>
+                </Grid>
+
+                <!-- The day, big, with the week beside it: the ringed days bring the same books back. -->
+                <Grid Margin="18,0,18,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock x:Name="DayTitle" Text="{Binding DayTitle}" FontFamily="{DynamicResource FontDisplay}"
+                               FontSize="32" FontWeight="SemiBold" Foreground="{DynamicResource Char_Fg}" TextTrimming="CharacterEllipsis"/>
+                    <ItemsControl x:Name="WeekStrip" Grid.Column="1" ItemsSource="{Binding Week}" ItemTemplate="{StaticResource FcWeekCell}"
+                                  Focusable="False" VerticalAlignment="Center" Margin="10,4,-3,0">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <StackPanel Orientation="Horizontal"/>
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                    </ItemsControl>
+                </Grid>
+                <TextBlock x:Name="WeekBlock" Text="{Binding TwinText}" Margin="18,2,18,0" FontSize="12" TextWrapping="Wrap"
+                           Foreground="{DynamicResource Char_FgMuted}"/>
+
+                <!-- Today's books. -->
+                <StackPanel x:Name="BooksBlock" Margin="18,16,18,0" Visibility="{Binding HasBooks, Converter={StaticResource FcBoolVis}}">
+                    <TextBlock Text="{Binding BooksLabel}" FontSize="11.5" FontWeight="SemiBold" Foreground="{DynamicResource Char_FgSubtle}"
+                               Margin="0,0,0,10"/>
+                    <ItemsControl x:Name="BookTiles" ItemsSource="{Binding Books}" ItemTemplate="{StaticResource FcBookTile}" Focusable="False">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <UniformGrid Columns="4"/>
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                    </ItemsControl>
+                </StackPanel>
+
+                <!-- The player's characters. -->
+                <StackPanel x:Name="RowsBlock" Margin="18,10,18,0" Visibility="{Binding HasRows, Converter={StaticResource FcBoolVis}}">
+                    <Border Height="1" Background="{DynamicResource Char_Divider}" Margin="0,0,0,14"/>
+                    <TextBlock Text="{DynamicResource FarmCard_Characters}" FontSize="11.5" FontWeight="SemiBold"
+                               Foreground="{DynamicResource Char_FgSubtle}" Margin="0,0,0,10"/>
+                    <ItemsControl x:Name="RowList" ItemsSource="{Binding Rows}" ItemTemplate="{StaticResource FcRow}" Focusable="False"/>
+                    <TextBlock Text="{Binding MoreText}" FontSize="12" Foreground="{DynamicResource Char_FgSubtle}" Margin="53,0,0,4"
+                               Visibility="{Binding HasMore, Converter={StaticResource FcBoolVis}}"/>
+                </StackPanel>
+
+                <!-- No UID, nothing today, or the showcase can't be read: one line, one action. -->
+                <Border x:Name="PlayerNote" Margin="18,10,18,0" Padding="12,10,10,10" CornerRadius="10"
+                        Background="{DynamicResource Char_ChipBg}" BorderBrush="{DynamicResource Char_Ring}" BorderThickness="1"
+                        Visibility="{Binding HasPlayerMessage, Converter={StaticResource FcBoolVis}}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Path Data="{StaticResource FcPersonGlyph}" Width="18" Height="18" Stretch="Uniform" StrokeThickness="1.5"
+                              Stroke="{DynamicResource Char_Accent}" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                        <TextBlock Grid.Column="1" Text="{Binding PlayerMessage}" FontSize="12.5" TextWrapping="Wrap"
+                                   Foreground="{DynamicResource Char_Fg}" VerticalAlignment="Center"/>
+                        <Button x:Name="AddUidButton" Grid.Column="2" Style="{DynamicResource KLinkButton}" Margin="10,0,0,0"
+                                Content="{Binding AddUidText}" VerticalAlignment="Center" Click="AddUidButton_Click"
+                                Visibility="{Binding ShowAddUid, Converter={StaticResource FcBoolVis}}"/>
+                    </Grid>
+                </Border>
+
+                <!-- A tip for players still learning the loop. -->
+                <Grid x:Name="TipLine" Margin="18,12,18,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Path Data="{StaticResource FcTipGlyph}" Width="15" Height="15" Stretch="Uniform" StrokeThickness="1.4"
+                          Stroke="{DynamicResource Char_Rarity5}" VerticalAlignment="Top" Margin="0,1,8,0"/>
+                    <TextBlock Grid.Column="1" Text="{Binding Tip}" FontSize="12" TextWrapping="Wrap" Foreground="{DynamicResource Char_FgMuted}"/>
+                </Grid>
+
+                <!-- Footer: the full page, turn the card off. -->
+                <Grid Margin="10,10,10,6">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <Button x:Name="FullListButton" Style="{StaticResource FcTextButton}" Foreground="{DynamicResource Char_Accent}"
+                            Click="FullListButton_Click">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="{DynamicResource FarmCard_FullList}" VerticalAlignment="Center"/>
+                            <Path Data="{StaticResource FcOutGlyph}" Width="16" Height="16" Stretch="None" StrokeThickness="1.5" Margin="5,0,0,0"
+                                  Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                  StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+                    <Button x:Name="DontShowButton" Grid.Column="2" Style="{StaticResource FcTextButton}" FontWeight="Normal"
+                            Content="{DynamicResource FarmCard_DontShow}" ToolTip="{DynamicResource FarmCard_DontShow_Tip}"
+                            Click="DontShowButton_Click"/>
+                </Grid>
+
+                <Border x:Name="CountdownTrack" Height="3" Margin="14,0,14,8" CornerRadius="1.5" Background="{DynamicResource Char_Track}">
+                    <Border x:Name="CountdownBar" HorizontalAlignment="Left" CornerRadius="1.5" Background="{DynamicResource Char_Accent}"
+                            Opacity="0.8"/>
+                </Border>
+            </StackPanel>
+        </Grid>
+    </Border>
+</UserControl>

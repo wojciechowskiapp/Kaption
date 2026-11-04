@@ -16,6 +16,8 @@ namespace GI_Subtitles.Services.Translation
         HotCache,
         Matcher,
         MatcherHeaderSeparated,
+        /// <summary>The matcher found a key, but nothing says the read is dialogue (map, menu, item text).</summary>
+        NotDialogue,
     }
 
     /// <summary>
@@ -62,6 +64,13 @@ namespace GI_Subtitles.Services.Translation
         private Dictionary<string, string> _memoDictionary;
         private string _lastConfirmedKey;
         private string _lastConfirmedNpc;
+
+        /// <summary>
+        /// Paint a matcher hit only when the dialogue data vouches for it: the key is a graph line, or a speaker the
+        /// data knows says something that reads as speech. Map labels, menus and item text are TextMap keys too.
+        /// Per game (<c>GameRegionProfile.RequiresDialogueEvidence</c>); without a loaded graph nothing is filtered.
+        /// </summary>
+        public bool RequireDialogueEvidence { get; set; }
 
         public SubtitleResolver(int memoCapacity = 100)
         {
@@ -220,6 +229,18 @@ namespace GI_Subtitles.Services.Translation
 
             if (key == null) key = "";
 
+            if (RequireDialogueEvidence && source != ResolutionSource.HotCache && content.Length > 0 &&
+                contextEngine?.IsLoaded == true && !HasDialogueEvidence(key, detectedNpcName, contextEngine))
+            {
+                if (Logger.IsDebugEnabled)
+                    Logger.Log.Debug($"Not dialogue, not painted: \"{ocrText}\" -> \"{key}\"");
+                content = "";
+                header = "";
+                key = "";
+                isPartialMatch = false;
+                source = ResolutionSource.NotDialogue;
+            }
+
             string res = string.IsNullOrEmpty(header) ? content : (header + "\n\n" + content);
 
             bool chainAdvanced = !isPartialMatch &&
@@ -254,6 +275,44 @@ namespace GI_Subtitles.Services.Translation
                 IsPartial = isPartialMatch,
                 ChainAdvanced = chainAdvanced,
             };
+        }
+
+        private static bool HasDialogueEvidence(string key, string npc, IGameDialogueContext context)
+        {
+            try
+            {
+                if (!context.CanVouchForLines) return true;
+                return context.IsDialogueLine(key) ||
+                       (context.IsKnownSpeaker(npc) && ReadsAsSpeech(key) &&
+                        !string.Equals(key.Trim(), npc.Trim(), StringComparison.OrdinalIgnoreCase));
+            }
+            catch (Exception ex)
+            {
+                Logger.Log.Warn($"Dialogue evidence check failed for \"{key}\": {ex.Message}");
+                return true;
+            }
+        }
+
+        /// <summary>
+        /// A sentence ending, or four words or more: a line someone says, not a name or a label ("Max HP",
+        /// "Talk to Illuga"). In the Genshin graph only option labels fail it (0.2% of lines).
+        /// </summary>
+        public static bool ReadsAsSpeech(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text)) return false;
+            string t = text.Trim();
+            char last = t[t.Length - 1];
+            if (last is '.' or '!' or '?' or '…' or '~' or '—' or '-' or '"' or '”' or '」' or '』' or ')' or '*' or '♪')
+                return true;
+            int words = 0;
+            bool inWord = false;
+            foreach (char c in t)
+            {
+                bool letter = char.IsLetterOrDigit(c);
+                if (letter && !inWord) words++;
+                inWord = letter || (inWord && c is '\'' or '’' or '-');
+            }
+            return words >= 4;
         }
 
         private bool ConfirmMatch(string key, string npc, IGameDialogueContext context,

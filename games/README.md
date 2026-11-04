@@ -27,6 +27,10 @@ change once a game ships. `id` is always `gameId` lower-cased. A key left out of
 `desktop.pacing` keeps the app's default. A candidate becomes a game by moving to `games/<key>.json` with the same
 key as its id, which keeps its votes.
 
+`site.guessName` (optional) is the daily guessing game's own name on the site: Gendle, Stardle, Zendle, Wuwdle. It
+titles the game's guess hub ("Gendle – daily Genshin Impact character guessing game") and starts every shared result
+("Gendle #12"). One capitalised word, unique across games; without it the hub keeps its plain title.
+
 When the executable name is generic (Unreal's `Client-Win64-Shipping` is shared by many games), set
 `"detect": { …, "requireTitle": true }`: the app then counts a process as the game only while one of its windows
 has a title from `windowTitles`. Two manifests may share an executable only if both set it.

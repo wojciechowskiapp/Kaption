@@ -105,6 +105,26 @@ namespace GI_Test
             Assert.AreEqual("MysteryStat", CharacterOverviewBuilder.Build(c.Find("1001"), c, null).SubStats[0]);
         }
 
+        /// <summary>Genshin and Star Rail have no role text: the character's role in its best team stands in, as on the site.</summary>
+        [TestMethod]
+        public void NoGameRole_UsesRoleInBestTeam_BySlotThenDataOrder()
+        {
+            const string Flins = CharacterTeamIndexTests.Flins, Columbina = CharacterTeamIndexTests.Columbina;
+            string T(string slot, string role) =>
+                CharacterTeamIndexTests.Team("T", "T", "ai+sources", new[] { Flins, Columbina }, (role == null ? Columbina : Flins, "en " + role, role ?? "x"))
+                    .Replace("\"source\"", (slot == null ? "" : "\"slot\": \"" + slot + "\", ") + "\"source\"");
+            CharacterCatalog Roster(params string[] teams) => CharacterTeamIndexTests.Catalog(
+                CharacterTeamIndexTests.Record(Flins, "Flins", null, null, teams),
+                CharacterTeamIndexTests.Record(Columbina, "Columbina", null, null));
+            string RoleOf(CharacterCatalog c) => CharacterOverviewBuilder.Build(c.Find(Flins), c, null).Role;
+
+            Assert.AreEqual("Najlepsza", RoleOf(Roster(T(null, "Bez slotu"), T("budget", "Budżetowa"), T("best", null), T("best", "Najlepsza"))),
+                "best slot first, skipping a team without a role for this character");
+            Assert.AreEqual("Budżetowa", RoleOf(Roster(T(null, "Bez slotu"), T("budget", "Budżetowa"))));
+            Assert.AreEqual("Bez slotu", RoleOf(Roster(T(null, "Bez slotu"))));
+            Assert.AreEqual("", RoleOf(Roster()), "no role and no team: none");
+        }
+
         [TestMethod]
         public void NullBuild_HasOfficialBuildFalse()
         {

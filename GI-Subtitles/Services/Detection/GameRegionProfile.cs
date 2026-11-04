@@ -190,6 +190,19 @@ namespace GI_Subtitles.Services.Detection
         /// </summary>
         public bool FiltersOcrJunk { get; set; } = false;
 
+        /// <summary>
+        /// A matcher hit is painted only when the dialogue data vouches for it (a graph line, or a known speaker saying
+        /// something that reads as speech): map labels, menus and item text are TextMap keys too. Resolver only.
+        /// Genshin (session 57); off elsewhere until measured.
+        /// </summary>
+        public bool RequiresDialogueEvidence { get; set; } = false;
+
+        /// <summary>
+        /// A read whose body boxes are barely lit (OcrReadEvidence) is a line fading out and counts as an empty read,
+        /// so the fade cannot become the change gate's baseline. OCR worker only. Genshin (session 57).
+        /// </summary>
+        public bool RejectsFadedReads { get; set; } = false;
+
         // ── Registered profiles ──
         //
         // Built from the embedded game manifests (games/<id>.json) by Services/Games/GameRegistry: beta and live

@@ -37,7 +37,9 @@
       "RegionMinWidthFraction": 0.7,
       "StrictRegionJunkFilter": false,
       "UsesSpeakerRowClassifier": false,
-      "FiltersOcrJunk": false
+      "FiltersOcrJunk": false,
+      "RequiresDialogueEvidence": true,
+      "RejectsFadedReads": true
     },
     {
       "GameId": "StarRail",
@@ -70,7 +72,9 @@
       "RegionMinWidthFraction": 0.7,
       "StrictRegionJunkFilter": false,
       "UsesSpeakerRowClassifier": false,
-      "FiltersOcrJunk": false
+      "FiltersOcrJunk": false,
+      "RequiresDialogueEvidence": false,
+      "RejectsFadedReads": false
     },
     {
       "GameId": "ZZZ",
@@ -109,7 +113,9 @@
       "RegionMinWidthFraction": 0.55,
       "StrictRegionJunkFilter": true,
       "UsesSpeakerRowClassifier": false,
-      "FiltersOcrJunk": false
+      "FiltersOcrJunk": false,
+      "RequiresDialogueEvidence": false,
+      "RejectsFadedReads": false
     }
   ],
   "fallback": {
@@ -139,7 +145,9 @@
     "RegionMinWidthFraction": 0.7,
     "StrictRegionJunkFilter": false,
     "UsesSpeakerRowClassifier": false,
-    "FiltersOcrJunk": false
+    "FiltersOcrJunk": false,
+    "RequiresDialogueEvidence": false,
+    "RejectsFadedReads": false
   },
   "fallbackForNull": {
     "GameId": "Unknown",
@@ -168,7 +176,9 @@
     "RegionMinWidthFraction": 0.7,
     "StrictRegionJunkFilter": false,
     "UsesSpeakerRowClassifier": false,
-    "FiltersOcrJunk": false
+    "FiltersOcrJunk": false,
+    "RequiresDialogueEvidence": false,
+    "RejectsFadedReads": false
   },
   "resolve": {
     "[Genshin]": {

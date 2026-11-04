@@ -124,7 +124,9 @@
             "regionSplitXFraction": { "type": "number", "exclusiveMinimum": 0, "exclusiveMaximum": 1 },
             "regionMinWidthFraction": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 },
             "strictRegionJunkFilter": { "type": "boolean" },
-            "ocrJunkFilter": { "description": "Drop HUD readouts, watermarks and stray glyphs (OcrTextJunkFilter) before the speaker/body split on every frame. The geometry classifier always does.", "type": "boolean" }
+            "ocrJunkFilter": { "description": "Drop HUD readouts, watermarks and stray glyphs (OcrTextJunkFilter) before the speaker/body split on every frame. The geometry classifier always does.", "type": "boolean" },
+            "dialogueEvidence": { "description": "Paint a match only when the dialogue data vouches for it: a dialogue-graph line, or a known speaker saying something that reads as speech. Map labels, menus and item text are TextMap keys too.", "type": "boolean" },
+            "fadedReadFilter": { "description": "Treat a read whose body boxes are barely lit (under 2% of pixels past the binary threshold) as empty: the line is fading out, and keeping it would hide the fade from the change gate.", "type": "boolean" }
           }
         },
         "dialogueContext": {
@@ -183,7 +185,8 @@
             "en": { "type": "string", "pattern": "^/[a-z0-9]+(?:-[a-z0-9]+)*/$" }
           }
         },
-        "ogBackground": { "description": "Key art for generated update images, relative to landing/.", "type": "string", "pattern": "^src/assets/[A-Za-z0-9_./-]+\\.(?:jpg|jpeg|png|webp)$" }
+        "ogBackground": { "description": "Key art for generated update images, relative to landing/.", "type": "string", "pattern": "^src/assets/[A-Za-z0-9_./-]+\\.(?:jpg|jpeg|png|webp)$" },
+        "guessName": { "description": "The daily guessing game's own name on the site (Gendle). Unique across games.", "type": "string", "pattern": "^[A-Z][A-Za-z]{2,23}$" }
       }
     },
     "slug": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$", "maxLength": 80 },
@@ -255,7 +258,7 @@
           }
         },
         "codes": {
-          "description": "null: the game has no redeem codes. hoyolab: the news worker reads the HoYoLAB codes panel and the site has a codes page with a redeem link. ingame: codes are redeemed only inside the game and no source is read yet, so there is no codes page.",
+          "description": "null: the game has no redeem codes. hoyolab: the news worker reads the HoYoLAB codes panel and the site has a codes page with a redeem link. ingame: codes are redeemed only inside the game; the site's codes page shows Copy and the in-game steps (redeemHow) instead of a link, and the news worker reads the sources [news.games.<id>] names (the official Discord follow, the wiki, the checked list).",
           "oneOf": [
             { "type": "null" },
             {
@@ -264,16 +267,46 @@
               "required": ["kind", "redeemUrl"],
               "properties": {
                 "kind": { "const": "hoyolab" },
-                "redeemUrl": { "type": "string", "pattern": "^https://[^\\s]*\\{code\\}[^\\s]*$" }
+                "redeemUrl": { "type": "string", "pattern": "^https://[^\\s]*\\{code\\}[^\\s]*$" },
+                "officialDiscord": {
+                  "description": "The game's official Discord server (guild id). Messages its announcement channels crosspost into the channel [news.games.<id>] discord_follow names are an official codes source next to the HoYoLAB panel; nothing else in that channel is.",
+                  "type": "string",
+                  "pattern": "^[0-9]{17,20}$"
+                }
               }
             },
             {
               "type": "object",
               "additionalProperties": false,
-              "required": ["kind", "redeemUrl"],
+              "required": ["kind", "redeemUrl", "redeemHow"],
               "properties": {
                 "kind": { "const": "ingame" },
-                "redeemUrl": { "type": "null" }
+                "redeemUrl": { "type": "null" },
+                "redeemHow": {
+                  "description": "Where a code is entered inside the game, as the game's own English UI labels: the site and the code alerts word the steps per language around them.",
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["path"],
+                  "properties": {
+                    "path": {
+                      "description": "The menus from the main screen to the code field, in order (Terminal, Settings, ...).",
+                      "type": "array",
+                      "minItems": 2,
+                      "maxItems": 6,
+                      "items": { "type": "string", "pattern": "^[A-Z][A-Za-z0-9 '&-]{0,39}$" }
+                    },
+                    "unlock": {
+                      "description": "The progress that unlocks the code field (Union Level 2), English game terms; absent when it is open from the start.",
+                      "type": "string",
+                      "pattern": "^[A-Z][A-Za-z0-9 '-]{1,59}$"
+                    }
+                  }
+                },
+                "officialDiscord": {
+                  "description": "The game's official Discord server (guild id). Messages its announcement channels crosspost into the channel [news.games.<id>] discord_follow names are an official codes source; nothing else in that channel is.",
+                  "type": "string",
+                  "pattern": "^[0-9]{17,20}$"
+                }
               }
             }
           ]

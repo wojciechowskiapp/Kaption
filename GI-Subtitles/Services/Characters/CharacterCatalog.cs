@@ -74,6 +74,8 @@ namespace GI_Subtitles.Services.Characters
     {
         public AiLocalized Name { get; set; } = AiLocalized.Empty;
         public string Source { get; set; } = "";
+        /// <summary>"best", "budget", "alternative", "upcoming" or "earlier" when the updater says; empty otherwise.</summary>
+        public string Slot { get; set; } = "";
         public IReadOnlyList<string> Members { get; set; } = Array.Empty<string>();
         /// <summary>Role per member id.</summary>
         public IReadOnlyDictionary<string, AiLocalized> Roles { get; set; } = new Dictionary<string, AiLocalized>();
@@ -753,6 +755,7 @@ namespace GI_Subtitles.Services.Characters
                 {
                     Name = Localized(t, "name"),
                     Source = Str(t, "source").Trim().ToLowerInvariant(),
+                    Slot = Str(t, "slot").Trim().ToLowerInvariant(),
                     Members = members,
                     Roles = roles,
                     Why = Localized(t, "why"),

@@ -34,13 +34,14 @@
     "hub": "zenless-zone-zero",
     "guideKey": "zzz",
     "guide": { "pl": "/pl/zenless-zone-zero-tlumaczenie/", "en": "/zenless-zone-zero-translator/" },
-    "ogBackground": "src/assets/og/ai/zzz.jpg"
+    "ogBackground": "src/assets/og/ai/zzz.jpg",
+    "guessName": "Zendle"
   },
   "source": { "kind": "datamine", "host": "gitea", "repo": "dimbreath/ZenlessData", "branch": "master", "keySpace": "minted" },
   "translation": { "targets": ["pl"], "sources": ["auto", "community"] },
   "news": {
     "hoyolabGid": 8,
     "officialFeeds": [{ "kind": "youtube", "channelId": "UC2SpC8rL9LaeQriE4YNdyzA" }],
-    "codes": { "kind": "hoyolab", "redeemUrl": "https://zenless.hoyoverse.com/redemption?code={code}" }
+    "codes": { "kind": "hoyolab", "redeemUrl": "https://zenless.hoyoverse.com/redemption?code={code}", "officialDiscord": "951972846152859699" }
   }
 }

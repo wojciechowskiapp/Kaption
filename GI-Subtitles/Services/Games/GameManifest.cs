@@ -74,6 +74,8 @@ namespace GI_Subtitles.Services.Games
         public double? RegionMinWidthFraction { get; set; }
         public bool? StrictRegionJunkFilter { get; set; }
         public bool? OcrJunkFilter { get; set; }
+        public bool? DialogueEvidence { get; set; }
+        public bool? FadedReadFilter { get; set; }
     }
 
     public sealed class GameDesktop

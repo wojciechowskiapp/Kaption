@@ -623,6 +623,7 @@ namespace GI_Subtitles.Views
             data.OverlayScreenAreas = OverlayScreenAreas;
             data.OnOpenSetupWizard = () => ShowSetupWizard();
             InitAutoStart();
+            InitFarmCard();
 
             // Always open settings window on startup (non-modal so UI stays responsive)
             data.Show();
@@ -1936,6 +1937,8 @@ namespace GI_Subtitles.Views
                 try
                 {
                     var layers = LayersFor(data?.Matcher);
+                    _subtitleResolver.RequireDialogueEvidence =
+                        Services.Detection.GameRegionProfile.ForCurrentGame().RequiresDialogueEvidence;
                     bool hasOcrText = ocrText.Length > 1;
                     SubtitleResolution resolution = default;
                     if (hasOcrText && !GameUiTextFilter.IsLikelyGameUI(ocrText))
@@ -4086,6 +4089,7 @@ namespace GI_Subtitles.Views
             string[] detectedAnswers = null;
             bool clearAnswers = false;
             bool wasCacheHit = false;
+            bool fadedRead = false;
             bool inferenceAttempted = false;
             bool inferenceTimedOut = false;
             Exception inferenceError = null;
@@ -4141,6 +4145,20 @@ namespace GI_Subtitles.Views
                                 detectedNpcName = detectedResult.NpcName;
                                 detectedText = detectedResult.DialogueText;
                                 detectedTextLayout = detectedResult;
+
+                                // A line read while the box fades is no line: its binary frame is already black, so
+                                // committing it would hide the fade-out from the change gate (OcrReadEvidence).
+                                if (binaryBaseline != null && detectedText.Length > 1 &&
+                                    Services.Detection.GameRegionProfile.ForCurrentGame().RejectsFadedReads &&
+                                    OcrReadEvidence.IsFaded(Cv2.CountNonZero(binaryBaseline),
+                                        OcrReadEvidence.BodyArea(detectedResult.DialogueBlocks)))
+                                {
+                                    if (Logger.IsDebugEnabled) Logger.Log.Debug($"Faded read ignored: \"{detectedText}\"");
+                                    fadedRead = true;
+                                    detectedText = string.Empty;
+                                    detectedNpcName = string.Empty;
+                                    detectedTextLayout = null;
+                                }
 
                                 if (Logger.IsDebugEnabled)
                                 {
@@ -4331,7 +4349,8 @@ namespace GI_Subtitles.Views
                             }
                             else if (retryFrame)
                             {
-                                _nextOcrAttemptUtc = DateTime.UtcNow + EmptyFrameRetryBackoff;
+                                // A fading line is read again at the next interval: the next line may be fading in.
+                                _nextOcrAttemptUtc = fadedRead ? DateTime.MinValue : DateTime.UtcNow + EmptyFrameRetryBackoff;
                                 Logger.Log.Debug("OCR returned no usable text; scheduling a same-frame retry.");
                             }
 

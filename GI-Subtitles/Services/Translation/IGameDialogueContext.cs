@@ -92,6 +92,15 @@ namespace GI_Subtitles.Services.Translation
         /// / test-support path; runtime code goes through the regular pipeline.</summary>
         long FindNodeByText(string enText, string npcFilter = null);
 
+        /// <summary>The dialogue graph is loaded, so <see cref="IsDialogueLine"/> and <see cref="IsKnownSpeaker"/> can answer.</summary>
+        bool CanVouchForLines { get; }
+
+        /// <summary>The English line, raw or as the pack keys it (PackKeyText), is a node of the dialogue graph (any speaker). False before the graph loads.</summary>
+        bool IsDialogueLine(string enText);
+
+        /// <summary>The detected speaker name is a speaker the dialogue data knows. False before it loads.</summary>
+        bool IsKnownSpeaker(string detectedNpcName);
+
         /// <summary>Explicitly set the active node and populate predictions from
         /// its successors. Used by tests and integrations with custom node
         /// resolution.</summary>

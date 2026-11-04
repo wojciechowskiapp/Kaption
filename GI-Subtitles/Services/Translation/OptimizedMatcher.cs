@@ -1476,7 +1476,9 @@ namespace GI_Subtitles.Services.Translation
 
                     if (normInput.StartsWith(normKey, StringComparison.Ordinal))
                     {
-                        currentDistance = 0;
+                        // A shorter key the read starts with is the whole answer only where an OCR line ends (the
+                        // dialogue above a choice list). Mid-line, "Very well. In the interests" is not "...Very well.".
+                        currentDistance = EndsAtLineBreak(input, keyLen, isEng) ? 0 : inputLen - keyLen;
                     }
                     else
                     {
@@ -1534,6 +1536,28 @@ namespace GI_Subtitles.Services.Translation
             Key = "";
             return "";
         }
+
+        /// <summary>
+        /// Whether the first <paramref name="normalizedLength"/> normalized characters of <paramref name="input"/> end
+        /// at a line break: no normalized character follows before the next line break.
+        /// </summary>
+        internal static bool EndsAtLineBreak(string input, int normalizedLength, bool isEng)
+        {
+            int count = 0;
+            int i = 0;
+            for (; i < input.Length && count < normalizedLength; i++)
+                if (CountsWhenNormalized(input[i], isEng)) count++;
+            for (; i < input.Length; i++)
+            {
+                char c = input[i];
+                if (c == '\n') return true;
+                if (CountsWhenNormalized(c, isEng)) return false;
+            }
+            return true;
+        }
+
+        private static bool CountsWhenNormalized(char c, bool isEng) =>
+            isEng ? (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') : !char.IsWhiteSpace(c);
 
         private static int CalculateLevenshteinDistance(ReadOnlySpan<char> source, ReadOnlySpan<char> target, int threshold)
         {
@@ -1690,12 +1714,13 @@ namespace GI_Subtitles.Services.Translation
                     maxIndex = 1;
                 }
             }
-            string bodyText = string.Join(" ", lines.Skip(maxIndex));
+            // Line breaks kept: the matcher accepts a shorter key the body starts with only where a line ends.
+            string bodyText = string.Join("\n", lines.Skip(maxIndex));
 
             string bodyMatch = FindClosestMatch(bodyText, out string bodyKey, out bool isPartial);
             if (string.IsNullOrEmpty(bodyMatch) && maxIndex > 1)
             {
-                bodyMatch = FindClosestMatch(string.Join(" ", lines.Skip(1)), out bodyKey, out isPartial);
+                bodyMatch = FindClosestMatch(string.Join("\n", lines.Skip(1)), out bodyKey, out isPartial);
             }
             key = bodyKey;
             result.Content = bodyMatch;

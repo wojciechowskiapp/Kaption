@@ -35,6 +35,7 @@ namespace GI_Subtitles.Core.UI
         ToolStripMenuItem startStopItem;
         ToolStripMenuItem charactersItem;
         ToolStripMenuItem fixLineItem;
+        ToolStripMenuItem farmTodayItem;
         private TrayState _trayState = TrayState.Idle;
         private int Size = Config.Config.Get<int>("Size");
         private bool AutoStart = Config.Config.Get("AutoStart", false);
@@ -98,6 +99,13 @@ namespace GI_Subtitles.Core.UI
                 try { (System.Windows.Application.Current?.MainWindow as Views.MainWindow)?.OpenSuggestFix(fromHotkey: false); }
                 catch (Exception ex) { Logger.Log.Warn($"Tray fix line failed: {ex.Message}"); }
             };
+            // The farm card on demand (Genshin only: the other games have no weekday rotation).
+            farmTodayItem = new ToolStripMenuItem(GetLocalizedString("Tray_FarmToday", "What to farm today"));
+            farmTodayItem.Click += (sender, e) =>
+            {
+                try { (System.Windows.Application.Current?.MainWindow as Views.MainWindow)?.ShowFarmCardOnDemand(); }
+                catch (Exception ex) { Logger.Log.Warn($"Tray farm card failed: {ex.Message}"); }
+            };
             string trayFeedback = GetLocalizedString("Tray_Feedback", "Send feedback\u2026");
             feedbackItem = new ToolStripMenuItem(trayFeedback);
             exitItem = new ToolStripMenuItem(GetLocalizedString("shell_Tray_Exit", trayExit));
@@ -156,6 +164,7 @@ namespace GI_Subtitles.Core.UI
             contextMenuStrip.Items.Add(startStopItem);
             contextMenuStrip.Items.Add(charactersItem);
             contextMenuStrip.Items.Add(fixLineItem);
+            contextMenuStrip.Items.Add(farmTodayItem);
             contextMenuStrip.Items.Add(settingItem);
             contextMenuStrip.Items.Add(new ToolStripSeparator());
             contextMenuStrip.Items.Add(exitItem);
@@ -330,6 +339,7 @@ namespace GI_Subtitles.Core.UI
                 exitItem.Text = GetLocalizedString("shell_Tray_Exit", "Quit Kaption");
                 if (charactersItem != null) charactersItem.Text = GetLocalizedString("shell_Tray_Characters", "Characters");
                 if (fixLineItem != null) fixLineItem.Text = GetLocalizedString("Tray_FixLine", "Fix the last subtitle…");
+                if (farmTodayItem != null) farmTodayItem.Text = GetLocalizedString("Tray_FarmToday", "What to farm today");
                 if (startStopItem != null)
                     startStopItem.Text = (data?.IsOcrRunning?.Invoke() ?? false)
                         ? GetLocalizedString("shell_Tray_Stop", "Stop translating")
@@ -679,6 +689,7 @@ namespace GI_Subtitles.Core.UI
         private void ContextMenuStrip_Opening(object sender, System.ComponentModel.CancelEventArgs e)
         {
             isContextMenuOpen = true;
+            if (farmTodayItem != null) farmTodayItem.Visible = Services.Today.FarmCardSettings.IsActiveGame();
             if (startStopItem != null)
             {
                 bool running = data?.IsOcrRunning?.Invoke() ?? false;
