@@ -1,0 +1,2117 @@
+{
+ "schema": 1,
+ "game": "genshin",
+ "sourceRevision": "bd35e243 (CNRELWin7.2.0)",
+ "regions": [
+  {
+   "city": 1,
+   "name": "Mondstadt"
+  },
+  {
+   "city": 2,
+   "name": "Liyue"
+  },
+  {
+   "city": 3,
+   "name": "Inazuma"
+  },
+  {
+   "city": 4,
+   "name": "Sumeru"
+  },
+  {
+   "city": 5,
+   "name": "Fontaine"
+  },
+  {
+   "city": 6,
+   "name": "Natlan"
+  },
+  {
+   "city": 7,
+   "name": "Nod-Krai"
+  },
+  {
+   "city": 8,
+   "name": "Snezhnaya"
+  }
+ ],
+ "domains": [
+  {
+   "kind": "talent",
+   "city": 1,
+   "name": "Domain of Mastery: Frosted Altar",
+   "days": [
+    0,
+    1,
+    4
+   ],
+   "items": [
+    {
+     "id": 104301,
+     "name": "Teachings of Freedom",
+     "rarity": 2
+    },
+    {
+     "id": 104302,
+     "name": "Guide to Freedom",
+     "rarity": 3
+    },
+    {
+     "id": 104303,
+     "name": "Philosophies of Freedom",
+     "rarity": 4
+    }
+   ],
+   "since": null
+  },
+  {
+   "kind": "talent",
+   "city": 1,
+   "name": "Domain of Mastery: Frozen Abyss",
+   "days": [
+    0,
+    2,
+    5
+   ],
+   "items": [
+    {
+     "id": 104304,
+     "name": "Teachings of Resistance",
+     "rarity": 2
+    },
+    {
+     "id": 104305,
+     "name": "Guide to Resistance",
+     "rarity": 3
+    },
+    {
+     "id": 104306,
+     "name": "Philosophies of Resistance",
+     "rarity": 4
+    }
+   ],
+   "since": null
+  },
+  {
+   "kind": "talent",
+   "city": 1,
+   "name": "Domain of Mastery: Realm of Slumber",
+   "days": [
+    0,
+    3,
+    6
+   ],
+   "items": [
+    {
+     "id": 104307,
+     "name": "Teachings of Ballad",
+     "rarity": 2
+    },
+    {
+     "id": 104308,
+     "name": "Guide to Ballad",
+     "rarity": 3
+    },
+    {
+     "id": 104309,
+     "name": "Philosophies of Ballad",
+     "rarity": 4
+    }
+   ],
+   "since": null
+  },
+  {
+   "kind": "weapon",
+   "city": 1,
+   "name": "Domain of Forgery: City of Reflections",
+   "days": [
+    0,
+    1,
+    4
+   ],
+   "items": [
+    {
+     "id": 114001,
+     "name": "Tile of Decarabian's Tower",
+     "rarity": 2
+    },
+    {
+     "id": 114002,
+     "name": "Debris of Decarabian's City",
+     "rarity": 3
+    },
+    {
+     "id": 114003,
+     "name": "Fragment of Decarabian's Epic",
+     "rarity": 4
+    },
+    {
+     "id": 114004,
+     "name": "Scattered Piece of Decarabian's Dream",
+     "rarity": 5
+    }
+   ],
+   "since": null
+  },
+  {
+   "kind": "weapon",
+   "city": 1,
+   "name": "Domain of Forgery: Ruins of Thirsting Capital",
+   "days": [
+    0,
+    3,
+    6
+   ],
+   "items": [
+    {
+     "id": 114009,
+     "name": "Fetters of the Dandelion Gladiator",
+     "rarity": 2
+    },
+    {
+     "id": 114010,
+     "name": "Chains of the Dandelion Gladiator",
+     "rarity": 3
+    },
+    {
+     "id": 114011,
+     "name": "Shackles of the Dandelion Gladiator",
+     "rarity": 4
+    },
+    {
+     "id": 114012,
+     "name": "Dream of the Dandelion Gladiator",
+     "rarity": 5
+    }
+   ],
+   "since": null
+  },
+  {
+   "kind": "weapon",
+   "city": 1,
+   "name": "Domain of Forgery: Submerged Valley",
+   "days": [
+    0,
+    2,
+    5
+   ],
+   "items": [
+    {
+     "id": 114005,
+     "name": "Boreal Wolf's Milk Tooth",
+     "rarity": 2
+    },
+    {
+     "id": 114006,
+     "name": "Boreal Wolf's Cracked Tooth",
+     "rarity": 3
+    },
+    {
+     "id": 114007,
+     "name": "Boreal Wolf's Broken Fang",
+     "rarity": 4
+    },
+    {
+     "id": 114008,
+     "name": "Boreal Wolf's Nostalgia",
+     "rarity": 5
+    }
+   ],
+   "since": null
+  },
+  {
+   "kind": "talent",
+   "city": 2,
+   "name": "Domain of Mastery: Altar of Flames",
+   "days": [
+    0,
+    1,
+    4
+   ],
+   "items": [
+    {
+     "id": 104310,
+     "name": "Teachings of Prosperity",
+     "rarity": 2
+    },
+    {
+     "id": 104311,
+     "name": "Guide to Prosperity",
+     "rarity": 3
+    },
+    {
+     "id": 104312,
+     "name": "Philosophies of Prosperity",
+     "rarity": 4
+    }
+   ],
+   "since": null
+  },
+  {
+   "kind": "talent",
+   "city": 2,
+   "name": "Domain of Mastery: Circle of Embers",
+   "days": [
+    0,
+    3,
+    6
+   ],
+   "items": [
+    {
+     "id": 104316,
+     "name": "Teachings of Gold",
+     "rarity": 2
+    },
+    {
+     "id": 104317,
+     "name": "Guide to Gold",
+     "rarity": 3
+    },
+    {
+     "id": 104318,
+     "name": "Philosophies of Gold",
+     "rarity": 4
+    }
+   ],
+   "since": null
+  },
+  {
+   "kind": "talent",
+   "city": 2,
+   "name": "Domain of Mastery: Heart of the Flames",
+   "days": [
+    0,
+    2,
+    5
+   ],
+   "items": [
+    {
+     "id": 104313,
+     "name": "Teachings of Diligence",
+     "rarity": 2
+    },
+    {
+     "id": 104314,
+     "name": "Guide to Diligence",
+     "rarity": 3
+    },
+    {
+     "id": 104315,
+     "name": "Philosophies of Diligence",
+     "rarity": 4
+    }
+   ],
+   "since": null
+  },
+  {
+   "kind": "weapon",
+   "city": 2,
+   "name": "Domain of Forgery: Thundercloud Altar",
+   "days": [
+    0,
+    1,
+    4
+   ],
+   "items": [
+    {
+     "id": 114013,
+     "name": "Luminous Sands from Guyun",
+     "rarity": 2
+    },
+    {
+     "id": 114014,
+     "name": "Lustrous Stone from Guyun",
+     "rarity": 3
+    },
+    {
+     "id": 114015,
+     "name": "Relic from Guyun",
+     "rarity": 4
+    },
+    {
+     "id": 114016,
+     "name": "Divine Body from Guyun",
+     "rarity": 5
+    }
+   ],
+   "since": null
+  },
+  {
+   "kind": "weapon",
+   "city": 2,
+   "name": "Domain of Forgery: Thundering Ruins",
+   "days": [
+    0,
+    2,
+    5
+   ],
+   "items": [
+    {
+     "id": 114017,
+     "name": "Mist Veiled Lead Elixir",
+     "rarity": 2
+    },
+    {
+     "id": 114018,
+     "name": "Mist Veiled Mercury Elixir",
+     "rarity": 3
+    },
+    {
+     "id": 114019,
+     "name": "Mist Veiled Gold Elixir",
+     "rarity": 4
+    },
+    {
+     "id": 114020,
+     "name": "Mist Veiled Primo Elixir",
+     "rarity": 5
+    }
+   ],
+   "since": null
+  },
+  {
+   "kind": "weapon",
+   "city": 2,
+   "name": "Domain of Forgery: Trial Grounds of Thunder",
+   "days": [
+    0,
+    3,
+    6
+   ],
+   "items": [
+    {
+     "id": 114021,
+     "name": "Grain of Aerosiderite",
+     "rarity": 2
+    },
+    {
+     "id": 114022,
+     "name": "Piece of Aerosiderite",
+     "rarity": 3
+    },
+    {
+     "id": 114023,
+     "name": "Bit of Aerosiderite",
+     "rarity": 4
+    },
+    {
+     "id": 114024,
+     "name": "Chunk of Aerosiderite",
+     "rarity": 5
+    }
+   ],
+   "since": null
+  },
+  {
+   "kind": "talent",
+   "city": 3,
+   "name": "Domain of Mastery: Reign of Violet",
+   "days": [
+    0,
+    1,
+    4
+   ],
+   "items": [
+    {
+     "id": 104320,
+     "name": "Teachings of Transience",
+     "rarity": 2
+    },
+    {
+     "id": 104321,
+     "name": "Guide to Transience",
+     "rarity": 3
+    },
+    {
+     "id": 104322,
+     "name": "Philosophies of Transience",
+     "rarity": 4
+    }
+   ],
+   "since": null
+  },
+  {
+   "kind": "talent",
+   "city": 3,
+   "name": "Domain of Mastery: Thundering Valley",
+   "days": [
+    0,
+    2,
+    5
+   ],
+   "items": [
+    {
+     "id": 104323,
+     "name": "Teachings of Elegance",
+     "rarity": 2
+    },
+    {
+     "id": 104324,
+     "name": "Guide to Elegance",
+     "rarity": 3
+    },
+    {
+     "id": 104325,
+     "name": "Philosophies of Elegance",
+     "rarity": 4
+    }
+   ],
+   "since": null
+  },
+  {
+   "kind": "talent",
+   "city": 3,
+   "name": "Domain of Mastery: Vine-Infested Ruins",
+   "days": [
+    0,
+    3,
+    6
+   ],
+   "items": [
+    {
+     "id": 104326,
+     "name": "Teachings of Light",
+     "rarity": 2
+    },
+    {
+     "id": 104327,
+     "name": "Guide to Light",
+     "rarity": 3
+    },
+    {
+     "id": 104328,
+     "name": "Philosophies of Light",
+     "rarity": 4
+    }
+   ],
+   "since": null
+  },
+  {
+   "kind": "weapon",
+   "city": 3,
+   "name": "Domain of Forgery: Altar of Sands",
+   "days": [
+    0,
+    2,
+    5
+   ],
+   "items": [
+    {
+     "id": 114029,
+     "name": "Narukami's Wisdom",
+     "rarity": 2
+    },
+    {
+     "id": 114030,
+     "name": "Narukami's Joy",
+     "rarity": 3
+    },
+    {
+     "id": 114031,
+     "name": "Narukami's Affection",
+     "rarity": 4
+    },
+    {
+     "id": 114032,
+     "name": "Narukami's Valor",
+     "rarity": 5
+    }
+   ],
+   "since": null
+  },
+  {
+   "kind": "weapon",
+   "city": 3,
+   "name": "Domain of Forgery: Sand Burial",
+   "days": [
+    0,
+    3,
+    6
+   ],
+   "items": [
+    {
+     "id": 114033,
+     "name": "Mask of the Wicked Lieutenant",
+     "rarity": 2
+    },
+    {
+     "id": 114034,
+     "name": "Mask of the Tiger's Bite",
+     "rarity": 3
+    },
+    {
+     "id": 114035,
+     "name": "Mask of the One-Horned",
+     "rarity": 4
+    },
+    {
+     "id": 114036,
+     "name": "Mask of the Kijin",
+     "rarity": 5
+    }
+   ],
+   "since": null
+  },
+  {
+   "kind": "weapon",
+   "city": 3,
+   "name": "Domain of Forgery: Sunken Sands",
+   "days": [
+    0,
+    1,
+    4
+   ],
+   "items": [
+    {
+     "id": 114025,
+     "name": "Coral Branch of a Distant Sea",
+     "rarity": 2
+    },
+    {
+     "id": 114026,
+     "name": "Jeweled Branch of a Distant Sea",
+     "rarity": 3
+    },
+    {
+     "id": 114027,
+     "name": "Jade Branch of a Distant Sea",
+     "rarity": 4
+    },
+    {
+     "id": 114028,
+     "name": "Golden Branch of a Distant Sea",
+     "rarity": 5
+    }
+   ],
+   "since": null
+  },
+  {
+   "kind": "talent",
+   "city": 4,
+   "name": "Domain of Mastery: Basket of Discipline",
+   "days": [
+    0,
+    3,
+    6
+   ],
+   "items": [
+    {
+     "id": 104335,
+     "name": "Teachings of Praxis",
+     "rarity": 2
+    },
+    {
+     "id": 104336,
+     "name": "Guide to Praxis",
+     "rarity": 3
+    },
+    {
+     "id": 104337,
+     "name": "Philosophies of Praxis",
+     "rarity": 4
+    }
+   ],
+   "since": null
+  },
+  {
+   "kind": "talent",
+   "city": 4,
+   "name": "Domain of Mastery: Full Moon",
+   "days": [
+    0,
+    1,
+    4
+   ],
+   "items": [
+    {
+     "id": 104329,
+     "name": "Teachings of Admonition",
+     "rarity": 2
+    },
+    {
+     "id": 104330,
+     "name": "Guide to Admonition",
+     "rarity": 3
+    },
+    {
+     "id": 104331,
+     "name": "Philosophies of Admonition",
+     "rarity": 4
+    }
+   ],
+   "since": null
+  },
+  {
+   "kind": "talent",
+   "city": 4,
+   "name": "Domain of Mastery: Witticism",
+   "days": [
+    0,
+    2,
+    5
+   ],
+   "items": [
+    {
+     "id": 104332,
+     "name": "Teachings of Ingenuity",
+     "rarity": 2
+    },
+    {
+     "id": 104333,
+     "name": "Guide to Ingenuity",
+     "rarity": 3
+    },
+    {
+     "id": 104334,
+     "name": "Philosophies of Ingenuity",
+     "rarity": 4
+    }
+   ],
+   "since": null
+  },
+  {
+   "kind": "weapon",
+   "city": 4,
+   "name": "Domain of Forgery: Leading Karma",
+   "days": [
+    0,
+    3,
+    6
+   ],
+   "items": [
+    {
+     "id": 114045,
+     "name": "Echo of Scorching Might",
+     "rarity": 2
+    },
+    {
+     "id": 114046,
+     "name": "Remnant Glow of Scorching Might",
+     "rarity": 3
+    },
+    {
+     "id": 114047,
+     "name": "Dream of Scorching Might",
+     "rarity": 4
+    },
+    {
+     "id": 114048,
+     "name": "Olden Days of Scorching Might",
+     "rarity": 5
+    }
+   ],
+   "since": null
+  },
+  {
+   "kind": "weapon",
+   "city": 4,
+   "name": "Domain of Forgery: Obsession",
+   "days": [
+    0,
+    2,
+    5
+   ],
+   "items": [
+    {
+     "id": 114041,
+     "name": "Oasis Garden's Reminiscence",
+     "rarity": 2
+    },
+    {
+     "id": 114042,
+     "name": "Oasis Garden's Kindness",
+     "rarity": 3
+    },
+    {
+     "id": 114043,
+     "name": "Oasis Garden's Mourning",
+     "rarity": 4
+    },
+    {
+     "id": 114044,
+     "name": "Oasis Garden's Truth",
+     "rarity": 5
+    }
+   ],
+   "since": null
+  },
+  {
+   "kind": "weapon",
+   "city": 4,
+   "name": "Domain of Forgery: Tainted Clouds",
+   "days": [
+    0,
+    1,
+    4
+   ],
+   "items": [
+    {
+     "id": 114037,
+     "name": "Copper Talisman of the Forest Dew",
+     "rarity": 2
+    },
+    {
+     "id": 114038,
+     "name": "Iron Talisman of the Forest Dew",
+     "rarity": 3
+    },
+    {
+     "id": 114039,
+     "name": "Silver Talisman of the Forest Dew",
+     "rarity": 4
+    },
+    {
+     "id": 114040,
+     "name": "Golden Talisman of the Forest Dew",
+     "rarity": 5
+    }
+   ],
+   "since": null
+  },
+  {
+   "kind": "talent",
+   "city": 5,
+   "name": "Domain of Mastery: Admonishing Engraving",
+   "days": [
+    0,
+    2,
+    5
+   ],
+   "items": [
+    {
+     "id": 104341,
+     "name": "Teachings of Justice",
+     "rarity": 2
+    },
+    {
+     "id": 104342,
+     "name": "Guide to Justice",
+     "rarity": 3
+    },
+    {
+     "id": 104343,
+     "name": "Philosophies of Justice",
+     "rarity": 4
+    }
+   ],
+   "since": null
+  },
+  {
+   "kind": "talent",
+   "city": 5,
+   "name": "Domain of Mastery: Chiming Recitation",
+   "days": [
+    0,
+    3,
+    6
+   ],
+   "items": [
+    {
+     "id": 104344,
+     "name": "Teachings of Order",
+     "rarity": 2
+    },
+    {
+     "id": 104345,
+     "name": "Guide to Order",
+     "rarity": 3
+    },
+    {
+     "id": 104346,
+     "name": "Philosophies of Order",
+     "rarity": 4
+    }
+   ],
+   "since": null
+  },
+  {
+   "kind": "talent",
+   "city": 5,
+   "name": "Domain of Mastery: Rhyming Rhythm",
+   "days": [
+    0,
+    1,
+    4
+   ],
+   "items": [
+    {
+     "id": 104338,
+     "name": "Teachings of Equity",
+     "rarity": 2
+    },
+    {
+     "id": 104339,
+     "name": "Guide to Equity",
+     "rarity": 3
+    },
+    {
+     "id": 104340,
+     "name": "Philosophies of Equity",
+     "rarity": 4
+    }
+   ],
+   "since": null
+  },
+  {
+   "kind": "weapon",
+   "city": 5,
+   "name": "Domain of Forgery: Artisanship",
+   "days": [
+    0,
+    2,
+    5
+   ],
+   "items": [
+    {
+     "id": 114053,
+     "name": "Dross of Pure Sacred Dewdrop",
+     "rarity": 2
+    },
+    {
+     "id": 114054,
+     "name": "Sublimation of Pure Sacred Dewdrop",
+     "rarity": 3
+    },
+    {
+     "id": 114055,
+     "name": "Spring of Pure Sacred Dewdrop",
+     "rarity": 4
+    },
+    {
+     "id": 114056,
+     "name": "Essence of Pure Sacred Dewdrop",
+     "rarity": 5
+    }
+   ],
+   "since": null
+  },
+  {
+   "kind": "weapon",
+   "city": 5,
+   "name": "Domain of Forgery: Curious Contraptions",
+   "days": [
+    0,
+    3,
+    6
+   ],
+   "items": [
+    {
+     "id": 114057,
+     "name": "Broken Goblet of the Pristine Sea",
+     "rarity": 2
+    },
+    {
+     "id": 114058,
+     "name": "Wine Goblet of the Pristine Sea",
+     "rarity": 3
+    },
+    {
+     "id": 114059,
+     "name": "Silver Goblet of the Pristine Sea",
+     "rarity": 4
+    },
+    {
+     "id": 114060,
+     "name": "Golden Goblet of the Pristine Sea",
+     "rarity": 5
+    }
+   ],
+   "since": null
+  },
+  {
+   "kind": "weapon",
+   "city": 5,
+   "name": "Domain of Forgery: Robotic Ruse",
+   "days": [
+    0,
+    1,
+    4
+   ],
+   "items": [
+    {
+     "id": 114049,
+     "name": "Fragment of an Ancient Chord",
+     "rarity": 2
+    },
+    {
+     "id": 114050,
+     "name": "Chapter of an Ancient Chord",
+     "rarity": 3
+    },
+    {
+     "id": 114051,
+     "name": "Movement of an Ancient Chord",
+     "rarity": 4
+    },
+    {
+     "id": 114052,
+     "name": "Echo of an Ancient Chord",
+     "rarity": 5
+    }
+   ],
+   "since": null
+  },
+  {
+   "kind": "talent",
+   "city": 6,
+   "name": "Domain of Mastery: Myriad Illusions",
+   "days": [
+    0,
+    2,
+    5
+   ],
+   "items": [
+    {
+     "id": 104350,
+     "name": "Teachings of Kindling",
+     "rarity": 2
+    },
+    {
+     "id": 104351,
+     "name": "Guide to Kindling",
+     "rarity": 3
+    },
+    {
+     "id": 104352,
+     "name": "Philosophies of Kindling",
+     "rarity": 4
+    }
+   ],
+   "since": null
+  },
+  {
+   "kind": "talent",
+   "city": 6,
+   "name": "Domain of Mastery: Return",
+   "days": [
+    0,
+    3,
+    6
+   ],
+   "items": [
+    {
+     "id": 104353,
+     "name": "Teachings of Conflict",
+     "rarity": 2
+    },
+    {
+     "id": 104354,
+     "name": "Guide to Conflict",
+     "rarity": 3
+    },
+    {
+     "id": 104355,
+     "name": "Philosophies of Conflict",
+     "rarity": 4
+    }
+   ],
+   "since": null
+  },
+  {
+   "kind": "talent",
+   "city": 6,
+   "name": "Domain of Mastery: Sublime Turning",
+   "days": [
+    0,
+    1,
+    4
+   ],
+   "items": [
+    {
+     "id": 104347,
+     "name": "Teachings of Contention",
+     "rarity": 2
+    },
+    {
+     "id": 104348,
+     "name": "Guide to Contention",
+     "rarity": 3
+    },
+    {
+     "id": 104349,
+     "name": "Philosophies of Contention",
+     "rarity": 4
+    }
+   ],
+   "since": null
+  },
+  {
+   "kind": "weapon",
+   "city": 6,
+   "name": "Domain of Forgery: Attentive Observation",
+   "days": [
+    0,
+    2,
+    5
+   ],
+   "items": [
+    {
+     "id": 114065,
+     "name": "Delirious Decadence of the Sacred Lord",
+     "rarity": 2
+    },
+    {
+     "id": 114066,
+     "name": "Delirious Desolation of the Sacred Lord",
+     "rarity": 3
+    },
+    {
+     "id": 114067,
+     "name": "Delirious Demeanor of the Sacred Lord",
+     "rarity": 4
+    },
+    {
+     "id": 114068,
+     "name": "Delirious Divinity of the Sacred Lord",
+     "rarity": 5
+    }
+   ],
+   "since": null
+  },
+  {
+   "kind": "weapon",
+   "city": 6,
+   "name": "Domain of Forgery: Estimation",
+   "days": [
+    0,
+    3,
+    6
+   ],
+   "items": [
+    {
+     "id": 114069,
+     "name": "Night-Wind's Mystic Consideration",
+     "rarity": 2
+    },
+    {
+     "id": 114070,
+     "name": "Night-Wind's Mystic Premonition",
+     "rarity": 3
+    },
+    {
+     "id": 114071,
+     "name": "Night-Wind's Mystic Augury",
+     "rarity": 4
+    },
+    {
+     "id": 114072,
+     "name": "Night-Wind's Mystic Revelation",
+     "rarity": 5
+    }
+   ],
+   "since": null
+  },
+  {
+   "kind": "weapon",
+   "city": 6,
+   "name": "Domain of Forgery: Scrying Shadows",
+   "days": [
+    0,
+    1,
+    4
+   ],
+   "items": [
+    {
+     "id": 114061,
+     "name": "Blazing Sacrificial Heart's Terror",
+     "rarity": 2
+    },
+    {
+     "id": 114062,
+     "name": "Blazing Sacrificial Heart's Hesitance",
+     "rarity": 3
+    },
+    {
+     "id": 114063,
+     "name": "Blazing Sacrificial Heart's Resolve",
+     "rarity": 4
+    },
+    {
+     "id": 114064,
+     "name": "Blazing Sacrificial Heart's Splendor",
+     "rarity": 5
+    }
+   ],
+   "since": null
+  },
+  {
+   "kind": "talent",
+   "city": 7,
+   "name": "Domain of Mastery: Fallen City",
+   "days": [
+    0,
+    1,
+    4
+   ],
+   "items": [
+    {
+     "id": 104356,
+     "name": "Teachings of Moonlight",
+     "rarity": 2
+    },
+    {
+     "id": 104357,
+     "name": "Guide to Moonlight",
+     "rarity": 3
+    },
+    {
+     "id": 104358,
+     "name": "Philosophies of Moonlight",
+     "rarity": 4
+    }
+   ],
+   "since": null
+  },
+  {
+   "kind": "talent",
+   "city": 7,
+   "name": "Domain of Mastery: Overturned Roost",
+   "days": [
+    0,
+    3,
+    6
+   ],
+   "items": [
+    {
+     "id": 104362,
+     "name": "Teachings of Vagrancy",
+     "rarity": 2
+    },
+    {
+     "id": 104363,
+     "name": "Guide to Vagrancy",
+     "rarity": 3
+    },
+    {
+     "id": 104364,
+     "name": "Philosophies of Vagrancy",
+     "rarity": 4
+    }
+   ],
+   "since": null
+  },
+  {
+   "kind": "talent",
+   "city": 7,
+   "name": "Domain of Mastery: Shadowed Legacy",
+   "days": [
+    0,
+    2,
+    5
+   ],
+   "items": [
+    {
+     "id": 104359,
+     "name": "Teachings of Elysium",
+     "rarity": 2
+    },
+    {
+     "id": 104360,
+     "name": "Guide to Elysium",
+     "rarity": 3
+    },
+    {
+     "id": 104361,
+     "name": "Philosophies of Elysium",
+     "rarity": 4
+    }
+   ],
+   "since": null
+  },
+  {
+   "kind": "weapon",
+   "city": 7,
+   "name": "Domain of Forgery: Lunar Oblation",
+   "days": [
+    0,
+    3,
+    6
+   ],
+   "items": [
+    {
+     "id": 114081,
+     "name": "Sundered Glory of the Far-North Scions",
+     "rarity": 2
+    },
+    {
+     "id": 114082,
+     "name": "Unyielding Delusion of the Far-North Scions",
+     "rarity": 3
+    },
+    {
+     "id": 114083,
+     "name": "Oblation of the Far-North Scions",
+     "rarity": 4
+    },
+    {
+     "id": 114084,
+     "name": "Aureate Radiance of the Far-North Scions",
+     "rarity": 5
+    }
+   ],
+   "since": null
+  },
+  {
+   "kind": "weapon",
+   "city": 7,
+   "name": "Domain of Forgery: Prayers Sung",
+   "days": [
+    0,
+    2,
+    5
+   ],
+   "items": [
+    {
+     "id": 114077,
+     "name": "Ember of Long Night Flint",
+     "rarity": 2
+    },
+    {
+     "id": 114078,
+     "name": "Afterglow of Long Night Flint",
+     "rarity": 3
+    },
+    {
+     "id": 114079,
+     "name": "Flare of Long Night Flint",
+     "rarity": 4
+    },
+    {
+     "id": 114080,
+     "name": "Blaze of Long Night Flint",
+     "rarity": 5
+    }
+   ],
+   "since": null
+  },
+  {
+   "kind": "weapon",
+   "city": 7,
+   "name": "Domain of Forgery: Radiant Splendor",
+   "days": [
+    0,
+    1,
+    4
+   ],
+   "items": [
+    {
+     "id": 114073,
+     "name": "Artful Device Fragment",
+     "rarity": 2
+    },
+    {
+     "id": 114074,
+     "name": "Artful Device Replica",
+     "rarity": 3
+    },
+    {
+     "id": 114075,
+     "name": "Artful Device Inheritance",
+     "rarity": 4
+    },
+    {
+     "id": 114076,
+     "name": "Artful Device Wish",
+     "rarity": 5
+    }
+   ],
+   "since": null
+  },
+  {
+   "kind": "talent",
+   "city": 8,
+   "name": "Domain of Mastery: Contemplation",
+   "days": [
+    0,
+    1,
+    4
+   ],
+   "items": [
+    {
+     "id": 104365,
+     "name": "Teachings of Charity",
+     "rarity": 2
+    },
+    {
+     "id": 104366,
+     "name": "Guide to Charity",
+     "rarity": 3
+    },
+    {
+     "id": 104367,
+     "name": "Philosophies of Charity",
+     "rarity": 4
+    }
+   ],
+   "since": null
+  },
+  {
+   "kind": "talent",
+   "city": 8,
+   "name": "Domain of Mastery: Hermitage",
+   "days": [
+    0,
+    2,
+    5
+   ],
+   "items": [
+    {
+     "id": 104368,
+     "name": "Teachings of Fortitude",
+     "rarity": 2
+    },
+    {
+     "id": 104369,
+     "name": "Guide to Fortitude",
+     "rarity": 3
+    },
+    {
+     "id": 104370,
+     "name": "Philosophies of Fortitude",
+     "rarity": 4
+    }
+   ],
+   "since": null
+  },
+  {
+   "kind": "talent",
+   "city": 8,
+   "name": "Domain of Mastery: Shared Vision",
+   "days": [
+    0,
+    3,
+    6
+   ],
+   "items": [
+    {
+     "id": 104371,
+     "name": "Teachings of Glory",
+     "rarity": 2
+    },
+    {
+     "id": 104372,
+     "name": "Guide to Glory",
+     "rarity": 3
+    },
+    {
+     "id": 104373,
+     "name": "Philosophies of Glory",
+     "rarity": 4
+    }
+   ],
+   "since": null
+  },
+  {
+   "kind": "weapon",
+   "city": 8,
+   "name": "Domain of Forgery: Cast Iron",
+   "days": [
+    0,
+    1,
+    4
+   ],
+   "items": [
+    {
+     "id": 114085,
+     "name": "Rise of the Pale Star Army",
+     "rarity": 2
+    },
+    {
+     "id": 114086,
+     "name": "Muster of the Pale Star Army",
+     "rarity": 3
+    },
+    {
+     "id": 114087,
+     "name": "Clarion of the Pale Star Army",
+     "rarity": 4
+    },
+    {
+     "id": 114088,
+     "name": "Triumph of the Pale Star Army",
+     "rarity": 5
+    }
+   ],
+   "since": null
+  },
+  {
+   "kind": "weapon",
+   "city": 8,
+   "name": "Domain of Forgery: Chain Track",
+   "days": [
+    0,
+    2,
+    5
+   ],
+   "items": [
+    {
+     "id": 114089,
+     "name": "Measured Pour of the Cellared Spiritual Nectar",
+     "rarity": 2
+    },
+    {
+     "id": 114090,
+     "name": "Intoxication of the Cellared Spiritual Nectar",
+     "rarity": 3
+    },
+    {
+     "id": 114091,
+     "name": "Exhilaration of the Cellared Spiritual Nectar",
+     "rarity": 4
+    },
+    {
+     "id": 114092,
+     "name": "Revelry of the Cellared Spiritual Nectar",
+     "rarity": 5
+    }
+   ],
+   "since": null
+  },
+  {
+   "kind": "weapon",
+   "city": 8,
+   "name": "Domain of Forgery: Severed Steel",
+   "days": [
+    0,
+    3,
+    6
+   ],
+   "items": [
+    {
+     "id": 114093,
+     "name": "The Frost Emperor's Revival",
+     "rarity": 2
+    },
+    {
+     "id": 114094,
+     "name": "The Frost Emperor's Ceremony",
+     "rarity": 3
+    },
+    {
+     "id": 114095,
+     "name": "The Frost Emperor's Lament",
+     "rarity": 4
+    },
+    {
+     "id": 114096,
+     "name": "The Frost Emperor's Farewell",
+     "rarity": 5
+    }
+   ],
+   "since": null
+  }
+ ],
+ "birthdays": [
+  {
+   "id": "10000075",
+   "month": 1,
+   "day": 3
+  },
+  {
+   "id": "10000124",
+   "month": 1,
+   "day": 5
+  },
+  {
+   "id": "10000108",
+   "month": 1,
+   "day": 6
+  },
+  {
+   "id": "10000050",
+   "month": 1,
+   "day": 9
+  },
+  {
+   "id": "10000090",
+   "month": 1,
+   "day": 10
+  },
+  {
+   "id": "10000133",
+   "month": 1,
+   "day": 13
+  },
+  {
+   "id": "10000125",
+   "month": 1,
+   "day": 14
+  },
+  {
+   "id": "10000039",
+   "month": 1,
+   "day": 18
+  },
+  {
+   "id": "10000107",
+   "month": 1,
+   "day": 20
+  },
+  {
+   "id": "10000061",
+   "month": 1,
+   "day": 22
+  },
+  {
+   "id": "10000045",
+   "month": 1,
+   "day": 24
+  },
+  {
+   "id": "10000083",
+   "month": 2,
+   "day": 2
+  },
+  {
+   "id": "10000084",
+   "month": 2,
+   "day": 2
+  },
+  {
+   "id": "10000143",
+   "month": 2,
+   "day": 4
+  },
+  {
+   "id": "10000136",
+   "month": 2,
+   "day": 8
+  },
+  {
+   "id": "10000148",
+   "month": 2,
+   "day": 9
+  },
+  {
+   "id": "10000078",
+   "month": 2,
+   "day": 11
+  },
+  {
+   "id": "10000024",
+   "month": 2,
+   "day": 14
+  },
+  {
+   "id": "10000128",
+   "month": 2,
+   "day": 17
+  },
+  {
+   "id": "10000150",
+   "month": 2,
+   "day": 20
+  },
+  {
+   "id": "10000054",
+   "month": 2,
+   "day": 22
+  },
+  {
+   "id": "10000032",
+   "month": 2,
+   "day": 29
+  },
+  {
+   "id": "10000119",
+   "month": 3,
+   "day": 1
+  },
+  {
+   "id": "10000035",
+   "month": 3,
+   "day": 3
+  },
+  {
+   "id": "10000077",
+   "month": 3,
+   "day": 6
+  },
+  {
+   "id": "10000063",
+   "month": 3,
+   "day": 10
+  },
+  {
+   "id": "10000103",
+   "month": 3,
+   "day": 13
+  },
+  {
+   "id": "10000003",
+   "month": 3,
+   "day": 14
+  },
+  {
+   "id": "10000123",
+   "month": 3,
+   "day": 14
+  },
+  {
+   "id": "10000109",
+   "month": 3,
+   "day": 16
+  },
+  {
+   "id": "10000034",
+   "month": 3,
+   "day": 21
+  },
+  {
+   "id": "10000113",
+   "month": 3,
+   "day": 23
+  },
+  {
+   "id": "10000137",
+   "month": 3,
+   "day": 24
+  },
+  {
+   "id": "10000066",
+   "month": 3,
+   "day": 26
+  },
+  {
+   "id": "10000140",
+   "month": 3,
+   "day": 29
+  },
+  {
+   "id": "10000095",
+   "month": 3,
+   "day": 30
+  },
+  {
+   "id": "10000116",
+   "month": 4,
+   "day": 2
+  },
+  {
+   "id": "10000129",
+   "month": 4,
+   "day": 3
+  },
+  {
+   "id": "10000062",
+   "month": 4,
+   "day": 4
+  },
+  {
+   "id": "10000079",
+   "month": 4,
+   "day": 7
+  },
+  {
+   "id": "10000088",
+   "month": 4,
+   "day": 10
+  },
+  {
+   "id": "10000093",
+   "month": 4,
+   "day": 11
+  },
+  {
+   "id": "10000026",
+   "month": 4,
+   "day": 17
+  },
+  {
+   "id": "10000060",
+   "month": 4,
+   "day": 20
+  },
+  {
+   "id": "10000100",
+   "month": 4,
+   "day": 22
+  },
+  {
+   "id": "10000082",
+   "month": 4,
+   "day": 25
+  },
+  {
+   "id": "10000016",
+   "month": 4,
+   "day": 30
+  },
+  {
+   "id": "10000072",
+   "month": 5,
+   "day": 3
+  },
+  {
+   "id": "10000067",
+   "month": 5,
+   "day": 8
+  },
+  {
+   "id": "10000122",
+   "month": 5,
+   "day": 9
+  },
+  {
+   "id": "10000126",
+   "month": 5,
+   "day": 15
+  },
+  {
+   "id": "10000055",
+   "month": 5,
+   "day": 18
+  },
+  {
+   "id": "10000064",
+   "month": 5,
+   "day": 21
+  },
+  {
+   "id": "10000130",
+   "month": 5,
+   "day": 23
+  },
+  {
+   "id": "10000115",
+   "month": 5,
+   "day": 25
+  },
+  {
+   "id": "10000031",
+   "month": 5,
+   "day": 27
+  },
+  {
+   "id": "10000097",
+   "month": 5,
+   "day": 31
+  },
+  {
+   "id": "10000057",
+   "month": 6,
+   "day": 1
+  },
+  {
+   "id": "10000112",
+   "month": 6,
+   "day": 8
+  },
+  {
+   "id": "10000006",
+   "month": 6,
+   "day": 9
+  },
+  {
+   "id": "10000022",
+   "month": 6,
+   "day": 16
+  },
+  {
+   "id": "10000049",
+   "month": 6,
+   "day": 21
+  },
+  {
+   "id": "10000071",
+   "month": 6,
+   "day": 23
+  },
+  {
+   "id": "10000052",
+   "month": 6,
+   "day": 26
+  },
+  {
+   "id": "10000058",
+   "month": 6,
+   "day": 27
+  },
+  {
+   "id": "10000014",
+   "month": 7,
+   "day": 5
+  },
+  {
+   "id": "10000081",
+   "month": 7,
+   "day": 9
+  },
+  {
+   "id": "10000056",
+   "month": 7,
+   "day": 14
+  },
+  {
+   "id": "10000046",
+   "month": 7,
+   "day": 15
+  },
+  {
+   "id": "10000033",
+   "month": 7,
+   "day": 20
+  },
+  {
+   "id": "10000059",
+   "month": 7,
+   "day": 24
+  },
+  {
+   "id": "10000029",
+   "month": 7,
+   "day": 27
+  },
+  {
+   "id": "10000065",
+   "month": 7,
+   "day": 27
+  },
+  {
+   "id": "10000048",
+   "month": 7,
+   "day": 28
+  },
+  {
+   "id": "10000102",
+   "month": 8,
+   "day": 3
+  },
+  {
+   "id": "10000110",
+   "month": 8,
+   "day": 8
+  },
+  {
+   "id": "10000021",
+   "month": 8,
+   "day": 10
+  },
+  {
+   "id": "10000080",
+   "month": 8,
+   "day": 11
+  },
+  {
+   "id": "10000091",
+   "month": 8,
+   "day": 16
+  },
+  {
+   "id": "10000094",
+   "month": 8,
+   "day": 17
+  },
+  {
+   "id": "10000076",
+   "month": 8,
+   "day": 20
+  },
+  {
+   "id": "10000096",
+   "month": 8,
+   "day": 22
+  },
+  {
+   "id": "10000027",
+   "month": 8,
+   "day": 26
+  },
+  {
+   "id": "10000106",
+   "month": 8,
+   "day": 28
+  },
+  {
+   "id": "10000041",
+   "month": 8,
+   "day": 31
+  },
+  {
+   "id": "10000036",
+   "month": 9,
+   "day": 7
+  },
+  {
+   "id": "10000020",
+   "month": 9,
+   "day": 9
+  },
+  {
+   "id": "10000038",
+   "month": 9,
+   "day": 13
+  },
+  {
+   "id": "10000098",
+   "month": 9,
+   "day": 20
+  },
+  {
+   "id": "10000121",
+   "month": 9,
+   "day": 21
+  },
+  {
+   "id": "10000099",
+   "month": 9,
+   "day": 22
+  },
+  {
+   "id": "10000085",
+   "month": 9,
+   "day": 24
+  },
+  {
+   "id": "10000002",
+   "month": 9,
+   "day": 28
+  },
+  {
+   "id": "10000131",
+   "month": 9,
+   "day": 29
+  },
+  {
+   "id": "10000025",
+   "month": 10,
+   "day": 9
+  },
+  {
+   "id": "10000089",
+   "month": 10,
+   "day": 13
+  },
+  {
+   "id": "10000105",
+   "month": 10,
+   "day": 14
+  },
+  {
+   "id": "10000044",
+   "month": 10,
+   "day": 16
+  },
+  {
+   "id": "10000053",
+   "month": 10,
+   "day": 19
+  },
+  {
+   "id": "10000051",
+   "month": 10,
+   "day": 25
+  },
+  {
+   "id": "10000073",
+   "month": 10,
+   "day": 27
+  },
+  {
+   "id": "10000047",
+   "month": 10,
+   "day": 29
+  },
+  {
+   "id": "10000120",
+   "month": 10,
+   "day": 31
+  },
+  {
+   "id": "10000023",
+   "month": 11,
+   "day": 2
+  },
+  {
+   "id": "10000114",
+   "month": 11,
+   "day": 5
+  },
+  {
+   "id": "10000101",
+   "month": 11,
+   "day": 11
+  },
+  {
+   "id": "10000111",
+   "month": 11,
+   "day": 15
+  },
+  {
+   "id": "10000042",
+   "month": 11,
+   "day": 20
+  },
+  {
+   "id": "10000132",
+   "month": 11,
+   "day": 20
+  },
+  {
+   "id": "10000086",
+   "month": 11,
+   "day": 23
+  },
+  {
+   "id": "10000043",
+   "month": 11,
+   "day": 26
+  },
+  {
+   "id": "10000015",
+   "month": 11,
+   "day": 30
+  },
+  {
+   "id": "10000037",
+   "month": 12,
+   "day": 2
+  },
+  {
+   "id": "10000070",
+   "month": 12,
+   "day": 3
+  },
+  {
+   "id": "10000104",
+   "month": 12,
+   "day": 10
+  },
+  {
+   "id": "10000087",
+   "month": 12,
+   "day": 18
+  },
+  {
+   "id": "10000074",
+   "month": 12,
+   "day": 19
+  },
+  {
+   "id": "10000068",
+   "month": 12,
+   "day": 21
+  },
+  {
+   "id": "10000092",
+   "month": 12,
+   "day": 22
+  },
+  {
+   "id": "10000127",
+   "month": 12,
+   "day": 23
+  },
+  {
+   "id": "10000069",
+   "month": 12,
+   "day": 29
+  },
+  {
+   "id": "10000030",
+   "month": 12,
+   "day": 31
+  }
+ ]
+}

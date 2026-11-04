@@ -1,0 +1,1552 @@
+{
+ "about": "One rule, two implementations: landing/src/lib/today-talents.ts (with serverDay in data/today.ts) and GI-Subtitles/Services/Characters/TalentFarmPlanner.cs (with Services/Today/ServerDay.cs) both run these cases (landing/src/lib/today-talents-fixture.test.mjs, GI-Test TalentFarmPlannerTests). Every expect is written by tools/fixtures/gen-talent-farm-cases.mjs from the TypeScript module: change the rule there or edit the inputs here, run the generator, then make the C# side pass.",
+ "schema": 1,
+ "domains": [
+  {
+   "kind": "talent",
+   "city": 1,
+   "name": "Domain of Mastery: Frosted Altar",
+   "days": [
+    0,
+    1,
+    4
+   ],
+   "items": [
+    {
+     "id": 104301,
+     "name": "Teachings of Freedom",
+     "rarity": 2
+    },
+    {
+     "id": 104302,
+     "name": "Guide to Freedom",
+     "rarity": 3
+    },
+    {
+     "id": 104303,
+     "name": "Philosophies of Freedom",
+     "rarity": 4
+    }
+   ],
+   "since": null
+  },
+  {
+   "kind": "talent",
+   "city": 1,
+   "name": "Domain of Mastery: Frozen Abyss",
+   "days": [
+    0,
+    2,
+    5
+   ],
+   "items": [
+    {
+     "id": 104304,
+     "name": "Teachings of Resistance",
+     "rarity": 2
+    },
+    {
+     "id": 104305,
+     "name": "Guide to Resistance",
+     "rarity": 3
+    },
+    {
+     "id": 104306,
+     "name": "Philosophies of Resistance",
+     "rarity": 4
+    }
+   ],
+   "since": null
+  },
+  {
+   "kind": "talent",
+   "city": 1,
+   "name": "Domain of Mastery: Realm of Slumber",
+   "days": [
+    0,
+    3,
+    6
+   ],
+   "items": [
+    {
+     "id": 104307,
+     "name": "Teachings of Ballad",
+     "rarity": 2
+    },
+    {
+     "id": 104308,
+     "name": "Guide to Ballad",
+     "rarity": 3
+    },
+    {
+     "id": 104309,
+     "name": "Philosophies of Ballad",
+     "rarity": 4
+    }
+   ],
+   "since": null
+  },
+  {
+   "kind": "talent",
+   "city": 2,
+   "name": "Domain of Mastery: Altar of Flames",
+   "days": [
+    0,
+    1,
+    4
+   ],
+   "items": [
+    {
+     "id": 104310,
+     "name": "Teachings of Prosperity",
+     "rarity": 2
+    },
+    {
+     "id": 104311,
+     "name": "Guide to Prosperity",
+     "rarity": 3
+    },
+    {
+     "id": 104312,
+     "name": "Philosophies of Prosperity",
+     "rarity": 4
+    }
+   ],
+   "since": null
+  },
+  {
+   "kind": "talent",
+   "city": 2,
+   "name": "Domain of Mastery: Circle of Embers",
+   "days": [
+    0,
+    3,
+    6
+   ],
+   "items": [
+    {
+     "id": 104316,
+     "name": "Teachings of Gold",
+     "rarity": 2
+    },
+    {
+     "id": 104317,
+     "name": "Guide to Gold",
+     "rarity": 3
+    },
+    {
+     "id": 104318,
+     "name": "Philosophies of Gold",
+     "rarity": 4
+    }
+   ],
+   "since": null
+  },
+  {
+   "kind": "talent",
+   "city": 2,
+   "name": "Domain of Mastery: Heart of the Flames",
+   "days": [
+    0,
+    2,
+    5
+   ],
+   "items": [
+    {
+     "id": 104313,
+     "name": "Teachings of Diligence",
+     "rarity": 2
+    },
+    {
+     "id": 104314,
+     "name": "Guide to Diligence",
+     "rarity": 3
+    },
+    {
+     "id": 104315,
+     "name": "Philosophies of Diligence",
+     "rarity": 4
+    }
+   ],
+   "since": null
+  },
+  {
+   "kind": "talent",
+   "city": 3,
+   "name": "Domain of Mastery: Reign of Violet",
+   "days": [
+    0,
+    1,
+    4
+   ],
+   "items": [
+    {
+     "id": 104320,
+     "name": "Teachings of Transience",
+     "rarity": 2
+    },
+    {
+     "id": 104321,
+     "name": "Guide to Transience",
+     "rarity": 3
+    },
+    {
+     "id": 104322,
+     "name": "Philosophies of Transience",
+     "rarity": 4
+    }
+   ],
+   "since": null
+  },
+  {
+   "kind": "talent",
+   "city": 3,
+   "name": "Domain of Mastery: Thundering Valley",
+   "days": [
+    0,
+    2,
+    5
+   ],
+   "items": [
+    {
+     "id": 104323,
+     "name": "Teachings of Elegance",
+     "rarity": 2
+    },
+    {
+     "id": 104324,
+     "name": "Guide to Elegance",
+     "rarity": 3
+    },
+    {
+     "id": 104325,
+     "name": "Philosophies of Elegance",
+     "rarity": 4
+    }
+   ],
+   "since": null
+  },
+  {
+   "kind": "talent",
+   "city": 3,
+   "name": "Domain of Mastery: Vine-Infested Ruins",
+   "days": [
+    0,
+    3,
+    6
+   ],
+   "items": [
+    {
+     "id": 104326,
+     "name": "Teachings of Light",
+     "rarity": 2
+    },
+    {
+     "id": 104327,
+     "name": "Guide to Light",
+     "rarity": 3
+    },
+    {
+     "id": 104328,
+     "name": "Philosophies of Light",
+     "rarity": 4
+    }
+   ],
+   "since": null
+  }
+ ],
+ "bookCases": [
+  {
+   "name": "one series by English name",
+   "materials": [
+    {
+     "name": "Teachings of Diligence",
+     "image": ""
+    },
+    {
+     "name": "Guide to Diligence",
+     "image": ""
+    },
+    {
+     "name": "Philosophies of Diligence",
+     "image": ""
+    },
+    {
+     "name": "Crown of Insight",
+     "image": ""
+    }
+   ],
+   "expect": [
+    "Domain of Mastery: Heart of the Flames"
+   ]
+  },
+  {
+   "name": "by stored icon when the name is not English",
+   "materials": [
+    {
+     "name": "Nauki o wolnosci",
+     "image": "https://x/img/UI_ItemIcon_104301.webp"
+    },
+    {
+     "name": "Korona",
+     "image": "https://x/img/UI_ItemIcon_104319.webp"
+    }
+   ],
+   "expect": [
+    "Domain of Mastery: Frosted Altar"
+   ]
+  },
+  {
+   "name": "a kit rotating through a region (Traveler, Anemo)",
+   "materials": [
+    {
+     "name": "Teachings of Ballad",
+     "image": ""
+    },
+    {
+     "name": "Guide to Ballad",
+     "image": ""
+    },
+    {
+     "name": "Philosophies of Ballad",
+     "image": ""
+    },
+    {
+     "name": "Crown of Insight",
+     "image": ""
+    },
+    {
+     "name": "Teachings of Freedom",
+     "image": ""
+    },
+    {
+     "name": "Guide to Freedom",
+     "image": ""
+    },
+    {
+     "name": "Philosophies of Freedom",
+     "image": ""
+    },
+    {
+     "name": "Teachings of Resistance",
+     "image": ""
+    },
+    {
+     "name": "Guide to Resistance",
+     "image": ""
+    },
+    {
+     "name": "Philosophies of Resistance",
+     "image": ""
+    }
+   ],
+   "expect": [
+    "Domain of Mastery: Frosted Altar",
+    "Domain of Mastery: Frozen Abyss",
+    "Domain of Mastery: Realm of Slumber"
+   ]
+  },
+  {
+   "name": "books from two regions: left out",
+   "materials": [
+    {
+     "name": "Teachings of Freedom",
+     "image": ""
+    },
+    {
+     "name": "Guide to Freedom",
+     "image": ""
+    },
+    {
+     "name": "Philosophies of Freedom",
+     "image": ""
+    },
+    {
+     "name": "Teachings of Prosperity",
+     "image": ""
+    },
+    {
+     "name": "Guide to Prosperity",
+     "image": ""
+    },
+    {
+     "name": "Philosophies of Prosperity",
+     "image": ""
+    }
+   ],
+   "expect": []
+  },
+  {
+   "name": "no talent materials",
+   "materials": [
+    {
+     "name": "Crown of Insight",
+     "image": ""
+    },
+    {
+     "name": "Mora",
+     "image": ""
+    }
+   ],
+   "expect": []
+  }
+ ],
+ "priorityCases": [
+  {
+   "name": "official order",
+   "skills": [
+    {
+     "kind": "basic"
+    },
+    {
+     "kind": "skill"
+    },
+    {
+     "kind": "ultimate"
+    },
+    {
+     "kind": "passive"
+    },
+    {
+     "kind": "constellation"
+    }
+   ],
+   "positions": [
+    2,
+    1,
+    0
+   ],
+   "expect": [
+    "ultimate",
+    "skill",
+    "basic"
+   ]
+  },
+  {
+   "name": "repeats, passives and out of range dropped",
+   "skills": [
+    {
+     "kind": "basic"
+    },
+    {
+     "kind": "skill"
+    },
+    {
+     "kind": "ultimate"
+    },
+    {
+     "kind": "passive"
+    }
+   ],
+   "positions": [
+    1,
+    1,
+    3,
+    9,
+    2
+   ],
+   "expect": [
+    "skill",
+    "ultimate"
+   ]
+  },
+  {
+   "name": "no order",
+   "skills": [
+    {
+     "kind": "basic"
+    },
+    {
+     "kind": "skill"
+    },
+    {
+     "kind": "ultimate"
+    }
+   ],
+   "positions": null,
+   "expect": []
+  }
+ ],
+ "bookForCases": [
+  {
+   "books": [
+    "Domain of Mastery: Frosted Altar",
+    "Domain of Mastery: Frozen Abyss",
+    "Domain of Mastery: Realm of Slumber"
+   ],
+   "target": 2,
+   "expect": "Domain of Mastery: Frosted Altar"
+  },
+  {
+   "books": [
+    "Domain of Mastery: Frosted Altar",
+    "Domain of Mastery: Frozen Abyss",
+    "Domain of Mastery: Realm of Slumber"
+   ],
+   "target": 3,
+   "expect": "Domain of Mastery: Frozen Abyss"
+  },
+  {
+   "books": [
+    "Domain of Mastery: Frosted Altar",
+    "Domain of Mastery: Frozen Abyss",
+    "Domain of Mastery: Realm of Slumber"
+   ],
+   "target": 4,
+   "expect": "Domain of Mastery: Realm of Slumber"
+  },
+  {
+   "books": [
+    "Domain of Mastery: Frosted Altar",
+    "Domain of Mastery: Frozen Abyss",
+    "Domain of Mastery: Realm of Slumber"
+   ],
+   "target": 5,
+   "expect": "Domain of Mastery: Frosted Altar"
+  },
+  {
+   "books": [
+    "Domain of Mastery: Frosted Altar",
+    "Domain of Mastery: Frozen Abyss",
+    "Domain of Mastery: Realm of Slumber"
+   ],
+   "target": 6,
+   "expect": "Domain of Mastery: Frozen Abyss"
+  },
+  {
+   "books": [
+    "Domain of Mastery: Frosted Altar",
+    "Domain of Mastery: Frozen Abyss",
+    "Domain of Mastery: Realm of Slumber"
+   ],
+   "target": 7,
+   "expect": "Domain of Mastery: Realm of Slumber"
+  },
+  {
+   "books": [
+    "Domain of Mastery: Frosted Altar",
+    "Domain of Mastery: Frozen Abyss",
+    "Domain of Mastery: Realm of Slumber"
+   ],
+   "target": 8,
+   "expect": "Domain of Mastery: Frosted Altar"
+  },
+  {
+   "books": [
+    "Domain of Mastery: Frosted Altar",
+    "Domain of Mastery: Frozen Abyss",
+    "Domain of Mastery: Realm of Slumber"
+   ],
+   "target": 9,
+   "expect": "Domain of Mastery: Frozen Abyss"
+  },
+  {
+   "books": [
+    "Domain of Mastery: Frosted Altar",
+    "Domain of Mastery: Frozen Abyss",
+    "Domain of Mastery: Realm of Slumber"
+   ],
+   "target": 10,
+   "expect": "Domain of Mastery: Realm of Slumber"
+  },
+  {
+   "books": [
+    "Domain of Mastery: Circle of Embers"
+   ],
+   "target": 7,
+   "expect": "Domain of Mastery: Circle of Embers"
+  },
+  {
+   "books": [],
+   "target": 3,
+   "expect": null
+  }
+ ],
+ "plan": {
+  "catalog": [
+   {
+    "id": "10000047",
+    "name": "Kaedehara Kazuha",
+    "path": "/c/kazuha/",
+    "icon": "kazuha.png",
+    "order": [
+     "skill",
+     "ultimate"
+    ],
+    "books": [
+     "Domain of Mastery: Heart of the Flames"
+    ]
+   },
+   {
+    "id": "10000052",
+    "name": "Raiden Shogun",
+    "path": "/c/raiden/",
+    "icon": null,
+    "order": [
+     "ultimate",
+     "skill",
+     "basic"
+    ],
+    "books": [
+     "Domain of Mastery: Vine-Infested Ruins"
+    ]
+   },
+   {
+    "id": "10000032",
+    "name": "Bennett",
+    "path": "/c/bennett/",
+    "icon": "bennett.png",
+    "order": [
+     "ultimate",
+     "skill"
+    ],
+    "books": [
+     "Domain of Mastery: Frozen Abyss"
+    ]
+   },
+   {
+    "id": "10000021",
+    "name": "Amber",
+    "path": "/c/amber/",
+    "icon": null,
+    "order": [],
+    "books": [
+     "Domain of Mastery: Frosted Altar"
+    ]
+   },
+   {
+    "id": "10000005-504",
+    "name": "Traveler (Anemo)",
+    "path": "/c/traveler/",
+    "icon": null,
+    "order": [
+     "ultimate",
+     "skill"
+    ],
+    "books": [
+     "Domain of Mastery: Frosted Altar",
+     "Domain of Mastery: Frozen Abyss",
+     "Domain of Mastery: Realm of Slumber"
+    ]
+   },
+   {
+    "id": "10000037",
+    "name": "Ganyu",
+    "path": "/c/ganyu/",
+    "icon": null,
+    "order": [
+     "basic",
+     "ultimate"
+    ],
+    "books": [
+     "Domain of Mastery: Heart of the Flames"
+    ]
+   }
+  ],
+  "chars": [
+   {
+    "id": "10000047",
+    "level": 90,
+    "talents": [
+     {
+      "kind": "basic",
+      "label": {
+       "en": "basic",
+       "pl": "basic"
+      },
+      "short": "NA",
+      "level": 1,
+      "bonus": 0
+     },
+     {
+      "kind": "skill",
+      "label": {
+       "en": "skill",
+       "pl": "skill"
+      },
+      "short": "E",
+      "level": 6,
+      "bonus": 3
+     },
+     {
+      "kind": "ultimate",
+      "label": {
+       "en": "ultimate",
+       "pl": "ultimate"
+      },
+      "short": "Q",
+      "level": 9,
+      "bonus": 0
+     }
+    ]
+   },
+   {
+    "id": "10000052",
+    "level": 90,
+    "talents": [
+     {
+      "kind": "basic",
+      "label": {
+       "en": "basic",
+       "pl": "basic"
+      },
+      "short": "NA",
+      "level": 10,
+      "bonus": 0
+     },
+     {
+      "kind": "skill",
+      "label": {
+       "en": "skill",
+       "pl": "skill"
+      },
+      "short": "E",
+      "level": 8,
+      "bonus": 0
+     },
+     {
+      "kind": "ultimate",
+      "label": {
+       "en": "ultimate",
+       "pl": "ultimate"
+      },
+      "short": "Q",
+      "level": 10,
+      "bonus": 3
+     }
+    ]
+   },
+   {
+    "id": "10000032",
+    "level": 80,
+    "talents": [
+     {
+      "kind": "basic",
+      "label": {
+       "en": "basic",
+       "pl": "basic"
+      },
+      "short": "NA",
+      "level": 1,
+      "bonus": 0
+     },
+     {
+      "kind": "skill",
+      "label": {
+       "en": "skill",
+       "pl": "skill"
+      },
+      "short": "E",
+      "level": 5,
+      "bonus": 0
+     },
+     {
+      "kind": "ultimate",
+      "label": {
+       "en": "ultimate",
+       "pl": "ultimate"
+      },
+      "short": "Q",
+      "level": 9,
+      "bonus": 3
+     }
+    ]
+   },
+   {
+    "id": "10000021",
+    "level": 90,
+    "talents": [
+     {
+      "kind": "basic",
+      "label": {
+       "en": "basic",
+       "pl": "basic"
+      },
+      "short": "NA",
+      "level": 2,
+      "bonus": 0
+     },
+     {
+      "kind": "skill",
+      "label": {
+       "en": "skill",
+       "pl": "skill"
+      },
+      "short": "E",
+      "level": 1,
+      "bonus": 0
+     },
+     {
+      "kind": "ultimate",
+      "label": {
+       "en": "ultimate",
+       "pl": "ultimate"
+      },
+      "short": "Q",
+      "level": 1,
+      "bonus": 0
+     }
+    ]
+   },
+   {
+    "id": "10000005-504",
+    "level": 70,
+    "talents": [
+     {
+      "kind": "basic",
+      "label": {
+       "en": "basic",
+       "pl": "basic"
+      },
+      "short": "NA",
+      "level": 1,
+      "bonus": 0
+     },
+     {
+      "kind": "skill",
+      "label": {
+       "en": "skill",
+       "pl": "skill"
+      },
+      "short": "E",
+      "level": 3,
+      "bonus": 0
+     },
+     {
+      "kind": "ultimate",
+      "label": {
+       "en": "ultimate",
+       "pl": "ultimate"
+      },
+      "short": "Q",
+      "level": 4,
+      "bonus": 0
+     }
+    ]
+   },
+   {
+    "id": "10000037",
+    "level": 90,
+    "talents": [
+     {
+      "kind": "basic",
+      "label": {
+       "en": "basic",
+       "pl": "basic"
+      },
+      "short": "NA",
+      "level": 10,
+      "bonus": 0
+     },
+     {
+      "kind": "skill",
+      "label": {
+       "en": "skill",
+       "pl": "skill"
+      },
+      "short": "E",
+      "level": 10,
+      "bonus": 0
+     },
+     {
+      "kind": "ultimate",
+      "label": {
+       "en": "ultimate",
+       "pl": "ultimate"
+      },
+      "short": "Q",
+      "level": 10,
+      "bonus": 0
+     }
+    ]
+   },
+   {
+    "id": "99999999",
+    "level": 90,
+    "talents": [
+     {
+      "kind": "skill",
+      "label": {
+       "en": "skill",
+       "pl": "skill"
+      },
+      "short": "E",
+      "level": 2,
+      "bonus": 0
+     }
+    ]
+   }
+  ],
+  "cases": [
+   {
+    "name": "Monday",
+    "open": [
+     "Domain of Mastery: Frosted Altar",
+     "Domain of Mastery: Altar of Flames",
+     "Domain of Mastery: Reign of Violet"
+    ],
+    "expect": [
+     {
+      "id": "10000005-504",
+      "name": "Traveler (Anemo)",
+      "path": "/c/traveler/",
+      "icon": null,
+      "level": 70,
+      "steps": [
+       {
+        "kind": "ultimate",
+        "label": {
+         "en": "ultimate",
+         "pl": "ultimate"
+        },
+        "short": "Q",
+        "level": 4,
+        "target": 5,
+        "bonus": 0,
+        "tier": 1,
+        "count": 6,
+        "crown": false,
+        "priority": 1,
+        "domain": "Domain of Mastery: Frosted Altar"
+       },
+       {
+        "kind": "basic",
+        "label": {
+         "en": "basic",
+         "pl": "basic"
+        },
+        "short": "NA",
+        "level": 1,
+        "target": 2,
+        "bonus": 0,
+        "tier": 0,
+        "count": 3,
+        "crown": false,
+        "priority": null,
+        "domain": "Domain of Mastery: Frosted Altar"
+       }
+      ],
+      "best": 1
+     },
+     {
+      "id": "10000021",
+      "name": "Amber",
+      "path": "/c/amber/",
+      "icon": null,
+      "level": 90,
+      "steps": [
+       {
+        "kind": "basic",
+        "label": {
+         "en": "basic",
+         "pl": "basic"
+        },
+        "short": "NA",
+        "level": 2,
+        "target": 3,
+        "bonus": 0,
+        "tier": 1,
+        "count": 2,
+        "crown": false,
+        "priority": null,
+        "domain": "Domain of Mastery: Frosted Altar"
+       },
+       {
+        "kind": "skill",
+        "label": {
+         "en": "skill",
+         "pl": "skill"
+        },
+        "short": "E",
+        "level": 1,
+        "target": 2,
+        "bonus": 0,
+        "tier": 0,
+        "count": 3,
+        "crown": false,
+        "priority": null,
+        "domain": "Domain of Mastery: Frosted Altar"
+       },
+       {
+        "kind": "ultimate",
+        "label": {
+         "en": "ultimate",
+         "pl": "ultimate"
+        },
+        "short": "Q",
+        "level": 1,
+        "target": 2,
+        "bonus": 0,
+        "tier": 0,
+        "count": 3,
+        "crown": false,
+        "priority": null,
+        "domain": "Domain of Mastery: Frosted Altar"
+       }
+      ],
+      "best": null
+     }
+    ]
+   },
+   {
+    "name": "Tuesday",
+    "open": [
+     "Domain of Mastery: Frozen Abyss",
+     "Domain of Mastery: Heart of the Flames",
+     "Domain of Mastery: Thundering Valley"
+    ],
+    "expect": [
+     {
+      "id": "10000047",
+      "name": "Kaedehara Kazuha",
+      "path": "/c/kazuha/",
+      "icon": "kazuha.png",
+      "level": 90,
+      "steps": [
+       {
+        "kind": "skill",
+        "label": {
+         "en": "skill",
+         "pl": "skill"
+        },
+        "short": "E",
+        "level": 6,
+        "target": 7,
+        "bonus": 3,
+        "tier": 2,
+        "count": 4,
+        "crown": false,
+        "priority": 1,
+        "domain": "Domain of Mastery: Heart of the Flames"
+       },
+       {
+        "kind": "ultimate",
+        "label": {
+         "en": "ultimate",
+         "pl": "ultimate"
+        },
+        "short": "Q",
+        "level": 9,
+        "target": 10,
+        "bonus": 0,
+        "tier": 2,
+        "count": 16,
+        "crown": true,
+        "priority": 2,
+        "domain": "Domain of Mastery: Heart of the Flames"
+       },
+       {
+        "kind": "basic",
+        "label": {
+         "en": "basic",
+         "pl": "basic"
+        },
+        "short": "NA",
+        "level": 1,
+        "target": 2,
+        "bonus": 0,
+        "tier": 0,
+        "count": 3,
+        "crown": false,
+        "priority": null,
+        "domain": "Domain of Mastery: Heart of the Flames"
+       }
+      ],
+      "best": 1
+     },
+     {
+      "id": "10000032",
+      "name": "Bennett",
+      "path": "/c/bennett/",
+      "icon": "bennett.png",
+      "level": 80,
+      "steps": [
+       {
+        "kind": "ultimate",
+        "label": {
+         "en": "ultimate",
+         "pl": "ultimate"
+        },
+        "short": "Q",
+        "level": 9,
+        "target": 10,
+        "bonus": 3,
+        "tier": 2,
+        "count": 16,
+        "crown": true,
+        "priority": 1,
+        "domain": "Domain of Mastery: Frozen Abyss"
+       },
+       {
+        "kind": "skill",
+        "label": {
+         "en": "skill",
+         "pl": "skill"
+        },
+        "short": "E",
+        "level": 5,
+        "target": 6,
+        "bonus": 0,
+        "tier": 1,
+        "count": 9,
+        "crown": false,
+        "priority": 2,
+        "domain": "Domain of Mastery: Frozen Abyss"
+       },
+       {
+        "kind": "basic",
+        "label": {
+         "en": "basic",
+         "pl": "basic"
+        },
+        "short": "NA",
+        "level": 1,
+        "target": 2,
+        "bonus": 0,
+        "tier": 0,
+        "count": 3,
+        "crown": false,
+        "priority": null,
+        "domain": "Domain of Mastery: Frozen Abyss"
+       }
+      ],
+      "best": 1
+     }
+    ]
+   },
+   {
+    "name": "Wednesday",
+    "open": [
+     "Domain of Mastery: Realm of Slumber",
+     "Domain of Mastery: Circle of Embers",
+     "Domain of Mastery: Vine-Infested Ruins"
+    ],
+    "expect": [
+     {
+      "id": "10000052",
+      "name": "Raiden Shogun",
+      "path": "/c/raiden/",
+      "icon": null,
+      "level": 90,
+      "steps": [
+       {
+        "kind": "skill",
+        "label": {
+         "en": "skill",
+         "pl": "skill"
+        },
+        "short": "E",
+        "level": 8,
+        "target": 9,
+        "bonus": 0,
+        "tier": 2,
+        "count": 12,
+        "crown": false,
+        "priority": 2,
+        "domain": "Domain of Mastery: Vine-Infested Ruins"
+       }
+      ],
+      "best": 2
+     },
+     {
+      "id": "10000005-504",
+      "name": "Traveler (Anemo)",
+      "path": "/c/traveler/",
+      "icon": null,
+      "level": 70,
+      "steps": [
+       {
+        "kind": "skill",
+        "label": {
+         "en": "skill",
+         "pl": "skill"
+        },
+        "short": "E",
+        "level": 3,
+        "target": 4,
+        "bonus": 0,
+        "tier": 1,
+        "count": 4,
+        "crown": false,
+        "priority": 2,
+        "domain": "Domain of Mastery: Realm of Slumber"
+       }
+      ],
+      "best": 2
+     }
+    ]
+   },
+   {
+    "name": "Sunday: every domain",
+    "open": [
+     "Domain of Mastery: Frosted Altar",
+     "Domain of Mastery: Frozen Abyss",
+     "Domain of Mastery: Realm of Slumber",
+     "Domain of Mastery: Altar of Flames",
+     "Domain of Mastery: Circle of Embers",
+     "Domain of Mastery: Heart of the Flames",
+     "Domain of Mastery: Reign of Violet",
+     "Domain of Mastery: Thundering Valley",
+     "Domain of Mastery: Vine-Infested Ruins"
+    ],
+    "expect": [
+     {
+      "id": "10000047",
+      "name": "Kaedehara Kazuha",
+      "path": "/c/kazuha/",
+      "icon": "kazuha.png",
+      "level": 90,
+      "steps": [
+       {
+        "kind": "skill",
+        "label": {
+         "en": "skill",
+         "pl": "skill"
+        },
+        "short": "E",
+        "level": 6,
+        "target": 7,
+        "bonus": 3,
+        "tier": 2,
+        "count": 4,
+        "crown": false,
+        "priority": 1,
+        "domain": "Domain of Mastery: Heart of the Flames"
+       },
+       {
+        "kind": "ultimate",
+        "label": {
+         "en": "ultimate",
+         "pl": "ultimate"
+        },
+        "short": "Q",
+        "level": 9,
+        "target": 10,
+        "bonus": 0,
+        "tier": 2,
+        "count": 16,
+        "crown": true,
+        "priority": 2,
+        "domain": "Domain of Mastery: Heart of the Flames"
+       },
+       {
+        "kind": "basic",
+        "label": {
+         "en": "basic",
+         "pl": "basic"
+        },
+        "short": "NA",
+        "level": 1,
+        "target": 2,
+        "bonus": 0,
+        "tier": 0,
+        "count": 3,
+        "crown": false,
+        "priority": null,
+        "domain": "Domain of Mastery: Heart of the Flames"
+       }
+      ],
+      "best": 1
+     },
+     {
+      "id": "10000032",
+      "name": "Bennett",
+      "path": "/c/bennett/",
+      "icon": "bennett.png",
+      "level": 80,
+      "steps": [
+       {
+        "kind": "ultimate",
+        "label": {
+         "en": "ultimate",
+         "pl": "ultimate"
+        },
+        "short": "Q",
+        "level": 9,
+        "target": 10,
+        "bonus": 3,
+        "tier": 2,
+        "count": 16,
+        "crown": true,
+        "priority": 1,
+        "domain": "Domain of Mastery: Frozen Abyss"
+       },
+       {
+        "kind": "skill",
+        "label": {
+         "en": "skill",
+         "pl": "skill"
+        },
+        "short": "E",
+        "level": 5,
+        "target": 6,
+        "bonus": 0,
+        "tier": 1,
+        "count": 9,
+        "crown": false,
+        "priority": 2,
+        "domain": "Domain of Mastery: Frozen Abyss"
+       },
+       {
+        "kind": "basic",
+        "label": {
+         "en": "basic",
+         "pl": "basic"
+        },
+        "short": "NA",
+        "level": 1,
+        "target": 2,
+        "bonus": 0,
+        "tier": 0,
+        "count": 3,
+        "crown": false,
+        "priority": null,
+        "domain": "Domain of Mastery: Frozen Abyss"
+       }
+      ],
+      "best": 1
+     },
+     {
+      "id": "10000005-504",
+      "name": "Traveler (Anemo)",
+      "path": "/c/traveler/",
+      "icon": null,
+      "level": 70,
+      "steps": [
+       {
+        "kind": "ultimate",
+        "label": {
+         "en": "ultimate",
+         "pl": "ultimate"
+        },
+        "short": "Q",
+        "level": 4,
+        "target": 5,
+        "bonus": 0,
+        "tier": 1,
+        "count": 6,
+        "crown": false,
+        "priority": 1,
+        "domain": "Domain of Mastery: Frosted Altar"
+       },
+       {
+        "kind": "skill",
+        "label": {
+         "en": "skill",
+         "pl": "skill"
+        },
+        "short": "E",
+        "level": 3,
+        "target": 4,
+        "bonus": 0,
+        "tier": 1,
+        "count": 4,
+        "crown": false,
+        "priority": 2,
+        "domain": "Domain of Mastery: Realm of Slumber"
+       },
+       {
+        "kind": "basic",
+        "label": {
+         "en": "basic",
+         "pl": "basic"
+        },
+        "short": "NA",
+        "level": 1,
+        "target": 2,
+        "bonus": 0,
+        "tier": 0,
+        "count": 3,
+        "crown": false,
+        "priority": null,
+        "domain": "Domain of Mastery: Frosted Altar"
+       }
+      ],
+      "best": 1
+     },
+     {
+      "id": "10000052",
+      "name": "Raiden Shogun",
+      "path": "/c/raiden/",
+      "icon": null,
+      "level": 90,
+      "steps": [
+       {
+        "kind": "skill",
+        "label": {
+         "en": "skill",
+         "pl": "skill"
+        },
+        "short": "E",
+        "level": 8,
+        "target": 9,
+        "bonus": 0,
+        "tier": 2,
+        "count": 12,
+        "crown": false,
+        "priority": 2,
+        "domain": "Domain of Mastery: Vine-Infested Ruins"
+       }
+      ],
+      "best": 2
+     },
+     {
+      "id": "10000021",
+      "name": "Amber",
+      "path": "/c/amber/",
+      "icon": null,
+      "level": 90,
+      "steps": [
+       {
+        "kind": "basic",
+        "label": {
+         "en": "basic",
+         "pl": "basic"
+        },
+        "short": "NA",
+        "level": 2,
+        "target": 3,
+        "bonus": 0,
+        "tier": 1,
+        "count": 2,
+        "crown": false,
+        "priority": null,
+        "domain": "Domain of Mastery: Frosted Altar"
+       },
+       {
+        "kind": "skill",
+        "label": {
+         "en": "skill",
+         "pl": "skill"
+        },
+        "short": "E",
+        "level": 1,
+        "target": 2,
+        "bonus": 0,
+        "tier": 0,
+        "count": 3,
+        "crown": false,
+        "priority": null,
+        "domain": "Domain of Mastery: Frosted Altar"
+       },
+       {
+        "kind": "ultimate",
+        "label": {
+         "en": "ultimate",
+         "pl": "ultimate"
+        },
+        "short": "Q",
+        "level": 1,
+        "target": 2,
+        "bonus": 0,
+        "tier": 0,
+        "count": 3,
+        "crown": false,
+        "priority": null,
+        "domain": "Domain of Mastery: Frosted Altar"
+       }
+      ],
+      "best": null
+     }
+    ]
+   },
+   {
+    "name": "nothing open",
+    "open": [],
+    "expect": []
+   }
+  ]
+ },
+ "dayCases": [
+  {
+   "now": "2026-11-04T02:59:00Z",
+   "server": "europe",
+   "offset": 1,
+   "expect": {
+    "weekday": 2,
+    "start": "2026-11-03T03:00:00.000Z",
+    "reset": "2026-11-04T03:00:00.000Z"
+   }
+  },
+  {
+   "now": "2026-11-04T03:00:00Z",
+   "server": "europe",
+   "offset": 1,
+   "expect": {
+    "weekday": 3,
+    "start": "2026-11-04T03:00:00.000Z",
+    "reset": "2026-11-05T03:00:00.000Z"
+   }
+  },
+  {
+   "now": "2026-11-04T12:00:00Z",
+   "server": "europe",
+   "offset": 1,
+   "expect": {
+    "weekday": 3,
+    "start": "2026-11-04T03:00:00.000Z",
+    "reset": "2026-11-05T03:00:00.000Z"
+   }
+  },
+  {
+   "now": "2026-11-04T08:59:00Z",
+   "server": "america",
+   "offset": -5,
+   "expect": {
+    "weekday": 2,
+    "start": "2026-11-03T09:00:00.000Z",
+    "reset": "2026-11-04T09:00:00.000Z"
+   }
+  },
+  {
+   "now": "2026-11-04T09:00:00Z",
+   "server": "america",
+   "offset": -5,
+   "expect": {
+    "weekday": 3,
+    "start": "2026-11-04T09:00:00.000Z",
+    "reset": "2026-11-05T09:00:00.000Z"
+   }
+  },
+  {
+   "now": "2026-11-03T19:59:00Z",
+   "server": "asia",
+   "offset": 8,
+   "expect": {
+    "weekday": 2,
+    "start": "2026-11-02T20:00:00.000Z",
+    "reset": "2026-11-03T20:00:00.000Z"
+   }
+  },
+  {
+   "now": "2026-11-03T20:00:00Z",
+   "server": "asia",
+   "offset": 8,
+   "expect": {
+    "weekday": 3,
+    "start": "2026-11-03T20:00:00.000Z",
+    "reset": "2026-11-04T20:00:00.000Z"
+   }
+  },
+  {
+   "now": "2026-11-08T03:30:00Z",
+   "server": "europe",
+   "offset": 1,
+   "expect": {
+    "weekday": 0,
+    "start": "2026-11-08T03:00:00.000Z",
+    "reset": "2026-11-09T03:00:00.000Z"
+   }
+  },
+  {
+   "now": "2026-12-31T23:30:00Z",
+   "server": "asia",
+   "offset": 8,
+   "expect": {
+    "weekday": 5,
+    "start": "2026-12-31T20:00:00.000Z",
+    "reset": "2027-01-01T20:00:00.000Z"
+   }
+  }
+ ]
+}

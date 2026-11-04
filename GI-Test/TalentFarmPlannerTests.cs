@@ -18,10 +18,7 @@ namespace GI_Test
     {
         private static JsonElement Fixture()
         {
-            string root = RenderTestKit.RepoRoot() ?? throw new AssertInconclusiveException("Repository root not found.");
-            string path = Path.Combine(root, "tools", "fixtures", "talent-farm-cases.json");
-            Assert.IsTrue(File.Exists(path), "the shared fixture is checked in");
-            return JsonDocument.Parse(File.ReadAllText(path)).RootElement.Clone();
+            return JsonDocument.Parse(SharedFixture.Read("tools/fixtures/talent-farm-cases.json", "talent-farm-cases.json")).RootElement.Clone();
         }
 
         internal static IReadOnlyList<TalentDomain> Domains(JsonElement fx) => fx.GetProperty("domains").EnumerateArray().Select(d =>

@@ -18,11 +18,7 @@ namespace GI_Test
         public static readonly DateTimeOffset Wednesday = DateTimeOffset.Parse("2026-11-04T12:00:00Z");
         public static readonly DateTimeOffset Sunday = DateTimeOffset.Parse("2026-11-08T12:00:00Z");
 
-        public static string ScheduleJson()
-        {
-            string root = RenderTestKit.RepoRoot() ?? throw new AssertInconclusiveException("Repository root not found.");
-            return File.ReadAllText(Path.Combine(root, "landing", "src", "data", "today", "genshin.json"));
-        }
+        public static string ScheduleJson() => SharedFixture.Read("landing/src/data/today/genshin.json", "today-genshin.json");
 
         public static TodaySchedule Schedule() => TodaySchedule.Parse(ScheduleJson()) ?? throw new AssertFailedException("schedule parses");
 
