@@ -78,8 +78,18 @@ namespace GI_Subtitles.Views
             return base.MeasureOverride(constraint);
         }
 
-        // The page link follows the strings in use: Polish opens the Polish page, every other language the English one.
-        private void SyncSiteLanguage() => Vm?.SetSiteLanguage(TryFindResource("Char_SiteLocale") as string);
+        // The page link follows the strings in use: Polish opens the Polish page, every other language the English one. The
+        // rotation chips' flag words ("opcjonalnie") follow them too.
+        private void SyncSiteLanguage()
+        {
+            var vm = Vm;
+            if (vm == null) return;
+            vm.SetSiteLanguage(TryFindResource("Char_SiteLocale") as string);
+            var en = RotationWords.English;
+            string Word(string key, string fallback) => TryFindResource(key) is string s && s.Length > 0 ? s : fallback;
+            vm.SetRotationWords(new RotationWords(Word("Char_Rotation_Hold", en.Hold), Word("Char_Rotation_Optional", en.Optional),
+                Word("Char_Rotation_Either", en.Either)));
+        }
 
         // The title row (name, chips, the actions) stays clear of the art's opaque part; when the actions do not fit
         // beside the title, they wrap under it, and the build card under the kaption.one button. Never narrower than a

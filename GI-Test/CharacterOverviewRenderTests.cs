@@ -350,6 +350,88 @@ namespace GI_Test
             foreach (string p in written) Console.WriteLine(p);
         }
 
+        /// <summary>
+        /// Round 4 flags from a built-in fixture (no tools/out): held skills ("H" on the icon), optional inputs (dashed, a whole
+        /// optional turn too), choices (two icons in one pill, "N / CA" as text) and a turn's note, on Varka's card (letters on
+        /// the discs) and Chiori's (the cached skill icons); popup and page, both palettes, PL and EN. Writes
+        /// char-rotations-flags-*.png with a -team close-up and a -team@2x one.
+        /// </summary>
+        [TestMethod]
+        public void RendersRotationFlags()
+        {
+            var catalog = CharacterRotationFlagTests.Flags();
+            var cache = CharacterImageCache.ForGame("Genshin");
+            var written = new List<string>();
+            var icons = new List<string>();
+            static string TextOf(TextBlock t) =>
+                t.Text.Length > 0 ? t.Text : string.Concat(t.Inlines.OfType<System.Windows.Documents.Run>().Select(r => r.Text));
+            RunSta(() =>
+            {
+                foreach (var (id, name, dark, popup, lang) in new[]
+                         {
+                             (CharacterRotationTests.Varka, "char-rotations-flags-popup-pl", true, true, "pl-PL"),
+                             (CharacterRotationTests.Varka, "char-rotations-flags-page-pl", false, false, "pl-PL"),
+                             (CharacterRotationTests.Varka, "char-rotations-flags-page-en", false, false, "en-US"),
+                             (CharacterRotationTests.Varka, "char-rotations-flags-page-dark-pl", true, false, "pl-PL"),
+                             (CharacterRotationTests.Chiori, "char-rotations-flags-icons-popup-pl", true, true, "pl-PL"),
+                             (CharacterRotationTests.Chiori, "char-rotations-flags-icons-page-pl", false, false, "pl-PL"),
+                             (CharacterRotationTests.Chiori, "char-rotations-flags-icons-page-en", false, false, "en-US"),
+                         })
+                {
+                    var model = CharacterOverviewBuilder.Build(catalog.Find(id), catalog, null);
+                    CharacterIcons.ApplyCached(model, cache);
+                    if (Fetch) Task.Run(() => CharacterIcons.FetchMissingAsync(model, cache)).Wait(TimeSpan.FromSeconds(60));
+                    CharacterOverviewViewModel.PrepareVisuals(model);
+                    var (host, view) = GoalHost(model, dark, popup, lang);
+                    bool polish = lang == "pl-PL", varka = id == CharacterRotationTests.Varka;
+
+                    var teams = (FrameworkElement)view.FindName("Section_Teams");
+                    var strip = Descendants<ItemsControl>(teams).Single(i => i.Name == "TeamRotations");
+                    Assert.IsTrue(Shown(strip), $"{name}: the rotation shows under the team's why");
+                    var texts = Descendants<TextBlock>(strip).Where(Shown).Select(TextOf).ToList();
+                    string all = string.Join(" | ", texts);
+                    Assert.AreEqual(varka ? 3 : 2, texts.Count(t => t == ">"), $"{name}: a > between turns: {all}");
+                    Assert.AreEqual(2, texts.Count(t => t == "H"), $"{name}: the H on each held icon: {all}");
+                    Assert.AreEqual(1, texts.Count(t => t == "/"), $"{name}: one pair of icons: {all}");
+                    Assert.AreEqual(1, texts.Count(t => t == "×2"), $"{name}: one count badge: {all}");
+                    foreach (string expected in varka
+                                 ? new[] { "N / CA", "D", "Combo*", "Omit if C6", "Hold the Skill only when the Burst is ready" }
+                                 : new[] { "Combo*", "Hold only on the first rotation" })
+                        CollectionAssert.Contains(texts, expected, $"{name}: {all}");
+
+                    // Optional inputs: dashed and unfilled. Varka: Durin's Q, Prune's D, Nicole's whole turn; Chiori: Itto's Q.
+                    var dashed = Descendants<System.Windows.Shapes.Shape>(strip).Where(Shown).Where(s => s.StrokeDashArray?.Count > 0).ToList();
+                    Assert.AreEqual(varka ? 4 : 1, dashed.Count, $"{name}: dashed outlines");
+                    Assert.IsTrue(dashed.All(s => s.Fill is SolidColorBrush b && b.Color.A == 0), $"{name}: an optional chip is unfilled");
+
+                    // Tooltips: the game's English terms, the flag words in the interface's language.
+                    var tips = Descendants<Grid>(strip).Where(Shown).Select(g => g.ToolTip as string).Where(t => t != null).ToList();
+                    string tipList = string.Join(" | ", tips);
+                    foreach (string ending in new[] { polish ? "(opcjonalnie)" : "(optional)", polish ? "(do wyboru)" : "(either)", " ×2 (hold)" })
+                        Assert.IsTrue(tips.Any(t => t.EndsWith(ending, StringComparison.Ordinal)), $"{name}: no tooltip ends with {ending}: {tipList}");
+
+                    // Never wider than the card: every turn sits inside the strip, notes included.
+                    foreach (var turn in Descendants<DockPanel>(strip).Where(Shown))
+                    {
+                        var box = turn.TransformToAncestor(strip).TransformBounds(new Rect(turn.RenderSize));
+                        Assert.IsTrue(box.Right <= strip.ActualWidth + 0.5, $"{name}: a turn ends at {box.Right:0.#} in a {strip.ActualWidth:0.#} px strip");
+                    }
+
+                    var vm = (CharacterOverviewViewModel)view.DataContext;
+                    var chips = vm.Teams.SelectMany(t => t.Rotations).SelectMany(r => r.Steps).SelectMany(s => s.Chips).Where(c => c.IsIcon).ToList();
+                    icons.Add($"{name}: {chips.Count(c => c.IconPath != null)} of {chips.Count} icon chips and " +
+                              $"{chips.Count(c => c.AltIconPath != null)} of {chips.Count(c => c.IsPair)} second icons drawn from cached skill icons");
+
+                    var full = Snapshot(host);
+                    written.Add(Save(full, name + ".png"));
+                    written.Add(Save(Crop(full, teams, host), name + "-team.png"));
+                    written.Add(Save(Crop(Snapshot(host, 2), teams, host, scale: 2), name + "-team@2x.png"));
+                }
+            });
+            foreach (string line in icons) Console.WriteLine(line);
+            foreach (string p in written) Console.WriteLine(p);
+        }
+
         private static (Border Host, CharacterOverviewView View) GoalHost(CharacterOverviewModel model, bool dark, bool popup, string lang)
         {
             var view = new CharacterOverviewView(model);
@@ -368,11 +450,12 @@ namespace GI_Test
             return (host, view);
         }
 
-        // The element's box on the whole-page render, with a margin, for a close-up.
-        private static BitmapSource Crop(BitmapSource full, FrameworkElement element, FrameworkElement host, double pad = 12)
+        // The element's box on the whole-page render, with a margin, for a close-up; scale matches a Snapshot taken at that scale.
+        private static BitmapSource Crop(BitmapSource full, FrameworkElement element, FrameworkElement host, double pad = 12, double scale = 1)
         {
             var box = element.TransformToAncestor(host).TransformBounds(new Rect(element.RenderSize));
             box.Inflate(pad, pad);
+            box = new Rect(box.X * scale, box.Y * scale, box.Width * scale, box.Height * scale);
             box.Intersect(new Rect(0, 0, full.PixelWidth, full.PixelHeight));
             var crop = new CroppedBitmap(full, new Int32Rect((int)box.X, (int)box.Y, (int)box.Width, (int)box.Height));
             crop.Freeze();

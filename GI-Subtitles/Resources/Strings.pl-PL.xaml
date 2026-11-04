@@ -1135,6 +1135,9 @@
     <sys:String x:Key="Char_Rotation" xmlns:sys="clr-namespace:System;assembly=mscorlib">Rotacja</sys:String>
     <sys:String x:Key="Char_Rotation_With" xmlns:sys="clr-namespace:System;assembly=mscorlib">z</sys:String>
     <sys:String x:Key="Char_Rotation_WithZe" xmlns:sys="clr-namespace:System;assembly=mscorlib">ze</sys:String>
+    <sys:String x:Key="Char_Rotation_Hold" xmlns:sys="clr-namespace:System;assembly=mscorlib">hold</sys:String>
+    <sys:String x:Key="Char_Rotation_Optional" xmlns:sys="clr-namespace:System;assembly=mscorlib">opcjonalnie</sys:String>
+    <sys:String x:Key="Char_Rotation_Either" xmlns:sys="clr-namespace:System;assembly=mscorlib">do wyboru</sys:String>
     <sys:String x:Key="Char_Count_Format" xmlns:sys="clr-namespace:System;assembly=mscorlib">Postaci: {0}</sys:String>
     <sys:String x:Key="Char_CountFiltered_Format" xmlns:sys="clr-namespace:System;assembly=mscorlib">{0} z {1}</sys:String>
     <sys:String x:Key="Char_Loading" xmlns:sys="clr-namespace:System;assembly=mscorlib">Wczytuję postacie…</sys:String>

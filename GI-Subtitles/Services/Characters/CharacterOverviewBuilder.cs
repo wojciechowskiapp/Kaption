@@ -140,6 +140,8 @@ namespace GI_Subtitles.Services.Characters
         public string IconUrl { get; set; }
         public string IconPath { get; set; }
         public IReadOnlyList<OverviewRotationAction> Actions { get; set; } = Array.Empty<OverviewRotationAction>();
+        /// <summary>The page's condition on this turn, English as written ("Omit if C6"); "" for none.</summary>
+        public string Note { get; set; } = "";
     }
 
     public sealed class OverviewRotationAction
@@ -154,7 +156,19 @@ namespace GI_Subtitles.Services.Characters
         public string IconPath { get; set; }
         /// <summary>"*", "**": the footnote that spells out this combo; "" for none.</summary>
         public string Marker { get; set; } = "";
-        /// <summary>The tooltip and accessible name, as the site's ("Elemental Skill: Passion Overload ×2").</summary>
+        /// <summary>The input's English name ("Elemental Skill: Passion Overload", "Charged Attack").</summary>
+        public string Name { get; set; } = "";
+        /// <summary>A held skill: an "H" tag on an icon chip, "hold" after a text chip's text.</summary>
+        public bool Hold { get; set; }
+        /// <summary>The page marks the input optional: a dashed outline.</summary>
+        public bool Optional { get; set; }
+        /// <summary>A choice's other input ("E / Q"), its skill, name and icon as for the first; "" when there is no choice.</summary>
+        public string Alt { get; set; } = "";
+        public string AltSkillName { get; set; } = "";
+        public string AltName { get; set; } = "";
+        public string AltIconUrl { get; set; }
+        public string AltIconPath { get; set; }
+        /// <summary>The tooltip and accessible name in English, as the site's ("Elemental Skill: Passion Overload ×2 (hold)").</summary>
         public string Description { get; set; } = "";
     }
 
@@ -735,7 +749,7 @@ namespace GI_Subtitles.Services.Characters
                     foreach (var a in r.Steps[i].Actions)
                     {
                         string marker = "";
-                        if (a.Action == RotationNotation.Combo && r.Combo.TryGetValue(member.Id, out string raw))
+                        if ((a.Action == RotationNotation.Combo || a.Alt == RotationNotation.Combo) && r.Combo.TryGetValue(member.Id, out string raw))
                         {
                             string text = GameTextFormatter.StripMarkup(raw).Trim();
                             if (text.Length > 0 && !markers.TryGetValue(member.Id, out marker))
@@ -753,6 +767,7 @@ namespace GI_Subtitles.Services.Characters
                         IsSelf = member.Id == selfId,
                         IconUrl = catalog.IconUrl(IconKind.Character, member.Icon),
                         Actions = actions,
+                        Note = GameTextFormatter.StripMarkup(r.Steps[i].Note ?? "").Trim(),
                     });
                 }
                 list.Add(new OverviewRotation { Variant = GameTextFormatter.StripMarkup(r.Variant ?? "").Trim(), Steps = steps, Combos = combos });
@@ -762,14 +777,29 @@ namespace GI_Subtitles.Services.Characters
 
         private static OverviewRotationAction ActionOf(RotationAction a, CharacterRecord member, CharacterCatalog catalog, string marker)
         {
-            var action = new OverviewRotationAction { Action = a.Action, Count = a.Count, Marker = marker };
+            var action = new OverviewRotationAction
+            {
+                Action = a.Action, Count = a.Count, Marker = marker, Hold = a.Hold, Optional = a.Optional, Alt = a.Alt ?? "",
+            };
             var skill = RotationSkill(catalog.Game, member, a.Action);
             if (skill != null)
             {
                 action.SkillName = skill.Name;
                 action.IconUrl = catalog.IconUrl(IconKind.Skill, skill.Icon);
             }
-            action.Description = RotationNotation.Describe(a.Action, a.Count, catalog.Game, action.SkillName, marker);
+            action.Name = RotationNotation.Name(a.Action, catalog.Game, action.SkillName);
+            if (action.Alt.Length > 0)
+            {
+                var alt = RotationSkill(catalog.Game, member, action.Alt);
+                if (alt != null)
+                {
+                    action.AltSkillName = alt.Name;
+                    action.AltIconUrl = catalog.IconUrl(IconKind.Skill, alt.Icon);
+                }
+                action.AltName = RotationNotation.Name(action.Alt, catalog.Game, action.AltSkillName);
+            }
+            action.Description = RotationNotation.Describe(action.Name, action.AltName, a.Count, marker,
+                RotationNotation.Flags(action.Alt.Length > 0, a.Hold, a.Optional, RotationWords.English));
             return action;
         }
 

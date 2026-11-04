@@ -8,8 +8,8 @@ namespace GI_Subtitles.Services.Characters
 {
     /// <summary>
     /// How rotation inputs are written, as on the site (landing/src/data/characters/rotations.ts; keep in step): E, Q, N as
-    /// the member's skill icon where the bundle names one, a repeat as a "×2" corner badge; any other input a text chip that
-    /// keeps its count ("N5", "CA ×2", "Combo"). Pure; safe on any thread.
+    /// the member's skill icon where the bundle names one, any other input a text chip ("N5", "CA ×2", "Combo", "E hold",
+    /// "E / Q"); a repeat is a "×2" badge on an icon chip, a hold an "H". Pure; safe on any thread.
     /// </summary>
     public static class RotationNotation
     {
@@ -21,6 +21,9 @@ namespace GI_Subtitles.Services.Characters
         public const string Dash = "D";
         public const string Combo = "combo";
         public const char Times = '\u00D7';
+        /// <summary>A held skill's marks, the game's own English in every language: "H" on an icon chip, "E hold" as text.</summary>
+        public const string HoldTag = "H";
+        public const string HoldWord = "hold";
 
         private static readonly string[] Tokens = { Skill, Burst, Normal, Charged, Plunge, Dash, Combo };
 
@@ -32,6 +35,10 @@ namespace GI_Subtitles.Services.Characters
         /// <summary>E, Q and N with an icon in the bundle draw as that icon (its letter until it is on disk).</summary>
         public static bool HasIconSlot(string action, bool hasIcon) => hasIcon && (action == Skill || action == Burst || action == Normal);
 
+        /// <summary>A choice draws as icons side by side only when both inputs have one; otherwise as text, "E / CA".</summary>
+        public static bool HasIconSlot(string action, bool hasIcon, string alt, bool altHasIcon) =>
+            HasIconSlot(action, hasIcon) && (string.IsNullOrEmpty(alt) || HasIconSlot(alt, altHasIcon));
+
         /// <summary>The chip's text: "Combo" for a combo, "N5" for an N without an icon (one hit reads "N"), else the token.</summary>
         public static string Label(string action, int count, bool hasIcon) =>
             action == Combo ? "Combo"
@@ -42,11 +49,26 @@ namespace GI_Subtitles.Services.Characters
         public static string Count(string action, int count, bool hasIcon) =>
             count > 1 && !(action == Normal && !hasIcon) ? Times + count.ToString(CultureInfo.InvariantCulture) : "";
 
-        /// <summary>The chip as plain text: "E ×2", "CA ×2", "N2", "Combo*".</summary>
-        public static string Text(string action, int count, bool hasIcon, string marker = "")
+        /// <summary>A choice reads "E / Q", "N / CA": its count belongs to the whole chip, so an N never folds it in.</summary>
+        public static string Label(string action, int count, bool hasIcon, string alt) =>
+            string.IsNullOrEmpty(alt) ? Label(action, count, hasIcon) : Label(action, 1, hasIcon) + " / " + Label(alt, 1, hasIcon);
+
+        /// <summary>"×2" as <see cref="Count(string,int,bool)"/>; a choice always shows its count.</summary>
+        public static string Count(string action, int count, bool hasIcon, string alt) =>
+            string.IsNullOrEmpty(alt) ? Count(action, count, hasIcon)
+            : count > 1 ? Times + count.ToString(CultureInfo.InvariantCulture) : "";
+
+        /// <summary>
+        /// The chip as plain text, in the site's order (text, "hold", count, marker): "E ×2", "CA ×2", "N2", "Combo*",
+        /// "E hold ×2", "E / Q", "N / CA ×3"; an optional input in KQM's brackets, "(Q)". <paramref name="hasIcon"/> is the
+        /// chip's form (a choice has icons only when both inputs do).
+        /// </summary>
+        public static string Text(string action, int count, bool hasIcon, string marker = "", bool hold = false, string alt = "",
+                                  bool optional = false)
         {
-            string times = Count(action, count, hasIcon);
-            return Label(action, count, hasIcon) + (times.Length > 0 ? " " + times : "") + (marker ?? "");
+            string times = Count(action, count, hasIcon, alt);
+            string core = Label(action, count, hasIcon, alt) + (hold ? " " + HoldWord : "") + (times.Length > 0 ? " " + times : "");
+            return (optional ? "(" + core + ")" : core) + (marker ?? "");
         }
 
         /// <summary>The footnote marker of the <paramref name="index"/>-th combo spelled out (0: "*", 1: "**").</summary>
@@ -72,17 +94,42 @@ namespace GI_Subtitles.Services.Characters
             : Terms.TryGetValue(action ?? "", out term) ? term : action ?? "";
 
         /// <summary>
-        /// A chip's tooltip and accessible name, as the site's: the input's name ("Elemental Skill: Passion Overload", or the
-        /// skill's own name when it starts with the term, "Ultimate: Lingering Snow"), then "×2", then the footnote marker.
+        /// An input's English name: the term, then the skill's own name when found ("Elemental Skill: Passion Overload"); a
+        /// skill name that starts with the term stands alone ("Ultimate: Lingering Snow").
         /// </summary>
-        public static string Describe(string action, int count, string game, string skillName, string marker)
+        public static string Name(string action, string game, string skillName)
         {
             string term = Term(action, game);
-            string label = string.IsNullOrEmpty(skillName) ? term
+            return string.IsNullOrEmpty(skillName) ? term
                 : skillName.StartsWith(term + ":", StringComparison.OrdinalIgnoreCase) ? skillName
                 : term + ": " + skillName;
+        }
+
+        /// <summary>A chip's tooltip and accessible name for one input, as the site's: its name, then "×2", then the marker.</summary>
+        public static string Describe(string action, int count, string game, string skillName, string marker) =>
+            Describe(Name(action, game, skillName), "", count, marker, null);
+
+        /// <summary>
+        /// The tooltip with the Round 4 flags, as the site's chipLabel: the name (a choice names both, "… / …"), "×2", the
+        /// marker, then the flags in brackets: "Elemental Skill: Binding Flame ×2 (hold, optional)".
+        /// </summary>
+        public static string Describe(string name, string altName, int count, string marker, IEnumerable<string> flags)
+        {
+            string label = string.IsNullOrEmpty(altName) ? name ?? "" : (name ?? "") + " / " + altName;
             string times = count > 1 ? Times + count.ToString(CultureInfo.InvariantCulture) : "";
-            return string.Join(" ", new[] { label, times, marker ?? "" }.Where(s => s.Length > 0));
+            string words = string.Join(", ", (flags ?? Enumerable.Empty<string>()).Where(w => !string.IsNullOrEmpty(w)));
+            return string.Join(" ", new[] { label, times, marker ?? "", words.Length > 0 ? "(" + words + ")" : "" }.Where(s => s.Length > 0));
+        }
+
+        /// <summary>A flagged input's words, in the site's order: a choice, a hold, an optional input.</summary>
+        public static IReadOnlyList<string> Flags(bool choice, bool hold, bool optional, RotationWords words)
+        {
+            words ??= RotationWords.English;
+            var list = new List<string>(3);
+            if (choice) list.Add(words.Either);
+            if (hold) list.Add(words.Hold);
+            if (optional) list.Add(words.Optional);
+            return list;
         }
 
         // The site's plWith: "ze Skirk", "ze Sparkle", but "z Prune", "z Shenhe", "z Zhongli", "z Sucrose", "z Szymonem".
@@ -91,5 +138,12 @@ namespace GI_Subtitles.Services.Characters
 
         /// <summary>Polish says "ze", not "z", before this name ("ze Skirk"); English always reads "with".</summary>
         public static bool TakesPolishZe(string name) => !string.IsNullOrEmpty(name) && PolishZe.IsMatch(name);
+    }
+
+    /// <summary>A flagged chip's tooltip words in the interface's language (the site's rotationFlags); the view reads its strings.</summary>
+    public sealed record RotationWords(string Hold, string Optional, string Either)
+    {
+        /// <summary>Char_Rotation_Hold / _Optional / _Either in English, for rows built without a view.</summary>
+        public static readonly RotationWords English = new RotationWords("hold", "optional", "either");
     }
 }

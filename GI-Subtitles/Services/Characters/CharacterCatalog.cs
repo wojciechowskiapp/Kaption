@@ -91,6 +91,12 @@ namespace GI_Subtitles.Services.Characters
         public string Action { get; set; } = "";
         /// <summary>1 when the data gives no count; for N the number of hits.</summary>
         public int Count { get; set; } = 1;
+        /// <summary>A held skill (KQM's "hE"); a tap is the plain action.</summary>
+        public bool Hold { get; set; }
+        /// <summary>The page marks the action optional (KQM's "(Q)").</summary>
+        public bool Optional { get; set; }
+        /// <summary>The other input of a choice: KQM's "E/Q" is Action "E", Alt "Q"; "" when there is no choice.</summary>
+        public string Alt { get; set; } = "";
     }
 
     /// <summary>One member's turn in a rotation.</summary>
@@ -99,6 +105,8 @@ namespace GI_Subtitles.Services.Characters
         /// <summary>A member id of the team.</summary>
         public string Member { get; set; } = "";
         public IReadOnlyList<RotationAction> Actions { get; set; } = Array.Empty<RotationAction>();
+        /// <summary>The page's condition on this turn, English ("Omit if C6"); "" for none.</summary>
+        public string Note { get; set; } = "";
     }
 
     /// <summary>A rotation as a guide page states it for the team (the updater transcribes, never composes one).</summary>
@@ -109,6 +117,8 @@ namespace GI_Subtitles.Services.Characters
         public IReadOnlyList<RotationStep> Steps { get; set; } = Array.Empty<RotationStep>();
         /// <summary>Member id → that member's named combo as the page spells it (English).</summary>
         public IReadOnlyDictionary<string, string> Combo { get; set; } = new Dictionary<string, string>();
+        /// <summary>Every member has a turn (true) or someone sits out (false); null when the data does not say. Not shown.</summary>
+        public bool? Covers { get; set; }
     }
 
     /// <summary>
@@ -295,6 +305,8 @@ namespace GI_Subtitles.Services.Characters
         public const int MaxActionCount = 20;
         public const int MaxVariantLength = 64;
         public const int MaxComboLength = 300;
+        /// <summary>A step's note, the contract's cap: a longer one drops the rotation here and on the site.</summary>
+        public const int MaxStepNoteLength = 80;
 
         public static readonly CharacterCatalog Empty = new CharacterCatalog(
             "", "", Array.Empty<CharacterRecord>(),
@@ -588,6 +600,7 @@ namespace GI_Subtitles.Services.Characters
                 variant = Squash(v.GetString());
                 if (variant.Length > MaxVariantLength) return null;
             }
+            if (!Flag(r, "covers", out bool? covers)) return null;
             if (!r.TryGetProperty("steps", out var s) || s.ValueKind != JsonValueKind.Array) return null;
             int count = s.GetArrayLength();
             if (count == 0 || count > MaxRotationSteps) return null;
@@ -605,7 +618,7 @@ namespace GI_Subtitles.Services.Characters
                 string text = p.Value.ValueKind == JsonValueKind.String ? Squash(p.Value.GetString()) : "";
                 if (members.Contains(p.Name) && text.Length > 0 && text.Length <= MaxComboLength) combo[p.Name] = text;
             }
-            return new TeamRotation { Variant = variant, Steps = steps, Combo = combo };
+            return new TeamRotation { Variant = variant, Steps = steps, Combo = combo, Covers = covers };
         }
 
         private static RotationStep ReadRotationStep(JsonElement e, IReadOnlyCollection<string> members)
@@ -624,10 +637,12 @@ namespace GI_Subtitles.Services.Characters
                 if (action == null) return null;
                 actions.Add(action);
             }
-            return new RotationStep { Member = member, Actions = actions };
+            if (!ReadNote(e, out string note)) return null;
+            return new RotationStep { Member = member, Actions = actions, Note = note };
         }
 
-        // A token of the grammar exactly as written; n absent or null is 1, else a whole number 1..MaxActionCount.
+        // A token of the grammar exactly as written; n absent or null is 1, else a whole number 1..MaxActionCount. hold and opt
+        // are true, false or null; alt is another token. Any other value skips the rotation: a hold shown as a tap would mislead.
         private static RotationAction ReadRotationAction(JsonElement x)
         {
             if (x.ValueKind != JsonValueKind.Object) return null;
@@ -637,7 +652,35 @@ namespace GI_Subtitles.Services.Characters
             if (x.TryGetProperty("n", out var n) && n.ValueKind != JsonValueKind.Null &&
                 (n.ValueKind != JsonValueKind.Number || !n.TryGetInt32(out count) || count < 1 || count > MaxActionCount))
                 return null;
-            return new RotationAction { Action = token, Count = count };
+            if (!Flag(x, "hold", out bool? hold) || !Flag(x, "opt", out bool? optional)) return null;
+            string alt = "";
+            if (x.TryGetProperty("alt", out var a) && a.ValueKind != JsonValueKind.Null)
+            {
+                alt = a.ValueKind == JsonValueKind.String ? (a.GetString() ?? "").Trim() : "";
+                if (!RotationNotation.IsAction(alt) || alt == token) return null;
+            }
+            return new RotationAction { Action = token, Count = count, Hold = hold == true, Optional = optional == true, Alt = alt };
+        }
+
+        // true, false, null or absent (null: not set); any other value spoils the rotation.
+        private static bool Flag(JsonElement e, string name, out bool? value)
+        {
+            value = null;
+            if (!e.TryGetProperty(name, out var v) || v.ValueKind == JsonValueKind.Null) return true;
+            if (v.ValueKind != JsonValueKind.True && v.ValueKind != JsonValueKind.False) return false;
+            value = v.ValueKind == JsonValueKind.True;
+            return true;
+        }
+
+        // One line of English, blank being none. Not a string, or past MaxStepNoteLength, spoils the rotation: dropping a
+        // condition alone would misstate the turn.
+        private static bool ReadNote(JsonElement e, out string note)
+        {
+            note = "";
+            if (!e.TryGetProperty("note", out var v) || v.ValueKind == JsonValueKind.Null) return true;
+            if (v.ValueKind != JsonValueKind.String) return false;
+            note = Squash(v.GetString());
+            return note.Length <= MaxStepNoteLength;
         }
 
         private static string Squash(string text) =>

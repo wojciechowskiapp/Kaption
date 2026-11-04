@@ -24,7 +24,11 @@ namespace GI_Subtitles.Services.Characters
             foreach (var member in Members(model)) member.IconPath = cache.CachedPathOrNull(member.IconUrl);
             foreach (var host in model.TeamHosts) host.IconPath = cache.CachedPathOrNull(host.IconUrl);
             foreach (var step in RotationSteps(model)) step.IconPath = cache.CachedPathOrNull(step.IconUrl);
-            foreach (var action in RotationActions(model)) action.IconPath = cache.CachedPathOrNull(action.IconUrl);
+            foreach (var action in RotationActions(model))
+            {
+                action.IconPath = cache.CachedPathOrNull(action.IconUrl);
+                action.AltIconPath = cache.CachedPathOrNull(action.AltIconUrl);
+            }
             model.SplashPath = cache.CachedPathOrNull(model.SplashUrl);
             model.AmbiencePath = cache.CachedPathOrNull(model.AmbienceUrl);
         }
@@ -57,6 +61,8 @@ namespace GI_Subtitles.Services.Characters
                 jobs.Add(Fetch(cache, step.IconUrl, p => step.IconPath = p));
             foreach (var action in RotationActions(model).Where(x => x.IconPath == null && x.IconUrl != null))
                 jobs.Add(Fetch(cache, action.IconUrl, p => action.IconPath = p));
+            foreach (var action in RotationActions(model).Where(x => x.AltIconPath == null && x.AltIconUrl != null))
+                jobs.Add(Fetch(cache, action.AltIconUrl, p => action.AltIconPath = p));
             if (model.SplashPath == null && model.SplashUrl != null)
                 jobs.Add(Fetch(cache, model.SplashUrl, p => model.SplashPath = p, CharacterImageCache.LargeMaxBytes));
             if (model.AmbiencePath == null && model.AmbienceUrl != null)

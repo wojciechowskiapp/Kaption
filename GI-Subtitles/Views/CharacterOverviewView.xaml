@@ -239,25 +239,53 @@
                 </DataTrigger>
             </Style.Triggers>
         </Style>
-        <!-- One input of a rotation: E, Q and N as the member's skill icon on a disc in the page's element colour where the
-             bundle names one (the letter until it is on disk), a repeat as a "×2" badge on the disc's corner; any other
-             input as a text chip that keeps its count ("N2", "CA ×2") and the combo's footnote marker ("Combo*"). -->
+        <!-- A rotation chip's outline: an icon chip in the page's element colour, a text chip neutral; an optional input
+             dashed and unfilled, as on the site. -->
+        <Style x:Key="RotationIconOutline" TargetType="Shape">
+            <Setter Property="Fill" Value="{Binding DataContext.ElementWash, RelativeSource={RelativeSource AncestorType=UserControl}}"/>
+            <Setter Property="Stroke" Value="{Binding DataContext.ElementSoft, RelativeSource={RelativeSource AncestorType=UserControl}}"/>
+            <Setter Property="StrokeThickness" Value="1"/>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsOptional}" Value="True">
+                    <Setter Property="Fill" Value="Transparent"/>
+                    <Setter Property="Stroke" Value="{DynamicResource Char_FgSubtle}"/>
+                    <Setter Property="StrokeDashArray" Value="3 2"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="RotationTextOutline" TargetType="Shape">
+            <Setter Property="Fill" Value="{DynamicResource Char_ChipBg}"/>
+            <Setter Property="Stroke" Value="{DynamicResource Char_Ring}"/>
+            <Setter Property="StrokeThickness" Value="1"/>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsOptional}" Value="True">
+                    <Setter Property="Fill" Value="Transparent"/>
+                    <Setter Property="Stroke" Value="{DynamicResource Char_FgSubtle}"/>
+                    <Setter Property="StrokeDashArray" Value="3 2"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <!-- One input of a rotation: E, Q and N as the member's skill icon on a disc (its letter until on disk), a choice of
+             two such inputs as both icons in one pill, "×2" top-right and a held skill's "H" bottom-right; any other input a
+             text chip keeping its count, "hold" and marker ("N2", "CA ×2", "E hold", "E / Q", "Combo*"). -->
         <DataTemplate x:Key="RotationChip">
             <Grid Background="Transparent" ToolTip="{Binding Description}" AutomationProperties.Name="{Binding Description}">
                 <Grid.Style>
                     <Style TargetType="Grid">
                         <Setter Property="Margin" Value="5,0,0,4"/>
                         <Style.Triggers>
-                            <!-- Room for the badge, which hangs past the disc's right edge. -->
+                            <!-- Room for the badge and the tag, which hang past the chip's right edge (the tag past its foot too). -->
                             <DataTrigger Binding="{Binding HasBadge}" Value="True">
                                 <Setter Property="Margin" Value="5,0,7,4"/>
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding HasHoldTag}" Value="True">
+                                <Setter Property="Margin" Value="5,0,7,7"/>
                             </DataTrigger>
                         </Style.Triggers>
                     </Style>
                 </Grid.Style>
-                <Grid Width="28" Height="28" Visibility="{Binding IsIcon, Converter={StaticResource BoolVis}}">
-                    <Ellipse Fill="{Binding DataContext.ElementWash, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                             Stroke="{Binding DataContext.ElementSoft, RelativeSource={RelativeSource AncestorType=UserControl}}" StrokeThickness="1"/>
+                <Grid Width="28" Height="28" Visibility="{Binding IsDisc, Converter={StaticResource BoolVis}}">
+                    <Ellipse Style="{StaticResource RotationIconOutline}"/>
                     <TextBlock Text="{Binding Label}" Style="{StaticResource Numeral}" FontSize="12.5"
                                Foreground="{Binding DataContext.ElementText, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                Visibility="{Binding IconPath, Converter={StaticResource MissingIcon}, ConverterParameter={x:Static local:OverviewImageSizes.Skill}}"/>
@@ -268,15 +296,45 @@
                         </Rectangle.OpacityMask>
                     </Rectangle>
                 </Grid>
-                <Border Height="28" MinWidth="28" CornerRadius="14" Padding="9,0" SnapsToDevicePixels="True"
-                        Background="{DynamicResource Char_ChipBg}" BorderBrush="{DynamicResource Char_Ring}" BorderThickness="1"
-                        Visibility="{Binding IsText, Converter={StaticResource BoolVis}}">
-                    <TextBlock FontFamily="{DynamicResource FontDisplay}" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource Char_Fg}"
+                <!-- A choice between two icon inputs: both icons in one pill, a slash between (letters until they are on disk). -->
+                <Grid Height="28" Visibility="{Binding IsPair, Converter={StaticResource BoolVis}}">
+                    <Rectangle RadiusX="14" RadiusY="14" Style="{StaticResource RotationIconOutline}"/>
+                    <StackPanel Orientation="Horizontal" Margin="5,0">
+                        <Grid Width="20" Height="20">
+                            <TextBlock Text="{Binding Letter}" Style="{StaticResource Numeral}" FontSize="12"
+                                       Foreground="{Binding DataContext.ElementText, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                       Visibility="{Binding IconPath, Converter={StaticResource MissingIcon}, ConverterParameter={x:Static local:OverviewImageSizes.Skill}}"/>
+                            <Rectangle Fill="{Binding DataContext.ElementText, RelativeSource={RelativeSource AncestorType=UserControl}}">
+                                <Rectangle.OpacityMask>
+                                    <ImageBrush ImageSource="{Binding IconPath, Converter={StaticResource IconImage}, ConverterParameter={x:Static local:OverviewImageSizes.Skill}}"
+                                                Stretch="Uniform"/>
+                                </Rectangle.OpacityMask>
+                            </Rectangle>
+                        </Grid>
+                        <TextBlock Text="/" FontFamily="{DynamicResource FontDisplay}" FontSize="12.5" FontWeight="Bold"
+                                   Foreground="{DynamicResource Char_FgSubtle}" VerticalAlignment="Center" Margin="3,0"/>
+                        <Grid Width="20" Height="20">
+                            <TextBlock Text="{Binding AltLetter}" Style="{StaticResource Numeral}" FontSize="12"
+                                       Foreground="{Binding DataContext.ElementText, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                       Visibility="{Binding AltIconPath, Converter={StaticResource MissingIcon}, ConverterParameter={x:Static local:OverviewImageSizes.Skill}}"/>
+                            <Rectangle Fill="{Binding DataContext.ElementText, RelativeSource={RelativeSource AncestorType=UserControl}}">
+                                <Rectangle.OpacityMask>
+                                    <ImageBrush ImageSource="{Binding AltIconPath, Converter={StaticResource IconImage}, ConverterParameter={x:Static local:OverviewImageSizes.Skill}}"
+                                                Stretch="Uniform"/>
+                                </Rectangle.OpacityMask>
+                            </Rectangle>
+                        </Grid>
+                    </StackPanel>
+                </Grid>
+                <Grid Height="28" MinWidth="28" Visibility="{Binding IsText, Converter={StaticResource BoolVis}}">
+                    <Rectangle RadiusX="14" RadiusY="14" Style="{StaticResource RotationTextOutline}"/>
+                    <TextBlock Margin="9,0" FontFamily="{DynamicResource FontDisplay}" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource Char_Fg}"
                                VerticalAlignment="Center" HorizontalAlignment="Center"><Run Text="{Binding Label, Mode=OneWay}"/><Run
+                               Text="{Binding InlineHold, Mode=OneWay}" FontSize="11" Foreground="{DynamicResource Char_FgMuted}"/><Run
                                Text="{Binding InlineCount, Mode=OneWay}" FontSize="11" Foreground="{DynamicResource Char_FgMuted}"/><Run
                                Text="{Binding Marker, Mode=OneWay}"/></TextBlock>
-                </Border>
-                <!-- "×2" on the disc's top-right corner, cut out of the card's surface. -->
+                </Grid>
+                <!-- "×2" on the chip's top-right corner, cut out of the card's surface. -->
                 <Border HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,-5,-7,0" MinWidth="17" Height="14" CornerRadius="7"
                         Padding="3,0" SnapsToDevicePixels="True" Background="{DynamicResource Char_CardBg}"
                         BorderBrush="{Binding DataContext.ElementText, RelativeSource={RelativeSource AncestorType=UserControl}}" BorderThickness="1"
@@ -284,11 +342,19 @@
                     <TextBlock Text="{Binding Count}" FontFamily="{DynamicResource FontDisplay}" FontSize="9.5" FontWeight="Bold"
                                Foreground="{DynamicResource Char_Fg}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                 </Border>
+                <!-- "H" for a held skill on the bottom-right corner: filled, so it never reads as the count. -->
+                <Border HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,-7,-5" MinWidth="14" Height="14" CornerRadius="4"
+                        Padding="3,0" SnapsToDevicePixels="True" Background="{DynamicResource Char_Fg}"
+                        BorderBrush="{DynamicResource Char_CardBg}" BorderThickness="1"
+                        Visibility="{Binding HasHoldTag, Converter={StaticResource BoolVis}}">
+                    <TextBlock Text="{Binding HoldTag}" FontFamily="{DynamicResource FontDisplay}" FontSize="9.5" FontWeight="Bold"
+                               Foreground="{DynamicResource Char_CardBg}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Border>
             </Grid>
         </DataTemplate>
         <!-- One member's turn in a rotation: a ">" before every turn but the first, the portrait (the page's own character
              ringed in its element colour; the name too when the bundle has no portrait), then the chips, which wrap beside
-             the portrait only when a turn is wider than the card. -->
+             the portrait only when a turn is wider than the card, and the page's condition for the turn under them. -->
         <DataTemplate x:Key="RotationStep">
             <DockPanel Margin="0,0,6,4">
                 <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" VerticalAlignment="Top">
@@ -310,13 +376,18 @@
                     <TextBlock Text="{Binding Name}" FontSize="12.5" FontWeight="SemiBold" Foreground="{DynamicResource Char_Fg}"
                                VerticalAlignment="Center" Margin="6,0,0,0" Visibility="{Binding ShowName, Converter={StaticResource BoolVis}}"/>
                 </StackPanel>
-                <ItemsControl ItemsSource="{Binding Chips}" Focusable="False" ItemTemplate="{StaticResource RotationChip}">
-                    <ItemsControl.ItemsPanel>
-                        <ItemsPanelTemplate>
-                            <WrapPanel/>
-                        </ItemsPanelTemplate>
-                    </ItemsControl.ItemsPanel>
-                </ItemsControl>
+                <StackPanel>
+                    <ItemsControl ItemsSource="{Binding Chips}" Focusable="False" ItemTemplate="{StaticResource RotationChip}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <WrapPanel/>
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                    </ItemsControl>
+                    <TextBlock x:Name="StepNote" Text="{Binding Note}" FontSize="11.5" Foreground="{DynamicResource Char_FgSubtle}" TextWrapping="Wrap"
+                               MaxWidth="256" HorizontalAlignment="Left" Margin="5,0,0,2"
+                               Visibility="{Binding HasNote, Converter={StaticResource BoolVis}}"/>
+                </StackPanel>
             </DockPanel>
         </DataTemplate>
         <!-- A plain row inside a card (weapons, guide sections). -->

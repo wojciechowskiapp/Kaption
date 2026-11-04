@@ -55,6 +55,7 @@ namespace GI_Subtitles.Views
         private bool _allTeamHostsShown;
         private bool _canOpenCharacters;
         private string _siteLanguage = "pl";
+        private RotationWords _rotationWords = RotationWords.English;
 
         public CharacterOverviewViewModel(CharacterOverviewModel model)
         {
@@ -121,7 +122,7 @@ namespace GI_Subtitles.Views
             }
 
             Facts = BuildFacts(model, Skills);
-            Teams = model.Teams.Select(t => new TeamCardRow(t)).ToList();
+            Teams = model.Teams.Select(t => new TeamCardRow(t, _rotationWords)).ToList();
             TeamHosts = model.TeamHosts.Select(h => new TeamHostRow(h)).ToList();
             TeammateCards = model.TeammateCards.Count > 0
                 ? model.TeammateCards.Select(t => new TeammateChip(t.Name, t.IconPath)).ToList()
@@ -160,7 +161,11 @@ namespace GI_Subtitles.Views
             foreach (var s in model.Teams.SelectMany(t => t.Rotations).SelectMany(r => r.Steps))
             {
                 IconImages.Load(s.IconPath, OverviewImageSizes.Member);
-                foreach (var a in s.Actions) IconImages.Load(a.IconPath, OverviewImageSizes.Skill);
+                foreach (var a in s.Actions)
+                {
+                    IconImages.Load(a.IconPath, OverviewImageSizes.Skill);
+                    IconImages.Load(a.AltIconPath, OverviewImageSizes.Skill);
+                }
             }
             foreach (var m in model.TeammateCards) IconImages.Load(m.IconPath, OverviewImageSizes.Member);
             foreach (var h in model.TeamHosts) IconImages.Load(h.IconPath, OverviewImageSizes.Member);
@@ -211,6 +216,16 @@ namespace GI_Subtitles.Views
             // The goal values and notes are written in the interface's language too.
             StatGoals = StatGoalRow.For(Model.StatGoals, language);
             Changed(nameof(StatGoals));
+        }
+
+        /// <summary>The flagged rotation chips' tooltip words, from the strings in use; the team cards are rebuilt when they change.</summary>
+        internal void SetRotationWords(RotationWords words)
+        {
+            if (words == null || words == _rotationWords) return;
+            _rotationWords = words;
+            if (!Model.Teams.Any(t => t.Rotations?.Count > 0)) return;
+            Teams = Model.Teams.Select(t => new TeamCardRow(t, words)).ToList();
+            Changed(nameof(Teams));
         }
 
         /// <summary>The host's surface: element text and icons are darkened on light, lightened on dark.</summary>
@@ -326,7 +341,7 @@ namespace GI_Subtitles.Views
         public bool HasBuildSection => HasBuild || Tips.Count > 0 || HasStatGoals;
 
         // ── teams ──
-        public IReadOnlyList<TeamCardRow> Teams { get; }
+        public IReadOnlyList<TeamCardRow> Teams { get; private set; }
         public bool HasTeamCards => Teams.Count > 0;
         public IReadOnlyList<string> Teammates => Model.Teammates;
         public IReadOnlyList<TeammateChip> TeammateCards { get; }
@@ -883,7 +898,7 @@ namespace GI_Subtitles.Views
     /// <summary>A team comp card: members with roles, why it works, and where it comes from.</summary>
     public sealed class TeamCardRow
     {
-        internal TeamCardRow(OverviewTeam team)
+        internal TeamCardRow(OverviewTeam team, RotationWords words = null)
         {
             Name = team.Name;
             Why = team.Why;
@@ -891,7 +906,7 @@ namespace GI_Subtitles.Views
             IsOfficial = Source == "official";
             IsAi = CharacterTeamIndex.IsUpdaterPick(Source); // "ai", "ai+sources", "ai+curated": no source label
             Members = team.Members.Select(m => new TeamMemberRow(m)).ToList();
-            Rotations = (team.Rotations ?? Array.Empty<OverviewRotation>()).Where(r => r?.Steps?.Count > 0).Select(r => new RotationRow(r)).ToList();
+            Rotations = (team.Rotations ?? Array.Empty<OverviewRotation>()).Where(r => r?.Steps?.Count > 0).Select(r => new RotationRow(r, words)).ToList();
         }
 
         public string Name { get; }
@@ -910,11 +925,11 @@ namespace GI_Subtitles.Views
     /// <summary>A rotation on a team card: the members' turns as one wrapping strip, the named combos as footnotes.</summary>
     public sealed class RotationRow
     {
-        internal RotationRow(OverviewRotation rotation)
+        internal RotationRow(OverviewRotation rotation, RotationWords words = null)
         {
             Variant = rotation.Variant ?? "";
             VariantTakesZe = RotationNotation.TakesPolishZe(Variant);
-            Steps = rotation.Steps.Select((s, i) => new RotationStepRow(s, showSeparator: i > 0)).ToList();
+            Steps = rotation.Steps.Select((s, i) => new RotationStepRow(s, showSeparator: i > 0, words)).ToList();
             // "* text", "** text": the marker on the combo's chip, then the combo as the page spells it.
             Footnotes = (rotation.Combos ?? Array.Empty<OverviewRotationCombo>()).Select(c => c.Marker + " " + c.Text).ToList();
             Text = string.Join(" > ", Steps.Select(s => s.Text));
@@ -932,10 +947,10 @@ namespace GI_Subtitles.Views
         public string Text { get; }
     }
 
-    /// <summary>One member's turn: a "&gt;" before every turn but the first, the portrait, then the chips.</summary>
+    /// <summary>One member's turn: a "&gt;" before every turn but the first, the portrait, the chips, then the page's condition.</summary>
     public sealed class RotationStepRow
     {
-        internal RotationStepRow(OverviewRotationStep step, bool showSeparator)
+        internal RotationStepRow(OverviewRotationStep step, bool showSeparator, RotationWords words = null)
         {
             Name = step.MemberName ?? "";
             IconPath = step.IconPath;
@@ -943,8 +958,9 @@ namespace GI_Subtitles.Views
             IsSelf = step.IsSelf;
             ShowName = step.IconUrl == null && step.IconPath == null;
             ShowSeparator = showSeparator;
-            Chips = (step.Actions ?? Array.Empty<OverviewRotationAction>()).Select(a => new RotationChipRow(a)).ToList();
-            Text = Name + ": " + string.Join(", ", Chips.Select(c => c.Text));
+            Chips = (step.Actions ?? Array.Empty<OverviewRotationAction>()).Select(a => new RotationChipRow(a, words)).ToList();
+            Note = step.Note ?? "";
+            Text = Name + ": " + string.Join(", ", Chips.Select(c => c.Text)) + (Note.Length > 0 ? " (" + Note + ")" : "");
         }
 
         /// <summary>English, like every character name.</summary>
@@ -957,31 +973,48 @@ namespace GI_Subtitles.Views
         public bool ShowName { get; }
         public bool ShowSeparator { get; }
         public IReadOnlyList<RotationChipRow> Chips { get; }
-        /// <summary>"Durin: E ×2, Q".</summary>
+        /// <summary>The page's condition on this turn, English as written ("Omit if C6"), a quiet line under the chips.</summary>
+        public string Note { get; }
+        public bool HasNote => Note.Length > 0;
+        /// <summary>"Durin: E ×2, Q", then the condition in brackets.</summary>
         public string Text { get; }
     }
 
     /// <summary>
-    /// One input (<see cref="RotationNotation"/>): E, Q and N as the member's skill icon on a disc where the bundle names one
-    /// (its letter until the icon is on disk), a repeat as a "×2" badge on the disc's corner; any other input as a text chip
-    /// that keeps its count in its text ("N2", "CA ×2") and carries the combo's footnote marker ("Combo*").
+    /// One input (<see cref="RotationNotation"/>): E, Q and N as the member's skill icon on a disc (a choice of two: a pill), "×2"
+    /// top-right and a hold's "H" bottom-right; any other input a text chip ("N2", "CA ×2", "E hold", "E / Q", "Combo*"). An
+    /// optional input has a dashed outline.
     /// </summary>
     public sealed class RotationChipRow
     {
-        internal RotationChipRow(OverviewRotationAction a)
+        internal RotationChipRow(OverviewRotationAction a, RotationWords words = null)
         {
+            string alt = a.Alt ?? "";
             bool hasIcon = a.IconUrl != null || a.IconPath != null;
-            IsIcon = RotationNotation.HasIconSlot(a.Action, hasIcon);
-            Label = RotationNotation.Label(a.Action, a.Count, hasIcon);
-            Count = RotationNotation.Count(a.Action, a.Count, hasIcon);
+            bool altHasIcon = a.AltIconUrl != null || a.AltIconPath != null;
+            IsChoice = alt.Length > 0;
+            IsHeld = a.Hold;
+            IsOptional = a.Optional;
+            IsIcon = RotationNotation.HasIconSlot(a.Action, hasIcon, alt, altHasIcon);
+            Label = RotationNotation.Label(a.Action, a.Count, IsIcon, alt);
+            Letter = RotationNotation.Label(a.Action, 1, hasIcon: true);
+            AltLetter = IsChoice ? RotationNotation.Label(alt, 1, hasIcon: true) : "";
+            Count = RotationNotation.Count(a.Action, a.Count, IsIcon, alt);
             Marker = IsIcon ? "" : a.Marker ?? "";
             IconPath = IsIcon ? a.IconPath : null;
-            Text = RotationNotation.Text(a.Action, a.Count, hasIcon, Marker);
-            Description = string.IsNullOrEmpty(a.Description) ? Text : a.Description;
+            AltIconPath = IsIcon && IsChoice ? a.AltIconPath : null;
+            Text = RotationNotation.Text(a.Action, a.Count, IsIcon, Marker, IsHeld, alt, IsOptional);
+            // The builder's English name, with the flag words in the interface's language ("(opcjonalnie)").
+            Description = !string.IsNullOrEmpty(a.Name)
+                ? RotationNotation.Describe(a.Name, a.AltName, a.Count, a.Marker, RotationNotation.Flags(IsChoice, IsHeld, IsOptional, words))
+                : string.IsNullOrEmpty(a.Description) ? Text : a.Description;
         }
 
-        /// <summary>The disc's letter until its icon is on disk, or the text chip's text: "E", "N", "N2", "CA", "Combo".</summary>
+        /// <summary>The disc's letter until its icon is on disk, or the text chip's text: "E", "N", "N2", "CA", "Combo", "E / Q".</summary>
         public string Label { get; }
+        /// <summary>A pair's letters until their icons are on disk: "E" and "Q".</summary>
+        public string Letter { get; }
+        public string AltLetter { get; }
         /// <summary>"×2" for a repeat; "" for one, and next to an "N2".</summary>
         public string Count { get; }
         /// <summary>The badge on an icon chip's corner.</summary>
@@ -990,13 +1023,26 @@ namespace GI_Subtitles.Views
         public string InlineCount => !IsIcon && Count.Length > 0 ? " " + Count : "";
         /// <summary>"*", "**" on a combo whose text the footnotes spell out.</summary>
         public string Marker { get; }
-        /// <summary>E, Q or N drawn from the member's own skill icon.</summary>
+        /// <summary>E, Q or N drawn from the member's own skill icon (a choice: both icons).</summary>
         public bool IsIcon { get; }
         public bool IsText => !IsIcon;
+        /// <summary>One icon on a disc, or a choice's two icons in one pill.</summary>
+        public bool IsDisc => IsIcon && !IsChoice;
+        public bool IsPair => IsIcon && IsChoice;
         public string IconPath { get; }
-        /// <summary>The chip as plain text: "E ×2", "CA ×2", "N2", "Combo*".</summary>
+        public string AltIconPath { get; }
+        /// <summary>A choice between two inputs ("E / Q").</summary>
+        public bool IsChoice { get; }
+        /// <summary>A held skill: the "H" tag on an icon chip, " hold" after a text chip's label.</summary>
+        public bool IsHeld { get; }
+        public bool HasHoldTag => IsIcon && IsHeld;
+        public string HoldTag => RotationNotation.HoldTag;
+        public string InlineHold => !IsIcon && IsHeld ? " " + RotationNotation.HoldWord : "";
+        /// <summary>The page marks the input optional: a dashed outline.</summary>
+        public bool IsOptional { get; }
+        /// <summary>The chip as plain text: "E ×2", "CA ×2", "N2", "Combo*", "E hold", "E / Q", "(Q)".</summary>
         public string Text { get; }
-        /// <summary>Tooltip and accessible name, as the site's: "Elemental Skill: Passion Overload ×2".</summary>
+        /// <summary>Tooltip and accessible name, as the site's: "Elemental Skill: Passion Overload ×2 (hold)".</summary>
         public string Description { get; }
     }
 

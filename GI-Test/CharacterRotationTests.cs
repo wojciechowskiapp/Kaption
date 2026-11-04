@@ -609,10 +609,10 @@ namespace GI_Test
 
         // ── icons ───────────────────────────────────────────────────────────
 
-        private static readonly byte[] Png = Convert.FromBase64String(
+        internal static readonly byte[] Png = Convert.FromBase64String(
             "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==");
 
-        private sealed class Handler : HttpMessageHandler
+        internal sealed class Handler : HttpMessageHandler
         {
             public readonly List<string> Urls = new List<string>();
             protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage r, CancellationToken ct)

@@ -1270,6 +1270,10 @@ Answer: X: {0}   Y: {1}   W: {2}   H: {3}</sys:String>
     <sys:String x:Key="Char_Rotation" xmlns:sys="clr-namespace:System;assembly=mscorlib">Rotation</sys:String>
     <sys:String x:Key="Char_Rotation_With" xmlns:sys="clr-namespace:System;assembly=mscorlib">with</sys:String>
     <sys:String x:Key="Char_Rotation_WithZe" xmlns:sys="clr-namespace:System;assembly=mscorlib">with</sys:String>
+    <!-- A flagged rotation chip's tooltip ends with these: "(hold, optional)". "hold" is the game's own word. -->
+    <sys:String x:Key="Char_Rotation_Hold" xmlns:sys="clr-namespace:System;assembly=mscorlib">hold</sys:String>
+    <sys:String x:Key="Char_Rotation_Optional" xmlns:sys="clr-namespace:System;assembly=mscorlib">optional</sys:String>
+    <sys:String x:Key="Char_Rotation_Either" xmlns:sys="clr-namespace:System;assembly=mscorlib">either</sys:String>
     <sys:String x:Key="Char_Count_Format" xmlns:sys="clr-namespace:System;assembly=mscorlib">{0} characters</sys:String>
     <sys:String x:Key="Char_CountFiltered_Format" xmlns:sys="clr-namespace:System;assembly=mscorlib">{0} of {1}</sys:String>
     <sys:String x:Key="Char_Loading" xmlns:sys="clr-namespace:System;assembly=mscorlib">Loading characters…</sys:String>
