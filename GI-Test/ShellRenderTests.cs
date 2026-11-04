@@ -486,8 +486,8 @@ namespace GI_Test
             object Find(string n) => window.FindName(n);
             string repo = RepoRoot();
 
-            ((TitleBar)Find("WindowTitleBar")).Subtitle = "v2.5.0";
-            ((Button)Find("VersionChip")).Content = "v2.5.0";
+            ((TitleBar)Find("WindowTitleBar")).Subtitle = "v2.5.1";
+            ((Button)Find("VersionChip")).Content = "v2.5.1";
 
             // State card: Genshin, its hub art, the scene's state.
             var art = Path.Combine(repo, "GI-Subtitles", "Assets", "Ambience", "genshin.jpg");

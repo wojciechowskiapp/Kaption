@@ -24,7 +24,7 @@ namespace GI_Test
     /// (light, at 820×760 and 1280×800 windows) and the tab's loading / empty / error states. States per sample:
     /// full data (AI notes, teams, ambience, images), no AI, no images. Output: %TEMP%\kaption-render\.
     /// Images come from the app's own cache; set KAPTION_RENDER_FETCH=1 to download missing ones first.
-    /// Inconclusive when tools/out holds no character data.
+    /// Inconclusive when tools/out holds no character data, except the goal-table render, which has its own fixture.
     /// </summary>
     [TestClass]
     public class CharacterOverviewRenderTests
@@ -111,6 +111,24 @@ namespace GI_Test
                     Layout(host, 1264, 761);
                     written.Add(Save(Snapshot(host), "tab-characters-1280x800-dark-pl.png"));
                 }
+                foreach (bool dark in new[] { false, true })
+                {
+                    // Settings, Characters: the goal table and the team rank badges scrolled into view, in both palettes.
+                    var page = Page(catalog, "Chiori", out var host, dark);
+                    Layout(host, 1264, 761);
+                    var view = (CharacterOverviewView)((ContentControl)page.FindName("OverviewHost")).Content;
+                    var scroller = (ScrollViewer)view.FindName("Scroller");
+                    view.ScrollTo(scroller.ScrollableHeight); // lays the lower sections out
+                    Layout(host, 1264, 761);
+                    var table = (FrameworkElement)view.FindName("StatGoalsTable");
+                    double top = table.TransformToAncestor(scroller).Transform(new Point(0, 0)).Y;
+                    view.ScrollTo(Math.Max(0, scroller.VerticalOffset + top - 96));
+                    Layout(host, 1264, 761);
+                    written.Add(Save(Snapshot(host), $"tab-characters-1280x800-goals{(dark ? "-dark" : "")}-pl.png"));
+                    Assert.IsTrue(view.ScrollToSection("Teams"));
+                    Layout(host, 1264, 761);
+                    written.Add(Save(Snapshot(host), $"tab-characters-1280x800-teams{(dark ? "-dark" : "")}-pl.png"));
+                }
                 foreach (var state in new[] { CharactersPage.PageState.Loading, CharactersPage.PageState.Empty, CharactersPage.PageState.Error })
                 {
                     var page = Page(CharacterCatalog.Empty, null, out var host);
@@ -191,6 +209,174 @@ namespace GI_Test
                 }
             });
             foreach (string p in written) Console.WriteLine(p);
+        }
+
+        /// <summary>
+        /// Goal stats and team ranks from a built-in fixture (no tools/out needed): the goal table in the build section and
+        /// the rank badges on the team cards and the "Gra też w drużynach" row, in the popup (dark) and on the page (light
+        /// and dark), Polish and English. Writes char-goals-*.png (whole page, the table, the teams).
+        /// </summary>
+        [TestMethod]
+        public void RendersTheGoalTableAndRankBadges()
+        {
+            const string dash = "\u2013", thin = "\u202F";
+            var catalog = CharacterStatGoalsTests.Genshin();
+            var written = new List<string>();
+            var contrast = new List<string>();
+            RunSta(() =>
+            {
+                foreach (var (dark, popup, lang) in new[] { (true, true, "pl-PL"), (false, false, "pl-PL"), (false, false, "en-US"), (true, false, "pl-PL") })
+                {
+                    var model = CharacterOverviewBuilder.Build(catalog.Find(CharacterStatGoalsTests.Chiori), catalog, null);
+                    var (host, view) = GoalHost(model, dark, popup, lang);
+                    string name = $"char-goals-{(popup ? "popup" : dark ? "page-dark" : "page")}-{lang.Substring(0, 2)}";
+                    bool polish = lang == "pl-PL";
+
+                    var table = (FrameworkElement)view.FindName("StatGoalsTable");
+                    Assert.IsTrue(Shown(table), $"{name}: the goal table shows");
+                    // Values are drawn in runs (with a spacer before each thousands gap); their accessible name is the text.
+                    var texts = Descendants<TextBlock>(table).Where(Shown)
+                        .Select(t => System.Windows.Automation.AutomationProperties.GetName(t) is { Length: > 0 } n ? n : t.Text).ToList();
+                    string thousands = polish ? "2" + thin + "500" + dash + "3" + thin + "000+" : "2,500" + dash + "3,000+";
+                    foreach (string expected in new[] { "CRIT Rate", "CRIT DMG", "DEF", "Energy Recharge", "60" + dash + "70%", "120%+", thousands, "100" + dash + "130%" })
+                        CollectionAssert.Contains(texts, expected, $"{name}: {string.Join(" | ", texts)}");
+                    string note = Descendants<TextBlock>(table).Where(Shown)
+                        .Select(t => System.Windows.Automation.AutomationProperties.GetName(t)).FirstOrDefault(n => n.StartsWith("Fluttering", StringComparison.Ordinal));
+                    Assert.AreEqual(polish ? "Fluttering Hasode (E) liczy obrażenia z DEF i ATK." : "Fluttering Hasode (E) scales with DEF and ATK.", note, name);
+
+                    // The thousands gaps: one spacer before each U+202F in Polish, none in English; the runs keep the text.
+                    var value = Descendants<TextBlock>(table).Single(t => System.Windows.Automation.AutomationProperties.GetName(t) == thousands);
+                    Assert.AreEqual(polish ? 2 : 0, value.Inlines.OfType<System.Windows.Documents.InlineUIContainer>().Count(), name);
+                    Assert.AreEqual(thousands, string.Concat(value.Inlines.OfType<System.Windows.Documents.Run>().Select(r => r.Text)), name);
+
+                    var teams = (FrameworkElement)view.FindName("Section_Teams");
+                    var badges = Descendants<TextBlock>(teams).Where(Shown).Where(t => t.Text.Length == 2 && t.Text[0] == 'C' && char.IsDigit(t.Text[1])).ToList();
+                    CollectionAssert.AreEquivalent(new[] { "C0", "C6", "C1" }, badges.Select(b => b.Text).ToList(), $"{name}: Navia C0, Gorou C6, and C1 on the Navia row");
+
+                    var full = Snapshot(host);
+                    written.Add(Save(full, name + ".png"));
+                    written.Add(Save(Crop(full, table, host), name + "-table.png"));
+                    written.Add(Save(Crop(full, teams, host), name + "-teams.png"));
+
+                    var card = Color.FromRgb(0, 0, 0);
+                    if (view.TryFindResource("Char_CardBg") is SolidColorBrush bg) card = bg.Color;
+                    foreach (var badge in badges.Take(1))
+                        contrast.Add($"{name}: badge {Fg(badge.Foreground)} on card {card}, {ContrastRatio(RelativeLuminance(Fg(badge.Foreground)), RelativeLuminance(card)):0.00}:1");
+                }
+            });
+            foreach (string line in contrast) Console.WriteLine(line);
+            foreach (string p in written) Console.WriteLine(p);
+        }
+
+        /// <summary>
+        /// Rotations from a built-in fixture (no tools/out): Varka's card with the owner's example and a second rotation, popup
+        /// and page, both palettes, PL and EN; Chiori's Geo card with the skill icons the app's cache holds. Writes
+        /// char-rotations-*.png and a -team close-up of each; checks "ze Skirk" / "with Skirk".
+        /// </summary>
+        [TestMethod]
+        public void RendersTeamRotations()
+        {
+            var catalog = CharacterRotationTests.Genshin();
+            var cache = CharacterImageCache.ForGame("Genshin");
+            var written = new List<string>();
+            var icons = new List<string>();
+            // A text built from runs (the tag "z" + " " + "Prune", a chip "CA" + " ×2") has no Text of its own: read the runs.
+            static string TextOf(TextBlock t) =>
+                t.Text.Length > 0 ? t.Text : string.Concat(t.Inlines.OfType<System.Windows.Documents.Run>().Select(r => r.Text));
+            RunSta(() =>
+            {
+                foreach (var (id, name, dark, popup, lang) in new[]
+                         {
+                             (CharacterRotationTests.Varka, "char-rotations-popup-pl", true, true, "pl-PL"),
+                             (CharacterRotationTests.Varka, "char-rotations-page-pl", false, false, "pl-PL"),
+                             (CharacterRotationTests.Varka, "char-rotations-page-en", false, false, "en-US"),
+                             (CharacterRotationTests.Varka, "char-rotations-page-dark-pl", true, false, "pl-PL"),
+                             (CharacterRotationTests.Chiori, "char-rotations-icons-popup-pl", true, true, "pl-PL"),
+                             (CharacterRotationTests.Chiori, "char-rotations-icons-page-pl", false, false, "pl-PL"),
+                         })
+                {
+                    var model = CharacterOverviewBuilder.Build(catalog.Find(id), catalog, null);
+                    CharacterIcons.ApplyCached(model, cache);
+                    if (Fetch) Task.Run(() => CharacterIcons.FetchMissingAsync(model, cache)).Wait(TimeSpan.FromSeconds(60));
+                    CharacterOverviewViewModel.PrepareVisuals(model);
+                    var (host, view) = GoalHost(model, dark, popup, lang);
+                    bool polish = lang == "pl-PL";
+
+                    var teams = (FrameworkElement)view.FindName("Section_Teams");
+                    var strip = Descendants<ItemsControl>(teams).Single(i => i.Name == "TeamRotations");
+                    Assert.IsTrue(Shown(strip), $"{name}: the rotations show under the team's why");
+                    var texts = Descendants<TextBlock>(strip).Where(Shown).Select(TextOf).ToList();
+                    string all = string.Join(" | ", texts);
+                    Assert.AreEqual(2, texts.Count(t => t == (polish ? "Rotacja" : "Rotation")), $"{name}: a heading per rotation: {all}");
+                    Assert.AreEqual(5, texts.Count(t => t == ">"), $"{name}: a > between turns (3 + 2): {all}");
+                    if (id == CharacterRotationTests.Varka)
+                    {
+                        CollectionAssert.Contains(texts, polish ? "z Prune" : "with Prune", all);
+                        Assert.AreEqual(2, texts.Count(t => t == "* " + CharacterRotationTests.VarkaCombo), $"{name}: the combo footnote: {all}");
+                        foreach (string chip in new[] { "CA ×2", "D", "P", "Combo*" })
+                            CollectionAssert.Contains(texts, chip, $"{name}: {all}");
+                        Assert.AreEqual(2, texts.Count(t => t == "×2"), $"{name}: the badges on Durin's E and Varka's N: {all}");
+                    }
+
+                    // Never wider than the card: every turn sits inside the strip, wrapping instead of scrolling.
+                    foreach (var turn in Descendants<DockPanel>(strip).Where(Shown))
+                    {
+                        var box = turn.TransformToAncestor(strip).TransformBounds(new Rect(turn.RenderSize));
+                        Assert.IsTrue(box.Right <= strip.ActualWidth + 0.5, $"{name}: a turn ends at {box.Right:0.#} in a {strip.ActualWidth:0.#} px strip");
+                    }
+
+                    var discs = ((CharacterOverviewViewModel)view.DataContext).Teams.SelectMany(t => t.Rotations)
+                        .SelectMany(r => r.Steps).SelectMany(s => s.Chips).Where(c => c.IsIcon).ToList();
+                    icons.Add($"{name}: {discs.Count(c => c.IconPath != null)} of {discs.Count} icon chips drawn from cached skill icons");
+
+                    var full = Snapshot(host);
+                    written.Add(Save(full, name + ".png"));
+                    written.Add(Save(Crop(full, teams, host), name + "-team.png"));
+                }
+
+                // "ze" before a name like Skirk, as the site's plWith; English says "with" either way.
+                string skirk = "[ { \"variant\": \"Skirk\", \"steps\": [ { \"member\": \"" + CharacterRotationTests.Durin + "\", \"actions\": [ { \"a\": \"E\" } ] } ] } ]";
+                var withSkirk = CharacterRotationTests.Genshin(skirk);
+                foreach (var (lang, expected) in new[] { ("pl-PL", "ze Skirk"), ("en-US", "with Skirk") })
+                {
+                    var model = CharacterOverviewBuilder.Build(withSkirk.Find(CharacterRotationTests.Varka), withSkirk, null);
+                    var (_, view) = GoalHost(model, false, false, lang);
+                    var strip = Descendants<ItemsControl>((FrameworkElement)view.FindName("Section_Teams")).Single(i => i.Name == "TeamRotations");
+                    var tags = Descendants<TextBlock>(strip).Where(Shown).Select(TextOf).ToList();
+                    CollectionAssert.Contains(tags, expected, string.Join(" | ", tags));
+                }
+            });
+            foreach (string line in icons) Console.WriteLine(line);
+            foreach (string p in written) Console.WriteLine(p);
+        }
+
+        private static (Border Host, CharacterOverviewView View) GoalHost(CharacterOverviewModel model, bool dark, bool popup, string lang)
+        {
+            var view = new CharacterOverviewView(model);
+            var host = new Border
+            {
+                Background = new SolidColorBrush(dark ? Color.FromRgb(0x0B, 0x0D, 0x17) : Colors.White),
+                Child = view,
+                UseLayoutRounding = true,
+            };
+            if (dark) TextOptions.SetTextFormattingMode(host, TextFormattingMode.Display);
+            foreach (var d in Strings(lang)) host.Resources.MergedDictionaries.Add(d);
+            host.Resources.MergedDictionaries.Add(Dictionary($"Themes/Palette.{(dark ? "Dark" : "Light")}.xaml"));
+            host.Resources.MergedDictionaries.Add(Dictionary($"Resources/CharacterPalette{(dark ? "Dark" : "Light")}.xaml"));
+            host.Resources.MergedDictionaries.Add(Dictionary($"Resources/CharacterLayout{(popup ? "Popup" : "Page")}.xaml"));
+            Layout(host, popup ? PopupWidth : DetailWidth);
+            return (host, view);
+        }
+
+        // The element's box on the whole-page render, with a margin, for a close-up.
+        private static BitmapSource Crop(BitmapSource full, FrameworkElement element, FrameworkElement host, double pad = 12)
+        {
+            var box = element.TransformToAncestor(host).TransformBounds(new Rect(element.RenderSize));
+            box.Inflate(pad, pad);
+            box.Intersect(new Rect(0, 0, full.PixelWidth, full.PixelHeight));
+            var crop = new CroppedBitmap(full, new Int32Rect((int)box.X, (int)box.Y, (int)box.Width, (int)box.Height));
+            crop.Freeze();
+            return crop;
         }
 
         // ── hosts ───────────────────────────────────────────────────────────
@@ -425,8 +611,40 @@ namespace GI_Test
                         ["source"] = "ai",
                         ["members"] = Ids(self, CharId("Navia"), CharId("Zhongli"), CharId("Gorou")),
                         ["roles"] = new JsonObject { [self] = Text("Sub DPS", "Drugi DPS"), [CharId("Gorou")] = Text("Buffer", "Wzmocnienia") },
-                        ["why"] = Text("Gorou's buffs need a full Geo team.", "Gorou wzmacnia tylko pełną drużynę Geo."),
+                        ["why"] = Text("Gorou's buffs need a full Geo team. Navia works at C0; Gorou at C6 adds Geo CRIT DMG.",
+                            "Gorou wzmacnia tylko pełną drużynę Geo. Navii wystarczy C0, a Gorou z C6 dokłada Geo CRIT DMG."),
+                        // The rank the team assumes per member (teams v3): badges after the names.
+                        ["ranks"] = new JsonObject { [CharId("Navia")] = 0, [CharId("Gorou")] = 6 },
+                        // Rotations (round 3): two strips under the why, the second with a variant tag and a combo footnote.
+                        ["rotations"] = JsonNode.Parse($$"""
+                            [ { "variant": null,
+                                "steps": [ { "member": "{{CharId("Zhongli")}}", "actions": [ { "a": "E" } ] },
+                                           { "member": "{{CharId("Gorou")}}", "actions": [ { "a": "E" }, { "a": "Q" } ] },
+                                           { "member": "{{self}}", "actions": [ { "a": "E" }, { "a": "Q" } ] },
+                                           { "member": "{{CharId("Navia")}}", "actions": [ { "a": "Q" }, { "a": "E" }, { "a": "N", "n": 2 }, { "a": "E", "n": 2 } ] } ] },
+                              { "variant": "Gorou",
+                                "steps": [ { "member": "{{CharId("Gorou")}}", "actions": [ { "a": "E" }, { "a": "Q" } ] },
+                                           { "member": "{{self}}", "actions": [ { "a": "E" } ] },
+                                           { "member": "{{CharId("Navia")}}", "actions": [ { "a": "E" }, { "a": "combo" } ] } ],
+                                "combo": { "{{CharId("Navia")}}": "N3 > E > N3 > E" } } ]
+                            """),
                     }),
+                // Goal stats (ai.stat_goals): the table in the build section.
+                ["stat_goals"] = JsonNode.Parse(CharacterStatGoalsTests.ChioriGoals),
+            };
+            // Navia's team assumes Chiori at C1: the badge on Chiori's "Gra też w drużynach" row.
+            root["characters"].AsArray().First(c => (string)c["name"] == "Navia").AsObject()["ai"] = new JsonObject
+            {
+                ["model"] = "gpt-6.1-terra",
+                ["teams"] = new JsonArray(new JsonObject
+                {
+                    ["name"] = Text("Crystallize", "Krystalizacja"),
+                    ["source"] = "ai",
+                    ["members"] = Ids(CharId("Navia"), self, CharId("Zhongli")),
+                    ["roles"] = new JsonObject { [self] = Text("Off-field DPS", "DPS z drugiej linii") },
+                    ["why"] = Text("Built around Chiori at C1.", "Drużyna liczy na Chiori z C1."),
+                    ["ranks"] = new JsonObject { [self] = 1 },
+                }),
             };
             var skills = target["skills"].AsArray();
             JsonArray IndicesOf(params string[] kinds) => new JsonArray(skills

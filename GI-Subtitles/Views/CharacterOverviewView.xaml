@@ -177,7 +177,28 @@
                 </Setter.Value>
             </Setter>
         </Style>
-        <!-- One host in "Gra też w drużynach": portrait, name, the host's team and this character's role in it. -->
+        <!-- The rank a team assumes for a member ("C1", "E0", "M2"): the ladder's numeral in a ring of the element colour. -->
+        <Style x:Key="RankBadge" TargetType="Border">
+            <Setter Property="CornerRadius" Value="5"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="BorderBrush" Value="{Binding DataContext.ElementText, RelativeSource={RelativeSource AncestorType=UserControl}}"/>
+            <Setter Property="Padding" Value="4,0,4,0"/>
+            <Setter Property="MinHeight" Value="16"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="SnapsToDevicePixels" Value="True"/>
+            <Setter Property="Focusable" Value="False"/>
+        </Style>
+        <Style x:Key="RankBadgeText" TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="{DynamicResource FontDisplay}"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{Binding DataContext.ElementText, RelativeSource={RelativeSource AncestorType=UserControl}}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+        </Style>
+
+        <!-- One host in "Gra też w drużynach": portrait, name, the host's team and this character's role in it, led by the
+             rank the team assumes for this character. -->
         <DataTemplate x:Key="TeamHostContent">
             <DockPanel>
                 <Grid Width="36" Height="36" DockPanel.Dock="Left" Margin="0,0,12,0" VerticalAlignment="Top">
@@ -197,10 +218,105 @@
                                TextTrimming="CharacterEllipsis"/>
                     <TextBlock Text="{Binding TeamName}" Style="{StaticResource OneLine}" Margin="0,1,0,0"
                                Visibility="{Binding TeamName, Converter={StaticResource EmptyCollapsed}}"/>
-                    <Border Style="{DynamicResource KTag}" Margin="0,6,0,0" Visibility="{Binding Role, Converter={StaticResource EmptyCollapsed}}">
-                        <TextBlock Text="{Binding Role}" Style="{DynamicResource KTagText}" TextWrapping="Wrap" Margin="0,2"/>
-                    </Border>
+                    <DockPanel Margin="0,6,0,0" Visibility="{Binding HasRoleLine, Converter={StaticResource BoolVis}}">
+                        <Border DockPanel.Dock="Left" Style="{StaticResource RankBadge}" MinHeight="22" Margin="0,0,6,0" VerticalAlignment="Top"
+                                Visibility="{Binding HasRank, Converter={StaticResource BoolVis}}">
+                            <TextBlock Text="{Binding RankLabel}" Style="{StaticResource RankBadgeText}"/>
+                        </Border>
+                        <Border Style="{DynamicResource KTag}" Visibility="{Binding Role, Converter={StaticResource EmptyCollapsed}}">
+                            <TextBlock Text="{Binding Role}" Style="{DynamicResource KTagText}" TextWrapping="Wrap" Margin="0,2"/>
+                        </Border>
+                    </DockPanel>
                 </StackPanel>
+            </DockPanel>
+        </DataTemplate>
+        <!-- The rotation's variant tag: "z" or "ze" before the name in Polish, "with" in English. -->
+        <Style x:Key="RotationWith" TargetType="Run">
+            <Setter Property="Text" Value="{DynamicResource Char_Rotation_With}"/>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding VariantTakesZe}" Value="True">
+                    <Setter Property="Text" Value="{DynamicResource Char_Rotation_WithZe}"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <!-- One input of a rotation: E, Q and N as the member's skill icon on a disc in the page's element colour where the
+             bundle names one (the letter until it is on disk), a repeat as a "×2" badge on the disc's corner; any other
+             input as a text chip that keeps its count ("N2", "CA ×2") and the combo's footnote marker ("Combo*"). -->
+        <DataTemplate x:Key="RotationChip">
+            <Grid Background="Transparent" ToolTip="{Binding Description}" AutomationProperties.Name="{Binding Description}">
+                <Grid.Style>
+                    <Style TargetType="Grid">
+                        <Setter Property="Margin" Value="5,0,0,4"/>
+                        <Style.Triggers>
+                            <!-- Room for the badge, which hangs past the disc's right edge. -->
+                            <DataTrigger Binding="{Binding HasBadge}" Value="True">
+                                <Setter Property="Margin" Value="5,0,7,4"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Grid.Style>
+                <Grid Width="28" Height="28" Visibility="{Binding IsIcon, Converter={StaticResource BoolVis}}">
+                    <Ellipse Fill="{Binding DataContext.ElementWash, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                             Stroke="{Binding DataContext.ElementSoft, RelativeSource={RelativeSource AncestorType=UserControl}}" StrokeThickness="1"/>
+                    <TextBlock Text="{Binding Label}" Style="{StaticResource Numeral}" FontSize="12.5"
+                               Foreground="{Binding DataContext.ElementText, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                               Visibility="{Binding IconPath, Converter={StaticResource MissingIcon}, ConverterParameter={x:Static local:OverviewImageSizes.Skill}}"/>
+                    <Rectangle Margin="4" Fill="{Binding DataContext.ElementText, RelativeSource={RelativeSource AncestorType=UserControl}}">
+                        <Rectangle.OpacityMask>
+                            <ImageBrush ImageSource="{Binding IconPath, Converter={StaticResource IconImage}, ConverterParameter={x:Static local:OverviewImageSizes.Skill}}"
+                                        Stretch="Uniform"/>
+                        </Rectangle.OpacityMask>
+                    </Rectangle>
+                </Grid>
+                <Border Height="28" MinWidth="28" CornerRadius="14" Padding="9,0" SnapsToDevicePixels="True"
+                        Background="{DynamicResource Char_ChipBg}" BorderBrush="{DynamicResource Char_Ring}" BorderThickness="1"
+                        Visibility="{Binding IsText, Converter={StaticResource BoolVis}}">
+                    <TextBlock FontFamily="{DynamicResource FontDisplay}" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource Char_Fg}"
+                               VerticalAlignment="Center" HorizontalAlignment="Center"><Run Text="{Binding Label, Mode=OneWay}"/><Run
+                               Text="{Binding InlineCount, Mode=OneWay}" FontSize="11" Foreground="{DynamicResource Char_FgMuted}"/><Run
+                               Text="{Binding Marker, Mode=OneWay}"/></TextBlock>
+                </Border>
+                <!-- "×2" on the disc's top-right corner, cut out of the card's surface. -->
+                <Border HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,-5,-7,0" MinWidth="17" Height="14" CornerRadius="7"
+                        Padding="3,0" SnapsToDevicePixels="True" Background="{DynamicResource Char_CardBg}"
+                        BorderBrush="{Binding DataContext.ElementText, RelativeSource={RelativeSource AncestorType=UserControl}}" BorderThickness="1"
+                        Visibility="{Binding HasBadge, Converter={StaticResource BoolVis}}">
+                    <TextBlock Text="{Binding Count}" FontFamily="{DynamicResource FontDisplay}" FontSize="9.5" FontWeight="Bold"
+                               Foreground="{DynamicResource Char_Fg}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Border>
+            </Grid>
+        </DataTemplate>
+        <!-- One member's turn in a rotation: a ">" before every turn but the first, the portrait (the page's own character
+             ringed in its element colour; the name too when the bundle has no portrait), then the chips, which wrap beside
+             the portrait only when a turn is wider than the card. -->
+        <DataTemplate x:Key="RotationStep">
+            <DockPanel Margin="0,0,6,4">
+                <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" VerticalAlignment="Top">
+                    <TextBlock Text="&gt;" FontSize="15" Foreground="{DynamicResource Char_FgSubtle}" VerticalAlignment="Center"
+                               Margin="0,0,8,1" Visibility="{Binding ShowSeparator, Converter={StaticResource BoolVis}}"/>
+                    <Grid Width="28" Height="28" Background="Transparent" ToolTip="{Binding Name}" AutomationProperties.Name="{Binding Name}">
+                        <Ellipse Fill="{DynamicResource Char_ChipBg}" Stroke="{DynamicResource Char_Ring}" StrokeThickness="1"/>
+                        <TextBlock Text="{Binding Initial}" Style="{StaticResource Numeral}" FontSize="12" Foreground="{DynamicResource Char_FgMuted}"
+                                   Visibility="{Binding IconPath, Converter={StaticResource MissingIcon}, ConverterParameter={x:Static local:OverviewImageSizes.Member}}"/>
+                        <Ellipse Margin="1">
+                            <Ellipse.Fill>
+                                <ImageBrush ImageSource="{Binding IconPath, Converter={StaticResource IconImage}, ConverterParameter={x:Static local:OverviewImageSizes.Member}}"
+                                            Stretch="UniformToFill"/>
+                            </Ellipse.Fill>
+                        </Ellipse>
+                        <Ellipse StrokeThickness="1.5" Visibility="{Binding IsSelf, Converter={StaticResource BoolVis}}"
+                                 Stroke="{Binding DataContext.ElementText, RelativeSource={RelativeSource AncestorType=UserControl}}"/>
+                    </Grid>
+                    <TextBlock Text="{Binding Name}" FontSize="12.5" FontWeight="SemiBold" Foreground="{DynamicResource Char_Fg}"
+                               VerticalAlignment="Center" Margin="6,0,0,0" Visibility="{Binding ShowName, Converter={StaticResource BoolVis}}"/>
+                </StackPanel>
+                <ItemsControl ItemsSource="{Binding Chips}" Focusable="False" ItemTemplate="{StaticResource RotationChip}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel/>
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                </ItemsControl>
             </DockPanel>
         </DataTemplate>
         <!-- A plain row inside a card (weapons, guide sections). -->
@@ -756,6 +872,44 @@
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
 
+                        <!-- Goal stats: a small table, the stat as the game names it, the value to aim for and a quiet note
+                             under the value. Numbers follow the interface language. -->
+                        <TextBlock Text="{DynamicResource Char_GoalStats}" Style="{StaticResource Label}"
+                                   Visibility="{Binding HasStatGoals, Converter={StaticResource BoolVis}}"/>
+                        <Border x:Name="StatGoalsTable" Style="{StaticResource Card}" Padding="20,4"
+                                Visibility="{Binding HasStatGoals, Converter={StaticResource BoolVis}}">
+                            <ItemsControl ItemsSource="{Binding StatGoals}" Focusable="False" Grid.IsSharedSizeScope="True"
+                                          AutomationProperties.Name="{DynamicResource Char_GoalStats}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border x:Name="Rule" BorderBrush="{DynamicResource Char_Divider}" BorderThickness="0,1,0,0"
+                                                Padding="0,10,0,10" AutomationProperties.Name="{Binding AutomationName}">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto" SharedSizeGroup="GoalStat"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Text="{Binding Stat}" FontSize="13" Foreground="{DynamicResource Char_FgMuted}"
+                                                           TextWrapping="Wrap" MaxWidth="200" VerticalAlignment="Top" Margin="0,2,16,0"/>
+                                                <StackPanel Grid.Column="1">
+                                                    <TextBlock local:GoalValueText.Text="{Binding Value}" FontFamily="{DynamicResource FontDisplay}" FontSize="14.5"
+                                                               FontWeight="SemiBold" Foreground="{DynamicResource Char_Fg}"
+                                                               Typography.NumeralAlignment="Tabular"/>
+                                                    <TextBlock local:SkillChipText.Text="{Binding Note}" Style="{StaticResource Muted}" FontSize="12.5"
+                                                               Margin="0,2,0,0" Visibility="{Binding HasNote, Converter={StaticResource BoolVis}}"/>
+                                                </StackPanel>
+                                            </Grid>
+                                        </Border>
+                                        <DataTemplate.Triggers>
+                                            <DataTrigger Binding="{Binding IsFirst}" Value="True">
+                                                <Setter TargetName="Rule" Property="BorderThickness" Value="0"/>
+                                            </DataTrigger>
+                                        </DataTemplate.Triggers>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </Border>
+
                         <TextBlock local:Loc.Key="{Binding WeaponsKey}" Style="{StaticResource Label}"
                                    Visibility="{Binding Weapons, Converter={StaticResource EmptyCollapsed}}"/>
                         <Border Style="{StaticResource Card}" Padding="6" Visibility="{Binding Weapons, Converter={StaticResource EmptyCollapsed}}">
@@ -997,8 +1151,13 @@
                                                                         </Ellipse.Fill>
                                                                     </Ellipse>
                                                                 </Grid>
-                                                                <TextBlock Text="{Binding Name}" FontSize="12.5" FontWeight="SemiBold" Foreground="{DynamicResource Char_Fg}"
-                                                                           TextAlignment="Center" TextWrapping="Wrap" Margin="0,8,0,0"/>
+                                                                <!-- The rank the team assumes for this member follows the name, as a badge. -->
+                                                                <TextBlock FontSize="12.5" FontWeight="SemiBold" Foreground="{DynamicResource Char_Fg}"
+                                                                           TextAlignment="Center" TextWrapping="Wrap" Margin="0,8,0,0"><Run
+                                                                     Text="{Binding Name, Mode=OneWay}"/><InlineUIContainer BaselineAlignment="Center"><Border
+                                                                     Style="{StaticResource RankBadge}" Margin="5,0,0,0"
+                                                                     Visibility="{Binding HasRank, Converter={StaticResource BoolVis}}"><TextBlock
+                                                                     Text="{Binding RankLabel}" Style="{StaticResource RankBadgeText}"/></Border></InlineUIContainer></TextBlock>
                                                                 <TextBlock Text="{Binding Role}" FontSize="11.5" Foreground="{DynamicResource Char_FgMuted}"
                                                                            TextAlignment="Center" TextWrapping="Wrap"
                                                                            Visibility="{Binding Role, Converter={StaticResource EmptyCollapsed}}"/>
@@ -1008,6 +1167,45 @@
                                                 </ItemsControl>
                                                 <TextBlock Text="{Binding Why}" Style="{StaticResource Muted}" Margin="0,14,0,0"
                                                            Visibility="{Binding Why, Converter={StaticResource EmptyCollapsed}}"/>
+                                                <!-- Rotations a guide states for the team: a heading with the member it is for when the page
+                                                     offers alternatives, the turns as one wrapping strip, the named combo spelled out under it. -->
+                                                <ItemsControl x:Name="TeamRotations" ItemsSource="{Binding Rotations}" Focusable="False" Margin="0,14,0,0"
+                                                              Visibility="{Binding HasRotations, Converter={StaticResource BoolVis}}">
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate>
+                                                            <Border BorderBrush="{DynamicResource Char_Divider}" BorderThickness="0,1,0,0" Padding="0,12,0,4">
+                                                                <StackPanel>
+                                                                    <WrapPanel>
+                                                                        <TextBlock Text="{DynamicResource Char_Rotation}" FontSize="12.5" FontWeight="SemiBold"
+                                                                                   Foreground="{DynamicResource Char_FgMuted}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                                                        <Border Style="{DynamicResource KTag}" Visibility="{Binding HasVariant, Converter={StaticResource BoolVis}}">
+                                                                            <!-- "z Prune", but "ze Skirk" (VariantTakesZe); English says "with" either way. -->
+                                                                            <TextBlock Style="{DynamicResource KTagText}"><Run Style="{StaticResource RotationWith}"/><Run
+                                                                                       Text=" "/><Run Text="{Binding Variant, Mode=OneWay}"/></TextBlock>
+                                                                        </Border>
+                                                                    </WrapPanel>
+                                                                    <ItemsControl ItemsSource="{Binding Steps}" Focusable="False" Margin="0,10,0,0"
+                                                                                  ItemTemplate="{StaticResource RotationStep}" AutomationProperties.Name="{Binding Text}">
+                                                                        <ItemsControl.ItemsPanel>
+                                                                            <ItemsPanelTemplate>
+                                                                                <WrapPanel/>
+                                                                            </ItemsPanelTemplate>
+                                                                        </ItemsControl.ItemsPanel>
+                                                                    </ItemsControl>
+                                                                    <ItemsControl ItemsSource="{Binding Footnotes}" Focusable="False" Margin="0,2,0,0"
+                                                                                  Visibility="{Binding HasFootnotes, Converter={StaticResource BoolVis}}">
+                                                                        <ItemsControl.ItemTemplate>
+                                                                            <DataTemplate>
+                                                                                <TextBlock Text="{Binding}" FontSize="12" Foreground="{DynamicResource Char_FgMuted}"
+                                                                                           TextWrapping="Wrap" Margin="0,0,0,2"/>
+                                                                            </DataTemplate>
+                                                                        </ItemsControl.ItemTemplate>
+                                                                    </ItemsControl>
+                                                                </StackPanel>
+                                                            </Border>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
                                             </StackPanel>
                                         </Border>
                                     </DataTemplate>
@@ -1060,7 +1258,7 @@
                                         <DataTemplate>
                                             <Grid>
                                                 <Button Style="{StaticResource CardButton}" Tag="{Binding HostId}" Click="TeamHost_Click"
-                                                        ToolTip="{DynamicResource Char_PlaysIn_Open}" AutomationProperties.Name="{Binding HostName}"
+                                                        ToolTip="{DynamicResource Char_PlaysIn_Open}" AutomationProperties.Name="{Binding AutomationName}"
                                                         AutomationProperties.HelpText="{Binding TeamName}"
                                                         Visibility="{Binding DataContext.CanOpenCharacters, RelativeSource={RelativeSource AncestorType=ItemsControl}, Converter={StaticResource BoolVis}}">
                                                     <ContentPresenter Content="{Binding}" ContentTemplate="{StaticResource TeamHostContent}"/>

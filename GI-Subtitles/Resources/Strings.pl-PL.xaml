@@ -1067,6 +1067,7 @@
     <sys:String x:Key="Char_Or" xmlns:sys="clr-namespace:System;assembly=mscorlib">lub</sys:String>
     <sys:String x:Key="Char_MainStats" xmlns:sys="clr-namespace:System;assembly=mscorlib">Główne staty</sys:String>
     <sys:String x:Key="Char_SubStats" xmlns:sys="clr-namespace:System;assembly=mscorlib">Substaty</sys:String>
+    <sys:String x:Key="Char_GoalStats" xmlns:sys="clr-namespace:System;assembly=mscorlib">Docelowe staty</sys:String>
     <sys:String x:Key="Char_Weapons" xmlns:sys="clr-namespace:System;assembly=mscorlib">Broń</sys:String>
     <sys:String x:Key="Char_Weapons_genshin" xmlns:sys="clr-namespace:System;assembly=mscorlib">Broń</sys:String>
     <sys:String x:Key="Char_Weapons_starrail" xmlns:sys="clr-namespace:System;assembly=mscorlib">Stożki światła</sys:String>
@@ -1131,6 +1132,9 @@
     <sys:String x:Key="Char_TeamSource_official" xmlns:sys="clr-namespace:System;assembly=mscorlib">Oficjalna drużyna</sys:String>
     <sys:String x:Key="Char_TeamSource_Other" xmlns:sys="clr-namespace:System;assembly=mscorlib">Źródło:</sys:String>
     <sys:String x:Key="Char_Teams_Fallback" xmlns:sys="clr-namespace:System;assembly=mscorlib">Gra podpowiada tych towarzyszy.</sys:String>
+    <sys:String x:Key="Char_Rotation" xmlns:sys="clr-namespace:System;assembly=mscorlib">Rotacja</sys:String>
+    <sys:String x:Key="Char_Rotation_With" xmlns:sys="clr-namespace:System;assembly=mscorlib">z</sys:String>
+    <sys:String x:Key="Char_Rotation_WithZe" xmlns:sys="clr-namespace:System;assembly=mscorlib">ze</sys:String>
     <sys:String x:Key="Char_Count_Format" xmlns:sys="clr-namespace:System;assembly=mscorlib">Postaci: {0}</sys:String>
     <sys:String x:Key="Char_CountFiltered_Format" xmlns:sys="clr-namespace:System;assembly=mscorlib">{0} z {1}</sys:String>
     <sys:String x:Key="Char_Loading" xmlns:sys="clr-namespace:System;assembly=mscorlib">Wczytuję postacie…</sys:String>

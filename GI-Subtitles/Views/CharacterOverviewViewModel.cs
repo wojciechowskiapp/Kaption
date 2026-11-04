@@ -100,6 +100,7 @@ namespace GI_Subtitles.Views
                 return new RankedStat { Rank = i + 1, Name = english, Gloss = GlossOf(new[] { english }, GlossInputs(new[] { english }, new[] { s }), "") };
             }).ToList();
             Weapons = model.Weapons.Select(w => new WeaponRow(w, Game)).ToList();
+            StatGoals = StatGoalRow.For(model.StatGoals, _siteLanguage);
 
             // When the whole build is an AI pick the section says so once; otherwise each AI line does.
             Tips = model.Highlights.Select(h => new TipRow(h, Game) { ShowAiTag = h.IsAi && !(model.HasBuild && model.BuildIsAi) }).ToList();
@@ -155,6 +156,12 @@ namespace GI_Subtitles.Views
             foreach (var o in model.SetGroups.SelectMany(g => g.Options)) IconImages.Load(o.IconPath, OverviewImageSizes.Set);
             foreach (var w in model.Weapons) IconImages.Load(w.IconPath, OverviewImageSizes.Weapon);
             foreach (var m in model.Teams.SelectMany(t => t.Members)) IconImages.Load(m.IconPath, OverviewImageSizes.Member);
+            // Rotation portraits are the card's member images; skill chips share the skills list's decode size.
+            foreach (var s in model.Teams.SelectMany(t => t.Rotations).SelectMany(r => r.Steps))
+            {
+                IconImages.Load(s.IconPath, OverviewImageSizes.Member);
+                foreach (var a in s.Actions) IconImages.Load(a.IconPath, OverviewImageSizes.Skill);
+            }
             foreach (var m in model.TeammateCards) IconImages.Load(m.IconPath, OverviewImageSizes.Member);
             foreach (var h in model.TeamHosts) IconImages.Load(h.IconPath, OverviewImageSizes.Member);
             foreach (var h in model.Highlights) IconImages.Load(h.IconPath, OverviewImageSizes.Tip);
@@ -201,6 +208,9 @@ namespace GI_Subtitles.Views
             _siteLanguage = language;
             Changed(nameof(PageUrl));
             Changed(nameof(HasPageUrl));
+            // The goal values and notes are written in the interface's language too.
+            StatGoals = StatGoalRow.For(Model.StatGoals, language);
+            Changed(nameof(StatGoals));
         }
 
         /// <summary>The host's surface: element text and icons are darkened on light, lightened on dark.</summary>
@@ -310,7 +320,10 @@ namespace GI_Subtitles.Views
         public IReadOnlyList<MainStatRow> MainStats { get; }
         public IReadOnlyList<RankedStat> SubStats { get; }
         public IReadOnlyList<WeaponRow> Weapons { get; }
-        public bool HasBuildSection => HasBuild || Tips.Count > 0;
+        /// <summary>Stat values to aim for, in the interface's language; with or without a build.</summary>
+        public IReadOnlyList<StatGoalRow> StatGoals { get; private set; }
+        public bool HasStatGoals => StatGoals.Count > 0;
+        public bool HasBuildSection => HasBuild || Tips.Count > 0 || HasStatGoals;
 
         // ── teams ──
         public IReadOnlyList<TeamCardRow> Teams { get; }
@@ -878,6 +891,7 @@ namespace GI_Subtitles.Views
             IsOfficial = Source == "official";
             IsAi = CharacterTeamIndex.IsUpdaterPick(Source); // "ai", "ai+sources", "ai+curated": no source label
             Members = team.Members.Select(m => new TeamMemberRow(m)).ToList();
+            Rotations = (team.Rotations ?? Array.Empty<OverviewRotation>()).Where(r => r?.Steps?.Count > 0).Select(r => new RotationRow(r)).ToList();
         }
 
         public string Name { get; }
@@ -888,6 +902,102 @@ namespace GI_Subtitles.Views
         public bool IsAi { get; }
         public bool IsOtherSource => !IsOfficial && !IsAi;
         public IReadOnlyList<TeamMemberRow> Members { get; }
+        /// <summary>The rotations a guide states for the team, under the why; empty when it has none.</summary>
+        public IReadOnlyList<RotationRow> Rotations { get; }
+        public bool HasRotations => Rotations.Count > 0;
+    }
+
+    /// <summary>A rotation on a team card: the members' turns as one wrapping strip, the named combos as footnotes.</summary>
+    public sealed class RotationRow
+    {
+        internal RotationRow(OverviewRotation rotation)
+        {
+            Variant = rotation.Variant ?? "";
+            VariantTakesZe = RotationNotation.TakesPolishZe(Variant);
+            Steps = rotation.Steps.Select((s, i) => new RotationStepRow(s, showSeparator: i > 0)).ToList();
+            // "* text", "** text": the marker on the combo's chip, then the combo as the page spells it.
+            Footnotes = (rotation.Combos ?? Array.Empty<OverviewRotationCombo>()).Select(c => c.Marker + " " + c.Text).ToList();
+            Text = string.Join(" > ", Steps.Select(s => s.Text));
+        }
+
+        /// <summary>The member this rotation is for, "with Prune" / "z Prune"; "" when the page offers no alternative.</summary>
+        public string Variant { get; }
+        public bool HasVariant => Variant.Length > 0;
+        /// <summary>Polish reads "ze" before this name ("ze Skirk"); the English strings say "with" either way.</summary>
+        public bool VariantTakesZe { get; }
+        public IReadOnlyList<RotationStepRow> Steps { get; }
+        public IReadOnlyList<string> Footnotes { get; }
+        public bool HasFootnotes => Footnotes.Count > 0;
+        /// <summary>"Durin: E ×2, Q > Prune: E, Q": the strip as plain text (its accessible name).</summary>
+        public string Text { get; }
+    }
+
+    /// <summary>One member's turn: a "&gt;" before every turn but the first, the portrait, then the chips.</summary>
+    public sealed class RotationStepRow
+    {
+        internal RotationStepRow(OverviewRotationStep step, bool showSeparator)
+        {
+            Name = step.MemberName ?? "";
+            IconPath = step.IconPath;
+            Initial = CharacterOverviewViewModel.InitialOf(Name);
+            IsSelf = step.IsSelf;
+            ShowName = step.IconUrl == null && step.IconPath == null;
+            ShowSeparator = showSeparator;
+            Chips = (step.Actions ?? Array.Empty<OverviewRotationAction>()).Select(a => new RotationChipRow(a)).ToList();
+            Text = Name + ": " + string.Join(", ", Chips.Select(c => c.Text));
+        }
+
+        /// <summary>English, like every character name.</summary>
+        public string Name { get; }
+        public string IconPath { get; }
+        public string Initial { get; }
+        /// <summary>The page's own character: its face is ringed in the element colour.</summary>
+        public bool IsSelf { get; }
+        /// <summary>The bundle has no portrait for this member: the name follows the initial.</summary>
+        public bool ShowName { get; }
+        public bool ShowSeparator { get; }
+        public IReadOnlyList<RotationChipRow> Chips { get; }
+        /// <summary>"Durin: E ×2, Q".</summary>
+        public string Text { get; }
+    }
+
+    /// <summary>
+    /// One input (<see cref="RotationNotation"/>): E, Q and N as the member's skill icon on a disc where the bundle names one
+    /// (its letter until the icon is on disk), a repeat as a "×2" badge on the disc's corner; any other input as a text chip
+    /// that keeps its count in its text ("N2", "CA ×2") and carries the combo's footnote marker ("Combo*").
+    /// </summary>
+    public sealed class RotationChipRow
+    {
+        internal RotationChipRow(OverviewRotationAction a)
+        {
+            bool hasIcon = a.IconUrl != null || a.IconPath != null;
+            IsIcon = RotationNotation.HasIconSlot(a.Action, hasIcon);
+            Label = RotationNotation.Label(a.Action, a.Count, hasIcon);
+            Count = RotationNotation.Count(a.Action, a.Count, hasIcon);
+            Marker = IsIcon ? "" : a.Marker ?? "";
+            IconPath = IsIcon ? a.IconPath : null;
+            Text = RotationNotation.Text(a.Action, a.Count, hasIcon, Marker);
+            Description = string.IsNullOrEmpty(a.Description) ? Text : a.Description;
+        }
+
+        /// <summary>The disc's letter until its icon is on disk, or the text chip's text: "E", "N", "N2", "CA", "Combo".</summary>
+        public string Label { get; }
+        /// <summary>"×2" for a repeat; "" for one, and next to an "N2".</summary>
+        public string Count { get; }
+        /// <summary>The badge on an icon chip's corner.</summary>
+        public bool HasBadge => IsIcon && Count.Length > 0;
+        /// <summary>" ×2" after a text chip's label, "" when it has no count.</summary>
+        public string InlineCount => !IsIcon && Count.Length > 0 ? " " + Count : "";
+        /// <summary>"*", "**" on a combo whose text the footnotes spell out.</summary>
+        public string Marker { get; }
+        /// <summary>E, Q or N drawn from the member's own skill icon.</summary>
+        public bool IsIcon { get; }
+        public bool IsText => !IsIcon;
+        public string IconPath { get; }
+        /// <summary>The chip as plain text: "E ×2", "CA ×2", "N2", "Combo*".</summary>
+        public string Text { get; }
+        /// <summary>Tooltip and accessible name, as the site's: "Elemental Skill: Passion Overload ×2".</summary>
+        public string Description { get; }
     }
 
     public sealed class TeamMemberRow
@@ -898,12 +1008,16 @@ namespace GI_Subtitles.Views
             Role = m.Role;
             IconPath = m.IconPath;
             Initial = CharacterOverviewViewModel.InitialOf(m.Name);
+            RankLabel = m.RankLabel ?? "";
         }
 
         public string Name { get; }
         public string Role { get; }
         public string IconPath { get; }
         public string Initial { get; }
+        /// <summary>The rank the team assumes ("C1", "E0", "M2"), a badge after the name; "" for none.</summary>
+        public string RankLabel { get; }
+        public bool HasRank => RankLabel.Length > 0;
     }
 
     /// <summary>One row of "Gra też w drużynach": the host, the host's team and this character's role in it.</summary>
@@ -917,6 +1031,7 @@ namespace GI_Subtitles.Views
             Initial = CharacterOverviewViewModel.InitialOf(host.HostName);
             TeamName = host.TeamName;
             Role = host.Role;
+            RankLabel = host.RankLabel ?? "";
         }
 
         public string HostId { get; }
@@ -925,6 +1040,47 @@ namespace GI_Subtitles.Views
         public string Initial { get; }
         public string TeamName { get; }
         public string Role { get; }
+        /// <summary>The rank the host's team assumes for this character ("C1"), a badge before the role; "" for none.</summary>
+        public string RankLabel { get; }
+        public bool HasRank => RankLabel.Length > 0;
+        public bool HasRoleLine => HasRank || !string.IsNullOrEmpty(Role);
+        /// <summary>What a screen reader says for the card: the host, and the rank its team assumes for this character.</summary>
+        public string AutomationName => HasRank ? $"{HostName}, {RankLabel}" : HostName;
+    }
+
+    /// <summary>One row of the goal table: the stat as the game names it, the value to aim for, a quiet note under it.</summary>
+    public sealed class StatGoalRow
+    {
+        private StatGoalRow(OverviewStatGoal goal, string value, string language, bool isFirst)
+        {
+            Stat = goal.Stat ?? "";
+            Value = value;
+            Note = goal.Note?.PickFor(language) ?? "";
+            IsFirst = isFirst;
+        }
+
+        /// <summary>English, as the game names it.</summary>
+        public string Stat { get; }
+        /// <summary>"2,500–3,000+" / "2 500–3 000+", "200%+", "100–130%".</summary>
+        public string Value { get; }
+        public string Note { get; }
+        public bool HasNote => Note.Length > 0;
+        /// <summary>The first row has no rule above it.</summary>
+        public bool IsFirst { get; }
+        public string AutomationName => HasNote ? $"{Stat}: {Value}. {Note}" : $"{Stat}: {Value}";
+
+        /// <summary>The rows in the data's order; a goal with nothing to write is left out.</summary>
+        internal static IReadOnlyList<StatGoalRow> For(IReadOnlyList<OverviewStatGoal> goals, string language)
+        {
+            var rows = new List<StatGoalRow>();
+            foreach (var g in goals ?? Array.Empty<OverviewStatGoal>())
+            {
+                string value = g?.ValueFor(language) ?? "";
+                if (value.Length == 0 || string.IsNullOrWhiteSpace(g.Stat)) continue;
+                rows.Add(new StatGoalRow(g, value, language, rows.Count == 0));
+            }
+            return rows;
+        }
     }
 
     /// <summary>A teammate chip: portrait when cached, otherwise the initial.</summary>

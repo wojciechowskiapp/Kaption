@@ -1202,6 +1202,7 @@ Answer: X: {0}   Y: {1}   W: {2}   H: {3}</sys:String>
     <sys:String x:Key="Char_Or" xmlns:sys="clr-namespace:System;assembly=mscorlib">or</sys:String>
     <sys:String x:Key="Char_MainStats" xmlns:sys="clr-namespace:System;assembly=mscorlib">Main stats</sys:String>
     <sys:String x:Key="Char_SubStats" xmlns:sys="clr-namespace:System;assembly=mscorlib">Substats</sys:String>
+    <sys:String x:Key="Char_GoalStats" xmlns:sys="clr-namespace:System;assembly=mscorlib">Target stats</sys:String>
     <sys:String x:Key="Char_Weapons" xmlns:sys="clr-namespace:System;assembly=mscorlib">Weapons</sys:String>
     <sys:String x:Key="Char_Weapons_genshin" xmlns:sys="clr-namespace:System;assembly=mscorlib">Weapons</sys:String>
     <sys:String x:Key="Char_Weapons_starrail" xmlns:sys="clr-namespace:System;assembly=mscorlib">Light cones</sys:String>
@@ -1266,6 +1267,9 @@ Answer: X: {0}   Y: {1}   W: {2}   H: {3}</sys:String>
     <sys:String x:Key="Char_TeamSource_official" xmlns:sys="clr-namespace:System;assembly=mscorlib">Official team</sys:String>
     <sys:String x:Key="Char_TeamSource_Other" xmlns:sys="clr-namespace:System;assembly=mscorlib">Source:</sys:String>
     <sys:String x:Key="Char_Teams_Fallback" xmlns:sys="clr-namespace:System;assembly=mscorlib">The game suggests these teammates.</sys:String>
+    <sys:String x:Key="Char_Rotation" xmlns:sys="clr-namespace:System;assembly=mscorlib">Rotation</sys:String>
+    <sys:String x:Key="Char_Rotation_With" xmlns:sys="clr-namespace:System;assembly=mscorlib">with</sys:String>
+    <sys:String x:Key="Char_Rotation_WithZe" xmlns:sys="clr-namespace:System;assembly=mscorlib">with</sys:String>
     <sys:String x:Key="Char_Count_Format" xmlns:sys="clr-namespace:System;assembly=mscorlib">{0} characters</sys:String>
     <sys:String x:Key="Char_CountFiltered_Format" xmlns:sys="clr-namespace:System;assembly=mscorlib">{0} of {1}</sys:String>
     <sys:String x:Key="Char_Loading" xmlns:sys="clr-namespace:System;assembly=mscorlib">Loading characters…</sys:String>

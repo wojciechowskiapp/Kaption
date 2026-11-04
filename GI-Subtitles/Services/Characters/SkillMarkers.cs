@@ -92,6 +92,25 @@ namespace GI_Subtitles.Services.Characters
             return markers;
         }
 
+        /// <summary>The game's letter for a rank: Genshin C(onstellation), Star Rail E(idolon), ZZZ M(indscape); "" otherwise.</summary>
+        public static string RankLetter(string game)
+        {
+            switch ((game ?? "").ToLowerInvariant())
+            {
+                case "genshin": return "C";
+                case "starrail": return "E";
+                case "zzz": return "M";
+                default: return "";
+            }
+        }
+
+        /// <summary>"C1", "E0", "M6"; "" for a game without ranks or a rank outside 0..6.</summary>
+        public static string RankLabel(string game, int rank)
+        {
+            string letter = RankLetter(game);
+            return letter.Length == 0 || rank < 0 || rank > CharacterCatalog.MaxRank ? "" : letter + rank;
+        }
+
         /// <summary>"Name (E)", or the name alone when the kind has no marker.</summary>
         public static string WithMarker(string name, string marker) =>
             string.IsNullOrEmpty(marker) || string.IsNullOrEmpty(name) ? name ?? "" : name + " " + marker;

@@ -23,6 +23,8 @@ namespace GI_Subtitles.Services.Characters
             foreach (var skill in model.Skills) skill.IconPath = cache.CachedPathOrNull(skill.IconUrl);
             foreach (var member in Members(model)) member.IconPath = cache.CachedPathOrNull(member.IconUrl);
             foreach (var host in model.TeamHosts) host.IconPath = cache.CachedPathOrNull(host.IconUrl);
+            foreach (var step in RotationSteps(model)) step.IconPath = cache.CachedPathOrNull(step.IconUrl);
+            foreach (var action in RotationActions(model)) action.IconPath = cache.CachedPathOrNull(action.IconUrl);
             model.SplashPath = cache.CachedPathOrNull(model.SplashUrl);
             model.AmbiencePath = cache.CachedPathOrNull(model.AmbienceUrl);
         }
@@ -50,6 +52,11 @@ namespace GI_Subtitles.Services.Characters
                 jobs.Add(Fetch(cache, member.IconUrl, p => member.IconPath = p));
             foreach (var host in model.TeamHosts.Where(x => x.IconPath == null && x.IconUrl != null))
                 jobs.Add(Fetch(cache, host.IconUrl, p => host.IconPath = p));
+            // A URL repeated across steps and the card above is downloaded once: the cache shares the request in flight.
+            foreach (var step in RotationSteps(model).Where(x => x.IconPath == null && x.IconUrl != null))
+                jobs.Add(Fetch(cache, step.IconUrl, p => step.IconPath = p));
+            foreach (var action in RotationActions(model).Where(x => x.IconPath == null && x.IconUrl != null))
+                jobs.Add(Fetch(cache, action.IconUrl, p => action.IconPath = p));
             if (model.SplashPath == null && model.SplashUrl != null)
                 jobs.Add(Fetch(cache, model.SplashUrl, p => model.SplashPath = p, CharacterImageCache.LargeMaxBytes));
             if (model.AmbiencePath == null && model.AmbienceUrl != null)
@@ -76,5 +83,11 @@ namespace GI_Subtitles.Services.Characters
 
         private static IEnumerable<OverviewTeamMember> Members(CharacterOverviewModel model) =>
             model.Teams.SelectMany(t => t.Members);
+
+        private static IEnumerable<OverviewRotationStep> RotationSteps(CharacterOverviewModel model) =>
+            model.Teams.SelectMany(t => t.Rotations).SelectMany(r => r.Steps);
+
+        private static IEnumerable<OverviewRotationAction> RotationActions(CharacterOverviewModel model) =>
+            RotationSteps(model).SelectMany(s => s.Actions);
     }
 }

@@ -1583,7 +1583,7 @@
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                    <Button x:Name="VersionChip" Style="{StaticResource BarChipButton}" Content="v2.5.0" Click="VersionChip_Click"
+                    <Button x:Name="VersionChip" Style="{StaticResource BarChipButton}" Content="v2.5.1" Click="VersionChip_Click"
                             ToolTip="{DynamicResource shell_Bar_Version_Tip}" AutomationProperties.Name="{DynamicResource shell_Bar_Version_Tip}"/>
                     <Border x:Name="StateChip" Style="{StaticResource Chip}" Margin="8,0,0,0">
                         <StackPanel Orientation="Horizontal">

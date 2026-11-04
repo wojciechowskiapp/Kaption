@@ -102,6 +102,10 @@ namespace GI_Subtitles.Services.Characters
         public string Role { get; set; } = "";
         public string IconUrl { get; set; }
         public string IconPath { get; set; }
+        /// <summary>The constellation / eidolon / mindscape the team assumes for this member (0..6), null when it does not matter.</summary>
+        public int? Rank { get; set; }
+        /// <summary><see cref="Rank"/> with the game's letter ("C1", "E0", "M2"); "" when there is none.</summary>
+        public string RankLabel { get; set; } = "";
     }
 
     /// <summary>A team comp; <see cref="Source"/> is "official", "ai" or another provider's label.</summary>
@@ -111,6 +115,55 @@ namespace GI_Subtitles.Services.Characters
         public string Source { get; set; } = "";
         public string Why { get; set; } = "";
         public IReadOnlyList<OverviewTeamMember> Members { get; set; } = Array.Empty<OverviewTeamMember>();
+        /// <summary>The rotations a guide states for the team, shown under the why; empty when none does.</summary>
+        public IReadOnlyList<OverviewRotation> Rotations { get; set; } = Array.Empty<OverviewRotation>();
+    }
+
+    /// <summary>A rotation on a team card: the members' turns in order and the named combos spelled out.</summary>
+    public sealed class OverviewRotation
+    {
+        /// <summary>The English name of the member this rotation is for ("Prune"), "" when the page offers no alternative.</summary>
+        public string Variant { get; set; } = "";
+        public IReadOnlyList<OverviewRotationStep> Steps { get; set; } = Array.Empty<OverviewRotationStep>();
+        /// <summary>One footnote per member whose combo the strip shows, in step order.</summary>
+        public IReadOnlyList<OverviewRotationCombo> Combos { get; set; } = Array.Empty<OverviewRotationCombo>();
+    }
+
+    public sealed class OverviewRotationStep
+    {
+        public string MemberId { get; set; } = "";
+        /// <summary>English, like every character name.</summary>
+        public string MemberName { get; set; } = "";
+        /// <summary>The page's own character: its face in the strip is ringed in the element colour.</summary>
+        public bool IsSelf { get; set; }
+        /// <summary>The member's portrait, the same image as on the card above.</summary>
+        public string IconUrl { get; set; }
+        public string IconPath { get; set; }
+        public IReadOnlyList<OverviewRotationAction> Actions { get; set; } = Array.Empty<OverviewRotationAction>();
+    }
+
+    public sealed class OverviewRotationAction
+    {
+        /// <summary>"E", "Q", "N", "CA", "P", "D" or "combo" (<see cref="RotationNotation"/>).</summary>
+        public string Action { get; set; } = "";
+        public int Count { get; set; } = 1;
+        /// <summary>The member's skill this input stands for (E, Q, N), as the game names it; "" for none.</summary>
+        public string SkillName { get; set; } = "";
+        /// <summary>That skill's icon; null when the bundle names none (every ZZZ skill) or for any other input.</summary>
+        public string IconUrl { get; set; }
+        public string IconPath { get; set; }
+        /// <summary>"*", "**": the footnote that spells out this combo; "" for none.</summary>
+        public string Marker { get; set; } = "";
+        /// <summary>The tooltip and accessible name, as the site's ("Elemental Skill: Passion Overload ×2").</summary>
+        public string Description { get; set; } = "";
+    }
+
+    public sealed class OverviewRotationCombo
+    {
+        /// <summary>"*" for the first member's combo, "**" for a second one, in step order.</summary>
+        public string Marker { get; set; } = "*";
+        public string MemberName { get; set; } = "";
+        public string Text { get; set; } = "";
     }
 
     /// <summary>Another character's team that includes this one: the host, the team's name and this character's role.</summary>
@@ -124,6 +177,28 @@ namespace GI_Subtitles.Services.Characters
         public string TeamName { get; set; } = "";
         /// <summary>This character's role in the host's team, "" when the data names none.</summary>
         public string Role { get; set; } = "";
+        /// <summary>The rank the host's team assumes for this character (0..6), null when it does not matter.</summary>
+        public int? Rank { get; set; }
+        /// <summary><see cref="Rank"/> with the game's letter ("C1"); "" when there is none.</summary>
+        public string RankLabel { get; set; } = "";
+    }
+
+    /// <summary>A stat value to aim for. The numbers stay raw: the view writes them in the interface's language.</summary>
+    public sealed class OverviewStatGoal
+    {
+        /// <summary>The stat as the game names it (English), the percent stats by their short names ("ATK%").</summary>
+        public string Stat { get; set; } = "";
+        public double? Min { get; set; }
+        public double? Max { get; set; }
+        /// <summary>"%" or "".</summary>
+        public string Unit { get; set; } = "";
+        /// <summary>More is fine: the value ends in "+".</summary>
+        public bool Open { get; set; }
+        /// <summary>A short line under the value in both languages, either may be empty.</summary>
+        public AiLocalized Note { get; set; } = AiLocalized.Empty;
+
+        /// <summary>"2,500–3,000+" in English, "2 500–3 000+" in Polish (<see cref="StatGoalFormat"/>).</summary>
+        public string ValueFor(string language) => StatGoalFormat.Value(Min, Max, Unit, Open, language);
     }
 
     /// <summary>One recommended slot of N pieces with its alternatives, e.g. 4 pieces: A or B.</summary>
@@ -210,6 +285,9 @@ namespace GI_Subtitles.Services.Characters
         public IReadOnlyList<OverviewTeammate> TeammateCards { get; set; } = Array.Empty<OverviewTeammate>();
         /// <summary>Team comps, official first, then AI, then other sources.</summary>
         public IReadOnlyList<OverviewTeam> Teams { get; set; } = Array.Empty<OverviewTeam>();
+        /// <summary>Stat values to aim for, in the data's order; shown in the build section, empty when the data has none.</summary>
+        public IReadOnlyList<OverviewStatGoal> StatGoals { get; set; } = Array.Empty<OverviewStatGoal>();
+        public bool HasStatGoals => StatGoals.Count > 0;
         /// <summary>Other characters' teams with a place for this one ("Gra też w drużynach"), the newest host first.</summary>
         public IReadOnlyList<OverviewTeamHost> TeamHosts { get; set; } = Array.Empty<OverviewTeamHost>();
         /// <summary>Skills to level first, English names in order; the game's order, else the AI's.</summary>
@@ -388,8 +466,9 @@ namespace GI_Subtitles.Services.Characters
                 Playstyle = PickAiText(record.Ai, t => t.Playstyle.Count > 0)?.Playstyle
                                 .Select(p => A(GameTextFormatter.StripMarkup(p))).ToList()
                             ?? (IReadOnlyList<string>)Array.Empty<string>(),
-                Teams = Teams(record.Ai, catalog, A),
+                Teams = Teams(record.Ai, catalog, A, record.Id),
                 TeamHosts = TeamHosts(record, catalog, A),
+                StatGoals = StatGoals(record.Ai, catalog, A),
             };
             var image = record.Ai?.Image;
             if (image != null)
@@ -615,7 +694,8 @@ namespace GI_Subtitles.Services.Characters
 
         // Members missing from the roster are dropped; a team needs two left to be worth showing. The order is the one the
         // reverse index uses, so "the host's first team" is the first card on the host's page.
-        private static IReadOnlyList<OverviewTeam> Teams(CharacterAi ai, CharacterCatalog catalog, Func<string, int, string> annotate) =>
+        private static IReadOnlyList<OverviewTeam> Teams(CharacterAi ai, CharacterCatalog catalog, Func<string, int, string> annotate,
+                                                         string selfId) =>
             CharacterTeamIndex.ShownTeams(ai, catalog)
                 .Select(t => new OverviewTeam
                 {
@@ -628,9 +708,127 @@ namespace GI_Subtitles.Services.Characters
                         Name = c.Name,
                         Role = t.Roles.TryGetValue(c.Id, out var role) ? annotate(GameTextFormatter.StripMarkup(role.Pick()), -1) : "",
                         IconUrl = catalog.IconUrl(IconKind.Character, c.Icon),
+                        Rank = RankOf(t, c.Id),
+                        RankLabel = RankLabelOf(t, c.Id, catalog.Game),
                     }).ToList(),
+                    Rotations = Rotations(t, catalog, selfId),
                 })
                 .ToList();
+
+        // Every step's member must be on the roster, or the rotation is left out (never shown in part). A combo the page
+        // spells out gets a footnote marker per member, "*" then "**", in step order (as on the site).
+        private static IReadOnlyList<OverviewRotation> Rotations(AiTeam team, CharacterCatalog catalog, string selfId)
+        {
+            if (team.Rotations.Count == 0) return Array.Empty<OverviewRotation>();
+            var list = new List<OverviewRotation>();
+            foreach (var r in team.Rotations)
+            {
+                var members = r.Steps.Select(s => catalog.Find(s.Member)).ToList();
+                if (members.Any(m => m == null)) continue;
+                var combos = new List<OverviewRotationCombo>();
+                var markers = new Dictionary<string, string>(StringComparer.Ordinal);
+                var steps = new List<OverviewRotationStep>();
+                for (int i = 0; i < r.Steps.Count; i++)
+                {
+                    var member = members[i];
+                    var actions = new List<OverviewRotationAction>();
+                    foreach (var a in r.Steps[i].Actions)
+                    {
+                        string marker = "";
+                        if (a.Action == RotationNotation.Combo && r.Combo.TryGetValue(member.Id, out string raw))
+                        {
+                            string text = GameTextFormatter.StripMarkup(raw).Trim();
+                            if (text.Length > 0 && !markers.TryGetValue(member.Id, out marker))
+                            {
+                                marker = markers[member.Id] = RotationNotation.Marker(markers.Count);
+                                combos.Add(new OverviewRotationCombo { Marker = marker, MemberName = member.Name, Text = text });
+                            }
+                        }
+                        actions.Add(ActionOf(a, member, catalog, marker ?? ""));
+                    }
+                    steps.Add(new OverviewRotationStep
+                    {
+                        MemberId = member.Id,
+                        MemberName = member.Name,
+                        IsSelf = member.Id == selfId,
+                        IconUrl = catalog.IconUrl(IconKind.Character, member.Icon),
+                        Actions = actions,
+                    });
+                }
+                list.Add(new OverviewRotation { Variant = GameTextFormatter.StripMarkup(r.Variant ?? "").Trim(), Steps = steps, Combos = combos });
+            }
+            return list;
+        }
+
+        private static OverviewRotationAction ActionOf(RotationAction a, CharacterRecord member, CharacterCatalog catalog, string marker)
+        {
+            var action = new OverviewRotationAction { Action = a.Action, Count = a.Count, Marker = marker };
+            var skill = RotationSkill(catalog.Game, member, a.Action);
+            if (skill != null)
+            {
+                action.SkillName = skill.Name;
+                action.IconUrl = catalog.IconUrl(IconKind.Skill, skill.Icon);
+            }
+            action.Description = RotationNotation.Describe(a.Action, a.Count, catalog.Game, action.SkillName, marker);
+            return action;
+        }
+
+        private static readonly System.Text.RegularExpressions.Regex UltimateName =
+            new System.Text.RegularExpressions.Regex(@"^Ultimate\b", System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+
+        /// <summary>
+        /// The member's skill an input stands for, as on the site: E the first "skill", Q the first "ultimate", N the first
+        /// "basic" of its default kit; ZZZ files them as "special" and "chain", its Q being the chain named "Ultimate: …".
+        /// </summary>
+        internal static CharacterSkill RotationSkill(string game, CharacterRecord member, string action)
+        {
+            if (member == null) return null;
+            bool zzz = string.Equals(game, "zzz", StringComparison.OrdinalIgnoreCase);
+            string kind = action == RotationNotation.Skill ? (zzz ? "special" : "skill")
+                : action == RotationNotation.Burst ? (zzz ? "chain" : "ultimate")
+                : action == RotationNotation.Normal ? "basic" : null;
+            if (kind == null) return null;
+            string kit = RotationKit(member);
+            var own = member.Skills.Where(s => s.Kind == kind && (kit == null || s.Variant.Length == 0 || s.Variant == kit)).ToList();
+            return (zzz && action == RotationNotation.Burst ? own.FirstOrDefault(s => UltimateName.IsMatch(s.Name)) : null) ?? own.FirstOrDefault();
+        }
+
+        // The site's kitStates(member)[0]: the default kit, else "original", else the first; null (every skill) for one kit.
+        private static string RotationKit(CharacterRecord member)
+        {
+            var found = member.Variants;
+            string first = member.DefaultVariant.Length > 0 ? member.DefaultVariant : found.Contains("original") ? "original" : found.FirstOrDefault();
+            return first != null && 1 + found.Count(v => v != first) > 1 ? first : null;
+        }
+
+        private static int? RankOf(AiTeam team, string id) => team.Ranks.TryGetValue(id, out int rank) ? rank : (int?)null;
+
+        private static string RankLabelOf(AiTeam team, string id, string game) =>
+            RankOf(team, id) is int rank ? SkillMarkers.RankLabel(game, rank) : "";
+
+        // A goal's stat is a key of the section's catalog, like a build's main stats: shown as the game's short name of a
+        // percent stat ("ATK%") when the section has one, else as its label, exactly as the site does. A key the
+        // catalog lacks is skipped.
+        private static IReadOnlyList<OverviewStatGoal> StatGoals(CharacterAi ai, CharacterCatalog catalog, Func<string, int, string> annotate)
+        {
+            if (ai == null || ai.StatGoals.Count == 0) return Array.Empty<OverviewStatGoal>();
+            string Note(string text) => annotate(GameTextFormatter.StripMarkup(text ?? "").Trim(), -1);
+            var goals = new List<OverviewStatGoal>();
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var g in ai.StatGoals)
+            {
+                string key = g.Stat ?? "";
+                if (!catalog.Stats.TryGetValue(key, out string english) || string.IsNullOrWhiteSpace(english) || !seen.Add(key)) continue;
+                string label = catalog.StatsShort.TryGetValue(key, out string shortName) ? shortName : english.Trim();
+                var note = new AiLocalized { En = Note(g.Note?.En), Pl = Note(g.Note?.Pl) };
+                goals.Add(new OverviewStatGoal
+                {
+                    Stat = label, Min = g.Min, Max = g.Max, Unit = g.Unit ?? "", Open = g.Open,
+                    Note = note.IsEmpty ? AiLocalized.Empty : note,
+                });
+            }
+            return goals;
+        }
 
         // The reverse index, one row per host: who, which team, and this character's role in it.
         private static IReadOnlyList<OverviewTeamHost> TeamHosts(CharacterRecord record, CharacterCatalog catalog, Func<string, int, string> annotate) =>
@@ -642,6 +840,8 @@ namespace GI_Subtitles.Services.Characters
                     IconUrl = catalog.IconUrl(IconKind.Character, h.Host.Icon),
                     TeamName = GameTextFormatter.StripMarkup(h.Team.Name.Pick()),
                     Role = h.Team.Roles.TryGetValue(record.Id, out var role) ? annotate(GameTextFormatter.StripMarkup(role.Pick()), -1) : "",
+                    Rank = RankOf(h.Team, record.Id),
+                    RankLabel = RankLabelOf(h.Team, record.Id, catalog.Game),
                 })
                 .ToList();
 

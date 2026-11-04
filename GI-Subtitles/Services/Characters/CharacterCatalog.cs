@@ -51,6 +51,10 @@ namespace GI_Subtitles.Services.Characters
 
         /// <summary>Polish first (the shipped target language), English as the fallback.</summary>
         public string Pick() => Pl.Length > 0 ? Pl : En;
+
+        /// <summary>The interface's language first ("pl" picks Polish, anything else English), the other as the fallback.</summary>
+        public string PickFor(string language) =>
+            CharacterPageLink.IsPolish(language) ? Pick() : En.Length > 0 ? En : Pl;
     }
 
     /// <summary>An ambience image in the element's mood (no likeness, no text), made by the updater. https only.</summary>
@@ -74,6 +78,54 @@ namespace GI_Subtitles.Services.Characters
         /// <summary>Role per member id.</summary>
         public IReadOnlyDictionary<string, AiLocalized> Roles { get; set; } = new Dictionary<string, AiLocalized>();
         public AiLocalized Why { get; set; } = AiLocalized.Empty;
+        /// <summary>Member id → the constellation / eidolon / mindscape (0..6) the team assumes; only members it matters for.</summary>
+        public IReadOnlyDictionary<string, int> Ranks { get; set; } = new Dictionary<string, int>();
+        /// <summary>The rotations a guide states for this team (one or two), in the data's order; empty when none does.</summary>
+        public IReadOnlyList<TeamRotation> Rotations { get; set; } = Array.Empty<TeamRotation>();
+    }
+
+    /// <summary>One action of a rotation step (<see cref="RotationNotation"/>), done <see cref="Count"/> times.</summary>
+    public sealed class RotationAction
+    {
+        /// <summary>"E", "Q", "N", "CA", "P", "D" or "combo".</summary>
+        public string Action { get; set; } = "";
+        /// <summary>1 when the data gives no count; for N the number of hits.</summary>
+        public int Count { get; set; } = 1;
+    }
+
+    /// <summary>One member's turn in a rotation.</summary>
+    public sealed class RotationStep
+    {
+        /// <summary>A member id of the team.</summary>
+        public string Member { get; set; } = "";
+        public IReadOnlyList<RotationAction> Actions { get; set; } = Array.Empty<RotationAction>();
+    }
+
+    /// <summary>A rotation as a guide page states it for the team (the updater transcribes, never composes one).</summary>
+    public sealed class TeamRotation
+    {
+        /// <summary>The English name of the member this rotation is for when the page offers alternatives ("Prune"), else "".</summary>
+        public string Variant { get; set; } = "";
+        public IReadOnlyList<RotationStep> Steps { get; set; } = Array.Empty<RotationStep>();
+        /// <summary>Member id → that member's named combo as the page spells it (English).</summary>
+        public IReadOnlyDictionary<string, string> Combo { get; set; } = new Dictionary<string, string>();
+    }
+
+    /// <summary>
+    /// A stat value to aim for ("CRIT Rate 60–70%", "Energy Recharge 200%+"). At least one bound is set, and
+    /// min ≤ max when both are.
+    /// </summary>
+    public sealed class StatGoal
+    {
+        /// <summary>A key of the section's stat catalog (<see cref="CharacterCatalog.Stats"/>), like a build's main stats.</summary>
+        public string Stat { get; set; } = "";
+        public double? Min { get; set; }
+        public double? Max { get; set; }
+        /// <summary>"%" or "".</summary>
+        public string Unit { get; set; } = "";
+        /// <summary>More is fine: the value gets a "+".</summary>
+        public bool Open { get; set; }
+        public AiLocalized Note { get; set; } = AiLocalized.Empty;
     }
 
     public sealed class GuideSection
@@ -162,6 +214,8 @@ namespace GI_Subtitles.Services.Characters
         public AiPriority Priority { get; set; }
         public AiImage Image { get; set; }
         public IReadOnlyList<AiTeam> Teams { get; set; } = Array.Empty<AiTeam>();
+        /// <summary>Stat values to aim for, in the data's order; empty in bundles from before stat_goals.</summary>
+        public IReadOnlyList<StatGoal> StatGoals { get; set; } = Array.Empty<StatGoal>();
     }
 
     public sealed class CharacterRecord
@@ -229,6 +283,18 @@ namespace GI_Subtitles.Services.Characters
     {
         public const int SupportedSchema = 1;
         public const long MaxBytes = 64L * 1024 * 1024;
+        /// <summary>The updater writes 2 to 6 goals; entries past this are ignored.</summary>
+        public const int MaxStatGoals = 6;
+        /// <summary>The highest constellation / eidolon / mindscape.</summary>
+        public const int MaxRank = 6;
+        /// <summary>The updater writes one or two rotations per team; entries past this are ignored.</summary>
+        public const int MaxRotations = 2;
+        // Sanity caps on one rotation: past them the rotation is skipped, never cut short.
+        public const int MaxRotationSteps = 24;
+        public const int MaxStepActions = 12;
+        public const int MaxActionCount = 20;
+        public const int MaxVariantLength = 64;
+        public const int MaxComboLength = 300;
 
         public static readonly CharacterCatalog Empty = new CharacterCatalog(
             "", "", Array.Empty<CharacterRecord>(),
@@ -245,6 +311,8 @@ namespace GI_Subtitles.Services.Characters
         public IReadOnlyDictionary<string, GearSet> Sets { get; }
         public IReadOnlyDictionary<string, GameWeapon> Weapons { get; }
         public IReadOnlyDictionary<string, string> Stats { get; }
+        /// <summary>The game's short name of a percent stat by key ("ATK%"), from the section's stats_short; may be empty.</summary>
+        public IReadOnlyDictionary<string, string> StatsShort { get; private set; } = new Dictionary<string, string>();
         public bool IsEmpty => Characters.Count == 0;
 
         private CharacterCatalog(string game, string version, IReadOnlyList<CharacterRecord> characters,
@@ -336,7 +404,21 @@ namespace GI_Subtitles.Services.Characters
             return new CharacterCatalog(game, Str(root, "game_version"), characters, sets, weapons, stats)
             {
                 _icons = ReadIconSources(root),
+                StatsShort = ReadStatsShort(root, stats),
             };
+        }
+
+        // The site's rule for a short name: a short English word or two ending in "%"; anything else is ignored.
+        private static readonly System.Text.RegularExpressions.Regex ShortStat =
+            new System.Text.RegularExpressions.Regex(@"^[A-Za-z][A-Za-z .-]{0,23}%\z", System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+
+        private static Dictionary<string, string> ReadStatsShort(JsonElement root, Dictionary<string, string> stats)
+        {
+            var map = new Dictionary<string, string>(StringComparer.Ordinal);
+            foreach (var p in Members(root, "stats_short"))
+                if (stats.ContainsKey(p.Name) && p.Value.ValueKind == JsonValueKind.String && ShortStat.IsMatch(p.Value.GetString() ?? ""))
+                    map[p.Name] = p.Value.GetString();
+            return map;
         }
 
         // icon_base / icon_ext per kind; only absolute https bases are accepted.
@@ -423,10 +505,143 @@ namespace GI_Subtitles.Services.Characters
                 Priority = ReadPriority(a),
                 Image = Safe(() => ReadImage(a)),
                 Teams = ReadTeams(a),
+                StatGoals = ReadStatGoals(a),
             };
             return ai.En == null && ai.Pl == null && ai.Build == null && ai.Priority == null &&
-                   ai.Image == null && ai.Teams.Count == 0 ? null : ai;
+                   ai.Image == null && ai.Teams.Count == 0 && ai.StatGoals.Count == 0 ? null : ai;
         }
+
+        // A bad entry is skipped, never the list; the first goal per stat wins.
+        private static IReadOnlyList<StatGoal> ReadStatGoals(JsonElement a)
+        {
+            var goals = new List<StatGoal>();
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var g in Items(a, "stat_goals"))
+            {
+                var goal = ReadStatGoal(g);
+                if (goal == null || !seen.Add(goal.Stat)) continue;
+                goals.Add(goal);
+                if (goals.Count == MaxStatGoals) break;
+            }
+            return goals;
+        }
+
+        private static StatGoal ReadStatGoal(JsonElement g)
+        {
+            if (g.ValueKind != JsonValueKind.Object) return null;
+            string stat = Str(g, "stat").Trim();
+            if (stat.Length == 0 && g.TryGetProperty("stat", out var rawStat) && rawStat.ValueKind == JsonValueKind.Number)
+                stat = rawStat.GetRawText(); // the contract says string; tolerate a numeric key (ZZZ keys are digits)
+            if (stat.Length == 0 || stat.Length > 64) return null;
+            if (!Bound(g, "min", out double? min) || !Bound(g, "max", out double? max)) return null;
+            if ((min == null && max == null) || min > max) return null;
+            string unit = "";
+            if (g.TryGetProperty("unit", out var u) && u.ValueKind != JsonValueKind.Null)
+                unit = u.ValueKind == JsonValueKind.String ? (u.GetString() ?? "").Trim() : null;
+            if (unit != "%" && unit != "") return null;
+            return new StatGoal { Stat = stat, Min = min, Max = max, Unit = unit, Open = Bool(g, "open"), Note = Localized(g, "note") };
+        }
+
+        // Absent or null is no bound; a finite number of 0 or more is one; anything else spoils the entry.
+        private static bool Bound(JsonElement g, string name, out double? value)
+        {
+            value = null;
+            if (!g.TryGetProperty(name, out var v) || v.ValueKind == JsonValueKind.Null) return true;
+            if (v.ValueKind != JsonValueKind.Number || !v.TryGetDouble(out double d) || double.IsNaN(d) || double.IsInfinity(d) || d < 0)
+                return false;
+            value = d == 0 ? 0 : d; // JSON -0 would print as "-0"
+            return true;
+        }
+
+        // Members only, whole numbers 0..6 only; anything else drops that one pair.
+        private static IReadOnlyDictionary<string, int> ReadRanks(JsonElement t, IReadOnlyCollection<string> members)
+        {
+            var ranks = new Dictionary<string, int>(StringComparer.Ordinal);
+            foreach (var p in Members(t, "ranks"))
+                if (members.Contains(p.Name) && p.Value.ValueKind == JsonValueKind.Number &&
+                    p.Value.TryGetInt32(out int n) && n >= 0 && n <= MaxRank)
+                    ranks[p.Name] = n;
+            return ranks;
+        }
+
+        // The first MaxRotations good rotations; any defect skips that rotation whole: shown as the page wrote it, or not at all.
+        private static IReadOnlyList<TeamRotation> ReadRotations(JsonElement t, IReadOnlyCollection<string> members)
+        {
+            var rotations = new List<TeamRotation>();
+            foreach (var r in Items(t, "rotations"))
+            {
+                var rotation = ReadRotation(r, members);
+                if (rotation == null) continue;
+                rotations.Add(rotation);
+                if (rotations.Count == MaxRotations) break;
+            }
+            return rotations;
+        }
+
+        private static TeamRotation ReadRotation(JsonElement r, IReadOnlyCollection<string> members)
+        {
+            if (r.ValueKind != JsonValueKind.Object) return null;
+            string variant = "";
+            if (r.TryGetProperty("variant", out var v) && v.ValueKind != JsonValueKind.Null)
+            {
+                if (v.ValueKind != JsonValueKind.String) return null;
+                variant = Squash(v.GetString());
+                if (variant.Length > MaxVariantLength) return null;
+            }
+            if (!r.TryGetProperty("steps", out var s) || s.ValueKind != JsonValueKind.Array) return null;
+            int count = s.GetArrayLength();
+            if (count == 0 || count > MaxRotationSteps) return null;
+            var steps = new List<RotationStep>(count);
+            foreach (var e in s.EnumerateArray())
+            {
+                var step = ReadRotationStep(e, members);
+                if (step == null) return null;
+                steps.Add(step);
+            }
+            // A combo for no member, or without text, drops alone: its chip still shows, without the footnote.
+            var combo = new Dictionary<string, string>(StringComparer.Ordinal);
+            foreach (var p in Members(r, "combo"))
+            {
+                string text = p.Value.ValueKind == JsonValueKind.String ? Squash(p.Value.GetString()) : "";
+                if (members.Contains(p.Name) && text.Length > 0 && text.Length <= MaxComboLength) combo[p.Name] = text;
+            }
+            return new TeamRotation { Variant = variant, Steps = steps, Combo = combo };
+        }
+
+        private static RotationStep ReadRotationStep(JsonElement e, IReadOnlyCollection<string> members)
+        {
+            if (e.ValueKind != JsonValueKind.Object || !e.TryGetProperty("member", out var m)) return null;
+            string member = m.ValueKind == JsonValueKind.String ? (m.GetString() ?? "").Trim()
+                : m.ValueKind == JsonValueKind.Number ? m.GetRawText() : ""; // ids are strings; a number is tolerated, as in members
+            if (member.Length == 0 || !members.Contains(member)) return null;
+            if (!e.TryGetProperty("actions", out var a) || a.ValueKind != JsonValueKind.Array) return null;
+            int count = a.GetArrayLength();
+            if (count == 0 || count > MaxStepActions) return null;
+            var actions = new List<RotationAction>(count);
+            foreach (var x in a.EnumerateArray())
+            {
+                var action = ReadRotationAction(x);
+                if (action == null) return null;
+                actions.Add(action);
+            }
+            return new RotationStep { Member = member, Actions = actions };
+        }
+
+        // A token of the grammar exactly as written; n absent or null is 1, else a whole number 1..MaxActionCount.
+        private static RotationAction ReadRotationAction(JsonElement x)
+        {
+            if (x.ValueKind != JsonValueKind.Object) return null;
+            string token = Str(x, "a").Trim();
+            if (!RotationNotation.IsAction(token)) return null;
+            int count = 1;
+            if (x.TryGetProperty("n", out var n) && n.ValueKind != JsonValueKind.Null &&
+                (n.ValueKind != JsonValueKind.Number || !n.TryGetInt32(out count) || count < 1 || count > MaxActionCount))
+                return null;
+            return new RotationAction { Action = token, Count = count };
+        }
+
+        private static string Squash(string text) =>
+            System.Text.RegularExpressions.Regex.Replace(text ?? "", @"\s+", " ").Trim();
 
         private static AiImage ReadImage(JsonElement a)
         {
@@ -482,6 +697,8 @@ namespace GI_Subtitles.Services.Characters
                     Members = members,
                     Roles = roles,
                     Why = Localized(t, "why"),
+                    Ranks = ReadRanks(t, members),
+                    Rotations = ReadRotations(t, members),
                 });
             }
             return teams;
