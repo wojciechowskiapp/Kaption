@@ -621,6 +621,7 @@ namespace GI_Subtitles.Views
             data.OnOpenSetupWizard = () => ShowSetupWizard();
             InitAutoStart();
             InitFarmCard();
+            InitGuessNotify();
 
             // Always open settings window on startup (non-modal so UI stays responsive)
             data.Show();
@@ -962,7 +963,7 @@ namespace GI_Subtitles.Views
                         LocalizedString("Notice_GpuFallback_Title", "Kaption switched to the processor"),
                         LocalizedString(
                             "Notice_GpuFallback_Body",
-                            "Your GPU was too slow to run text recognition reliably, so Kaption is using the processor instead. Translation keeps working."));
+                            "Your graphics card couldn't read the dialogue reliably, so Kaption is using the processor instead. Translation keeps working."));
                 }
                 catch (Exception ex)
                 {
@@ -3951,7 +3952,12 @@ namespace GI_Subtitles.Views
                 OCRResult ocr = engine.DetectTextFromMat(frame);
                 var lines = QuickTranslateSegmenter.OrderLines(
                     (ocr?.TextBlocks ?? new List<PaddleOCRSharp.TextBlock>()).Select(ToQuickTranslateLine));
-                if (lines.Count == 0) return none;
+                if (lines.Count == 0)
+                {
+                    // Says so in a normal bundle; "no text" was otherwise invisible at INFO (KAP-EF8C-C5CF).
+                    Logger.Log.Info($"QuickTranslate: 0 lines read in {frame.Width}x{frame.Height} ({engine.ExecutionProvider}).");
+                    return none;
+                }
                 if (matcher == null)
                     return (new[] { QuickTranslateSegment.Unmatched(string.Join("\n", lines)) }, lines);
 

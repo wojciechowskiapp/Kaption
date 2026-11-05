@@ -724,6 +724,7 @@ namespace GI_Subtitles.Views
                 Config.Set("SetupCompleted", true);
                 Config.Set("SetupDismissed", false);
                 Config.Set(SettingsWindow.Intro25SeenKey, true); // the setup already said what 2.5 does
+                Config.Set(Shell.SpotlightRules.SeenWuWaKey, true); // a new player just picked from a list that has WuWa
             }
             FinishButton.Focus();
         }
@@ -804,6 +805,7 @@ namespace GI_Subtitles.Views
                 Config.Set("SetupCompleted", true);
                 Config.Set("SetupDismissed", false);
                 Config.Set(SettingsWindow.Intro25SeenKey, true);
+                Config.Set(Shell.SpotlightRules.SeenWuWaKey, true); // a new player just picked from a list that has WuWa
             }
             _signInCts?.Cancel();
             base.OnClosing(e);

@@ -111,6 +111,8 @@ namespace GI_Subtitles.Services.Games
     {
         public string Hub { get; set; }
         public string GuideKey { get; set; }
+        /// <summary>The daily guess game's name on the site ("Gendle", "Wuwdle"): site.guessName.</summary>
+        public string GuessName { get; set; }
     }
 
     /// <summary>Where the game's English comes from (datamine host and repository).</summary>

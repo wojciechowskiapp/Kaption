@@ -4,7 +4,7 @@
 [![CodeQL](https://github.com/wojciechowskiapp/Kaption/actions/workflows/codeql.yml/badge.svg)](https://github.com/wojciechowskiapp/Kaption/actions/workflows/codeql.yml)
 [![License: AGPL-3.0 OR Commercial](https://img.shields.io/badge/license-AGPL--3.0%20OR%20Commercial-blue.svg)](./LICENSE)
 
-Kaption shows Polish subtitles over the dialogue in Genshin Impact, Honkai: Star Rail and Zenless Zone Zero. It reads the dialogue box from your screen and draws the translation on top, without touching the game's files or memory.
+Kaption shows Polish subtitles over the dialogue in Genshin Impact, Honkai: Star Rail, Zenless Zone Zero and Wuthering Waves. It reads the dialogue box from your screen and draws the translation on top, without touching the game's files or memory.
 
 **[Download for Windows](https://kaption.one/#download)** · [kaption.one](https://kaption.one)
 
@@ -15,6 +15,7 @@ Kaption shows Polish subtitles over the dialogue in Genshin Impact, Honkai: Star
 - Genshin Impact
 - Honkai: Star Rail
 - Zenless Zone Zero
+- Wuthering Waves
 
 ## How it works
 
@@ -38,10 +39,10 @@ The installer brings the .NET runtime with it, and Kaption updates itself.
 - Auto-start: Kaption starts translating when the game is on screen and stops when you close it.
 - New subtitles: a clearer typeface that stays readable over bright scenes, and Wygląd napisów (Subtitle style) with a true-scale preview and three styles.
 - Setup in one window: language, game, sign-in and the first subtitle download, one step after another.
-- Postacie (Characters): skills, builds and materials for every character in the three games, with game terms in English and the Polish next to them.
+- Postacie (Characters): skills, builds and materials for every character in Genshin Impact, Honkai: Star Rail and Zenless Zone Zero, with game terms in English and the Polish next to them.
 - Ctrl+Q quick translate: select any panel in the game, read it in Polish, and open the card of the character Kaption recognised.
 - Build cards on [kaption.one/my-build](https://kaption.one/my-build/): a shareable PNG of any character from your UID, in a dozen layouts, in Polish or English.
-- Polish subtitle packs for all three games, refreshed after each game patch.
+- Polish subtitle packs for all four games, refreshed after each game patch.
 
 ## Privacy
 
@@ -49,7 +50,7 @@ Your screen is read on your own computer and screen images never leave it; subti
 
 ## Building
 
-Windows and the [.NET 10 SDK](https://dotnet.microsoft.com/download) (10.0.403 or newer) are all you need:
+Windows and the [.NET 10 SDK](https://dotnet.microsoft.com/download) (10.0.403 or newer) are all you need. Kaption keeps up with the newest stable .NET and C#, so expect it to move to .NET 11 soon after that comes out.
 
 ```
 dotnet build GI-Subtitles.sln -c Release
@@ -66,4 +67,4 @@ Kaption is dual-licensed under [AGPL-3.0](./LICENSE-AGPL) or a [commercial licen
 
 Kaption began as a fork of [qew21/Genshin-Subtitles](https://github.com/qew21/Genshin-Subtitles) (Apache-2.0), where the idea of reading the dialogue and looking it up in the game's text came from. Every line is matched against game data maintained by [Dimbreath](https://www.patreon.com/c/dimbreath/posts): [AnimeGameData2](https://gitlab.com/Dimbreath/animegamedata2), [turnbasedgamedata](https://gitlab.com/Dimbreath/turnbasedgamedata) and [ZenlessData](https://git.mero.moe/dimbreath/ZenlessData). If that work helps you too, please support it. Kaption is built on PaddleOCR, ONNX Runtime, OpenCV, Velopack, Lucene.NET and Sentry.
 
-Kaption is independent and not affiliated with HoYoverse, Cognosphere or miHoYo.
+Kaption is independent and not affiliated with HoYoverse, Cognosphere, miHoYo or Kuro Games.

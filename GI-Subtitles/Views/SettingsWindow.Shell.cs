@@ -85,6 +85,7 @@ namespace GI_Subtitles.Views
             SyncThemeRadios();
             SyncAutoStartControls();
             ShowIntro25IfNew();
+            InitializeGuessNotify();
             RestoreAdvancedState();
             RefreshBuildCardMemory();
             InitializeLookPage();
@@ -820,25 +821,31 @@ namespace GI_Subtitles.Views
             {
                 OcrGpuStatus.Ok => null,
                 OcrGpuStatus.Unavailable => L("Dash_GpuUnavailable", "Running on the processor: the graphics card could not be started for translation. Updating the graphics driver usually fixes this; restart Kaption afterwards."),
-                OcrGpuStatus.RetryNextLaunch => L("Dash_GpuRetryNextLaunch", "Running on the processor this time: the graphics card was busy or slow while Kaption started. It gets another try at the next launch."),
-                _ => L("Dash_GpuQuarantined", "Running on the processor: the graphics card was too slow at startup. Tick “Use GPU acceleration” under Help › Advanced to try it again."),
+                OcrGpuStatus.RetryNextLaunch => L("Dash_GpuRetryNextLaunch", "Running on the processor this time: the graphics card didn't read text reliably while Kaption started. It gets another try at the next launch."),
+                _ => L("Dash_GpuQuarantined", "Running on the processor: the graphics card couldn't read text reliably. Tick “Use GPU acceleration” under Help › Advanced to try it again."),
             };
         }
 
         private static string _adapterName;
-        /// <summary>The graphics card's full description (with its driver ids and memory); logged once when first read.</summary>
+        private static int _adapterNameIndex = -1;
+        /// <summary>
+        /// The OCR graphics card's full description (with its driver ids and memory); logged once per card. On a hybrid
+        /// laptop that is the discrete GPU, not adapter 0 (see OcrAdapterSelector).
+        /// </summary>
         private static string AdapterName()
         {
-            if (_adapterName != null) return _adapterName.Length == 0 ? null : _adapterName;
+            int index = OcrAdapterSelector.InUseIndex;
+            if (_adapterName != null && _adapterNameIndex == index) return _adapterName.Length == 0 ? null : _adapterName;
             try
             {
-                _adapterName = Services.Capture.DxgiScreenCapture.TryGetAdapterName(0, out string name) ? name ?? "" : "";
-                if (_adapterName.Length > 0) Logger.Log.Info($"Graphics adapter: {_adapterName}");
+                _adapterName = Services.Capture.DxgiScreenCapture.TryGetAdapterName(index, out string name) ? name ?? "" : "";
+                if (_adapterName.Length > 0) Logger.Log.Info($"Graphics adapter for OCR: {_adapterName}");
             }
             catch
             {
                 _adapterName = "";
             }
+            _adapterNameIndex = index;
             return _adapterName.Length == 0 ? null : _adapterName;
         }
 

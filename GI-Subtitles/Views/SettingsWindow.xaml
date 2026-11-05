@@ -326,9 +326,11 @@
                             </Grid>
                         </Border>
 
+                        <!-- The "once" stack: one-time cards and the ranking strip share row 5, so rows 6-9 keep their numbers. -->
+                        <StackPanel x:Name="StartOnceCards" Grid.Row="5">
                         <!-- Returning users, once: what 2.5 changes, with the auto-start switch right there. New installs
                              learn it in the setup window and never see this card. -->
-                        <Border x:Name="Intro25Card" Grid.Row="5" Visibility="Collapsed" Style="{StaticResource Card}" Margin="0,16,0,0" Padding="0">
+                        <Border x:Name="Intro25Card" Visibility="Collapsed" Style="{StaticResource Card}" Margin="0,16,0,0" Padding="0">
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="3"/>
@@ -351,6 +353,87 @@
                                         Click="Intro25Ok_Click" VerticalAlignment="Center" Margin="0,0,16,0"/>
                             </Grid>
                         </Border>
+
+                        <!-- New in Kaption (SettingsWindow.GuessNotify.cs, SpotlightRules): Wuthering Waves in Polish while the
+                             live listing backs it, and the guess game. Each row closes on its own and retires after 3 launches. -->
+                        <Border x:Name="SpotlightCard" Visibility="Collapsed" Style="{StaticResource Card}" Margin="0,16,0,0" Padding="0">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="3"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Border Margin="0,14" CornerRadius="0,2,2,0" Background="{StaticResource BrandGradientBrush}"/>
+                                <StackPanel Grid.Column="1" Margin="18,14,10,14">
+                                    <TextBlock Style="{StaticResource Eyebrow}" shell:Typo.Eyebrow="{DynamicResource shell_Spotlight_Eyebrow}" Margin="0,0,0,10"/>
+                                    <Grid x:Name="SpotlightWuWaRow" Visibility="Collapsed">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Border x:Name="SpotlightWuWaThumb" Width="64" Height="64" CornerRadius="8" VerticalAlignment="Top"
+                                                Background="{DynamicResource SurfaceSunkenBrush}" BorderThickness="0,0,0,2"
+                                                AutomationProperties.Name="{DynamicResource shell_Spotlight_WuWa_Title}"/>
+                                        <StackPanel Grid.Column="1" Margin="14,0,12,0" VerticalAlignment="Center">
+                                            <TextBlock Text="{DynamicResource shell_Spotlight_WuWa_Title}" Style="{StaticResource CardTitle}" Margin="0,0,0,2"/>
+                                            <TextBlock x:Name="SpotlightWuWaBody" Text="{DynamicResource shell_Spotlight_WuWa_Body}" Style="{StaticResource HintText}"/>
+                                            <Button x:Name="SpotlightWuWaActionButton" Style="{StaticResource LinkButton}" HorizontalAlignment="Left" Margin="0,6,0,0"
+                                                    Content="{DynamicResource shell_Spotlight_WuWa_Switch}" Click="SpotlightWuWa_Click"/>
+                                        </StackPanel>
+                                        <Button Grid.Column="2" Style="{StaticResource IconButton}" Click="SpotlightWuWaClose_Click" VerticalAlignment="Top"
+                                                ToolTip="{DynamicResource shell_Action_Dismiss}" AutomationProperties.Name="{DynamicResource shell_Action_Dismiss}">
+                                            <Path Data="{StaticResource IconClose}" Width="16" Height="16" Stretch="None" StrokeThickness="1.6"
+                                                  Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                                  StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
+                                        </Button>
+                                    </Grid>
+                                    <Grid x:Name="SpotlightGuessRow" Visibility="Collapsed">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Border x:Name="SpotlightGuessThumb" Width="64" Height="64" CornerRadius="8" VerticalAlignment="Top"
+                                                Background="{DynamicResource SurfaceSunkenBrush}" BorderThickness="0,0,0,2"/>
+                                        <StackPanel Grid.Column="1" Margin="14,0,12,0" VerticalAlignment="Center">
+                                            <TextBlock x:Name="SpotlightGuessTitle" Style="{StaticResource CardTitle}" Margin="0,0,0,2"/>
+                                            <TextBlock Text="{DynamicResource shell_Spotlight_Guess_Body}" Style="{StaticResource HintText}"/>
+                                            <Button Style="{StaticResource LinkButton}" HorizontalAlignment="Left" Margin="0,6,0,0"
+                                                    Content="{DynamicResource shell_Spotlight_Guess_Play}" Click="SpotlightGuess_Click"/>
+                                        </StackPanel>
+                                        <Button Grid.Column="2" Style="{StaticResource IconButton}" Click="SpotlightGuessClose_Click" VerticalAlignment="Top"
+                                                ToolTip="{DynamicResource shell_Action_Dismiss}" AutomationProperties.Name="{DynamicResource shell_Action_Dismiss}">
+                                            <Path Data="{StaticResource IconClose}" Width="16" Height="16" Stretch="None" StrokeThickness="1.6"
+                                                  Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                                  StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
+                                        </Button>
+                                    </Grid>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+
+                        <!-- Someone passed the player in the guess game's ranking: the tray notice's text, kept here until the
+                             next standing read replaces it (MainWindow.GuessNotify.cs). -->
+                        <Border x:Name="GuessRankStrip" Visibility="Collapsed" Style="{StaticResource Callout}" Margin="0,12,0,0">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <Path Data="{StaticResource IconPeople}" Width="16" Height="16" Stretch="None" VerticalAlignment="Center"
+                                      Stroke="{DynamicResource AccentTextBrush}" StrokeThickness="1.6" StrokeLineJoin="Round"
+                                      StrokeStartLineCap="Round" StrokeEndLineCap="Round" Margin="0,0,10,0"/>
+                                <TextBlock x:Name="GuessRankStripText" Grid.Column="1" Style="{StaticResource BodyText}" TextWrapping="Wrap"
+                                           Foreground="{DynamicResource TextBrush}" VerticalAlignment="Center" AutomationProperties.LiveSetting="Polite"/>
+                                <Button Grid.Column="2" Style="{StaticResource LinkButton}" Margin="12,0,0,0" VerticalAlignment="Center"
+                                        Content="{DynamicResource GuessNotify_Open}" Click="GuessRankOpen_Click"/>
+                                <Button Grid.Column="3" Style="{StaticResource LinkButtonPlain}" Margin="12,0,0,0" VerticalAlignment="Center"
+                                        Content="{DynamicResource GuessNotify_TurnOff}" Click="GuessRankTurnOff_Click"/>
+                            </Grid>
+                        </Border>
+                        </StackPanel>
 
                         <!-- A shortcut Windows refused because another app holds it. -->
                         <Border x:Name="HotkeyConflictStrip" Grid.Row="6" Visibility="Collapsed" Style="{StaticResource Callout}"
@@ -1406,6 +1489,30 @@
                                             Content="{DynamicResource Community_Referrals_Button}" ToolTip="{DynamicResource Tip_Community_Referrals}"
                                             Click="DashReferrals_Click" VerticalAlignment="Center"/>
                                 </Grid>
+                                <!-- The guess game: where to play, and the switch for the ranking notice (GuessNotify.Enabled). -->
+                                <Grid x:Name="GuessCommunityRow" Margin="0,2,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel VerticalAlignment="Center" Margin="0,0,16,0">
+                                        <TextBlock Text="{DynamicResource shell_Guess_Title}" FontSize="{StaticResource FontSizeBody}" FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource TextBrush}"/>
+                                        <TextBlock x:Name="GuessCommunityBody" Style="{StaticResource HintText}" Margin="0,2,0,0"/>
+                                    </StackPanel>
+                                    <Button Grid.Column="1" x:Name="GuessPlayButton" Style="{StaticResource SecondaryButton}"
+                                            Content="{DynamicResource shell_Guess_Play}" VerticalAlignment="Center" Click="GuessPlay_Click"/>
+                                </Grid>
+                                <CheckBox x:Name="GuessNotifyToggle" Style="{StaticResource ToggleSwitch}" Margin="0,10,0,0" IsChecked="True"
+                                          HorizontalAlignment="Left" Checked="GuessNotifyToggle_Changed" Unchecked="GuessNotifyToggle_Changed"
+                                          AutomationProperties.Name="{DynamicResource shell_Guess_Notify_Toggle}"
+                                          AutomationProperties.HelpText="{DynamicResource shell_Guess_Notify_Hint}">
+                                    <StackPanel Margin="0,0,16,0">
+                                        <TextBlock Text="{DynamicResource shell_Guess_Notify_Toggle}" Foreground="{DynamicResource TextBrush}"
+                                                   FontWeight="SemiBold" TextWrapping="Wrap"/>
+                                        <TextBlock Text="{DynamicResource shell_Guess_Notify_Hint}" Style="{StaticResource HintText}" Margin="0,2,0,0"/>
+                                    </StackPanel>
+                                </CheckBox>
                                 <!-- The language vote. Names no language and promises no date: Polish is the only pack today. -->
                                 <Grid x:Name="NextLanguageBanner" Margin="0,16,0,0">
                                     <Grid.ColumnDefinitions>

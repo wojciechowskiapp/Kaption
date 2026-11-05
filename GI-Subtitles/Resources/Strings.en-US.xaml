@@ -352,6 +352,29 @@
     <sys:String x:Key="shell_Intro25_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">Kaption starts by itself when the game is on screen</sys:String>
     <sys:String x:Key="shell_Intro25_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">Start the game and translation starts on its own. Close it and translation stops. If you stop it yourself, it waits for you. The same switch is on the Game and subtitles page.</sys:String>
     <sys:String x:Key="shell_Intro25_Ok" xmlns:sys="clr-namespace:System;assembly=mscorlib">Got it</sys:String>
+    <sys:String x:Key="shell_Spotlight_Eyebrow" xmlns:sys="clr-namespace:System;assembly=mscorlib">New in Kaption</sys:String>
+    <sys:String x:Key="shell_Spotlight_WuWa_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">Wuthering Waves has Polish subtitles</sys:String>
+    <sys:String x:Key="shell_Spotlight_WuWa_Body_Format" xmlns:sys="clr-namespace:System;assembly=mscorlib">Version {0} is ready. Pick the game and the subtitles download on their own.</sys:String>
+    <sys:String x:Key="shell_Spotlight_WuWa_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">The subtitles are ready. Pick the game and they download on their own.</sys:String>
+    <sys:String x:Key="shell_Spotlight_WuWa_Switch" xmlns:sys="clr-namespace:System;assembly=mscorlib">Switch to Wuthering Waves</sys:String>
+    <sys:String x:Key="shell_Spotlight_WuWa_Open" xmlns:sys="clr-namespace:System;assembly=mscorlib">Open Game and subtitles</sys:String>
+    <sys:String x:Key="shell_Spotlight_Guess_Title_Format" xmlns:sys="clr-namespace:System;assembly=mscorlib">{0}: guess today's character</sys:String>
+    <sys:String x:Key="shell_Spotlight_Guess_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">A new puzzle every day for each game Kaption supports. In ranked mode the clock runs and every solve counts towards the monthly leaderboard.</sys:String>
+    <sys:String x:Key="shell_Spotlight_Guess_Play" xmlns:sys="clr-namespace:System;assembly=mscorlib">Play today's puzzle</sys:String>
+    <sys:String x:Key="shell_Guess_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">Guess the character</sys:String>
+    <sys:String x:Key="shell_Guess_Body_Format" xmlns:sys="clr-namespace:System;assembly=mscorlib">{0}: a new puzzle every day and a ranked leaderboard each month.</sys:String>
+    <sys:String x:Key="shell_Guess_And" xmlns:sys="clr-namespace:System;assembly=mscorlib">and</sys:String>
+    <sys:String x:Key="shell_Guess_Play" xmlns:sys="clr-namespace:System;assembly=mscorlib">Play</sys:String>
+    <sys:String x:Key="shell_Guess_Notify_Toggle" xmlns:sys="clr-namespace:System;assembly=mscorlib">Tell me when someone passes me in the ranking</sys:String>
+    <sys:String x:Key="shell_Guess_Notify_Hint" xmlns:sys="clr-namespace:System;assembly=mscorlib">At most once a day, and never while you play or subtitles are on.</sys:String>
+    <sys:String x:Key="GuessNotify_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">Someone passed you in {0}</sys:String>
+    <sys:String x:Key="GuessNotify_Title_Global" xmlns:sys="clr-namespace:System;assembly=mscorlib">Someone passed you in the overall ranking</sys:String>
+    <sys:String x:Key="GuessNotify_Body_Format" xmlns:sys="clr-namespace:System;assembly=mscorlib">You're now #{1} on this month's {0} board, down from #{2}. Just ahead of you: {3}.</sys:String>
+    <sys:String x:Key="GuessNotify_Body_NoName_Format" xmlns:sys="clr-namespace:System;assembly=mscorlib">You're now #{1} on this month's {0} board, down from #{2}.</sys:String>
+    <sys:String x:Key="GuessNotify_Board_Global" xmlns:sys="clr-namespace:System;assembly=mscorlib">overall</sys:String>
+    <sys:String x:Key="GuessNotify_Pseudonym_Format" xmlns:sys="clr-namespace:System;assembly=mscorlib">Player {0}</sys:String>
+    <sys:String x:Key="GuessNotify_Open" xmlns:sys="clr-namespace:System;assembly=mscorlib">See your place</sys:String>
+    <sys:String x:Key="GuessNotify_TurnOff" xmlns:sys="clr-namespace:System;assembly=mscorlib">Turn off</sys:String>
     <sys:String x:Key="onb_Region_Saved" xmlns:sys="clr-namespace:System;assembly=mscorlib">Saved, set by hand</sys:String>
     <sys:String x:Key="onb_Game_DetectedKept_Format" xmlns:sys="clr-namespace:System;assembly=mscorlib">{0} is running. Your saved dialogue area stays; Detect automatically replaces it.</sys:String>
     <sys:String x:Key="shell_Card_AutoStartBlocked" xmlns:sys="clr-namespace:System;assembly=mscorlib">Auto-start on hold</sys:String>
@@ -500,10 +523,10 @@
     <sys:String x:Key="Tip_Settings_OcrModel" xmlns:sys="clr-namespace:System;assembly=mscorlib">Changes the local ONNX models used to detect and read game dialogue.</sys:String>
     <sys:String x:Key="Settings_OcrGpu_Checkbox" xmlns:sys="clr-namespace:System;assembly=mscorlib">Use GPU acceleration (DirectML)</sys:String>
     <sys:String x:Key="Tip_Settings_OcrGpu" xmlns:sys="clr-namespace:System;assembly=mscorlib">Runs text recognition on the graphics card. Kaption switches to the processor on its own if the GPU turns out to be too slow or unstable; tick this box again to give the GPU another try.</sys:String>
-    <sys:String x:Key="Settings_OcrGpu_Quarantined" xmlns:sys="clr-namespace:System;assembly=mscorlib">Kaption is running text recognition on the processor because the GPU was too slow. Tick the box again to retry the GPU.</sys:String>
-    <sys:String x:Key="Dash_GpuQuarantined" xmlns:sys="clr-namespace:System;assembly=mscorlib">Running on the processor: the graphics card was too slow at startup. Tick “Use GPU acceleration” under Help › Advanced to try it again.</sys:String>
+    <sys:String x:Key="Settings_OcrGpu_Quarantined" xmlns:sys="clr-namespace:System;assembly=mscorlib">Kaption is running text recognition on the processor because the GPU couldn't read text reliably. Tick the box again to retry the GPU.</sys:String>
+    <sys:String x:Key="Dash_GpuQuarantined" xmlns:sys="clr-namespace:System;assembly=mscorlib">Running on the processor: the graphics card couldn't read text reliably. Tick “Use GPU acceleration” under Help › Advanced to try it again.</sys:String>
     <sys:String x:Key="Dash_GpuUnavailable" xmlns:sys="clr-namespace:System;assembly=mscorlib">Running on the processor: the graphics card could not be started for translation. Updating the graphics driver usually fixes this; restart Kaption afterwards.</sys:String>
-    <sys:String x:Key="Dash_GpuRetryNextLaunch" xmlns:sys="clr-namespace:System;assembly=mscorlib">Running on the processor this time: the graphics card was busy or slow while Kaption started. It gets another try at the next launch.</sys:String>
+    <sys:String x:Key="Dash_GpuRetryNextLaunch" xmlns:sys="clr-namespace:System;assembly=mscorlib">Running on the processor this time: the graphics card didn't read text reliably while Kaption started. It gets another try at the next launch.</sys:String>
 
     <!-- Dashboard Tab -->
     <sys:String x:Key="Tab_Dashboard" xmlns:sys="clr-namespace:System;assembly=mscorlib">General</sys:String>
@@ -730,7 +753,7 @@
     <sys:String x:Key="Update_Balloon_Body_Format" xmlns:sys="clr-namespace:System;assembly=mscorlib">Version {0} is ready to install. Click to open Settings.</sys:String>
     <!-- Tray notice shown once when Kaption quarantines the GPU for OCR. -->
     <sys:String x:Key="Notice_GpuFallback_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">Kaption switched to the processor</sys:String>
-    <sys:String x:Key="Notice_GpuFallback_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">Your graphics card was too slow to read the dialogue reliably, so Kaption is using the processor instead. Translation keeps working.</sys:String>
+    <sys:String x:Key="Notice_GpuFallback_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">Your graphics card couldn't read the dialogue reliably, so Kaption is using the processor instead. Translation keeps working.</sys:String>
 
     <!-- Region overlay labels -->
     <sys:String x:Key="Overlay_DialogueRegion_Label" xmlns:sys="clr-namespace:System;assembly=mscorlib">Dialogue Region</sys:String>

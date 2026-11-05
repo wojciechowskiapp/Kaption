@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.Runtime.InteropServices;
@@ -456,6 +457,101 @@ namespace GI_Subtitles.Services.Capture
             }
         }
 
+        /// <summary>Adapters in <c>EnumAdapters1</c> order (DirectML's device ids). Empty when DXGI cannot be asked.</summary>
+        internal static IReadOnlyList<GpuAdapterInfo> EnumerateAdapters()
+        {
+            var adapters = new List<GpuAdapterInfo>();
+            IntPtr factory = IntPtr.Zero;
+            try
+            {
+                if (CreateDXGIFactory1(ref IID_IDXGIFactory1, out factory) < 0 || factory == IntPtr.Zero) return adapters;
+                for (int index = 0; index < MaxEnumeratedAdapters; index++)
+                {
+                    // DXGI_ERROR_NOT_FOUND ends the list.
+                    if (IDXGIFactory1_EnumAdapters1(factory, index, out IntPtr adapter) < 0 || adapter == IntPtr.Zero) break;
+                    try
+                    {
+                        if (TryDescribeAdapter(adapter, index, out GpuAdapterInfo info)) adapters.Add(info);
+                    }
+                    finally { Marshal.Release(adapter); }
+                }
+            }
+            catch (Exception ex)
+            {
+                if (Logger.IsDebugEnabled) Logger.Log.Debug($"DXGI adapter enumeration failed: {ex.Message}");
+            }
+            finally
+            {
+                if (factory != IntPtr.Zero) Marshal.Release(factory);
+            }
+            return adapters;
+        }
+
+        /// <summary>
+        /// Adapter LUIDs in the order Windows ranks them for <paramref name="preference"/>
+        /// (<c>IDXGIFactory6::EnumAdapterByGpuPreference</c>, Windows 10 1803+). Null when that interface is missing.
+        /// </summary>
+        internal static IReadOnlyList<long> EnumerateAdapterLuidsByPreference(DxgiGpuPreference preference)
+        {
+            IntPtr factory = IntPtr.Zero;
+            IntPtr factory6 = IntPtr.Zero;
+            try
+            {
+                if (CreateDXGIFactory1(ref IID_IDXGIFactory1, out factory) < 0 || factory == IntPtr.Zero) return null;
+                if (IUnknown_QueryInterface(factory, ref IID_IDXGIFactory6, out factory6) < 0 || factory6 == IntPtr.Zero)
+                    return null;
+
+                var luids = new List<long>();
+                for (int index = 0; index < MaxEnumeratedAdapters; index++)
+                {
+                    if (IDXGIFactory6_EnumAdapterByGpuPreference(
+                            factory6, index, (int)preference, ref IID_IDXGIAdapter1, out IntPtr adapter) < 0
+                        || adapter == IntPtr.Zero) break;
+                    try
+                    {
+                        // Here index is the ranking position, not a device id; only the LUID is used.
+                        if (TryDescribeAdapter(adapter, index, out GpuAdapterInfo info)) luids.Add(info.Luid);
+                    }
+                    finally { Marshal.Release(adapter); }
+                }
+                return luids;
+            }
+            catch (Exception ex)
+            {
+                if (Logger.IsDebugEnabled) Logger.Log.Debug($"DXGI adapter ranking failed: {ex.Message}");
+                return null;
+            }
+            finally
+            {
+                if (factory6 != IntPtr.Zero) Marshal.Release(factory6);
+                if (factory != IntPtr.Zero) Marshal.Release(factory);
+            }
+        }
+
+        private const int MaxEnumeratedAdapters = 16;
+
+        private static bool TryDescribeAdapter(IntPtr adapter, int index, out GpuAdapterInfo info)
+        {
+            info = null;
+            IntPtr descPtr = Marshal.AllocHGlobal(Marshal.SizeOf(typeof(DXGI_ADAPTER_DESC1)));
+            try
+            {
+                if (IDXGIAdapter1_GetDesc1(adapter, descPtr) < 0) return false;
+                var desc = (DXGI_ADAPTER_DESC1)Marshal.PtrToStructure(descPtr, typeof(DXGI_ADAPTER_DESC1));
+                long luid = ((long)desc.AdapterLuid.HighPart << 32) | desc.AdapterLuid.LowPart;
+                info = new GpuAdapterInfo(
+                    index,
+                    (desc.Description ?? "").Trim(),
+                    desc.VendorId,
+                    desc.DeviceId,
+                    (ulong)desc.DedicatedVideoMemory / (1024UL * 1024UL),
+                    luid,
+                    GpuAdapterInfo.LooksSoftware(desc.Flags, desc.VendorId, desc.DeviceId));
+                return true;
+            }
+            finally { Marshal.FreeHGlobal(descPtr); }
+        }
+
         /// <summary>
         /// Convert an absolute virtual-desktop capture rectangle to coordinates local to
         /// one DXGI output. Desktop Duplication exposes one surface per output; it cannot
@@ -518,6 +614,8 @@ namespace GI_Subtitles.Services.Capture
         private const int D3D11_MAP_READ = 1;
 
         private static Guid IID_IDXGIFactory1 = new Guid("770aae78-f26f-4dba-a829-253c83d1b387");
+        private static Guid IID_IDXGIFactory6 = new Guid("c1b6694f-ff09-44a9-b03c-77900a0a1d17");
+        private static Guid IID_IDXGIAdapter1 = new Guid("29038f61-3839-4626-91fd-086879011a05");
         private static Guid IID_IDXGIOutput1 = new Guid("00cddea8-939b-4b83-a340-a685226666cc");
         private static Guid IID_ID3D11Texture2D = new Guid("6f15aaf2-d208-4e89-9ab4-489535d34f9c");
 
@@ -544,6 +642,10 @@ namespace GI_Subtitles.Services.Capture
 
         [UnmanagedFunctionPointer(CallingConvention.StdCall)]
         private delegate int EnumAdapters1Delegate(IntPtr self, int index, out IntPtr ppAdapter);
+
+        [UnmanagedFunctionPointer(CallingConvention.StdCall)]
+        private delegate int EnumAdapterByGpuPreferenceDelegate(
+            IntPtr self, int index, int gpuPreference, ref Guid riid, out IntPtr ppvAdapter);
 
         [UnmanagedFunctionPointer(CallingConvention.StdCall)]
         private delegate int EnumOutputsDelegate(IntPtr self, int index, out IntPtr ppOutput);
@@ -581,6 +683,7 @@ namespace GI_Subtitles.Services.Capture
         // Vtable slot numbers (from COM interface definitions)
         // IUnknown: 0=QI, 1=AddRef, 2=Release
         // IDXGIFactory1: 12=EnumAdapters1
+        // IDXGIFactory6: 29=EnumAdapterByGpuPreference (Factory2 adds 14-24, 3 adds 25, 4 adds 26-27, 5 adds 28)
         // IDXGIAdapter1: 7=EnumOutputs, 10=GetDesc1
         // IDXGIOutput: 7=GetDesc
         // IDXGIOutput1: 22=DuplicateOutput
@@ -600,6 +703,11 @@ namespace GI_Subtitles.Services.Capture
 
         private static int IDXGIFactory1_EnumAdapters1(IntPtr factory, int index, out IntPtr ppAdapter)
             => GetVtblDelegate<EnumAdapters1Delegate>(factory, 12)(factory, index, out ppAdapter);
+
+        private static int IDXGIFactory6_EnumAdapterByGpuPreference(
+            IntPtr factory6, int index, int gpuPreference, ref Guid riid, out IntPtr ppAdapter)
+            => GetVtblDelegate<EnumAdapterByGpuPreferenceDelegate>(factory6, 29)(
+                factory6, index, gpuPreference, ref riid, out ppAdapter);
 
         private static int IDXGIAdapter1_EnumOutputs(IntPtr adapter, int index, out IntPtr ppOutput)
             => GetVtblDelegate<EnumOutputsDelegate>(adapter, 7)(adapter, index, out ppOutput);

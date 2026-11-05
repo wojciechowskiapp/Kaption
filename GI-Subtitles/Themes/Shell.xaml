@@ -399,6 +399,27 @@
         </Setter>
     </Style>
 
+    <!-- LinkButton without the arrow: an action that stays here or switches something off ("Wyłącz"). -->
+    <Style x:Key="LinkButtonPlain" TargetType="Button" BasedOn="{StaticResource LinkButton}">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border Background="Transparent" Padding="{TemplateBinding Padding}" MinHeight="32">
+                        <ContentPresenter VerticalAlignment="Center" RecognizesAccessKey="True"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Foreground" Value="{DynamicResource TextDisabledBrush}"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <!-- A shortcut inside a Start tile (Skróty › Karta buildu): one row that is a button. An icon chip, a title and a
          hint, the external-link mark at the end; a sunken surface and a hairline so it reads as clickable next to the
          key-cap rows. At least 44 px tall; hover, pressed, disabled and the keyboard focus ring in palette keys, so

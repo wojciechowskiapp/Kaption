@@ -353,6 +353,29 @@
     <sys:String x:Key="shell_Intro25_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">Kaption sam startuje, gdy gra jest na ekranie</sys:String>
     <sys:String x:Key="shell_Intro25_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">Włącz grę, a tłumaczenie ruszy samo. Zamknij ją, a zatrzyma się. Jeśli wyłączysz je ręcznie, poczeka na Ciebie. Ten sam przełącznik znajdziesz w zakładce Gra i napisy.</sys:String>
     <sys:String x:Key="shell_Intro25_Ok" xmlns:sys="clr-namespace:System;assembly=mscorlib">Rozumiem</sys:String>
+    <sys:String x:Key="shell_Spotlight_Eyebrow" xmlns:sys="clr-namespace:System;assembly=mscorlib">Nowość w Kaption</sys:String>
+    <sys:String x:Key="shell_Spotlight_WuWa_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">Wuthering Waves ma już polskie napisy</sys:String>
+    <sys:String x:Key="shell_Spotlight_WuWa_Body_Format" xmlns:sys="clr-namespace:System;assembly=mscorlib">Wersja {0} jest gotowa. Wybierz grę, a napisy pobiorą się same.</sys:String>
+    <sys:String x:Key="shell_Spotlight_WuWa_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">Napisy są gotowe. Wybierz grę, a pobiorą się same.</sys:String>
+    <sys:String x:Key="shell_Spotlight_WuWa_Switch" xmlns:sys="clr-namespace:System;assembly=mscorlib">Przełącz na Wuthering Waves</sys:String>
+    <sys:String x:Key="shell_Spotlight_WuWa_Open" xmlns:sys="clr-namespace:System;assembly=mscorlib">Otwórz zakładkę Gra i napisy</sys:String>
+    <sys:String x:Key="shell_Spotlight_Guess_Title_Format" xmlns:sys="clr-namespace:System;assembly=mscorlib">{0}: zgadnij postać dnia</sys:String>
+    <sys:String x:Key="shell_Spotlight_Guess_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">Codziennie nowa zagadka z każdej gry, którą obsługuje Kaption. W trybie rankingowym liczy się czas, a wyniki trafiają do rankingu miesiąca.</sys:String>
+    <sys:String x:Key="shell_Spotlight_Guess_Play" xmlns:sys="clr-namespace:System;assembly=mscorlib">Zagraj dziś</sys:String>
+    <sys:String x:Key="shell_Guess_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">Zgadnij postać</sys:String>
+    <sys:String x:Key="shell_Guess_Body_Format" xmlns:sys="clr-namespace:System;assembly=mscorlib">{0}: nowa zagadka każdego dnia i ranking co miesiąc.</sys:String>
+    <sys:String x:Key="shell_Guess_And" xmlns:sys="clr-namespace:System;assembly=mscorlib">i</sys:String>
+    <sys:String x:Key="shell_Guess_Play" xmlns:sys="clr-namespace:System;assembly=mscorlib">Zagraj</sys:String>
+    <sys:String x:Key="shell_Guess_Notify_Toggle" xmlns:sys="clr-namespace:System;assembly=mscorlib">Daj znać, gdy ktoś mnie wyprzedzi w rankingu</sys:String>
+    <sys:String x:Key="shell_Guess_Notify_Hint" xmlns:sys="clr-namespace:System;assembly=mscorlib">Najwyżej raz dziennie i nigdy w trakcie gry ani przy włączonych napisach.</sys:String>
+    <sys:String x:Key="GuessNotify_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">Ktoś Cię wyprzedził w {0}</sys:String>
+    <sys:String x:Key="GuessNotify_Title_Global" xmlns:sys="clr-namespace:System;assembly=mscorlib">Ktoś Cię wyprzedził w rankingu ogólnym</sys:String>
+    <sys:String x:Key="GuessNotify_Body_Format" xmlns:sys="clr-namespace:System;assembly=mscorlib">Spadasz z {2}. na {1}. miejsce w miesięcznym rankingu {0}. Tuż przed Tobą: {3}.</sys:String>
+    <sys:String x:Key="GuessNotify_Body_NoName_Format" xmlns:sys="clr-namespace:System;assembly=mscorlib">Spadasz z {2}. na {1}. miejsce w miesięcznym rankingu {0}.</sys:String>
+    <sys:String x:Key="GuessNotify_Board_Global" xmlns:sys="clr-namespace:System;assembly=mscorlib">ogólnym</sys:String>
+    <sys:String x:Key="GuessNotify_Pseudonym_Format" xmlns:sys="clr-namespace:System;assembly=mscorlib">Gracz {0}</sys:String>
+    <sys:String x:Key="GuessNotify_Open" xmlns:sys="clr-namespace:System;assembly=mscorlib">Zobacz swoje miejsce</sys:String>
+    <sys:String x:Key="GuessNotify_TurnOff" xmlns:sys="clr-namespace:System;assembly=mscorlib">Wyłącz</sys:String>
     <sys:String x:Key="onb_Region_Saved" xmlns:sys="clr-namespace:System;assembly=mscorlib">Zapisany ręcznie</sys:String>
     <sys:String x:Key="onb_Game_DetectedKept_Format" xmlns:sys="clr-namespace:System;assembly=mscorlib">Na ekranie jest {0}. Zapisany obszar dialogu zostaje, „Wykryj automatycznie” go zastąpi.</sys:String>
     <sys:String x:Key="shell_Card_AutoStartBlocked" xmlns:sys="clr-namespace:System;assembly=mscorlib">Auto-start wstrzymany</sys:String>
@@ -501,10 +524,10 @@
     <sys:String x:Key="Tip_Settings_OcrModel" xmlns:sys="clr-namespace:System;assembly=mscorlib">Zmienia lokalne modele ONNX używane do wykrywania i odczytywania dialogów z gry.</sys:String>
     <sys:String x:Key="Settings_OcrGpu_Checkbox" xmlns:sys="clr-namespace:System;assembly=mscorlib">Używaj akceleracji GPU (DirectML)</sys:String>
     <sys:String x:Key="Tip_Settings_OcrGpu" xmlns:sys="clr-namespace:System;assembly=mscorlib">Rozpoznaje tekst na karcie graficznej. Jeśli GPU okaże się za wolne albo niestabilne, Kaption sam przełączy się na procesor; zaznacz to pole ponownie, żeby dać GPU jeszcze jedną szansę.</sys:String>
-    <sys:String x:Key="Settings_OcrGpu_Quarantined" xmlns:sys="clr-namespace:System;assembly=mscorlib">Kaption rozpoznaje tekst na procesorze, bo karta graficzna była za wolna. Zaznacz pole ponownie, żeby spróbować z GPU.</sys:String>
-    <sys:String x:Key="Dash_GpuQuarantined" xmlns:sys="clr-namespace:System;assembly=mscorlib">Działa na procesorze, bo karta graficzna była za wolna przy starcie. Zaznacz „Używaj akceleracji GPU” w Pomoc › Zaawansowane, żeby spróbować ponownie.</sys:String>
+    <sys:String x:Key="Settings_OcrGpu_Quarantined" xmlns:sys="clr-namespace:System;assembly=mscorlib">Kaption rozpoznaje tekst na procesorze, bo karta graficzna nie radziła sobie z odczytem. Zaznacz pole ponownie, żeby spróbować z GPU.</sys:String>
+    <sys:String x:Key="Dash_GpuQuarantined" xmlns:sys="clr-namespace:System;assembly=mscorlib">Działa na procesorze, bo karta graficzna nie radziła sobie z odczytem tekstu. Zaznacz „Używaj akceleracji GPU” w Pomoc › Zaawansowane, żeby spróbować ponownie.</sys:String>
     <sys:String x:Key="Dash_GpuUnavailable" xmlns:sys="clr-namespace:System;assembly=mscorlib">Działa na procesorze, bo nie udało się uruchomić karty graficznej do tłumaczenia. Zwykle pomaga aktualizacja sterownika karty, potem uruchom Kaption ponownie.</sys:String>
-    <sys:String x:Key="Dash_GpuRetryNextLaunch" xmlns:sys="clr-namespace:System;assembly=mscorlib">Tym razem działa na procesorze, bo karta graficzna była zajęta albo wolna przy starcie. Przy następnym uruchomieniu Kaption spróbuje znowu.</sys:String>
+    <sys:String x:Key="Dash_GpuRetryNextLaunch" xmlns:sys="clr-namespace:System;assembly=mscorlib">Tym razem działa na procesorze, bo karta graficzna nie radziła sobie z odczytem tekstu przy starcie. Przy następnym uruchomieniu Kaption spróbuje znowu.</sys:String>
 
     <!-- Dashboard Tab -->
     <sys:String x:Key="Tab_Dashboard" xmlns:sys="clr-namespace:System;assembly=mscorlib">Ogólne</sys:String>
@@ -735,7 +758,7 @@
     <sys:String x:Key="Update_Balloon_Body_Format" xmlns:sys="clr-namespace:System;assembly=mscorlib">Wersja {0} jest gotowa do instalacji. Kliknij, żeby otworzyć Ustawienia.</sys:String>
     <!-- Powiadomienie w zasobniku, pokazywane raz przy przejściu OCR na CPU. -->
     <sys:String x:Key="Notice_GpuFallback_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">Kaption przełączył się na procesor</sys:String>
-    <sys:String x:Key="Notice_GpuFallback_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">Karta graficzna była za wolna, żeby stabilnie odczytywać dialogi, więc Kaption korzysta z procesora. Tłumaczenie działa dalej.</sys:String>
+    <sys:String x:Key="Notice_GpuFallback_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">Karta graficzna nie radziła sobie z odczytem dialogów, więc Kaption korzysta z procesora. Tłumaczenie działa dalej.</sys:String>
 
     <!-- Region overlay labels -->
     <sys:String x:Key="Overlay_DialogueRegion_Label" xmlns:sys="clr-namespace:System;assembly=mscorlib">Obszar dialogu</sys:String>

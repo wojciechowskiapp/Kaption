@@ -47,7 +47,7 @@ namespace GI_Test
         [TestMethod]
         public void CommunityFixes_FollowTheManifest_NotAHandKeptList()
         {
-            Assert.IsTrue(SuggestionRules.TakesSuggestions("wuwa", "pl"), "a beta game whose sources list community");
+            Assert.IsTrue(SuggestionRules.TakesSuggestions("wuwa", "pl"), "a listed game whose sources list community");
 
             // The fixture game is translated by the updater only: its fixes stay on the PC.
             string root = RenderTestKit.RepoRoot();
@@ -75,12 +75,12 @@ namespace GI_Test
         }
 
         [TestMethod]
-        public void WuWa_IsAListedBetaGame_AfterTheThreeShippedOnes()
+        public void WuWa_IsAListedLiveGame_AfterTheThreeShippedOnes()
         {
             var registry = GameRegistry.Current;
             CollectionAssert.AreEqual(new[] { "genshin", "starrail", "zzz", "wuwa" }, registry.WireIds.ToArray());
             GameManifest wuwa = registry.FindByWireId("wuwa");
-            Assert.AreEqual(GameManifest.StatusBeta, wuwa.Status);
+            Assert.AreEqual(GameManifest.StatusLive, wuwa.Status, "live since session 59");
             Assert.AreEqual("WuWa", wuwa.GameId);
             Assert.AreSame(wuwa, registry.Find("Wuthering Waves"));
             Assert.AreEqual(GameDesktop.MirrorNone, wuwa.Desktop.UpstreamTextMap, "minted key space: TextMapEN.json comes from the bundle");

@@ -71,6 +71,21 @@ Only 9 or 10 digits without a leading zero count; anything else in these keys is
 
 The domain schedule comes from `kaption.one/data/today/genshin.json` and is kept in `%APPDATA%\Kaption\Genshin\today.json`; the showcase is kept, trimmed to names, levels and talent levels, in `showcase.json` next to it. A UID the build card read from the game screen is offered in the field but saved only when you click Save. The log never names the UID, and diagnostic bundles mask it.
 
+## Guess game and Start notices
+
+Kaption's guess game lives on kaption.one (Gendle, Stardle, Zendle, Wuwdle). The app can tell you, at most once a day, when someone passes you in this month's ranked leaderboard. It reads your place from `api.kaption.one/api/app/guess/standing` about 2 minutes after start and then every 4 hours (every 12 hours while you have no place this month; after an error it tries again in 15 minutes, then an hour, then 4 hours), and only while you are signed in. A drop on the selected game's board or on the overall board becomes one tray notice, never while subtitles run, while a game is in front, or while Windows is in a full-screen app, presentation mode or quiet time. Notices count only once you have points this month, and only when the player now just ahead of you has more points than you (a tie-break at equal points is no notice). Start repeats the notice in a strip with "Zobacz swoje miejsce" ("See your place") and "Wyłącz" ("Turn off"); the switch is in Pomoc › Społeczność (Help › Community). If the server turns the request down, Kaption only notes it in the log: your sign-in is never touched.
+
+| Key | Default | What it does |
+|---|---|---|
+| `GuessNotify.Enabled` | `true` | Off stops the reads and the notices. The switch "Daj znać, gdy ktoś mnie wyprzedzi w rankingu" ("Tell me when someone passes me in the ranking") and "Wyłącz" on the Start strip write it. |
+| `GuessNotify.LastShownDay` | none | Written by Kaption: the local day (`yyyy-MM-dd`) the last notice reached you, as a tray notice or on the Start strip. |
+| `GuessNotify.Baseline` | none | Written by Kaption: your place per board the last time it was accepted, as JSON (`{"global":{"period":"2026-11","rank":3,"points":140}}`). A drop is measured from here; a new month starts again. |
+| `GuessNotify.StandingUrl` | none | Debug builds only: a test server's address used instead of the standing endpoint, called without your session. Local `http` or any `https` address. Release builds ignore it. Never point `ApiUrl` at a test server for this. |
+| `Ui.Seen.WuWaPolish` | `false` | The "Nowość w Kaption" ("New in Kaption") card's Wuthering Waves row was closed or used. The setup sets it for new installs. The row shows only while the server lists the Polish WuWa pack. |
+| `Ui.Seen.GuessGame` | `false` | The same card's guess game row was closed or used. |
+| `Ui.Spotlight.Shows.WuWaPolish`, `Ui.Spotlight.Shows.GuessGame` | `0` | Written by Kaption: launches on which each row was on screen. A row retires after 3. |
+| `Ui.DismissedAnnouncements` | none | Ids of the announcements you closed on Start (newest last, at most 50), so a closed one never comes back. |
+
 ## OCR and translation
 
 The per-game defaults come from `GameRegionProfile`. Override them only for specific hardware or custom text.

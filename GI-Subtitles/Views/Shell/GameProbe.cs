@@ -88,6 +88,13 @@ namespace GI_Subtitles.Views.Shell
             return false;
         }
 
+        /// <summary>The executable name (no ".exe") of the window in front, or null when there is none or Windows will not say.</summary>
+        public static string ForegroundImageName()
+        {
+            uint pid = ProcessIdOf(GetForegroundWindow());
+            return pid == 0 ? null : ImageNameOf(pid);
+        }
+
         private static HashSet<uint> ListGameProcesses(IReadOnlyCollection<string> processNames)
         {
             var pids = new HashSet<uint>();

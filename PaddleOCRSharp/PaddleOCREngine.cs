@@ -944,6 +944,13 @@ namespace PaddleOCRSharp
                 ? (region.Width, region.Height)
                 : (FallbackDetectorWidth, FallbackDetectorHeight);
 
+        /// <summary>The frame size warm-up compiles the detector for; later passes of this size reuse that shape.</summary>
+        public static CvSize WarmUpDetectorSize(CvSize? captureRegion)
+        {
+            (int width, int height) = WarmUpDetectorShape(captureRegion);
+            return new CvSize(width, height);
+        }
+
         /// <summary>
         /// Times one detector + recogniser pass over the shapes <see cref="WarmUp(TimeSpan, CvSize?)"/>
         /// compiled. Warm-up time is mostly DirectML kernel compilation; this is what a frame costs.

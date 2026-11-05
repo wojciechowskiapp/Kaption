@@ -2196,7 +2196,19 @@ namespace GI_Subtitles.Views
             string input,
             bool? useGpuOverride = null,
             string profileOverride = null)
+            => LoadEngine(input, useGpuOverride, profileOverride, readCheck: null);
+
+        /// <summary>Budget for one startup read check; it reuses compiled shapes, so this only catches a hang.</summary>
+        private static readonly TimeSpan OcrReadCheckTimeout = TimeSpan.FromSeconds(10);
+
+        /// <param name="readCheck">Replaces <see cref="OcrReadProbe.TryRead"/> in tests; null runs the real check.</param>
+        internal static PaddleOCREngine LoadEngine(
+            string input,
+            bool? useGpuOverride,
+            string profileOverride,
+            Func<PaddleOCREngine, OpenCvSharp.Size, bool?> readCheck)
         {
+            readCheck ??= (candidate, canvas) => OcrReadProbe.TryRead(candidate, canvas, OcrReadCheckTimeout);
             bool useGpu = useGpuOverride ?? Config.Get("UseGpuOcr", true);
             // A quarantine recorded by an earlier session (or by this one's
             // runtime recovery) outranks the preference until the next release.
@@ -2219,7 +2231,9 @@ namespace GI_Subtitles.Views
             PaddleOCREngine CreateEngine(OcrModelProfile profile)
             {
                 OCRModelConfig config = profile.CreateModelConfig(inferenceRoot);
-                OCRParameter parameters = new OCRParameter
+                OpenCvSharp.Size? captureSize = GetConfiguredCaptureSize();
+                // A fresh object per engine: PaddleOCREngine keeps the reference, and the read check holds two engines.
+                OCRParameter NewParameters(bool gpu, int gpuId) => new OCRParameter
                 {
                     cpu_math_library_num_threads = 3,
                     enable_mkldnn = true,
@@ -2233,100 +2247,127 @@ namespace GI_Subtitles.Views
                     // Product policy: suppress low-confidence texture/UI
                     // hallucinations even when the detector has high recall.
                     rec_score_thresh = 0.5f,
-                    use_gpu = useGpu,
-                    gpu_id = 0
+                    use_gpu = gpu,
+                    gpu_id = gpuId
                 };
 
+                OCRParameter described = NewParameters(useGpu, 0);
                 Logger.Log.Info(
                     $"Loading OCR profile '{profile.Id}' ({profile.ModelName}); " +
                     $"GPU acceleration: {(useGpu ? "requested" : "disabled")}, " +
-                    $"detThreshold={parameters.det_db_thresh:F2}, " +
-                    $"detBoxThreshold={parameters.det_db_box_thresh:F2}, " +
-                    $"detUnclip={parameters.det_db_unclip_ratio:F2}, " +
-                    $"recScoreThreshold={parameters.rec_score_thresh:F2}");
+                    $"detThreshold={described.det_db_thresh:F2}, " +
+                    $"detBoxThreshold={described.det_db_box_thresh:F2}, " +
+                    $"detUnclip={described.det_db_unclip_ratio:F2}, " +
+                    $"recScoreThreshold={described.rec_score_thresh:F2}");
 
-                // One INFO line naming the device DirectML will target. We only
-                // ever see GPU stalls second-hand through app.log, and "which
-                // GPU" is the first question every such ticket raises. Reuses
-                // the DXGI interop already in the capture backend; the DML
-                // device id and the DXGI adapter index share an enumeration
-                // order in practice, so gpu_id is the right index to describe.
-                if (useGpu)
+                // Every engine built here is returned or disposed, also when a constructor or warm-up throws.
+                var held = new List<PaddleOCREngine>();
+                PaddleOCREngine Build(OCRParameter parameters)
                 {
-                    if (GI_Subtitles.Services.Capture.DxgiScreenCapture.TryGetAdapterName(
-                            parameters.gpu_id, out string adapterName))
-                        Logger.Log.Info($"DirectML target adapter {parameters.gpu_id}: {adapterName}.");
-                    else
-                        Logger.Log.Info($"DirectML target adapter {parameters.gpu_id}: name unavailable.");
+                    var built = new PaddleOCREngine(config, parameters);
+                    held.Add(built);
+                    return built;
+                }
+                void Drop(PaddleOCREngine dropped)
+                {
+                    held.Remove(dropped);
+                    dropped.Dispose();
+                }
+                PaddleOCREngine Loaded(PaddleOCREngine kept)
+                {
+                    held.Remove(kept);
+                    foreach (PaddleOCREngine other in held) other.Dispose();
+                    held.Clear();
+                    Logger.Log.Info(
+                        $"OCR engine loaded successfully — model: {kept.ModelName}, " +
+                        $"provider: {kept.ExecutionProvider}, GPU active: {kept.IsUsingGpu}");
+                    return kept;
                 }
 
-                PaddleOCREngine engine = null;
                 try
                 {
-                    engine = new PaddleOCREngine(config, parameters);
-                    string gpuUnfitReason = null;
-                    try
+                    PaddleOCREngine processor = null; // warm, from a read check that the processor passed
+                    string unfitReason = null;
+                    var unreadable = new List<string>();
+                    if (useGpu)
                     {
-                        TimeSpan warmUpDuration = engine.WarmUp(
-                            TimeSpan.FromSeconds(engine.IsUsingGpu ? 30 : 45),
-                            GetConfiguredCaptureSize());
-                        if (OcrGpuFitness.NeedsSteadyStateProbe(engine.IsUsingGpu, warmUpDuration))
+                        OcrAdapterChoice choice = OcrAdapterSelector.ChooseForThisProcess();
+                        OcrAdapterSelector.RecordInUse(choice.Index);
+                        // The chosen GPU first, then adapter 0, which is what ran before there was a choice.
+                        int[] candidates = choice.Index == 0 ? new[] { 0 } : new[] { choice.Index, 0 };
+                        foreach (int gpuId in candidates)
                         {
-                            // One contended launch (a game loading) must not move a whole release to CPU.
-                            TimeSpan steady = engine.ProbeSteadyState(TimeSpan.FromSeconds(10), GetConfiguredCaptureSize());
-                            if (OcrGpuFitness.IsUnfit(warmUpDuration, steady))
+                            string label = DescribeOcrAdapter(gpuId);
+                            Logger.Log.Info($"DirectML target adapter {gpuId}: {label} " +
+                                            $"({(gpuId == choice.Index ? choice.Reason : "adapter 0, as before the GPU choice")}).");
+
+                            PaddleOCREngine gpu = Build(NewParameters(true, gpuId));
+                            if (!gpu.IsUsingGpu)
                             {
-                                gpuUnfitReason =
-                                    $"DirectML OCR warm-up took {warmUpDuration.TotalSeconds:F1}s " +
-                                    $"(budget {OcrGpuFitness.WarmUpBudget.TotalSeconds:F0}s) and a compiled pass still took " +
-                                    $"{steady.TotalMilliseconds:F0}ms (budget {OcrGpuFitness.SteadyStateBudget.TotalMilliseconds:F0}ms)";
+                                // The constructor fell back to CPU sessions (driver, eGPU unplugged); try the next GPU.
+                                Logger.Log.Warn($"DirectML did not start on adapter {gpuId}.");
+                                Drop(gpu);
+                                continue;
                             }
-                            else
+
+                            string unfit = MeasureOcrGpuFitness(gpu, captureSize);
+                            if (unfit != null)
                             {
-                                Logger.Log.Warn(
-                                    $"DirectML OCR warm-up took {warmUpDuration.TotalSeconds:F1}s, but a compiled pass took " +
-                                    $"{steady.TotalMilliseconds:F0}ms: slow kernel compilation, not a slow GPU. Keeping the GPU.");
+                                Logger.Log.Warn($"{unfit} on adapter {gpuId}.");
+                                unfitReason = unfit;
+                                Drop(gpu);
+                                continue;
                             }
+
+                            // Fast is not enough: the GPU must also read.
+                            OcrReadProbeVerdict verdict = RunOcrReadCheck(
+                                gpu, config, NewParameters(false, 0), captureSize, readCheck, out PaddleOCREngine readCpu);
+                            if (readCpu != null)
+                            {
+                                held.Add(readCpu);
+                                if (processor == null) processor = readCpu;
+                                else Drop(readCpu);
+                            }
+                            if (verdict != OcrReadProbeVerdict.GpuUnreadableCpuReads)
+                            {
+                                OcrGpuQuarantine.ClearStrikes();
+                                OcrAdapterSelector.RecordInUse(gpuId);
+                                return Loaded(gpu);
+                            }
+                            Logger.Log.Warn($"DirectML on adapter {gpuId} did not read the startup test word; the processor did.");
+                            unreadable.Add(label);
+                            Drop(gpu);
                         }
                     }
-                    catch (Exception warmupEx) when (engine.IsUsingGpu)
-                    {
-                        gpuUnfitReason =
-                            $"DirectML OCR warm-up failed ({warmupEx.GetType().Name}: " +
-                            $"{warmupEx.Message})";
-                    }
 
-                    if (gpuUnfitReason != null)
+                    if (unreadable.Count > 0 || unfitReason != null)
                     {
-                        // Failed warm-up, or slow even on compiled shapes: CPU for this session. Only the
-                        // second such launch in a row for this version persists the quarantine.
+                        string reason = unreadable.Count > 0
+                            ? $"DirectML on {string.Join(" and ", unreadable)} did not read the startup test word; the processor did"
+                            : unfitReason;
+                        // CPU for this session; only the second such launch in a row for this version persists it.
                         if (OcrGpuFitness.QuarantineAfterStrike(OcrGpuQuarantine.RecordStrike()))
                         {
-                            Logger.Log.Warn($"{gpuUnfitReason}. Second launch in a row; retrying {profile.ModelName} on CPU.");
-                            OcrGpuQuarantine.Engage(gpuUnfitReason);
+                            Logger.Log.Warn($"{reason}. Second launch in a row; {profile.ModelName} runs on the CPU.");
+                            OcrGpuQuarantine.Engage(reason);
                         }
                         else
                         {
-                            Logger.Log.Warn($"{gpuUnfitReason}. Using the CPU for this session; DirectML is retried at the next launch.");
+                            Logger.Log.Warn($"{reason}. Using the CPU for this session; DirectML is retried at the next launch.");
                         }
-                        engine.Dispose();
-                        engine = null;
-                        parameters.use_gpu = false;
-                        engine = new PaddleOCREngine(config, parameters);
-                        engine.WarmUp(TimeSpan.FromSeconds(45), GetConfiguredCaptureSize());
                     }
 
-                    if (gpuUnfitReason == null && engine.IsUsingGpu)
-                        OcrGpuQuarantine.ClearStrikes();
-
-                    Logger.Log.Info(
-                        $"OCR engine loaded successfully — model: {engine.ModelName}, " +
-                        $"provider: {engine.ExecutionProvider}, GPU active: {engine.IsUsingGpu}");
-                    return engine;
+                    if (processor == null)
+                    {
+                        processor = Build(NewParameters(false, 0));
+                        processor.WarmUp(TimeSpan.FromSeconds(45), captureSize);
+                    }
+                    return Loaded(processor);
                 }
                 catch
                 {
-                    engine?.Dispose();
+                    foreach (PaddleOCREngine built in held) built.Dispose();
+                    held.Clear();
                     throw;
                 }
             }
@@ -2375,6 +2416,90 @@ namespace GI_Subtitles.Views
                 }
             }
         }
+
+        /// <summary>
+        /// Checks that a GPU engine that passed the speed gates also reads (see <see cref="OcrReadProbe"/>). Only when
+        /// the GPU misses the test word and a processor engine reads it is the verdict
+        /// <see cref="OcrReadProbeVerdict.GpuUnreadableCpuReads"/>, with that warm engine in <paramref name="cpuEngine"/>.
+        /// Anything else, including an exception, means "keep the GPU". Never throws.
+        /// </summary>
+        private static OcrReadProbeVerdict RunOcrReadCheck(
+            PaddleOCREngine gpuEngine,
+            OCRModelConfig config,
+            OCRParameter cpuParameters,
+            OpenCvSharp.Size? captureSize,
+            Func<PaddleOCREngine, OpenCvSharp.Size, bool?> readCheck,
+            out PaddleOCREngine cpuEngine)
+        {
+            cpuEngine = null;
+            PaddleOCREngine built = null;
+            try
+            {
+                OpenCvSharp.Size canvas = OcrReadProbe.CanvasFor(captureSize);
+                bool? gpuReads = readCheck(gpuEngine, canvas);
+                if (gpuReads != false) return OcrReadProbe.Decide(gpuReads, null);
+
+                built = new PaddleOCREngine(config, cpuParameters);
+                built.WarmUp(TimeSpan.FromSeconds(45), captureSize);
+                bool? cpuReads = readCheck(built, canvas);
+                OcrReadProbeVerdict verdict = OcrReadProbe.Decide(gpuReads, cpuReads);
+                if (verdict == OcrReadProbeVerdict.GpuUnreadableCpuReads)
+                {
+                    cpuEngine = built;
+                    built = null;
+                }
+                else
+                {
+                    Logger.Log.Warn(cpuReads == null
+                        ? "OCR read check inconclusive: the processor check could not run; keeping the GPU."
+                        : "OCR read check inconclusive: the processor did not read the test word either; keeping the GPU.");
+                }
+                return verdict;
+            }
+            catch (Exception ex)
+            {
+                Logger.Log.Warn($"OCR read check failed ({ex.GetType().Name}: {ex.Message}); keeping the GPU.");
+                return OcrReadProbeVerdict.Inconclusive;
+            }
+            finally
+            {
+                built?.Dispose();
+            }
+        }
+
+        /// <summary>
+        /// Null when a GPU engine is fast enough to keep, else why not. Unchanged rules: a failed warm-up, or a slow one
+        /// whose compiled pass is slow too (OcrGpuFitness). One contended launch must not move a whole release to CPU.
+        /// </summary>
+        private static string MeasureOcrGpuFitness(PaddleOCREngine engine, OpenCvSharp.Size? captureSize)
+        {
+            try
+            {
+                TimeSpan warmUpDuration = engine.WarmUp(TimeSpan.FromSeconds(30), captureSize);
+                if (!OcrGpuFitness.NeedsSteadyStateProbe(engine.IsUsingGpu, warmUpDuration)) return null;
+
+                TimeSpan steady = engine.ProbeSteadyState(TimeSpan.FromSeconds(10), captureSize);
+                if (OcrGpuFitness.IsUnfit(warmUpDuration, steady))
+                {
+                    return $"DirectML OCR warm-up took {warmUpDuration.TotalSeconds:F1}s " +
+                           $"(budget {OcrGpuFitness.WarmUpBudget.TotalSeconds:F0}s) and a compiled pass still took " +
+                           $"{steady.TotalMilliseconds:F0}ms (budget {OcrGpuFitness.SteadyStateBudget.TotalMilliseconds:F0}ms)";
+                }
+                Logger.Log.Warn(
+                    $"DirectML OCR warm-up took {warmUpDuration.TotalSeconds:F1}s, but a compiled pass took " +
+                    $"{steady.TotalMilliseconds:F0}ms: slow kernel compilation, not a slow GPU. Keeping the GPU.");
+                return null;
+            }
+            catch (Exception warmupEx)
+            {
+                return $"DirectML OCR warm-up failed ({warmupEx.GetType().Name}: {warmupEx.Message})";
+            }
+        }
+
+        private static string DescribeOcrAdapter(int gpuId) =>
+            GI_Subtitles.Services.Capture.DxgiScreenCapture.TryGetAdapterName(gpuId, out string name)
+                ? name
+                : $"adapter {gpuId} (name unavailable)";
         public void SetImage(Bitmap bitmap)
         {
             using (MemoryStream ms = new MemoryStream())
@@ -3850,11 +3975,13 @@ namespace GI_Subtitles.Views
         {
             if (AnnouncementsStack == null) return;
             AnnouncementsStack.Children.Clear();
-            foreach (var item in items)
+            // A banner the player closed stays closed (Ui.DismissedAnnouncements).
+            var visible = GI_Subtitles.Views.Shell.AnnouncementDismissals.Visible(items, a => a.Id, GI_Subtitles.Views.Shell.AnnouncementDismissals.Load());
+            foreach (var item in visible)
             {
                 AnnouncementsStack.Children.Add(BuildAnnouncementBorder(item));
             }
-            AnnouncementsStack.Visibility = Visibility.Visible;
+            AnnouncementsStack.Visibility = visible.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
         }
 
         /// <summary>
@@ -3953,16 +4080,49 @@ namespace GI_Subtitles.Views
                 });
             }
 
-            return new Border
+            var layout = new System.Windows.Controls.Grid();
+            layout.ColumnDefinitions.Add(new System.Windows.Controls.ColumnDefinition { Width = new System.Windows.GridLength(1, System.Windows.GridUnitType.Star) });
+            layout.ColumnDefinitions.Add(new System.Windows.Controls.ColumnDefinition { Width = System.Windows.GridLength.Auto });
+            layout.Children.Add(panel);
+            var banner = new Border
             {
                 Background = new SolidColorBrush(bg),
                 BorderBrush = new SolidColorBrush(border),
                 BorderThickness = new Thickness(1),
                 CornerRadius = new CornerRadius(10),
-                Padding = new Thickness(14, 10, 14, 10),
+                Padding = new Thickness(14, 10, 8, 10),
                 Margin = new Thickness(0, 0, 0, 10),
-                Child = panel,
+                Child = layout,
             };
+            if (!string.IsNullOrEmpty(a?.Id))
+            {
+                var close = new System.Windows.Controls.Button
+                {
+                    VerticalAlignment = System.Windows.VerticalAlignment.Top,
+                    Margin = new Thickness(8, -2, 0, 0),
+                    Content = new System.Windows.Shapes.Path
+                    {
+                        Data = TryFindResource("IconClose") as System.Windows.Media.Geometry,
+                        Width = 16, Height = 16, Stretch = System.Windows.Media.Stretch.None, StrokeThickness = 1.6,
+                        Stroke = new SolidColorBrush(title),
+                        StrokeStartLineCap = System.Windows.Media.PenLineCap.Round, StrokeEndLineCap = System.Windows.Media.PenLineCap.Round,
+                    },
+                };
+                close.SetResourceReference(FrameworkElement.StyleProperty, "IconButton");
+                close.SetResourceReference(FrameworkElement.ToolTipProperty, "shell_Action_Dismiss");
+                System.Windows.Automation.AutomationProperties.SetName(close, L("shell_Action_Dismiss", "Hide"));
+                System.Windows.Controls.Grid.SetColumn(close, 1);
+                string id = a.Id;
+                close.Click += (_, __) =>
+                {
+                    GI_Subtitles.Views.Shell.AnnouncementDismissals.Dismiss(id);
+                    AnnouncementsStack.Children.Remove(banner);
+                    if (AnnouncementsStack.Children.Count == 0) AnnouncementsStack.Visibility = Visibility.Collapsed;
+                    Logger.Log.Info($"Announcement {id} closed on Start.");
+                };
+                layout.Children.Add(close);
+            }
+            return banner;
         }
 
         /// <summary>

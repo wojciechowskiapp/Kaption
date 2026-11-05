@@ -419,6 +419,34 @@ namespace GI_Subtitles.Services.Network
         }
 
         /// <summary>
+        /// GET /api/app/guess/standing?game= — the player's place on this month's guess boards, for the ranking notice.
+        /// Every failure is logged at Info and thrown to the caller (GuessStandingPoller), which backs off. A 401 here
+        /// never reaches the licence: a cosmetic feature must not end the session. <paramref name="fixtureUrl"/>
+        /// (Debug builds only) replaces the endpoint and is called without the session.
+        /// </summary>
+        public async Task<Services.Guess.GuessStanding> GetGuessStandingAsync(string sessionJwt, string game, CancellationToken ct,
+                                                                             string fixtureUrl = null)
+        {
+            string query = string.IsNullOrWhiteSpace(game) ? string.Empty : "game=" + Uri.EscapeDataString(game.Trim().ToLowerInvariant());
+            string url;
+            string token;
+            if (!string.IsNullOrEmpty(fixtureUrl))
+            {
+                url = query.Length == 0 ? fixtureUrl : fixtureUrl + (fixtureUrl.Contains('?') ? "&" : "?") + query;
+                token = null;
+            }
+            else
+            {
+                if (string.IsNullOrEmpty(sessionJwt))
+                    throw new ArgumentException("sessionJwt required", nameof(sessionJwt));
+                url = "/api/app/guess/standing" + (query.Length == 0 ? string.Empty : "?" + query);
+                token = sessionJwt;
+            }
+            var root = await GetJsonAsync<JsonElement>(url, token, ct, quiet: true).ConfigureAwait(false);
+            return Services.Guess.GuessStanding.Parse(root);
+        }
+
+        /// <summary>
         /// POST /api/feedback — ship a one-off note to the developer. Backend
         /// rate-limits at 5 per IP per day, persists to D1, optionally
         /// notifies the operator via Discord webhook. The message is trimmed
@@ -822,7 +850,8 @@ namespace GI_Subtitles.Services.Network
         //  Transport helpers
         // ───────────────────────────────────────────────────────────────────
 
-        private Task<T> GetJsonAsync<T>(string path, string authToken, CancellationToken ct)
+        // quiet: a best-effort feature's failures are Info (no GlitchTip, no alarm in the log), not Warn or Error.
+        private Task<T> GetJsonAsync<T>(string path, string authToken, CancellationToken ct, bool quiet = false)
         {
             string url = ResolveUrl(path);
             return SendAndParseAsync<T>(() =>
@@ -831,7 +860,7 @@ namespace GI_Subtitles.Services.Network
                 if (!string.IsNullOrEmpty(authToken))
                     req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", authToken);
                 return req;
-            }, ct);
+            }, ct, quiet);
         }
 
         private Task<T> PostJsonAsync<T>(string path, object body, string authToken, CancellationToken ct)
@@ -874,8 +903,15 @@ namespace GI_Subtitles.Services.Network
         /// </summary>
         private async Task<T> SendAndParseAsync<T>(
             Func<HttpRequestMessage> requestFactory,
-            CancellationToken ct)
+            CancellationToken ct,
+            bool quiet = false)
         {
+            void Note(string message)
+            {
+                if (quiet) Logger.Log.Info(message);
+                else Logger.Log.Warn(message);
+            }
+
             const int MaxAttempts = 4;
             // Delays between attempts 1→2, 2→3, 3→4 (no delay after final).
             var backoff = new[] { 500, 1000, 2000 };
@@ -902,7 +938,7 @@ namespace GI_Subtitles.Services.Network
                         lastTransient = ex;
                         if (attempt + 1 < MaxAttempts)
                         {
-                            Logger.Log.Warn(
+                            Note(
                                 $"API {lastUri} attempt {attempt + 1}/{MaxAttempts} network error: {ex.Message} — retrying in {backoff[attempt]} ms");
                             try { await Task.Delay(backoff[attempt], ct).ConfigureAwait(false); }
                             catch (OperationCanceledException) { throw; }
@@ -917,7 +953,7 @@ namespace GI_Subtitles.Services.Network
                         lastTransient = ex;
                         if (attempt + 1 < MaxAttempts)
                         {
-                            Logger.Log.Warn(
+                            Note(
                                 $"API {lastUri} attempt {attempt + 1}/{MaxAttempts} timed out — retrying in {backoff[attempt]} ms");
                             try { await Task.Delay(backoff[attempt], ct).ConfigureAwait(false); }
                             catch (OperationCanceledException) { throw; }
@@ -942,7 +978,7 @@ namespace GI_Subtitles.Services.Network
                             string _ = response.Content != null
                                 ? await response.Content.ReadAsStringAsync().ConfigureAwait(false)
                                 : null;
-                            Logger.Log.Warn(
+                            Note(
                                 $"API {lastUri} attempt {attempt + 1}/{MaxAttempts} HTTP {status} — retrying in {backoff[attempt]} ms");
                             lastTransient = new HttpRequestException($"HTTP {status}");
                             try { await Task.Delay(backoff[attempt], ct).ConfigureAwait(false); }
@@ -952,7 +988,7 @@ namespace GI_Subtitles.Services.Network
 
                         // Classify non-success responses (including 5xx after
                         // the retry budget is exhausted) into typed exceptions.
-                        await ThrowIfErrorAsync(response, ct).ConfigureAwait(false);
+                        await ThrowIfErrorAsync(response, ct, quiet).ConfigureAwait(false);
 
                         string responseText = response.Content != null
                             ? await response.Content.ReadAsStringAsync().ConfigureAwait(false)
@@ -967,7 +1003,9 @@ namespace GI_Subtitles.Services.Network
                         }
                         catch (JsonException ex)
                         {
-                            Logger.Log.Error($"Failed to parse API response from {req.RequestUri}: {ex.Message}");
+                            string parseFailure = $"Failed to parse API response from {req.RequestUri}: {ex.Message}";
+                            if (quiet) Logger.Log.Info(parseFailure);
+                            else Logger.Log.Error(parseFailure);
                             throw new ApiException("Kaption's servers returned an unexpected response.", ex);
                         }
                     }
@@ -982,7 +1020,7 @@ namespace GI_Subtitles.Services.Network
                 lastTransient ?? new Exception($"retry budget exhausted for {lastUri}"));
         }
 
-        private static async Task ThrowIfErrorAsync(HttpResponseMessage response, CancellationToken ct)
+        private static async Task ThrowIfErrorAsync(HttpResponseMessage response, CancellationToken ct, bool quiet = false)
         {
             if (response.IsSuccessStatusCode)
                 return;
@@ -996,7 +1034,8 @@ namespace GI_Subtitles.Services.Network
             catch (Exception ex)
             {
                 // Non-fatal: we still classify by status code below.
-                Logger.Log.Warn($"Could not read error response body: {ex.Message}");
+                if (quiet) Logger.Log.Info($"Could not read error response body: {ex.Message}");
+                else Logger.Log.Warn($"Could not read error response body: {ex.Message}");
             }
 
             ApiError parsed = null;
@@ -1007,7 +1046,9 @@ namespace GI_Subtitles.Services.Network
             }
 
             int status = (int)response.StatusCode;
-            Logger.Log.Warn($"API call returned HTTP {status} from {response.RequestMessage?.RequestUri}: {parsed?.Describe() ?? body ?? "(no body)"}");
+            string returned = $"API call returned HTTP {status} from {response.RequestMessage?.RequestUri}: {parsed?.Describe() ?? body ?? "(no body)"}";
+            if (quiet) Logger.Log.Info(returned);
+            else Logger.Log.Warn(returned);
 
             // Split 401 from 403 — prior to this, tier-denied responses
             // (e.g. free_beta user hitting a Pro-only file) triggered the
