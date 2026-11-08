@@ -1,8 +1,8 @@
 // ─────────────────────────────────────────────────────────────────────────────
 //  SentryAppender.cs
 //  ---------------------------------------------------------------------------
-//  log4net → Sentry/GlitchTip bridge. Every Error/Fatal LoggingEvent the app
-//  emits is automatically forwarded to GlitchTip without touching the 140+
+//  log4net → Sentry bridge. Every Error/Fatal LoggingEvent the app
+//  emits is automatically forwarded to Sentry without touching the 140+
 //  existing Logger.Log.Error(...) call sites. Drop-in: register once at
 //  startup (see Logger.RegisterSentryAppender) and every swallowed-catch
 //  that logs at Error level surfaces in the dashboard from then on.
@@ -10,7 +10,7 @@
 //  Why a log4net appender instead of editing every catch:
 //    * Most catches do `Logger.Log.Error($"X failed: {ex}")` and never
 //      bubble the exception. App.xaml.cs only forwards UNHANDLED exceptions
-//      to Sentry, so swallowed catches are invisible to GlitchTip — that's
+//      to Sentry, so swallowed catches would be invisible there — that's
 //      why the ChooseRegion OverflowException never reached the dashboard.
 //    * Adding one CrashReportingService.ReportException call per catch is
 //      140+ touch-points that future code will inevitably forget. An
@@ -28,7 +28,9 @@
 //      flow through SentrySdk.CaptureException/CaptureMessage which still
 //      run the BeforeSend scrubber on every payload.
 //
-//  Quota / abuse protection (GlitchTip free tier is ~1k events/month):
+//  Quota / abuse protection. Sentry's free Developer plan allows 5,000
+//  errors a month for the whole org, and per-key rate limits are a
+//  Business-plan feature, so these client-side limits are the only guard:
 //    * Per-session cap: MaxEventsPerSession events then the appender drops
 //      silently. Prevents a runaway OCR-loop exception from burning a
 //      month's quota in a few minutes.
@@ -62,7 +64,7 @@ namespace GI_Subtitles.Core.Logging
 {
     /// <summary>
     /// log4net appender that forwards Error+ events to the Sentry SDK
-    /// (which CrashReportingService points at GlitchTip). Attaches to the
+    /// (which CrashReportingService points at Sentry). Attaches to the
     /// log4net root in <see cref="GI_Subtitles.Common.Logger.RegisterSentryAppender"/>.
     /// </summary>
     public class SentryAppender : AppenderSkeleton

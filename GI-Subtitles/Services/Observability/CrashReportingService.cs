@@ -1,24 +1,17 @@
 ﻿// ─────────────────────────────────────────────────────────────────────────────
 //  CrashReportingService.cs
 //  ---------------------------------------------------------------------------
-//  Opt-in crash reporting. Wire-level target is GlitchTip (an open-source,
-//  Sentry-API-compatible server), so we use the official Sentry .NET SDK and
-//  just point its DSN at our GlitchTip instance — no custom protocol.
+//  Opt-in crash reporting through the official Sentry .NET SDK to the
+//  kaption-desktop project on sentry.io, EU region (events are stored in
+//  Frankfurt). Free Developer plan: 5,000 errors a month, kept 30 days.
+//  App versions before 2.5.8 sent to GlitchTip, which speaks the same wire
+//  format; the switch was one DSN string.
 //
-//  Why Sentry SDK against GlitchTip, not sentry.io:
-//    * Zero code cost at swap time: change one DSN string.
-//    * GlitchTip accepts the Sentry wire format byte-for-byte for the
-//      features we actually use (exception capture, issue grouping,
-//      breadcrumbs, release + environment tagging).
-//    * No paid tier involved until the app genuinely outgrows 1 k events/month.
-//
-//  GlitchTip-specific divergence from sentry.io defaults (see StartSdk for the
-//  exact option wiring + rationale comments):
-//    * AutoSessionTracking = false — GlitchTip doesn't support the
-//      session envelope. Leaving the Sentry default of true wastes quota.
-//    * TracesSampleRate = 0 — we don't instrument transactions anywhere in
-//      the WPF app; every event is an exception, so sample rate for
-//      transactions is 0.
+//  Divergence from the SDK defaults (see StartSdk for the exact wiring):
+//    * AutoSessionTracking = false — session tracking is usage analytics,
+//      and the owner's rule is no analytics: only opt-in crash reports.
+//    * TracesSampleRate = 0 — no performance tracing either, for the same
+//      reason; every event we send is an error.
 //
 //  What this file actually does:
 //    1. Initialize()      — reads consent + DSN from Config, calls SentrySdk.Init
@@ -57,7 +50,7 @@ namespace GI_Subtitles.Services.Observability
 {
     /// <summary>
     /// Process-wide, static access point for crash reporting. See file header
-    /// for intended behaviour and the GlitchTip wire-format details.
+    /// for intended behaviour and the Sentry options we set.
     /// </summary>
     public static class CrashReportingService
     {
@@ -75,21 +68,23 @@ namespace GI_Subtitles.Services.Observability
         private const string DefaultEnvironment = "production";
 
         /// <summary>
-        /// Baked-in GlitchTip DSN for the <c>kaption-desktop</c> project.
+        /// Baked-in Sentry DSN for the <c>kaption-desktop</c> project
+        /// (EU ingest host, org <c>michal-wojciechowski-dev</c>).
         /// DSNs are write-only tokens by design — an attacker who extracts
         /// this from the binary can only SEND events to our project, never
         /// read them. Treated as public, same trust model as a public
         /// analytics write-key. Users can override by setting
         /// <c>SentryDsn</c> in <c>Config.json</c> (enterprise: point at a
-        /// private GlitchTip instance).
+        /// private Sentry or GlitchTip instance; an empty string disables sends).
         ///
         /// If this DSN ever gets abused (flood from leaked binary): create a
-        /// new one in the GlitchTip dashboard, deactivate the old one, swap
+        /// new client key in Sentry (Project Settings → Client Keys),
+        /// deactivate the old one, swap
         /// the string here, ship a patch release. Old installs stop sending
         /// crashes until they update — acceptable cost.
         /// </summary>
         private const string DefaultDsn =
-            "";
+            "https://85b750e4f335926bb9ffb5d84206e068@o4507924022558720.ingest.de.sentry.io/4512396053250128";
 
         /// <summary>
         /// True after <see cref="Initialize"/> has completed at least once.
@@ -118,7 +113,7 @@ namespace GI_Subtitles.Services.Observability
                     _enabled = Config.Get("CrashReportingEnabled", false);
                     // Fall back to the baked default when Config doesn't carry
                     // an explicit key. This is what makes a vanilla install
-                    // report to our GlitchTip without any user action.
+                    // report to our Sentry project once the user opts in.
                     string dsn = Config.Get("SentryDsn", DefaultDsn);
                     bool hasDsn = !string.IsNullOrWhiteSpace(dsn);
 
@@ -132,7 +127,7 @@ namespace GI_Subtitles.Services.Observability
                     else if (_enabled && !hasDsn)
                     {
                         // User opted in, but we don't have a DSN configured yet.
-                        // This is the "beta without GlitchTip project yet" state —
+                        // This is the "DSN cleared in Config.json" state —
                         // log explicitly so the mismatch isn't silent.
                         Logger.Log.Warn(
                             "CrashReportingService: user opted in, but SentryDsn is empty. " +
@@ -351,22 +346,14 @@ namespace GI_Subtitles.Services.Observability
                     // volumes and makes grouping heuristics much sharper.
                     o.AttachStacktrace = true;
 
-                    // GlitchTip-specific: they explicitly don't support the
-                    // session-tracking envelope shape ("auto_session_tracking
-                    // — Set to false. GlitchTip does not support session
-                    // tracking."). Leaving the Sentry default of `true` here
-                    // sends extra envelopes GlitchTip drops server-side,
-                    // wasting our free-tier quota. Disabled outright.
+                    // Session tracking reports every app start and how it
+                    // ended: usage analytics. Owner rule: no analytics, only
+                    // the crash reports the user opted in to. Off for good.
                     o.AutoSessionTracking = false;
 
-                    // We don't instrument transactions anywhere in the
-                    // desktop app — every event we ship is an exception.
-                    // Setting the sample rate to 0 explicitly disables
-                    // the SDK's opportunistic transaction collection so we
-                    // never send a transaction envelope GlitchTip would
-                    // either drop or count against the free-tier budget.
-                    // GlitchTip docs recommend 0.01 for apps that *do*
-                    // instrument; ours doesn't, so 0 is correct here.
+                    // No performance tracing: transactions would be usage
+                    // data too (same owner rule), and the app instruments
+                    // none. 0 keeps the SDK from sending any transaction.
                     o.TracesSampleRate = 0;
 
                     // Disable Sentry's own diagnostic logger — it pipes into
@@ -443,7 +430,7 @@ namespace GI_Subtitles.Services.Observability
         }
 
         /// <summary>
-        /// Build the <c>Release</c> tag GlitchTip groups events by.
+        /// Build the <c>Release</c> tag Sentry groups events by.
         /// Format follows Sentry's convention: <c>{project}@{version}</c>.
         /// </summary>
         private static string GetReleaseString()

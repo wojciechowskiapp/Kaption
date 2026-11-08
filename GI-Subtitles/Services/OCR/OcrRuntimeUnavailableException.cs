@@ -22,7 +22,7 @@ namespace GI_Subtitles.Services.OCR
         public string Diagnostics { get; }
 
         /// <summary>First line of <see cref="Exception.Message"/>. Kept stable per error
-        /// code because GlitchTip titles and groups issues on that line.</summary>
+        /// code because Sentry titles and groups issues on that line.</summary>
         public string Summary => Summarise(ErrorCode);
 
         private static string Summarise(string errorCode) => string.IsNullOrEmpty(errorCode)

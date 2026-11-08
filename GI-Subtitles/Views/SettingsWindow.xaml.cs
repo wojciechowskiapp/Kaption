@@ -2380,7 +2380,7 @@ namespace GI_Subtitles.Views
             {
                 // A failed native load is cached for the process, so the
                 // compatibility profile would fail the same way. Warn, not Error:
-                // MainWindow sends this failure to GlitchTip exactly once.
+                // MainWindow sends this failure to Sentry exactly once.
                 if (OcrRuntimeDiagnostics.IsRuntimeUnavailable(ex, out string runtimeError))
                 {
                     string diagnostics = OcrRuntimeDiagnostics.Probe();
@@ -2393,7 +2393,7 @@ namespace GI_Subtitles.Views
 
                 if (!requested.FallsBackToCompatibilityProfile)
                 {
-                    // Warn, not Error: KickOffEngineInit sends the one GlitchTip event for this failure.
+                    // Warn, not Error: KickOffEngineInit sends the one Sentry event for this failure.
                     Logger.Log.Warn($"Error loading OCR profile '{requested.Id}': {ex}");
                     throw new Exception($"Failed to load OCR model {requested.ModelName}.", ex);
                 }

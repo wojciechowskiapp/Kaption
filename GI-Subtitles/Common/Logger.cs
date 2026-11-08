@@ -31,10 +31,10 @@ namespace GI_Subtitles.Common
         }
 
         /// <summary>
-        /// Attach the Sentry/GlitchTip forwarding appender to the log4net root.
+        /// Attach the Sentry forwarding appender to the log4net root.
         /// From this point on every <c>Logger.Log.Error(...)</c> (and Fatal)
         /// is automatically captured by <see cref="SentryAppender"/> and
-        /// shipped to GlitchTip — no per-call-site changes required. WARN
+        /// shipped to Sentry — no per-call-site changes required. WARN
         /// and below stay local only.
         ///
         /// Must be called AFTER

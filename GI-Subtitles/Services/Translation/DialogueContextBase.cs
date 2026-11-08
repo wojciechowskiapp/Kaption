@@ -441,7 +441,7 @@ namespace GI_Subtitles.Services.Translation
             }
             catch (Exception ex)
             {
-                // The first match then loads it, as it did before warm-up existed: Warn, not a GlitchTip Error.
+                // The first match then loads it, as it did before warm-up existed: Warn, not a Sentry Error.
                 Logger.Log.Warn($"DialogueContext warm-up failed: {ex.GetType().Name}: {ex.Message}");
             }
         }

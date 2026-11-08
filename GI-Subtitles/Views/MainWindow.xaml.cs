@@ -829,7 +829,7 @@ namespace GI_Subtitles.Views
         /// "Fallback to CPU" buttons — safe to call repeatedly; the previous
         /// engine (if any) is disposed inside <see cref="SettingsWindow.LoadEngine()"/>
         /// before the new InferenceSessions are built. Errors are reported
-        /// to GlitchTip via <see cref="CrashReportingService.ReportException"/>
+        /// to Sentry via <see cref="CrashReportingService.ReportException"/>
         /// <summary>
         /// Recovery path for "session loaded but file-protection secret is
         /// missing" — a desync between LicenseService.CurrentActivation and
@@ -926,7 +926,7 @@ namespace GI_Subtitles.Views
                         return;
                     }
                     // Warn, not Error: SentryAppender forwards Error lines, and the
-                    // ReportException below is this failure's single GlitchTip event.
+                    // ReportException below is this failure's single Sentry event.
                     // Its [CRASH-REPORT] line keeps the full trace in app.log.
                     Logger.Log.Warn("Failed to load OCR engine: " +
                         ((ex as OcrRuntimeUnavailableException)?.Summary ?? ex.Message));

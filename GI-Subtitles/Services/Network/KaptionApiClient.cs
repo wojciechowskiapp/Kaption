@@ -850,7 +850,7 @@ namespace GI_Subtitles.Services.Network
         //  Transport helpers
         // ───────────────────────────────────────────────────────────────────
 
-        // quiet: a best-effort feature's failures are Info (no GlitchTip, no alarm in the log), not Warn or Error.
+        // quiet: a best-effort feature's failures are Info (no Sentry event, no alarm in the log), not Warn or Error.
         private Task<T> GetJsonAsync<T>(string path, string authToken, CancellationToken ct, bool quiet = false)
         {
             string url = ResolveUrl(path);

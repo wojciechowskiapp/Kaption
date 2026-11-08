@@ -53,6 +53,7 @@ namespace GI_Test
 
         [TestMethod]
         [DataRow("\"SentryDsn\": \"https://abc123@app.glitchtip.com/22273\"", "abc123")]
+        [DataRow("\"SentryDsn\": \"https://def456@o1.ingest.de.sentry.io/42\"", "def456")]
         [DataRow("\"ApiToken\": \"tok_live_9f8e7d6c\"", "tok_live_9f8e7d6c")]
         [DataRow("\"password\": \"hunter2\"", "hunter2")]
         [DataRow("api_key=sk-abcdef123456", "sk-abcdef123456")]

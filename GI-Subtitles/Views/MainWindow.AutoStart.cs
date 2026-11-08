@@ -210,7 +210,7 @@ namespace GI_Subtitles.Views
         /// <summary>
         /// Auto-start waits on the dialogue area alone and the game is in front: once the game window has kept one size
         /// for a few probes, save the area from the profile's ratios. Never replaces a saved area; a failure shows on the
-        /// Start card with the picker as its action. Logs stay Info/Warn: a best-effort step is not a GlitchTip event.
+        /// Start card with the picker as its action. Logs stay Info/Warn: a best-effort step is not a Sentry event.
         /// </summary>
         private async Task TryAutoFillRegionAsync(Services.Detection.GameRegionProfile profile, bool gameInFront)
         {

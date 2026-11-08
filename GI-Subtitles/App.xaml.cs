@@ -178,7 +178,7 @@ namespace GI_Subtitles
         /// <summary>
         /// Centralised unhandled-exception sink. Routes a single dedupe
         /// decision across all three reporting paths (log4net file appender,
-        /// crash.log direct write, GlitchTip upload) so a repeating exception
+        /// crash.log direct write, Sentry upload) so a repeating exception
         /// can only spam each sink once per dedupe window.
         ///
         /// Pre-CrashSpamGuard, a WPF layout exception that fired on every
@@ -207,7 +207,7 @@ namespace GI_Subtitles
             WriteCrashLogDirectWithPrefix(crashKind, details, suppressionPrefix);
 
             try { CrashReportingService.ReportException(ex, contextTag: sentryContextTag); }
-            catch { /* GlitchTip ingest failures shouldn't propagate */ }
+            catch { /* Sentry ingest failures shouldn't propagate */ }
 
             FlushLog4Net();
         }
@@ -216,7 +216,7 @@ namespace GI_Subtitles
         /// Multi-slot dedupe helper for repeating-exception storms. A WPF
         /// layout exception fires on every Measure pass — left unchecked it
         /// can produce hundreds of MB of identical stack traces in seconds
-        /// across crash.log + app.log + GlitchTip uploads. This guard tracks
+        /// across crash.log + app.log + Sentry uploads. This guard tracks
         /// the last few distinct fingerprints and suppresses re-emission
         /// within a short window, surfacing a "[N more times]" summary when
         /// the next distinct entry comes through.
@@ -403,14 +403,13 @@ namespace GI_Subtitles
             catch { /* best-effort warn */ }
 
             // Crash reporting. Reads Config["CrashReportingEnabled"] +
-            // Config["SentryDsn"] and starts the Sentry SDK (pointed at our
-            // GlitchTip instance — Sentry-API-compatible) only when both are
-            // set. Kept before exception handlers so they can forward
+            // Config["SentryDsn"] and starts the Sentry SDK (our kaption-desktop
+            // project, EU region) only when both are set. Kept before exception handlers so they can forward
             // unconditionally; the service checks consent internally.
             CrashReportingService.Initialize();
 
             // Ensure final flush on normal process exit so any trailing logs
-            // land on disk AND any queued crash events reach GlitchTip. Sentry
+            // land on disk AND any queued crash events reach Sentry. Sentry
             // batches events in memory; without a Shutdown() the last crash
             // before a clean quit never actually leaves the machine.
             AppDomain.CurrentDomain.ProcessExit += (s, a) =>
@@ -431,7 +430,7 @@ namespace GI_Subtitles
                 try { Logger.Log.Error($"FATAL unhandled exception (terminating={args.IsTerminating}): {msg}"); } catch { }
                 // Then unbuffered direct write — guaranteed even if logger is broken.
                 WriteCrashLogDirect(args.IsTerminating ? "FATAL" : "UNHANDLED", msg);
-                // Forward to CrashReportingService → Sentry SDK → GlitchTip.
+                // Forward to CrashReportingService → Sentry SDK → Sentry (EU).
                 // Service checks consent + DSN presence internally; when either
                 // is missing it writes a local [CRASH-REPORT:*] log line and
                 // returns without touching the network.
@@ -485,7 +484,7 @@ namespace GI_Subtitles
             // Register in-memory log appender for the Logs tab
             Logger.RegisterInMemoryAppender();
 
-            // Bridge log4net → Sentry/GlitchTip. Every Logger.Log.Error /
+            // Bridge log4net → Sentry. Every Logger.Log.Error /
             // Fatal call site is now automatically forwarded — including
             // exceptions swallowed in local try/catch blocks (e.g.
             // INotifyIcon.ChooseRegion) that previously never reached the
