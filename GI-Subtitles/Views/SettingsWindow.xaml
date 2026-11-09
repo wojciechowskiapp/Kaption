@@ -185,8 +185,6 @@
                             <ComboBox Name="UILangSelector" SelectionChanged="UILangSelector_SelectionChanged">
                                 <ComboBoxItem Content="English" Tag="en-US" IsSelected="True"/>
                                 <ComboBoxItem Content="Polski" Tag="pl-PL"/>
-                                <ComboBoxItem Content="日本語" Tag="ja-JP"/>
-                                <ComboBoxItem Content="简体中文" Tag="zh-CN"/>
                             </ComboBox>
                             <ComboBox Name="InputSelector"><ComboBoxItem Content="English" IsSelected="True"/></ComboBox>
                             <ListBox Name="OutputSelector" SelectionMode="Multiple"><ListBoxItem Content="Polski" IsSelected="True"/></ListBox>

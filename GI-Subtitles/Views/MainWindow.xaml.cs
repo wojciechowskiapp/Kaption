@@ -35,10 +35,8 @@ using GI_Subtitles.Services.QuickTranslate;
 using GI_Subtitles.Services.Translation;
 using System.Globalization;
 using GI_Subtitles.Common;
-using GI_Subtitles.Core.Screen;
 using GI_Subtitles.Services.Rendering;
 using static GI_Subtitles.Core.Config.Config;
-using MatchSource = GI_Subtitles.Services.Rendering.MatchSource;
 using System.Windows.Threading;
 // Explicit alias: PaddleOCRSharp also exports a `Logger`, so a bare `Logger` is ambiguous here.
 using Logger = GI_Subtitles.Common.Logger;
@@ -109,7 +107,6 @@ namespace GI_Subtitles.Views
         // The underlying code (AnswerTranslationService, answer OCR, display path)
         // is fully intact — this gate is the only thing stopping it from running.
         internal const bool FeatureAnswerTranslationEnabled = false;
-        internal readonly OverlayCardManager _cardManager = new OverlayCardManager();
         private DateTime _lastOcrTime = DateTime.MinValue;
         private DateTime _nextOcrAttemptUtc = DateTime.MinValue;
         private int _ocrPipelineGeneration;
@@ -166,9 +163,6 @@ namespace GI_Subtitles.Views
         public System.Windows.Threading.DispatcherTimer OCRTimer = new System.Windows.Threading.DispatcherTimer();
         public System.Windows.Threading.DispatcherTimer UITimer = new System.Windows.Threading.DispatcherTimer();
         readonly bool debug = Config.Get<bool>("Debug", false);
-        readonly string server = Config.Get<string>("Server", "https://mp3.2langs.com/download");
-        readonly string token = Config.Get<string>("Token", "ENGI");
-        readonly int distant = Config.Get<int>("Distant", 3);
         [DllImport("user32.dll", CharSet = CharSet.Auto)]
         public static extern int SetWindowPos(IntPtr hWnd, int hWndInsertAfter, int x, int y, int Width, int Height, int flags);
         // SWP_NOSIZE | SWP_NOMOVE | SWP_NOACTIVATE: keep the overlay topmost without taking the game's focus. Without
@@ -248,14 +242,6 @@ namespace GI_Subtitles.Views
         string InputLanguage = Config.Get("Input", "EN") ?? "EN";
         string OutputLanguage = Config.Get("Output", "PL") ?? "PL";
         string Game = Config.Get<string>("Game") ?? "Genshin";
-        // DEPRECATED: Config("Update") was a static JSON manifest URL used by the
-        // legacy CheckAndUpdate path. It is no longer consulted — updates are
-        // now handled by UpdateService (Services/Update/UpdateService.cs) which
-        // delegates to Velopack's UpdateManager against Config["UpdateFeedUrl"]
-        // (default: https://files.kaption.one/releases/stable/). The config
-        // key is retained only so old installs don't trip on an unexpected
-        // schema; nothing reads this field any more.
-        string Update = Config.Get<string>("Update");
         string version = Assembly.GetExecutingAssembly().GetName().Version.ToString();
 
         /// <summary>
@@ -2092,7 +2078,7 @@ namespace GI_Subtitles.Views
                                 // Log matched translation to dialogue log (skip for predicted display —
                                 // wait until OCR confirms the actual match to avoid logging guesses).
                                 if (!displayingPrediction)
-                                    Services.DialogueLog.Log(header, content, ocrText, null);
+                                    Services.DialogueLog.Log(header, content);
                             }
                         }
 

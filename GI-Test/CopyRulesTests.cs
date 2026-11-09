@@ -56,26 +56,14 @@ namespace GI_Test
         }
 
         [TestMethod]
-        public void W26Keys_ExistInAllFourLocales()
+        public void W26Keys_ExistInBothLocales()
         {
             static HashSet<string> Keys(string file) => Strings(file).Select(s => s.Key).Where(k => W26Prefixes.Any(k.StartsWith)).ToHashSet();
             var en = Keys("Strings.en-US.xaml");
             Assert.IsTrue(en.Count > 30, "the 2.6 keys are there");
-            foreach (string other in new[] { "Strings.pl-PL.xaml", "Strings.ja-JP.xaml", "Strings.zh-CN.xaml" })
-            {
-                var keys = Keys(other);
-                CollectionAssert.AreEquivalent(en.OrderBy(k => k).ToList(), keys.OrderBy(k => k).ToList(),
-                    $"{other}: missing {string.Join(", ", en.Except(keys))}; extra {string.Join(", ", keys.Except(en))}");
-            }
-            // Japanese and Chinese are translated, not English copies (sample subtitles and names aside).
-            var english = Strings("Strings.en-US.xaml").Where(s => W26Prefixes.Any(s.Key.StartsWith)).ToDictionary(s => s.Key, s => s.Value);
-            foreach (string file in new[] { "Strings.ja-JP.xaml", "Strings.zh-CN.xaml" })
-            {
-                var copied = Strings(file).Where(s => W26Prefixes.Any(s.Key.StartsWith) && !IsSampleSubtitle(s.Key))
-                    .Where(s => english.TryGetValue(s.Key, out var e) && e == s.Value && Regex.IsMatch(e, "[a-z]{4,}"))
-                    .Select(s => s.Key).ToList();
-                Assert.AreEqual(0, copied.Count, $"{file} copies English for: {string.Join(", ", copied)}");
-            }
+            var keys = Keys("Strings.pl-PL.xaml");
+            CollectionAssert.AreEquivalent(en.OrderBy(k => k).ToList(), keys.OrderBy(k => k).ToList(),
+                $"Strings.pl-PL.xaml: missing {string.Join(", ", en.Except(keys))}; extra {string.Join(", ", keys.Except(en))}");
         }
 
         [TestMethod]
@@ -108,13 +96,13 @@ namespace GI_Test
         private static Dictionary<string, string> BuildCardCopy(string file) =>
             Strings(file).Where(s => s.Key.StartsWith("card_")).ToDictionary(s => s.Key, s => s.Value);
 
-        private static readonly string[] Locales = { "Strings.en-US.xaml", "Strings.pl-PL.xaml", "Strings.ja-JP.xaml", "Strings.zh-CN.xaml" };
+        private static readonly string[] Locales = { "Strings.en-US.xaml", "Strings.pl-PL.xaml" };
 
         /// <summary>U+2014, written as a number so this test does not carry the character itself.</summary>
         private const char EmDash = (char)0x2014;
 
         [TestMethod]
-        public void BuildCardKeys_ExistInAllFourLocales_AndAreTranslated()
+        public void BuildCardKeys_ExistInBothLocales_AndAreTranslated()
         {
             var en = BuildCardCopy("Strings.en-US.xaml");
             Assert.IsTrue(en.Count >= 10, "the build card's keys are there");

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Net;
@@ -440,13 +441,16 @@ namespace GI_Test
         [TestMethod]
         public void Poller_Schedule()
         {
-            Assert.AreEqual(TimeSpan.FromMinutes(2), GuessStandingPoller.FirstDelay);
-            Assert.AreEqual(TimeSpan.FromHours(4), GuessStandingPoller.NextDelay(GuessPollOutcome.Read, 0));
-            Assert.AreEqual(TimeSpan.FromHours(12), GuessStandingPoller.NextDelay(GuessPollOutcome.NoStanding, 0));
-            Assert.AreEqual(TimeSpan.FromHours(4), GuessStandingPoller.NextDelay(GuessPollOutcome.Refused, 0));
-            Assert.AreEqual(TimeSpan.FromMinutes(15), GuessStandingPoller.NextDelay(GuessPollOutcome.Failed, 1));
-            Assert.AreEqual(TimeSpan.FromHours(1), GuessStandingPoller.NextDelay(GuessPollOutcome.Failed, 2));
-            Assert.AreEqual(TimeSpan.FromHours(4), GuessStandingPoller.NextDelay(GuessPollOutcome.Failed, 9));
+            var s = GuessPollSchedule.Default;
+            Assert.AreEqual(TimeSpan.FromMinutes(2), s.FirstDelay);
+            Assert.AreEqual(TimeSpan.FromHours(4), GuessStandingPoller.NextDelay(GuessPollOutcome.Read, 0, s));
+            Assert.AreEqual(TimeSpan.FromHours(12), GuessStandingPoller.NextDelay(GuessPollOutcome.NoStanding, 0, s));
+            Assert.AreEqual(TimeSpan.FromHours(4), GuessStandingPoller.NextDelay(GuessPollOutcome.Refused, 0, s));
+            Assert.AreEqual(TimeSpan.FromMinutes(15), GuessStandingPoller.NextDelay(GuessPollOutcome.NoSession, 0, s));
+            Assert.AreEqual(TimeSpan.FromMinutes(15), GuessStandingPoller.NextDelay(GuessPollOutcome.Failed, 1, s));
+            Assert.AreEqual(TimeSpan.FromHours(1), GuessStandingPoller.NextDelay(GuessPollOutcome.Failed, 2, s));
+            Assert.AreEqual(TimeSpan.FromHours(4), GuessStandingPoller.NextDelay(GuessPollOutcome.Failed, 9, s));
+            Assert.AreEqual(TimeSpan.FromSeconds(60), s.GateRetry);
         }
 
         [TestMethod]
@@ -521,6 +525,423 @@ namespace GI_Test
             }
             Assert.IsFalse(File.ReadAllText(Path.Combine(root, "GI-Subtitles", "Services", "Guess", "GuessNotifySettings.cs")).Contains("\"ApiUrl\""),
                 "the fixture override never touches ApiUrl");
+        }
+
+        // ── The place after the last score (2026-11-09 report) ─────────
+
+        private static readonly DateTimeOffset LastScore = new(2026, 11, 6, 0, 4, 37, TimeSpan.Zero);
+        private static readonly DateTimeOffset ReadAt = new(2026, 11, 8, 23, 53, 55, TimeSpan.Zero);
+
+        /// <summary>The owner's read on 2026-11-09: #3 on both boards, #1 after the last score, the players above with more points.</summary>
+        private static GuessStanding OwnersRead(DateTimeOffset? at = null, GuessPlace lastScored = null, string period = Period)
+        {
+            lastScored ??= new GuessPlace(1, 220, LastScore);
+            var games = new Dictionary<string, GuessBoardStanding>
+            {
+                ["genshin"] = new GuessBoardStanding(3, 220, 6, new GuessNeighbour(2, null, "f1b010", false, 240, 20), null) { LastScored = lastScored },
+                ["starrail"] = null, ["zzz"] = null, ["wuwa"] = null,
+            };
+            return new GuessStanding
+            {
+                Period = period,
+                At = at ?? ReadAt,
+                Global = new GuessBoardStanding(3, 220, 6, new GuessNeighbour(2, null, "9c228e", false, 260, 40), null) { LastScored = lastScored },
+                Games = games,
+                PlayedThisMonth = true,
+            };
+        }
+
+        [TestMethod]
+        public void Rule_APassWhileTheAppWasClosed_IsReportedFromThePlaceAfterTheLastScore_TheOwnersReport()
+        {
+            // What the owner's Config held after 2.5.8's first read: #3 on both boards, stored without a time.
+            var stored = GuessBaselines.Parse("{\"genshin\":{\"period\":\"2026-11\",\"rank\":3,\"points\":220},\"global\":{\"period\":\"2026-11\",\"rank\":3,\"points\":220}}");
+            foreach (var start in new[] { stored, GuessBaselines.Empty })
+            {
+                var o = GuessOvertakeRule.Evaluate(start, OwnersRead(), "genshin");
+                Assert.IsNotNull(o.Candidate, "passed twice while Kaption was closed");
+                Assert.AreEqual("genshin", o.Candidate.Board, "the selected game's board first");
+                Assert.AreEqual(1, o.Candidate.From);
+                Assert.AreEqual(3, o.Candidate.To);
+                Assert.AreEqual(240, o.Candidate.Above.Points);
+                Assert.AreEqual(1, o.Baselines["genshin"].Rank, "the reference stays until the notice is delivered");
+                Assert.AreEqual(LastScore, o.Baselines["genshin"].At);
+                Assert.AreEqual(GuessCheckResult.Passed, o.Checks.Single(c => c.Board == "genshin").Result);
+                Assert.IsTrue(o.Checks.Single(c => c.Board == "genshin").FromLastScore);
+            }
+        }
+
+        [TestMethod]
+        public void Rule_ThePlaceAfterTheLastScore_LosesToANewerReadOfTheApp()
+        {
+            // The app saw #2 after the last score: a drop is measured from #2, not from #1.
+            var b = GuessBaselines.Empty.With("global", new GuessBaseline(Period, 2, 220, new DateTimeOffset(2026, 11, 7, 20, 0, 0, TimeSpan.Zero)));
+            var o = GuessOvertakeRule.Evaluate(b, OwnersRead(), null);
+            Assert.AreEqual(2, o.Candidate.From);
+            Assert.IsFalse(o.Checks.Single().FromLastScore);
+        }
+
+        [TestMethod]
+        public void Rule_ADeliveredPass_NeverComesBack_EvenWithThePlaceAfterTheLastScore()
+        {
+            var read = OwnersRead();
+            var o = GuessOvertakeRule.Evaluate(GuessBaselines.Empty, read, "genshin");
+            var delivered = GuessOvertakeRule.Delivered(o.Baselines, read, "genshin", o.Candidate.Board);
+            Assert.AreEqual(ReadAt, delivered["genshin"].At, "stamped with the server's time of the read");
+            Assert.AreEqual(3, delivered["global"].Rank);
+            Assert.IsNull(GuessOvertakeRule.Evaluate(delivered, OwnersRead(ReadAt.AddHours(4)), "genshin").Candidate);
+            Assert.AreEqual(GuessCheckResult.NothingNew, GuessOvertakeRule.Evaluate(delivered, OwnersRead(ReadAt.AddHours(4)), "genshin").Checks[0].Result);
+        }
+
+        [TestMethod]
+        public void Rule_ScoringAgain_MovesTheReference()
+        {
+            var o = GuessOvertakeRule.Evaluate(GuessBaselines.Empty, OwnersRead(), "genshin");
+            var delivered = GuessOvertakeRule.Delivered(o.Baselines, OwnersRead(), "genshin", "genshin");
+            // A new score at #3: nothing new; a later read without the field keeps measuring from there.
+            var again = OwnersRead(ReadAt.AddDays(1), new GuessPlace(3, 220, ReadAt.AddHours(10)));
+            var p = GuessOvertakeRule.Evaluate(delivered, again, "genshin");
+            Assert.IsNull(p.Candidate);
+            Assert.AreEqual(3, p.Baselines["genshin"].Rank);
+        }
+
+        [TestMethod]
+        public void Rule_ATieBreakBelowThePlaceAfterTheLastScore_IsNoNotice()
+        {
+            var read = OwnersRead();
+            var tied = read.Global with { Above = new GuessNeighbour(2, "X", null, false, 220, 0) };
+            var o = GuessOvertakeRule.Evaluate(GuessBaselines.Empty, new GuessStanding { Period = Period, At = ReadAt, Global = tied, Games = read.Games }, null);
+            Assert.IsNull(o.Candidate);
+            Assert.AreEqual(GuessCheckResult.TieBreak, o.Checks[0].Result);
+            Assert.AreEqual(3, o.Baselines["global"].Rank, "re-based from now");
+            Assert.AreEqual(ReadAt, o.Baselines["global"].At);
+        }
+
+        [TestMethod]
+        public void Rule_AStaleStandingWithAFreshPlaceAfterTheLastScore_IsNoPass()
+        {
+            // A colo's 30-second copy says #3 with 220; the replay says #2 with 260 after a solve the copy predates.
+            // Paired they would read "passed, 2 → 3" for a climb. Points that differ mean the two are not the same moment.
+            var stale = OwnersRead(lastScored: new GuessPlace(2, 260, ReadAt.AddMinutes(-1)));
+            var stamped = new DateTimeOffset(2026, 11, 8, 10, 0, 0, TimeSpan.Zero);
+            foreach (var start in new[]
+                     {
+                         GuessBaselines.Empty,
+                         GuessBaselines.Empty.With("global", new GuessBaseline(Period, 3, 220)),
+                         GuessBaselines.Empty.With("global", new GuessBaseline(Period, 3, 220, stamped)),
+                     })
+            {
+                var o = GuessOvertakeRule.Evaluate(start, stale, null);
+                Assert.IsNull(o.Candidate);
+                var check = o.Checks.Single();
+                Assert.IsFalse(check.FromLastScore, "ignored");
+                Assert.AreEqual(GuessCheckResult.StaleCopy, check.Result);
+                // The stored place stays as it was: re-based on the stale place stamped with the read's time, the next
+                // `since` would be newer than the score, the server would not replay it, and a pass after it would be lost.
+                Assert.AreEqual(start["global"], o.Baselines["global"]);
+                Assert.AreEqual(GuessOvertakeRule.Since(start, null), GuessOvertakeRule.Since(o.Baselines, null));
+                StringAssert.Contains(GuessOvertakeRule.Describe(stale, o, TimeSpan.FromHours(4)), "stale copy");
+            }
+        }
+
+        [TestMethod]
+        public void Rule_AStaleStandingSkippedOnce_ThePassAfterTheScoreIsStillFound()
+        {
+            // The reviewer's scenario: #3 with 220 stored at 10:00; the player solves (#2 with 260); a stale read; then
+            // someone passes them (#3 with 260). The pass must be told from #2, not lost against a re-based #3.
+            var start = GuessBaselines.Empty.With("global", new GuessBaseline(Period, 3, 220, new DateTimeOffset(2026, 11, 8, 10, 0, 0, TimeSpan.Zero)));
+            var scored = new GuessPlace(2, 260, ReadAt.AddMinutes(-1));
+            var o = GuessOvertakeRule.Evaluate(start, OwnersRead(lastScored: scored), null);
+            Assert.IsNull(o.Candidate);
+            // Four hours later, fresh: #3 with 260, the player above has more.
+            var later = new GuessStanding
+            {
+                Period = Period, At = ReadAt.AddHours(4), PlayedThisMonth = true, Games = OwnersRead().Games,
+                Global = new GuessBoardStanding(3, 260, 6, new GuessNeighbour(2, null, "9c228e", false, 300, 40), null) { LastScored = scored },
+            };
+            var p = GuessOvertakeRule.Evaluate(o.Baselines, later, null);
+            Assert.AreEqual(2, p.Candidate?.From);
+            Assert.AreEqual(3, p.Candidate.To);
+        }
+
+        [TestMethod]
+        public void Rule_ADeliveryNeverStampsAStaleBoard()
+        {
+            // The notice's own board passed on this read; the global board on it is a stale copy. Delivery re-bases the
+            // notice's board and leaves the stale one's stored place alone, for the same reason as in Evaluate.
+            var stamped = new DateTimeOffset(2026, 11, 8, 10, 0, 0, TimeSpan.Zero);
+            var start = GuessBaselines.Empty
+                .With("genshin", new GuessBaseline(Period, 1, 220, stamped))
+                .With("global", new GuessBaseline(Period, 3, 220, stamped));
+            var read = OwnersRead(); // Genshin's last score (Nov 6) predates its stored place: measured from #1
+            read = new GuessStanding
+            {
+                Period = read.Period, At = read.At, PlayedThisMonth = true, Games = read.Games,
+                Global = new GuessBoardStanding(3, 220, 6, new GuessNeighbour(2, null, "9c228e", false, 260, 40), null)
+                { LastScored = new GuessPlace(2, 260, ReadAt.AddMinutes(-1)) },
+            };
+            var o = GuessOvertakeRule.Evaluate(start, read, "genshin");
+            Assert.AreEqual("genshin", o.Candidate?.Board);
+            var delivered = GuessOvertakeRule.Delivered(o.Baselines, read, "genshin", o.Candidate.Board);
+            Assert.AreEqual(new GuessBaseline(Period, 3, 220, ReadAt), delivered["genshin"]);
+            Assert.AreEqual(start["global"], delivered["global"], "the stale board keeps its stored place");
+        }
+
+        [TestMethod]
+        public void Rule_ANoticeAroundTheMonthsUtcEdge_CountsAsThisMonths()
+        {
+            // The month is UTC, the notice day is local. Stored without a time by 2.5.8 right after the notice.
+            var told = GuessBaselines.Parse("{\"global\":{\"period\":\"2026-11\",\"rank\":3,\"points\":220}}");
+            // UTC+1: told at 00:30 local on Dec 1, still November in UTC. The last score was on Nov 6.
+            Func<DateTimeOffset, string> plusOne = t => t.ToOffset(TimeSpan.FromHours(1)).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+            var o = GuessOvertakeRule.Evaluate(told, OwnersRead(at: new DateTimeOffset(2026, 11, 30, 23, 45, 0, TimeSpan.Zero)), null,
+                lastShownDay: "2026-12-01", localDay: plusOne);
+            Assert.IsNull(o.Candidate, "told on Dec 1 local, inside November UTC: the same drop");
+            // UTC-5: told at 20:00 local on Nov 30, already December in UTC; the score was 21:00 local on Nov 30 (Dec 1 02:00Z).
+            var dec = GuessBaselines.Parse("{\"global\":{\"period\":\"2026-12\",\"rank\":3,\"points\":220}}");
+            Func<DateTimeOffset, string> minusFive = t => t.ToOffset(TimeSpan.FromHours(-5)).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+            var read = OwnersRead(at: new DateTimeOffset(2026, 12, 1, 3, 0, 0, TimeSpan.Zero), period: "2026-12",
+                                  lastScored: new GuessPlace(1, 220, new DateTimeOffset(2026, 12, 1, 0, 30, 0, TimeSpan.Zero)));
+            Assert.IsNull(GuessOvertakeRule.Evaluate(dec, read, null, lastShownDay: "2026-11-30", localDay: minusFive).Candidate,
+                "told on Nov 30 local, inside December UTC: the same drop");
+            // A notice from the local day before the month began is last month's.
+            Assert.IsNotNull(GuessOvertakeRule.Evaluate(dec, read, null, lastShownDay: "2026-11-29", localDay: minusFive).Candidate);
+        }
+
+        [TestMethod]
+        public void Rule_APlayerAlreadyToldUnder258_IsNotToldTheSameDropAgain()
+        {
+            // 2.5.8 delivered "1 → 3" on Nov 8 and stored #3 without a time. The first 2.5.9 read brings the place after
+            // the Nov 6 score (#1): the notice must not come back.
+            var told = GuessBaselines.Parse("{\"genshin\":{\"period\":\"2026-11\",\"rank\":3,\"points\":220},\"global\":{\"period\":\"2026-11\",\"rank\":3,\"points\":220}}");
+            var o = GuessOvertakeRule.Evaluate(told, OwnersRead(), "genshin", lastShownDay: "2026-11-08");
+            Assert.IsNull(o.Candidate);
+            Assert.IsTrue(o.Checks.All(c => c.Result == GuessCheckResult.NothingNew && !c.FromLastScore));
+            Assert.AreEqual(ReadAt, o.Baselines["genshin"].At, "stamped now, so the next read measures from here");
+            // A score after that notice is newer than it: a pass after the new score is a new pass.
+            var scoredAfter = OwnersRead(lastScored: new GuessPlace(1, 220, new DateTimeOffset(2026, 11, 8, 12, 0, 0, TimeSpan.Zero)));
+            var p = GuessOvertakeRule.Evaluate(told, scoredAfter, "genshin", lastShownDay: "2026-11-07");
+            Assert.AreEqual(1, p.Candidate?.From);
+            // A notice from last month says nothing about this month's place (the owner's case has none at all).
+            Assert.IsNotNull(GuessOvertakeRule.Evaluate(told, OwnersRead(), "genshin", lastShownDay: "2026-10-30").Candidate);
+            Assert.IsNotNull(GuessOvertakeRule.Evaluate(told, OwnersRead(), "genshin", lastShownDay: null).Candidate);
+        }
+
+        private static readonly Func<DateTimeOffset, string> UtcDay = t => t.UtcDateTime.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+
+        [TestMethod]
+        public void Rule_ToldUnder258_ThenScoredHigherTheSameDayAndPassed_IsANewPass()
+        {
+            // sol S1 (2026-11-09): 2.5.8 told the player at #3 with 140 on Nov 8 and stored that place without a time.
+            // Later that day they scored again (#1 with 200) and were passed back to #3. The first 2.5.9 read must
+            // report 1 -> 3: more points after the last score than in the stored place prove a score after it.
+            var told = GuessBaselines.Parse("{\"global\":{\"period\":\"2026-11\",\"rank\":3,\"points\":140}}");
+            var climbed = new GuessPlace(1, 200, new DateTimeOffset(2026, 11, 8, 18, 0, 0, TimeSpan.Zero));
+            var read = new GuessStanding
+            {
+                Period = Period, At = ReadAt, PlayedThisMonth = true, Games = new Dictionary<string, GuessBoardStanding>(),
+                Global = new GuessBoardStanding(3, 200, 6, new GuessNeighbour(2, null, "9c228e", false, 240, 40), null) { LastScored = climbed },
+            };
+            var o = GuessOvertakeRule.Evaluate(told, read, null, lastShownDay: "2026-11-08", localDay: UtcDay);
+            Assert.IsNotNull(o.Candidate, "a pass after a newer score is a new pass");
+            Assert.AreEqual(1, o.Candidate.From);
+            Assert.AreEqual(3, o.Candidate.To);
+            var check = o.Checks.Single();
+            Assert.AreEqual(GuessCheckResult.Passed, check.Result);
+            Assert.IsTrue(check.FromLastScore);
+            Assert.AreEqual(new GuessBaseline(Period, 1, 200, climbed.At), o.Baselines["global"], "the reference stays until delivery");
+        }
+
+        [TestMethod]
+        public void Rule_ToldUnder258_TheSameDayWithTheSamePoints_IsNotToldAgain()
+        {
+            // 2.5.8 told "1 -> 3" on Nov 8 after a score earlier that day (#1 with 220) and stored #3 with 220 without a
+            // time. The first 2.5.9 read replays that score: the same points, the notice's day, so the same drop. Quiet.
+            var told = GuessBaselines.Parse("{\"global\":{\"period\":\"2026-11\",\"rank\":3,\"points\":220}}");
+            var read = OwnersRead(lastScored: new GuessPlace(1, 220, new DateTimeOffset(2026, 11, 8, 9, 0, 0, TimeSpan.Zero)));
+            var o = GuessOvertakeRule.Evaluate(told, read, null, lastShownDay: "2026-11-08", localDay: UtcDay);
+            Assert.IsNull(o.Candidate, "never the same drop twice");
+            var check = o.Checks.Single();
+            Assert.AreEqual(GuessCheckResult.NothingNew, check.Result);
+            Assert.IsFalse(check.FromLastScore);
+            Assert.AreEqual(new GuessBaseline(Period, 3, 220, ReadAt), o.Baselines["global"], "stamped now");
+        }
+
+        [TestMethod]
+        public void Rule_ANewMonth_LastMonthsPlaceGivesWayToThisMonthsLastScore()
+        {
+            var october = GuessBaselines.Empty
+                .With("global", new GuessBaseline("2026-10", 1, 900, new DateTimeOffset(2026, 10, 30, 12, 0, 0, TimeSpan.Zero)))
+                .With("genshin", new GuessBaseline("2026-10", 2, 500));
+            var o = GuessOvertakeRule.Evaluate(october, OwnersRead(), "genshin", lastShownDay: "2026-10-31");
+            Assert.AreEqual("genshin", o.Candidate?.Board);
+            Assert.AreEqual(1, o.Candidate.From, "this month's place after the last score, not October's #2");
+            Assert.AreEqual(Period, o.Baselines["global"].Period);
+            // Without this month's last score: a new month starts quietly, as before.
+            var plain = new GuessStanding { Period = Period, At = ReadAt, Global = OwnersRead().Global with { LastScored = null }, Games = new Dictionary<string, GuessBoardStanding>() };
+            Assert.IsNull(GuessOvertakeRule.Evaluate(october, plain, null).Candidate);
+        }
+
+        [TestMethod]
+        public void Rule_AVoidOfThePlayersOwnResult_IsNoPass()
+        {
+            // The app saw #1 with 260; an admin voided one of the player's own results (now 220) and the player with 240
+            // is above. Nobody passed them: their own points fell.
+            var b = GuessBaselines.Empty.With("global", new GuessBaseline(Period, 1, 260, new DateTimeOffset(2026, 11, 7, 12, 0, 0, TimeSpan.Zero)));
+            var voided = new GuessStanding
+            {
+                Period = Period, At = ReadAt, Games = new Dictionary<string, GuessBoardStanding>(),
+                Global = new GuessBoardStanding(2, 220, 6, new GuessNeighbour(1, "X", null, false, 240, 20), null),
+            };
+            var o = GuessOvertakeRule.Evaluate(b, voided, null);
+            Assert.IsNull(o.Candidate);
+            Assert.AreEqual(GuessCheckResult.OwnPointsFell, o.Checks.Single().Result);
+            Assert.AreEqual(2, o.Baselines["global"].Rank, "re-based: a later real pass counts from here");
+            StringAssert.Contains(GuessOvertakeRule.Describe(voided, o, TimeSpan.FromHours(4)), "own points fell");
+        }
+
+        [TestMethod]
+        public void Since_IsPerBoard_ZeroForABoardWithoutAStampedPlace()
+        {
+            Assert.AreEqual("genshin:0,global:0", GuessOvertakeRule.Since(GuessBaselines.Empty, "genshin"));
+            var unstamped = GuessBaselines.Empty.With("global", new GuessBaseline(Period, 3, 220));
+            Assert.AreEqual("genshin:0,global:0", GuessOvertakeRule.Since(unstamped, "genshin"), "a baseline from 2.5.7 or 2.5.8 has no time");
+            var b = GuessBaselines.Empty
+                .With("global", new GuessBaseline(Period, 3, 220, ReadAt))
+                .With("genshin", new GuessBaseline(Period, 3, 220, LastScore));
+            Assert.AreEqual("genshin:2026-11-06T00:04:37.000Z,global:2026-11-08T23:53:55.000Z", GuessOvertakeRule.Since(b, "genshin"));
+            Assert.AreEqual("global:2026-11-08T23:53:55.000Z", GuessOvertakeRule.Since(b, null), "the global board only");
+            // A newly selected game: its board is replayed once, the global board keeps its own stamp.
+            Assert.AreEqual("starrail:0,global:2026-11-08T23:53:55.000Z", GuessOvertakeRule.Since(b, "starrail"));
+        }
+
+        [TestMethod]
+        public void Baselines_KeepTheirServerTime()
+        {
+            var b = GuessBaselines.Empty.With("global", new GuessBaseline(Period, 3, 220, LastScore));
+            string json = b.ToJson();
+            StringAssert.Contains(json, "\"at\":\"2026-11-06T00:04:37.000Z\"");
+            Assert.AreEqual(LastScore, GuessBaselines.Parse(json)["global"].At);
+            Assert.IsNull(GuessBaselines.Parse("{\"global\":{\"period\":\"2026-11\",\"rank\":3,\"points\":220,\"at\":\"soon\"}}")["global"].At);
+        }
+
+        [TestMethod]
+        public void Parse_ReadsThePlaceAfterTheLastScore_TheServersTime_AndTheCadence()
+        {
+            var s = GuessStanding.Parse(@"{""period"":""2026-11"",""at"":""2026-11-08T23:53:55.000Z"",""poll"":{""minutes"":60,""idleMinutes"":180},
+                ""global"":{""rank"":3,""points"":220,""played"":9,""lastScored"":{""rank"":1,""points"":220,""at"":""2026-11-06T00:04:37.000Z""}},
+                ""games"":{""genshin"":{""rank"":3,""points"":220,""lastScored"":{""rank"":0,""points"":220,""at"":""x""}},
+                           ""starrail"":{""rank"":2,""points"":90,""lastScored"":{""rank"":1,""at"":""2026-11-06T00:04:37.000Z""}}}}");
+            Assert.AreEqual(ReadAt, s.At);
+            Assert.AreEqual(TimeSpan.FromMinutes(60), s.PollEvery);
+            Assert.AreEqual(TimeSpan.FromMinutes(180), s.PollIdle);
+            Assert.AreEqual(new GuessPlace(1, 220, LastScore), s.Global.LastScored);
+            Assert.IsNull(s.Board("genshin").LastScored, "an unreadable one is none");
+            Assert.IsNull(s.Board("starrail").LastScored, "one without its points cannot be checked against the standing: none");
+            Assert.IsTrue(s.PlayedThisMonth);
+            var tried = GuessStanding.Parse("{\"period\":\"2026-11\",\"global\":{\"rank\":null,\"points\":0,\"played\":5}}");
+            Assert.IsNull(tried.Global, "no place yet");
+            Assert.IsTrue(tried.PlayedThisMonth, "but played: the normal cadence, not the idle one");
+            var old = GuessStanding.Parse(Contract);
+            Assert.IsNull(old.At);
+            Assert.IsNull(old.PollEvery);
+            Assert.IsNull(old.Global.LastScored, "a Worker older than the app");
+            Assert.IsFalse(GuessStanding.Parse("{\"period\":\"2026-11\",\"global\":null}").PlayedThisMonth);
+        }
+
+        [TestMethod]
+        public void Schedule_ConfigPinWins_ThenTheServer_ThenTheDefault_AllClamped()
+        {
+            var d = GuessPollSchedule.Resolve(GuessPollPins.None, null, null);
+            Assert.AreEqual(GuessPollSchedule.Default, d);
+            Assert.AreEqual(TimeSpan.FromMinutes(2), d.FirstDelay);
+            Assert.AreEqual(TimeSpan.FromHours(4), d.Interval);
+            Assert.AreEqual(TimeSpan.FromHours(12), d.IdleInterval);
+            var server = GuessPollSchedule.Resolve(GuessPollPins.None, TimeSpan.FromMinutes(60), TimeSpan.FromMinutes(180));
+            Assert.AreEqual(TimeSpan.FromMinutes(60), server.Interval);
+            Assert.AreEqual(TimeSpan.FromMinutes(180), server.IdleInterval);
+            var pinned = GuessPollSchedule.Resolve(new GuessPollPins(30, 90, null, 5, new[] { 2, 10 }, 20), TimeSpan.FromMinutes(60), TimeSpan.FromMinutes(180));
+            Assert.AreEqual(TimeSpan.FromSeconds(30), pinned.FirstDelay);
+            Assert.AreEqual(TimeSpan.FromMinutes(90), pinned.Interval, "a Config pin wins over the server");
+            Assert.AreEqual(TimeSpan.FromMinutes(180), pinned.IdleInterval);
+            Assert.AreEqual(TimeSpan.FromMinutes(5), pinned.NoSessionRecheck);
+            CollectionAssert.AreEqual(new[] { TimeSpan.FromMinutes(2), TimeSpan.FromMinutes(10) }, pinned.Retry.ToArray());
+            Assert.AreEqual(TimeSpan.FromSeconds(20), pinned.GateRetry);
+            var wild = GuessPollSchedule.Resolve(new GuessPollPins(0, 1, 999_999, 0, new[] { 0, -5 }, 1), TimeSpan.FromSeconds(1), null);
+            Assert.AreEqual(GuessPollSchedule.MinFirstDelay, wild.FirstDelay);
+            Assert.AreEqual(GuessPollSchedule.MinInterval, wild.Interval);
+            Assert.AreEqual(GuessPollSchedule.MaxIdleInterval, wild.IdleInterval);
+            Assert.AreEqual(GuessPollSchedule.MinNoSessionRecheck, wild.NoSessionRecheck);
+            CollectionAssert.AreEqual(new[] { GuessPollSchedule.MinRetry, GuessPollSchedule.MinRetry }, wild.Retry.ToArray());
+            Assert.AreEqual(GuessPollSchedule.MinGateRetry, wild.GateRetry);
+            Assert.AreEqual(GuessPollSchedule.Default.Retry.Count, GuessPollSchedule.Resolve(new GuessPollPins(null, null, null, null, Array.Empty<int>(), null), null, null).Retry.Count,
+                "an empty list keeps the default steps");
+        }
+
+        [TestMethod]
+        public void Schedule_ConfigValues_OnlyNumbersArePins()
+        {
+            var values = new Dictionary<string, System.Text.Json.Nodes.JsonNode>
+            {
+                [GuessNotifySettings.PollMinutesKey] = System.Text.Json.Nodes.JsonNode.Parse("90"),
+                [GuessNotifySettings.IdlePollMinutesKey] = System.Text.Json.Nodes.JsonNode.Parse("\"often\""),
+                [GuessNotifySettings.FirstDelaySecondsKey] = System.Text.Json.Nodes.JsonNode.Parse("30.4"),
+                [GuessNotifySettings.RetryMinutesKey] = System.Text.Json.Nodes.JsonNode.Parse("[5, \"x\", 30]"),
+                [GuessNotifySettings.GateRetrySecondsKey] = System.Text.Json.Nodes.JsonNode.Parse("{\"a\":1}"),
+                [GuessNotifySettings.NoSessionRecheckMinutesKey] = System.Text.Json.Nodes.JsonNode.Parse("2147483647.6"),
+            };
+            var pins = GuessNotifySettings.PinsFrom(k => values.TryGetValue(k, out var v) ? v : null);
+            Assert.AreEqual(90, pins.PollMinutes);
+            Assert.IsNull(pins.IdlePollMinutes, "a word is no pin");
+            Assert.AreEqual(30, pins.FirstDelaySeconds);
+            CollectionAssert.AreEqual(new[] { 5, 30 }, pins.RetryMinutes.ToArray());
+            Assert.IsNull(pins.GateRetrySeconds);
+            Assert.AreEqual(int.MaxValue, pins.NoSessionRecheckMinutes, "clamped before the cast, so it cannot wrap to a negative");
+            Assert.AreEqual(int.MinValue, GuessNotifySettings.PinsFrom(k => k == GuessNotifySettings.PollMinutesKey
+                ? System.Text.Json.Nodes.JsonNode.Parse("-2147483648.7") : null).PollMinutes);
+            Assert.AreEqual(GuessPollPins.None, GuessNotifySettings.PinsFrom(_ => null) with { RetryMinutes = null });
+        }
+
+        [TestMethod]
+        public void Poller_APlayerWithoutAPlaceButWithAPlay_KeepsTheNormalCadence()
+        {
+            var s = GuessPollSchedule.Default;
+            Assert.AreEqual(GuessPollOutcome.Unplaced, GuessStandingPoller.OutcomeOf(new GuessStanding { Period = Period, PlayedThisMonth = true }));
+            Assert.AreEqual(GuessPollOutcome.NoStanding, GuessStandingPoller.OutcomeOf(new GuessStanding { Period = Period }));
+            Assert.AreEqual(GuessPollOutcome.Read, GuessStandingPoller.OutcomeOf(OwnersRead()));
+            Assert.AreEqual(s.Interval, GuessStandingPoller.NextDelay(GuessPollOutcome.Unplaced, 0, s));
+            Assert.AreEqual(s.IdleInterval, GuessStandingPoller.NextDelay(GuessPollOutcome.NoStanding, 0, s));
+            using var p = new GuessStandingPoller(_ => Task.FromResult(OwnersRead()), () => true);
+            Assert.AreEqual(TimeSpan.FromHours(4), p.DelayAfter(OwnersRead()));
+            var tuned = new GuessStanding { Period = Period, PlayedThisMonth = true, PollEvery = TimeSpan.FromMinutes(45), PollIdle = TimeSpan.FromMinutes(90) };
+            Assert.AreEqual(TimeSpan.FromMinutes(45), p.DelayAfter(tuned), "the server's cadence");
+        }
+
+        [TestMethod]
+        public void ReadLog_SaysWhatTheReadFound()
+        {
+            var o = GuessOvertakeRule.Evaluate(GuessBaselines.Empty, OwnersRead(), "genshin");
+            string line = GuessOvertakeRule.Describe(OwnersRead(), o, TimeSpan.FromHours(4));
+            StringAssert.Contains(line, "genshin #3 (220 pts)");
+            StringAssert.Contains(line, "passed: #1 after the last score (2026-11-06 00:04Z) → #3");
+            StringAssert.Contains(line, "notice: genshin");
+            StringAssert.Contains(line, "next read in 04:00:00");
+            var none = new GuessStanding { Period = Period, PlayedThisMonth = true };
+            StringAssert.Contains(GuessOvertakeRule.Describe(none, GuessOvertakeRule.Evaluate(GuessBaselines.Empty, none, "genshin"), TimeSpan.FromHours(4)),
+                "no place this month yet (played)");
+            var quiet = GuessOvertakeRule.Delivered(o.Baselines, OwnersRead(), "genshin", "genshin");
+            StringAssert.Contains(GuessOvertakeRule.Describe(OwnersRead(), GuessOvertakeRule.Evaluate(quiet, OwnersRead(), "genshin"), TimeSpan.FromHours(4)),
+                "nothing new");
+        }
+
+        [TestMethod]
+        public async Task Client_SendsSince_OnlyWhenGiven()
+        {
+            string Response(string body) =>
+                $"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {Encoding.UTF8.GetByteCount(body)}\r\nConnection: close\r\n\r\n{body}";
+            using var server = new OneShotHttp(Response(Contract));
+            await new KaptionApiClient(server.BaseUrl).GetGuessStandingAsync("jwt", "genshin", CancellationToken.None, since: "2026-11-06T00:04:37.000Z");
+            StringAssert.StartsWith(server.RequestLine, "GET /api/app/guess/standing?game=genshin&since=2026-11-06T00%3A04%3A37.000Z ");
         }
 
         // ── Spotlight ───────────────────────────────────────────────────

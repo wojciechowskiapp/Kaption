@@ -21,7 +21,7 @@ namespace GI_Test
     [TestClass]
     public class WuWaSurfaceTests
     {
-        private static readonly string[] Cultures = { "en-US", "pl-PL", "zh-CN", "ja-JP" };
+        private static readonly string[] Cultures = { "en-US", "pl-PL" };
 
         private static JsonObject Manifest()
         {

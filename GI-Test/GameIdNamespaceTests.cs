@@ -38,13 +38,13 @@ namespace GI_Test
     public class GameIdNamespaceTests
     {
         /// <summary>
-        /// The four shipped UI dictionaries. Only one is merged at a time
+        /// The two shipped UI dictionaries. Only one is merged at a time
         /// (App.xaml.cs swaps the Source on the single Strings entry), so a key
         /// missing from any one of them degrades for the users on that locale
         /// and for nobody else — exactly the kind of gap that survives a manual
         /// check.
         /// </summary>
-        private static readonly string[] Cultures = { "en-US", "pl-PL", "zh-CN", "ja-JP" };
+        private static readonly string[] Cultures = { "en-US", "pl-PL" };
 
         /// <summary>
         /// Load a compiled Strings dictionary out of the GI-Subtitles assembly.

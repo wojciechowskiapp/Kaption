@@ -42,6 +42,9 @@ namespace GI_Subtitles.Services.Guess
         /// <summary>The local day the notice was found on; its balloon is only shown that day.</summary>
         public string PendingDay { get; private set; }
 
+        /// <summary>What the last read came to, board by board (for its log line).</summary>
+        public GuessOvertakeRule.Outcome LastOutcome { get; private set; }
+
         /// <summary>
         /// The Start strip counts as seen only when Settings is the active window, not minimised, on Start, with the
         /// strip up. A Settings window left open behind the game is visible to WPF but not to the player.
@@ -54,12 +57,18 @@ namespace GI_Subtitles.Services.Guess
         /// the strip: this read replaces what it said).
         /// </summary>
         public GuessBaselines Read(GuessBaselines baselines, GuessStanding standing, string gameBoard, string today,
+                                   Func<GuessOvertake, GuessNotice> build, out GuessOvertake candidate) =>
+            Read(baselines, standing, gameBoard, today, null, build, out candidate);
+
+        /// <param name="lastShownDay">The day the last notice reached the player (see <see cref="GuessOvertakeRule.Evaluate"/>).</param>
+        public GuessBaselines Read(GuessBaselines baselines, GuessStanding standing, string gameBoard, string today, string lastShownDay,
                                    Func<GuessOvertake, GuessNotice> build, out GuessOvertake candidate)
         {
             candidate = null;
             if (standing == null) return baselines ?? GuessBaselines.Empty;
             Standing = standing;
-            var outcome = GuessOvertakeRule.Evaluate(baselines, standing, gameBoard);
+            var outcome = GuessOvertakeRule.Evaluate(baselines, standing, gameBoard, lastShownDay);
+            LastOutcome = outcome;
             candidate = outcome.Candidate;
             GuessNotice notice = candidate == null ? null : build?.Invoke(candidate);
             if (notice == null)

@@ -95,12 +95,6 @@
          class). AutoGenerateBindingRedirects stays off for safety. -->
     <AutoGenerateBindingRedirects>false</AutoGenerateBindingRedirects>
 
-    <!-- Default-ON for net5+, but kept explicit for documentation: the
-         Properties\Resources.resx mask Icon entry is non-string and needs
-         the preserialized-resources shim. System.Resources.Extensions is
-         in-box on net8; the PackageReference was dropped. -->
-    <GenerateResourceUsePreserializedResources>true</GenerateResourceUsePreserializedResources>
-
     <!-- R2R on for cold-start perf (-200 to -800 ms projected).
          Non-Composite for Velopack-delta friendliness; composite would
          blow up deltas from ~200 KB to 5–10 MB per release. SelfContained
@@ -167,26 +161,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- Properties\Resources.resx preserves the .Designer.cs / .resx
-         codegen triad. Settings.settings + Settings.Designer.cs were
-         deleted — no code used Properties.Settings.Default anywhere. -->
-    <Compile Update="Properties\Resources.Designer.cs">
-      <AutoGen>True</AutoGen>
-      <DesignTime>True</DesignTime>
-      <DependentUpon>Resources.resx</DependentUpon>
-    </Compile>
-    <EmbeddedResource Update="Properties\Resources.resx">
-      <Generator>ResXFileCodeGenerator</Generator>
-      <LastGenOutput>Resources.Designer.cs</LastGenOutput>
-    </EmbeddedResource>
-  </ItemGroup>
-
-  <ItemGroup>
     <!-- Bundled resources that ship inside Kaption.exe. -->
     <Resource Include="Resources\kaption.ico" />
     <Resource Include="Resources\kaption-running.ico" />
-    <Resource Include="Resources\qrcode.jpg" />
-    <Resource Include="Resources\drag.png" />
     <!-- AI ambience art (Start state card per game, welcome backdrop), q78 JPEG, at most 220 KB each. -->
     <Resource Include="Assets\Ambience\*.jpg" />
     <!-- Subtitle overlay faces (OFL-1.1): Source Sans 3 Semibold/Bold unmodified, Inter Tight 600/700 cut to Latin and

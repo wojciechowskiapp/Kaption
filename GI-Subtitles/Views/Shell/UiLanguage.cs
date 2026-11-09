@@ -8,7 +8,8 @@ using Logger = GI_Subtitles.Common.Logger;
 namespace GI_Subtitles.Views.Shell
 {
     /// <summary>
-    /// The interface language, Polish or English (zh/ja dictionaries stay for old configs but are not offered).
+    /// The interface language, Polish or English. The zh-CN and ja-JP dictionaries were removed on 2026-11-09; a
+    /// config that still names one reads as English (ConfigMigrations v5 rewrites it once).
     /// Applies live: the string dictionaries are swapped at app level, so every DynamicResource follows.
     /// </summary>
     public static class UiLanguage
@@ -21,18 +22,15 @@ namespace GI_Subtitles.Views.Shell
         public static string FromWindows(string windowsDisplayLanguage) =>
             windowsDisplayLanguage != null && windowsDisplayLanguage.StartsWith("pl", StringComparison.OrdinalIgnoreCase) ? Polish : English;
 
-        public static string Current
-        {
-            get
-            {
-                string saved = Config.Get<string>("UILang", null);
-                return string.Equals(saved, Polish, StringComparison.OrdinalIgnoreCase) ? Polish : English;
-            }
-        }
+        /// <summary>pl-PL for Polish, en-US for anything else (null, an old zh-CN or ja-JP value, a typo).</summary>
+        public static string Normalize(string culture) =>
+            string.Equals(culture, Polish, StringComparison.OrdinalIgnoreCase) ? Polish : English;
+
+        public static string Current => Normalize(Config.Get<string>("UILang", null));
 
         public static void Apply(string culture)
         {
-            string tag = string.Equals(culture, Polish, StringComparison.OrdinalIgnoreCase) ? Polish : English;
+            string tag = Normalize(culture);
             Config.Set("UILang", tag);
             var app = Application.Current;
             if (app == null) return;

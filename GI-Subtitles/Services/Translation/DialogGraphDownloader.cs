@@ -16,7 +16,7 @@ namespace GI_Subtitles.Services.Translation
     /// Downloads raw game data from Dimbreath/animegamedata2 and builds
     /// compact preprocessed dialogue graph files for the prediction engine.
     ///
-    /// This is the C# equivalent of tools/build_dialogue_graph.py.
+    /// (It replaced tools/build_dialogue_graph.py, deleted on 2026-11-09.)
     /// Runs on first launch (when DialogGraph.json doesn't exist) and
     /// downloads ~93MB of raw dialog data, processes it into ~25MB of
     /// compact files, then saves them alongside the TextMap files.

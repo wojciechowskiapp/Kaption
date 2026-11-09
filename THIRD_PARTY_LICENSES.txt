@@ -313,7 +313,7 @@ License:   MIT License
 Copyright: Copyright (c) 2018 Sentry (https://sentry.io) and individual contributors.
 
  Sentry's .NET SDK is bundled to forward opt-in crash reports from the desktop
- client to a self-hosted GlitchTip instance. Users can opt out at first launch
+ client to Sentry (EU region). Users can opt out at first launch
  or by clearing the Config["SentryDsn"] key.
 
  MIT License (see Velopack section above for full text).

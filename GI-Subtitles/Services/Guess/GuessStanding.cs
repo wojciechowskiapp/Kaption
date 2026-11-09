@@ -7,8 +7,18 @@ namespace GI_Subtitles.Services.Guess
     /// <summary>A player next to the caller on a board, exactly as the public board shows them.</summary>
     public sealed record GuessNeighbour(int Rank, string Name, string Tag, bool Hidden, int Points, int Gap);
 
+    /// <summary>A place on a board at a moment (server time), with the player's points then.</summary>
+    public sealed record GuessPlace(int Rank, int Points, DateTimeOffset At);
+
     /// <summary>The caller's place on one monthly board.</summary>
-    public sealed record GuessBoardStanding(int Rank, int Points, int Players, GuessNeighbour Above, GuessNeighbour Below);
+    public sealed record GuessBoardStanding(int Rank, int Points, int Players, GuessNeighbour Above, GuessNeighbour Below)
+    {
+        /// <summary>
+        /// The place right after the player's last result that scored on this board (the server's <c>lastScored</c>,
+        /// sent when the app asks with <c>since</c>). Their points have not moved since, so a lower place now is a pass.
+        /// </summary>
+        public GuessPlace LastScored { get; init; }
+    }
 
     /// <summary>
     /// GET /api/app/guess/standing (design section 5): the caller's place on the global board and on each game's board
@@ -27,6 +37,16 @@ namespace GI_Subtitles.Services.Guess
         public IReadOnlyDictionary<string, GuessBoardStanding> Games { get; init; } = new Dictionary<string, GuessBoardStanding>();
         public int TodayPlayed { get; init; }
         public int TodayOf { get; init; }
+
+        /// <summary>The server's clock when it answered; baselines are stamped with it, never with the PC's clock.</summary>
+        public DateTimeOffset? At { get; init; }
+
+        /// <summary>The player finished a ranked puzzle this month, with or without a place: the normal read cadence.</summary>
+        public bool PlayedThisMonth { get; init; }
+
+        /// <summary>The server's read cadence (<c>poll</c>): with something played this month, and with nothing. Null when not sent.</summary>
+        public TimeSpan? PollEvery { get; init; }
+        public TimeSpan? PollIdle { get; init; }
 
         /// <summary>The standing on a board id ("global" or a game's wire id); null when none.</summary>
         public GuessBoardStanding Board(string board)
@@ -59,6 +79,7 @@ namespace GI_Subtitles.Services.Guess
             if (string.IsNullOrEmpty(period)) return null;
 
             var games = new Dictionary<string, GuessBoardStanding>(StringComparer.Ordinal);
+            bool played = root.TryGetProperty("global", out var globalEl) && Played(globalEl);
             if (root.TryGetProperty("games", out var g) && g.ValueKind == JsonValueKind.Object)
             {
                 foreach (var p in g.EnumerateObject())
@@ -66,6 +87,7 @@ namespace GI_Subtitles.Services.Guess
                     string id = p.Name.Trim().ToLowerInvariant();
                     if (id.Length == 0 || id == GlobalBoard) continue;
                     games[id] = ParseBoard(p.Value);
+                    played |= Played(p.Value);
                 }
             }
             // The review's earlier draft: "game": { "id": "genshin", "standing": { ... } }.
@@ -75,28 +97,40 @@ namespace GI_Subtitles.Services.Guess
                 games[oneId.Trim().ToLowerInvariant()] = ParseBoard(st);
             }
 
-            int played = 0, of = 0;
+            int todayPlayed = 0, of = 0;
             if (root.TryGetProperty("today", out var t) && t.ValueKind == JsonValueKind.Object)
             {
-                played = Int(t, "played");
+                todayPlayed = Int(t, "played");
                 of = Int(t, "of");
             }
 
-            DateTimeOffset? closes = null;
-            if (Str(root, "closesAt") is string c && DateTimeOffset.TryParse(c, System.Globalization.CultureInfo.InvariantCulture,
-                    System.Globalization.DateTimeStyles.AssumeUniversal, out var parsed))
-                closes = parsed;
+            TimeSpan? every = null, idle = null;
+            if (root.TryGetProperty("poll", out var poll) && poll.ValueKind == JsonValueKind.Object)
+            {
+                every = Int(poll, "minutes") is int m and > 0 ? TimeSpan.FromMinutes(m) : null;
+                idle = Int(poll, "idleMinutes") is int i and > 0 ? TimeSpan.FromMinutes(i) : null;
+            }
 
             return new GuessStanding
             {
                 Period = period,
-                ClosesAt = closes,
+                ClosesAt = Time(Str(root, "closesAt")),
                 Global = root.TryGetProperty("global", out var gl) ? ParseBoard(gl) : null,
                 Games = games,
-                TodayPlayed = played,
+                TodayPlayed = todayPlayed,
                 TodayOf = of,
+                At = Time(Str(root, "at")),
+                PlayedThisMonth = played || todayPlayed > 0,
+                PollEvery = every,
+                PollIdle = idle,
             };
         }
+
+        private static bool Played(JsonElement board) => board.ValueKind == JsonValueKind.Object && Int(board, "played") > 0;
+
+        private static DateTimeOffset? Time(string s) =>
+            s != null && DateTimeOffset.TryParse(s, System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.AssumeUniversal, out var parsed) ? parsed : null;
 
         private static GuessBoardStanding ParseBoard(JsonElement e)
         {
@@ -105,7 +139,18 @@ namespace GI_Subtitles.Services.Guess
             if (rank < 1) return null; // "no place yet" (rank null) is no standing for the notice
             return new GuessBoardStanding(rank, Int(e, "points"), Int(e, "players"),
                 e.TryGetProperty("above", out var a) ? ParseNeighbour(a) : null,
-                e.TryGetProperty("below", out var b) ? ParseNeighbour(b) : null);
+                e.TryGetProperty("below", out var b) ? ParseNeighbour(b) : null)
+            {
+                LastScored = e.TryGetProperty("lastScored", out var ls) ? ParsePlace(ls) : null,
+            };
+        }
+
+        /// <summary>Null unless it has a place, the points it had there (checked against the standing's) and a time.</summary>
+        private static GuessPlace ParsePlace(JsonElement e)
+        {
+            if (e.ValueKind != JsonValueKind.Object) return null;
+            int rank = Int(e, "rank"), points = Int(e, "points");
+            return rank >= 1 && points >= 1 && Time(Str(e, "at")) is DateTimeOffset at ? new GuessPlace(rank, points, at) : null;
         }
 
         private static GuessNeighbour ParseNeighbour(JsonElement e)

@@ -324,8 +324,9 @@ namespace GI_Subtitles.Views
                 catch (Exception ex) { Logger.Log.Warn($"Initial Dashboard refresh failed: {ex.Message}"); }
             };
             Scale = scale;
-            // Load UI language from config, default to zh-CN
-            string uiLang = Config.Get("UILang", "en-US");
+            // Load UI language from config (Polish or English)
+            // Normalized: a profile that still says zh-CN or ja-JP (ConfigMigrations v5 not yet run) reads as English.
+            string uiLang = GI_Subtitles.Views.Shell.UiLanguage.Normalize(Config.Get("UILang", "en-US"));
             ApplyLanguage(uiLang);
 
             // Sync UI language selector without triggering extra logic
@@ -679,9 +680,10 @@ namespace GI_Subtitles.Views
         /// Set UI language from any caller (tray menu or settings window).
         /// Keeps Config, resources, tray text, hotkeys and selector in sync.
         /// </summary>
-        /// <param name="cultureTag">Culture tag such as zh-CN / en-US / ja-JP.</param>
+        /// <param name="cultureTag">pl-PL or en-US; anything else is treated as en-US.</param>
         public void SetUILanguage(string cultureTag)
         {
+            cultureTag = Shell.UiLanguage.Normalize(cultureTag);
             try
             {
                 // Temporarily suppress SelectionChanged side effects
@@ -789,12 +791,6 @@ namespace GI_Subtitles.Views
                 {
                     case "pl-PL":
                         rd.Source = new Uri("pack://application:,,,/Resources/Strings.pl-PL.xaml", UriKind.Absolute);
-                        break;
-                    case "ja-JP":
-                        rd.Source = new Uri("pack://application:,,,/Resources/Strings.ja-JP.xaml", UriKind.Absolute);
-                        break;
-                    case "zh-CN":
-                        rd.Source = new Uri("pack://application:,,,/Resources/Strings.zh-CN.xaml", UriKind.Absolute);
                         break;
                     default:
                         // Unknown culture — en-US base is already loaded, nothing to overlay.
@@ -4214,15 +4210,6 @@ namespace GI_Subtitles.Views
             Config.Set("PlayerName", PlayerNameTextBox.Text.Trim());
         }
 
-        private OverlayCardManager _cardManager
-        {
-            get
-            {
-                if (System.Windows.Application.Current.MainWindow is MainWindow mw)
-                    return mw._cardManager;
-                return null;
-            }
-        }
 
         private void ShowSecondLangCheckBox_Checked(object sender, RoutedEventArgs e)
         {

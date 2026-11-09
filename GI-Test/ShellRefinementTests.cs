@@ -308,7 +308,7 @@ namespace GI_Test
             });
 
             // One sentence each, in every locale (the scan-failed summary is a status line, not a state).
-            foreach (string file in new[] { "Strings.pl-PL.xaml", "Strings.en-US.xaml", "Strings.ja-JP.xaml", "Strings.zh-CN.xaml" })
+            foreach (string file in new[] { "Strings.pl-PL.xaml", "Strings.en-US.xaml" })
             {
                 var dict = Dictionary("Resources/" + file);
                 foreach (string key in new[] { "state_Char_NoResults", "state_Char_Empty", "state_Char_Error", "state_Packs_Empty", "state_Logs_Empty" })

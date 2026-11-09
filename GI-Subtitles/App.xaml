@@ -11,8 +11,8 @@
                 <ResourceDictionary Source="Themes/Palette.Dark.xaml"/>
                 <!-- Window chrome, navigation rail, chips, skeletons and empty states shared by every window. -->
                 <ResourceDictionary Source="Themes/Shell.xaml"/>
-                <!-- Default language resource (will be replaced at runtime) -->
-                <ResourceDictionary Source="pack://application:,,,/Resources/Strings.zh-CN.xaml"/>
+                <!-- English strings as parsed; App.LoadUILanguageResources swaps in the chosen language at startup. -->
+                <ResourceDictionary Source="pack://application:,,,/Resources/Strings.en-US.xaml"/>
             </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>
     </Application.Resources>

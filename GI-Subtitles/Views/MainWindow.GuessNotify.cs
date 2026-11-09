@@ -20,20 +20,21 @@ namespace GI_Subtitles.Views
     /// </summary>
     public partial class MainWindow
     {
-        private static readonly TimeSpan GuessGateRetry = TimeSpan.FromSeconds(60);
         private GuessStandingPoller _guessPoller;
         private DispatcherTimer _guessGateTicker;
         private readonly GuessNoticeDelivery _guessDelivery = new();
+        /// <summary>The delivery step last logged for the waiting notice, so a re-check logs only a change.</summary>
+        private GuessDeliveryStep? _guessLoggedStep;
 
         private void InitGuessNotify()
         {
             var api = new KaptionApiClient();
-            _guessPoller = new GuessStandingPoller(ct => FetchGuessStandingAsync(api, ct), HasGuessSession);
+            _guessPoller = new GuessStandingPoller(ct => FetchGuessStandingAsync(api, ct), HasGuessSession, GuessNotifySettings.Schedule);
             _guessPoller.StandingRead += standing =>
             {
                 if (!Dispatcher.HasShutdownStarted) Dispatcher.BeginInvoke(new Action(() => OnGuessStanding(standing)));
             };
-            _guessGateTicker = new DispatcherTimer(DispatcherPriority.Background) { Interval = GuessGateRetry };
+            _guessGateTicker = new DispatcherTimer(DispatcherPriority.Background) { Interval = _guessPoller.Schedule.GateRetry };
             _guessGateTicker.Tick += (_, __) => TryDeliverGuessNotice();
             GuessNotifySettings.EnabledChanged += OnGuessNotifyEnabledChanged;
             if (data != null)
@@ -58,9 +59,17 @@ namespace GI_Subtitles.Views
             GuessNotifySettings.StandingUrlOverride != null
             || !string.IsNullOrEmpty(App.LicenseService?.CurrentActivation?.DeviceSessionJwt);
 
-        private static Task<GuessStanding> FetchGuessStandingAsync(KaptionApiClient api, CancellationToken ct) =>
-            api.GetGuessStandingAsync(App.LicenseService?.CurrentActivation?.DeviceSessionJwt, CurrentGuessBoard(), ct,
-                GuessNotifySettings.StandingUrlOverride);
+        /// <summary>
+        /// One standing request. <c>since</c> carries each watched board's stored server time (GuessOvertakeRule.Since): the server
+        /// adds the place after the last score only for a board scored on later, so a pass made while Kaption was
+        /// closed still counts.
+        /// </summary>
+        private static Task<GuessStanding> FetchGuessStandingAsync(KaptionApiClient api, CancellationToken ct)
+        {
+            string board = CurrentGuessBoard();
+            return api.GetGuessStandingAsync(App.LicenseService?.CurrentActivation?.DeviceSessionJwt, board, ct,
+                GuessNotifySettings.StandingUrlOverride, GuessOvertakeRule.Since(GuessNotifySettings.Baselines, board));
+        }
 
         private void OnGuessNotifyEnabledChanged()
         {
@@ -82,9 +91,10 @@ namespace GI_Subtitles.Views
         {
             if (standing == null || !GuessNotifySettings.Enabled) return;
             GuessNotifySettings.Baselines = _guessDelivery.Read(GuessNotifySettings.Baselines, standing, CurrentGuessBoard(),
-                GuessNotifySettings.Today(DateTime.Now), c => GuessNoticeText.Build(c, GuessL), out var candidate);
-            if (candidate != null)
-                Logger.Log.Info($"Guess ranking: passed on the {candidate.Board} board ({candidate.From} → {candidate.To}).");
+                GuessNotifySettings.Today(DateTime.Now), GuessNotifySettings.LastShownDay, c => GuessNoticeText.Build(c, GuessL), out var candidate);
+            // One line per read: each watched board, what it was measured from, the notice it found, the next read.
+            Logger.Log.Info(GuessOvertakeRule.Describe(standing, _guessDelivery.LastOutcome, _guessPoller.DelayAfter(standing)));
+            if (candidate != null) _guessLoggedStep = null; // a fresh notice: its first delivery decision is logged
             // A read without a drop replaces what the strip said.
             data?.ShowGuessRankNotice(_guessDelivery.Notice);
             TryDeliverGuessNotice();
@@ -112,21 +122,39 @@ namespace GI_Subtitles.Views
                     MarkGuessDelivered(today, "as a tray notice");
                     break;
                 case GuessDeliveryStep.Disabled:
+                    LogGuessDecision(decision.Step, "Guess ranking notice dropped: notices are turned off.");
                     ClearGuessNotice();
                     break;
-                case GuessDeliveryStep.Expired:   // yesterday's balloon is dropped; the strip keeps it until the next read
-                case GuessDeliveryStep.CappedToday: // the cap is for today; the strip still carries it
+                case GuessDeliveryStep.Expired:
+                    LogGuessDecision(decision.Step, $"Guess ranking notice from {_guessDelivery.PendingDay} not shown as a tray notice today; "
+                                                    + "the Start strip keeps it and the next read finds the drop again.");
+                    _guessGateTicker?.Stop();
+                    break;
+                case GuessDeliveryStep.CappedToday:
+                    LogGuessDecision(decision.Step, $"Guess ranking notice waits for tomorrow: one already reached you today ({GuessNotifySettings.LastShownDay}); "
+                                                    + "the Start strip shows it.");
+                    _guessGateTicker?.Stop();
+                    break;
                 case GuessDeliveryStep.Idle:
                     _guessGateTicker?.Stop();
                     break;
                 default:
                     if (_guessGateTicker?.IsEnabled == false)
                     {
-                        Logger.Log.Info($"Guess ranking notice waits ({decision.Gate}).");
+                        _guessGateTicker.Interval = _guessPoller.Schedule.GateRetry;
+                        Logger.Log.Info($"Guess ranking notice waits ({decision.Gate}); checking again every {_guessGateTicker.Interval}.");
                         _guessGateTicker.Start();
                     }
                     break;
             }
+        }
+
+        /// <summary>Logs a delivery decision once per notice and step: the 60-second re-checks and strip events repeat them.</summary>
+        private void LogGuessDecision(GuessDeliveryStep step, string line)
+        {
+            if (_guessLoggedStep == step) return;
+            _guessLoggedStep = step;
+            Logger.Log.Info(line);
         }
 
         private void MarkGuessDelivered(string today, string how)
@@ -134,7 +162,8 @@ namespace GI_Subtitles.Views
             GuessNotifySettings.LastShownDay = today;
             GuessNotifySettings.Baselines = _guessDelivery.Delivered(GuessNotifySettings.Baselines, CurrentGuessBoard());
             _guessGateTicker?.Stop();
-            Logger.Log.Info($"Guess ranking notice delivered {how}.");
+            _guessLoggedStep = null;
+            Logger.Log.Info($"Guess ranking notice delivered {how} ({_guessDelivery.Notice?.Board}).");
         }
 
         private void ClearGuessNotice()

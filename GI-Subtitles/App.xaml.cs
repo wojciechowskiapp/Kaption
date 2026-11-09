@@ -1282,16 +1282,16 @@ namespace GI_Subtitles
         {
             try
             {
-                string uiLang = Config.Get("UILang", "en-US");
+                // Polish or English: a value from an older build (zh-CN, ja-JP) or a hand edit reads as English.
+                string uiLang = GI_Subtitles.Views.Shell.UiLanguage.Normalize(Config.Get("UILang", "en-US"));
                 var culture = new CultureInfo(uiLang);
                 CultureInfo.DefaultThreadCurrentCulture = culture;
                 CultureInfo.DefaultThreadCurrentUICulture = culture;
 
-                // Remove the default resource dictionary from App.xaml if it exists.
-                // The app.xaml currently ships zh-CN as the fallback — we strip it here
-                // so the chosen locale is the one actually resolved at runtime.
+                // Remove the default string dictionary App.xaml merges (English); the en-US base and the
+                // chosen overlay are added below in the order the lookup needs.
                 var defaultRd = this.Resources.MergedDictionaries
-                    .FirstOrDefault(d => d.Source != null && d.Source.OriginalString.Contains("Strings.zh-CN.xaml"));
+                    .FirstOrDefault(d => d.Source != null && d.Source.OriginalString.Contains("Resources/Strings"));
                 if (defaultRd != null)
                 {
                     this.Resources.MergedDictionaries.Remove(defaultRd);
@@ -1341,12 +1341,6 @@ namespace GI_Subtitles
                     {
                         case "pl-PL":
                             rd.Source = new Uri("pack://application:,,,/Resources/Strings.pl-PL.xaml", UriKind.Absolute);
-                            break;
-                        case "ja-JP":
-                            rd.Source = new Uri("pack://application:,,,/Resources/Strings.ja-JP.xaml", UriKind.Absolute);
-                            break;
-                        case "zh-CN":
-                            rd.Source = new Uri("pack://application:,,,/Resources/Strings.zh-CN.xaml", UriKind.Absolute);
                             break;
                         default:
                             // Unknown culture — keep only en-US base.

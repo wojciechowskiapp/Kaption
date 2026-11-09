@@ -27,7 +27,7 @@ namespace GI_Subtitles.Core.Config
     public static class ConfigMigrations
     {
         /// <summary>Current migration tip. Bump when adding a new case.</summary>
-        private const int CurrentVersion = 4;
+        private const int CurrentVersion = 5;
 
         private const string VersionKey = "ConfigMigrationVersion";
 
@@ -98,8 +98,12 @@ namespace GI_Subtitles.Core.Config
                     Migration4_ResetPacingToMeasuredProfiles();
                     return;
 
+                case 5:
+                    Migration5_UiLanguage_PolishOrEnglish();
+                    return;
+
                 // Future migrations go here:
-                //   case 5: Migration5_SomethingElse(); return;
+                //   case 6: Migration6_SomethingElse(); return;
 
                 default:
                     Logger.Log.Warn($"ConfigMigrations: unknown version {version} — nothing to apply.");
@@ -257,7 +261,7 @@ namespace GI_Subtitles.Core.Config
                 // Read as double, NOT string. All five keys hold JSON numbers,
                 // and Config.Get<string> on a number throws inside Deserialize,
                 // which Config.Get catches and reports via Logger.Log.Error —
-                // and the Sentry appender forwards Error to GlitchTip. Asking
+                // and the Sentry appender forwards Error to Sentry. Asking
                 // for the wrong type here would fire a crash-report event per
                 // key, per user, on upgrade, and still log "OcrInterval=?".
                 double value = Config.Get<double>(key, double.NaN);
@@ -279,6 +283,22 @@ namespace GI_Subtitles.Core.Config
                 $"ConfigMigrations v4: cleared {cleared.Count} pinned OCR pacing key(s) " +
                 $"[{string.Join(", ", cleared)}] so the measured per-game profiles apply. " +
                 "Re-pin in Settings > Advanced if a machine needs different pacing.");
+        }
+
+        /// <summary>
+        /// UI language (2026-11-09): the zh-CN and ja-JP string dictionaries were removed (unmaintained, never
+        /// offered in the visible pickers). A config that still names one is rewritten to en-US, the language the
+        /// app already fell back to, so Config.json and the culture used for dates and numbers agree. pl-PL, en-US
+        /// and an absent key (first launch picks from Windows) are left alone.
+        /// </summary>
+        private static void Migration5_UiLanguage_PolishOrEnglish()
+        {
+            string saved = Config.Get<string>("UILang", null);
+            if (string.IsNullOrEmpty(saved)) return;
+            string normalized = GI_Subtitles.Views.Shell.UiLanguage.Normalize(saved);
+            if (string.Equals(saved, normalized, System.StringComparison.Ordinal)) return;
+            Config.Set("UILang", normalized);
+            Logger.Log.Info($"ConfigMigrations v5: UILang {saved} -> {normalized} (only Polish and English ship).");
         }
     }
 }

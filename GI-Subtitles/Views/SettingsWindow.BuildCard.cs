@@ -99,12 +99,8 @@ namespace GI_Subtitles.Views
             string line = L("card_Uid_NotRead", "Couldn't read the UID from the game screen. Type it on the page.");
             if (!UidReader.ShowsUidOnlyInMenus(gameId)) return line;
             string menu = L("card_Uid_MenuHint", "In Star Rail and ZZZ open the game menu (Esc), the UID is shown there.");
-            // Chinese and Japanese sentences end on a full-width stop and run on without a space.
-            return line.EndsWith(FullWidthStop) ? line + menu : line + " " + menu;
+            return line + " " + menu;
         }
-
-        /// <summary>U+3002, the full stop Chinese and Japanese end a sentence with.</summary>
-        private const char FullWidthStop = (char)0x3002;
 
         // The page's language follows the strings in use, like the Characters page's own link.
         private string SiteLanguage() => TryFindResource("Char_SiteLocale") as string ?? UiLanguage.Current;

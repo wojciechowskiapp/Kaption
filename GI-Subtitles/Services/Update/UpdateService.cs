@@ -188,10 +188,10 @@ namespace GI_Subtitles.Services.Update
             result.Info = new UpdateReleaseInfo
             {
                 Version = info.TargetFullRelease.Version?.ToString(),
-                // We don't yet host per-version release notes — link to the
-                // public changelog anchored on the target version. The landing
-                // page normalises "2.0.3" → "#v-2-0-3", so both formats work.
-                ReleaseNotesUrl = $"https://kaption.one/changelog#v-{info.TargetFullRelease.Version}",
+                // The "What's new" dialog prints the body as text, so it reads the plain-text notes (the
+                // newest release, Polish then English). Up to 2.5.8 this was /changelog#v-X, the HTML page;
+                // a Cloudflare rule still sends those requests (no User-Agent) to the text.
+                ReleaseNotesUrl = "https://kaption.one/changelog.txt",
             };
             result.Status = UpdateStatus.Available;
 

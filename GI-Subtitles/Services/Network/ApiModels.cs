@@ -413,34 +413,6 @@ namespace GI_Subtitles.Services.Network
         public long EndsAt { get; private set; }
     }
 
-    /// <summary>Response from GET /api/app/version.</summary>
-    public sealed class AppVersionInfo
-    {
-        [JsonPropertyName("version")]
-        [JsonInclude]
-        public string Version { get; private set; }
-
-        [JsonPropertyName("download_url")]
-        [JsonInclude]
-        public string Url { get; private set; }
-
-        [JsonPropertyName("sha256")]
-        [JsonInclude]
-        public string Sha256 { get; private set; }
-
-        [JsonPropertyName("release_notes_url")]
-        [JsonInclude]
-        public string ReleaseNotesUrl { get; private set; }
-
-        [JsonPropertyName("min_supported_version")]
-        [JsonInclude]
-        public string MinSupportedVersion { get; private set; }
-
-        [JsonPropertyName("published_at")]
-        [JsonInclude]
-        public long PublishedAt { get; private set; }
-    }
-
     /// <summary>
     /// Shape of error responses from the API. Fields are optional — servers
     /// may return just <c>error</c>, or include <c>message</c> / <c>details</c>.

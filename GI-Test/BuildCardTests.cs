@@ -302,12 +302,6 @@ namespace GI_Test
                     SettingsWindow.BuildCardLine(NoUid(UidReadOutcome.NotFound), "StarRail", false, en));
                 Assert.AreEqual("The text reader is still loading. Try again in a moment.",
                     SettingsWindow.BuildCardLine(NoUid(UidReadOutcome.NoReader), "ZZZ", false, en));
-
-                // Japanese runs the two sentences on after its full stop, without a space.
-                var ja = Lookup("ja-JP");
-                string jaLine = SettingsWindow.BuildCardLine(NoUid(UidReadOutcome.NotFound), "ZZZ", false, ja);
-                Assert.AreEqual(ja("card_Uid_NotRead", null) + ja("card_Uid_MenuHint", null), jaLine);
-                Assert.IsFalse(jaLine.Contains(" " + ja("card_Uid_MenuHint", null)), jaLine);
             });
         }
 

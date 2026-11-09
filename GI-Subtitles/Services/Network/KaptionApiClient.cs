@@ -103,22 +103,6 @@ namespace GI_Subtitles.Services.Network
     }
 
     // ═══════════════════════════════════════════════════════════════════════
-    //  Narrow interface for testability
-    // ═══════════════════════════════════════════════════════════════════════
-
-    /// <summary>
-    /// One-method seam over <see cref="KaptionApiClient.FetchFileProtectionKeyAsync"/>.
-    /// Lets <c>ServerKeyFileProtectionService</c> depend on a small surface
-    /// the tests can fake without standing up the whole HTTP client.
-    /// </summary>
-    public interface IFileProtectionKeyClient
-    {
-        Task<FileProtectionKeyResponse> FetchFileProtectionKeyAsync(
-            string deviceSessionJwt,
-            CancellationToken ct);
-    }
-
-    // ═══════════════════════════════════════════════════════════════════════
     //  Client
     // ═══════════════════════════════════════════════════════════════════════
 
@@ -134,7 +118,7 @@ namespace GI_Subtitles.Services.Network
     /// would trip the 30-second limit. Separate client for downloads, cancellation
     /// via CancellationToken only.
     /// </summary>
-    public sealed partial class KaptionApiClient : IFileProtectionKeyClient
+    public sealed partial class KaptionApiClient
     {
         // ── File-protection policy ────────────────────────────────────────
         // Bounds the client trusts on the server-returned pbkdf2_iterations.
@@ -284,14 +268,6 @@ namespace GI_Subtitles.Services.Network
         }
 
         /// <summary>
-        /// GET /api/app/version — publicly accessible latest-version manifest.
-        /// </summary>
-        public Task<AppVersionInfo> GetAppVersionAsync(CancellationToken ct)
-        {
-            return GetJsonAsync<AppVersionInfo>("/api/app/version", authToken: null, ct);
-        }
-
-        /// <summary>
         /// POST /api/app/file-protection-key — fetch (or refresh) the
         /// per-device 32-byte secret used to derive AES + HMAC keys for
         /// locally-cached <c>.gisub</c> translation packs.
@@ -353,11 +329,6 @@ namespace GI_Subtitles.Services.Network
             ValidateFileProtectionKeyResponse(body);
             return body;
         }
-
-        Task<FileProtectionKeyResponse> IFileProtectionKeyClient.FetchFileProtectionKeyAsync(
-            string deviceSessionJwt,
-            CancellationToken ct)
-            => FetchFileProtectionKeyAsync(deviceSessionJwt, ct);
 
         // Defends the desktop against a hostile or misconfigured backend.
         private static void ValidateFileProtectionKeyResponse(FileProtectionKeyResponse b)
@@ -422,12 +393,16 @@ namespace GI_Subtitles.Services.Network
         /// GET /api/app/guess/standing?game= — the player's place on this month's guess boards, for the ranking notice.
         /// Every failure is logged at Info and thrown to the caller (GuessStandingPoller), which backs off. A 401 here
         /// never reaches the licence: a cosmetic feature must not end the session. <paramref name="fixtureUrl"/>
-        /// (Debug builds only) replaces the endpoint and is called without the session.
+        /// (Debug builds only) replaces the endpoint and is called without the session. <paramref name="since"/> (an ISO
+        /// time or "0") asks for each watched board's place after the last score when that score is newer.
         /// </summary>
         public async Task<Services.Guess.GuessStanding> GetGuessStandingAsync(string sessionJwt, string game, CancellationToken ct,
-                                                                             string fixtureUrl = null)
+                                                                             string fixtureUrl = null, string since = null)
         {
-            string query = string.IsNullOrWhiteSpace(game) ? string.Empty : "game=" + Uri.EscapeDataString(game.Trim().ToLowerInvariant());
+            var parts = new List<string>(2);
+            if (!string.IsNullOrWhiteSpace(game)) parts.Add("game=" + Uri.EscapeDataString(game.Trim().ToLowerInvariant()));
+            if (!string.IsNullOrWhiteSpace(since)) parts.Add("since=" + Uri.EscapeDataString(since.Trim()));
+            string query = string.Join("&", parts);
             string url;
             string token;
             if (!string.IsNullOrEmpty(fixtureUrl))
@@ -480,24 +455,10 @@ namespace GI_Subtitles.Services.Network
         // ───────────────────────────────────────────────────────────────────
 
         /// <summary>
-        /// GET /api/referrals/me — fetch the user's current code, share URL,
-        /// stats, and reward ladder. Returns an empty-but-valid response when
-        /// the user hasn't used the referrals page yet (code field may be empty
-        /// on older accounts that pre-date the system); callers who need a
-        /// code for display should prefer <see cref="EnsureReferralCodeAsync"/>.
-        /// </summary>
-        public Task<ReferralMeResponse> GetReferralsMeAsync(string sessionJwt, CancellationToken ct = default)
-        {
-            if (string.IsNullOrEmpty(sessionJwt))
-                throw new ArgumentException("sessionJwt required", nameof(sessionJwt));
-            return GetJsonAsync<ReferralMeResponse>("/api/referrals/me", sessionJwt, ct);
-        }
-
-        /// <summary>
         /// POST /api/referrals/ensure-code — idempotent create-or-return of the
         /// user's referral code. Safe to call on every dialog open; the server
         /// generates a code on first call and returns the existing one on every
-        /// subsequent call. Response envelope matches <see cref="GetReferralsMeAsync"/>.
+        /// subsequent call. Same envelope as GET /api/referrals/me (the referrals page reads that one).
         /// </summary>
         public Task<ReferralMeResponse> EnsureReferralCodeAsync(string sessionJwt, CancellationToken ct = default)
         {

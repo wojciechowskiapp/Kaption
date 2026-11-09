@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Globalization;
@@ -105,6 +105,21 @@ namespace GI_Test
         public void InterfaceLanguageFollowsWindows(string windows, string expected)
         {
             Assert.AreEqual(expected, UiLanguage.FromWindows(windows));
+        }
+
+        // A profile that still says ja-JP or zh-CN (before ConfigMigrations v5 runs) loads as English, never as a
+        // half-Japanese window: SettingsWindow normalizes UILang before ApplyLanguage.
+        [TestMethod]
+        [DataRow("pl-PL", "pl-PL")]
+        [DataRow("PL-pl", "pl-PL")]
+        [DataRow("en-US", "en-US")]
+        [DataRow("ja-JP", "en-US")]
+        [DataRow("zh-CN", "en-US")]
+        [DataRow("", "en-US")]
+        [DataRow(null, "en-US")]
+        public void StoredInterfaceLanguageNormalizesToPolishOrEnglish(string stored, string expected)
+        {
+            Assert.AreEqual(expected, UiLanguage.Normalize(stored));
         }
 
         [TestMethod]

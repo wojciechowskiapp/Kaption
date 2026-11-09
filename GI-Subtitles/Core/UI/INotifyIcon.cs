@@ -1,5 +1,4 @@
-﻿using GI_Subtitles.Properties;
-using Microsoft.Win32;
+﻿using Microsoft.Win32;
 using Screenshot;
 using System;
 using System.Diagnostics;
@@ -570,7 +569,7 @@ namespace GI_Subtitles.Core.UI
         /// Create a language menu item for the tray language selector.
         /// </summary>
         /// <param name="displayName">Display text of the language.</param>
-        /// <param name="cultureTag">Culture tag such as zh-CN / en-US / ja-JP.</param>
+        /// <param name="cultureTag">pl-PL or en-US.</param>
         /// <returns>Configured ToolStripMenuItem.</returns>
         private ToolStripMenuItem CreateLanguageItem(string displayName, string cultureTag)
         {

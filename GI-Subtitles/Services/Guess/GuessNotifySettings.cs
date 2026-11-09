@@ -1,4 +1,6 @@
 using System;
+using System.Linq;
+using System.Text.Json.Nodes;
 using GI_Subtitles.Core.Config;
 
 namespace GI_Subtitles.Services.Guess
@@ -14,6 +16,40 @@ namespace GI_Subtitles.Services.Guess
         public const string BaselineKey = "GuessNotify.Baseline";
         /// <summary>Debug builds only: a fixture URL in place of the standing endpoint. Never ApiUrl.</summary>
         public const string StandingUrlKey = "GuessNotify.StandingUrl";
+
+        // The read cadence (GuessPollSchedule): unset keys follow the server's `poll`, then the defaults.
+        public const string FirstDelaySecondsKey = "GuessNotify.FirstDelaySeconds";
+        public const string PollMinutesKey = "GuessNotify.PollMinutes";
+        public const string IdlePollMinutesKey = "GuessNotify.IdlePollMinutes";
+        public const string NoSessionRecheckMinutesKey = "GuessNotify.NoSessionRecheckMinutes";
+        public const string RetryMinutesKey = "GuessNotify.RetryMinutes";
+        public const string GateRetrySecondsKey = "GuessNotify.GateRetrySeconds";
+
+        /// <summary>The cadence values pinned in Config; a key that is missing or not a number is no pin.</summary>
+        // Read as raw JSON, so a hand-edited value that is not a number is no pin rather than an Error on every read.
+        public static GuessPollPins Pins => PinsFrom(key => Config.Has(key) ? Config.Get<JsonNode>(key, null) : null);
+
+        /// <summary>The schedule after reading <paramref name="standing"/> (null before the first read): pins, then its <c>poll</c>.</summary>
+        public static GuessPollSchedule Schedule(GuessStanding standing) =>
+            GuessPollSchedule.Resolve(Pins, standing?.PollEvery, standing?.PollIdle);
+
+        /// <summary>The pins from raw values (<paramref name="read"/>: key → JSON or null); anything not a number is no pin.</summary>
+        public static GuessPollPins PinsFrom(Func<string, JsonNode> read)
+        {
+            int? Pin(string key) => Number(read(key));
+            int[] steps = read(RetryMinutesKey) is JsonArray a ? a.Select(Number).Where(n => n.HasValue).Select(n => n.Value).ToArray() : null;
+            return new GuessPollPins(Pin(FirstDelaySecondsKey), Pin(PollMinutesKey), Pin(IdlePollMinutesKey), Pin(NoSessionRecheckMinutesKey),
+                steps, Pin(GateRetrySecondsKey));
+        }
+
+        private static int? Number(JsonNode n)
+        {
+            if (n is not JsonValue v) return null;
+            if (v.TryGetValue(out int i)) return i;
+            // Clamped before the cast: a cast of a double past int's range does not saturate.
+            if (v.TryGetValue(out double d) && double.IsFinite(d)) return (int)Math.Clamp(Math.Round(d), int.MinValue, int.MaxValue);
+            return null;
+        }
 
         /// <summary>Raised after <see cref="Enabled"/> changes, so every switch and the poller follow.</summary>
         public static event Action EnabledChanged;

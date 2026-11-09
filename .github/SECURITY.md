@@ -67,7 +67,7 @@ These are not secrets; knowing them helps you report actionable issues:
 - **Device binding**: separate device-activation JWT, issued per `device_id` at activation time, revocable from the Dashboard.
 - **Licence-tier enforcement**: server-side effective-tier gate on every paid endpoint. Local-only gates are present for UX but are not relied on.
 - **File protection**: `.gisub` translation packs use AES-256-CBC for the bulk path and AES-CTR-with-per-block-HMAC for the mmap-friendly matcher blob. Both derive their AES + HMAC keys from a per-device 32-byte secret issued by `POST /api/app/file-protection-key` and persisted DPAPI-wrapped on the user's machine. There is no embedded application secret in the public source. If you find a decryption attack against a current-scheme file you recorded off your own machine, that is in scope.
-- **Crash reporting**: Sentry SDK pointing at a self-hosted GlitchTip instance. The DSN is empty in the public source; the released installer ships with a baked-in DSN. PII minimisation rules live in `CrashReportingService.cs`.
+- **Crash reporting**: opt-in, through the Sentry SDK to Sentry's EU region (app versions before 2.5.8 sent to hosted GlitchTip). The DSN is empty in the public source; the released installer ships with a baked-in DSN. PII minimisation rules live in `CrashReportingService.cs`.
 
 ## Cryptographic primitives we rely on
 

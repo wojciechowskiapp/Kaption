@@ -84,7 +84,7 @@ namespace GI_Subtitles.Services.Observability
         /// crashes until they update — acceptable cost.
         /// </summary>
         private const string DefaultDsn =
-            "https://85b750e4f335926bb9ffb5d84206e068@o4507924022558720.ingest.de.sentry.io/4512396053250128";
+            "";
 
         /// <summary>
         /// True after <see cref="Initialize"/> has completed at least once.

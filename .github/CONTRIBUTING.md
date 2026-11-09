@@ -53,7 +53,7 @@ Each game is one entry in `Services/Detection/GameRegionProfile.cs`: process nam
 
 ## Rules that matter
 
-- **Four string files.** Every new UI string goes into all four dictionaries: `Strings.en-US.xaml`, `Strings.pl-PL.xaml`, `Strings.ja-JP.xaml` and `Strings.zh-CN.xaml`. English and Polish are maintained and a test checks that their keys match; English text in the other two is fine.
+- **Two string files.** Every new UI string goes into `Strings.en-US.xaml` and `Strings.pl-PL.xaml`, and a test checks that their keys match. The app ships English and Polish only.
 - **No em dashes** in the string files. A test fails on them; use a comma, a colon or a full stop.
 - **Tests must not depend on your machine.** They run on a clean Windows runner with no Kaption install and no sign-in on disk. If your change touches start-up, sign-in or file protection, run the tests once with `%APPDATA%\Kaption\activation.dat` renamed, then rename it back. Use `TestProtection` for a fake activation, and never let a test write to the real profile.
 - Match the surrounding code: the newest C# on .NET 10, four-space indents, comments that say why. Window code-behind stays next to its XAML.
