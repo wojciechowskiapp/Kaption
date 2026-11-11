@@ -10,6 +10,7 @@ using System.Windows;
 using System.Globalization;
 using GI_Subtitles.Core.Config;
 using GI_Subtitles.Common;
+using GI_Subtitles.Services.Data;
 using GI_Subtitles.Services.Security;
 using GI_Subtitles.Services.Observability;
 using static GI_Subtitles.Core.Config.Config;
@@ -46,7 +47,17 @@ namespace GI_Subtitles
             // Logger isn't wired up yet at this point (that happens in OnStartup
             // via log4net config), so we don't log from here. If a Velopack hook
             // throws, the exception bubbles up and the installer reports it.
-            VelopackApp.Build().Run();
+            // A Debug build asked for the end-to-end mode with an unusable folder: quit before anything opens the
+            // real profile, rather than start on it.
+            if (E2EMode.Refusal != null)
+            {
+                Console.Error.WriteLine(E2EMode.Refusal);
+                Environment.Exit(E2ERefusedExitCode);
+            }
+            // Uninstall takes the "Start with Windows" entry with it (no logging in a hook: see above).
+            VelopackApp.Build()
+                .OnBeforeUninstallFastCallback(_ => GI_Subtitles.Services.Startup.WindowsStartup.RemoveForUninstall())
+                .Run();
 
             var app = new App();
             app.InitializeComponent();
@@ -54,6 +65,9 @@ namespace GI_Subtitles
         }
 
         private static Mutex _mutex = null;
+
+        /// <summary>Exit code when <see cref="E2EMode.Refusal"/> stops a start (Shutdown codes 1-4 are the startup gates).</summary>
+        internal const int E2ERefusedExitCode = 5;
 
         /// <summary>
         /// Process-wide licensing service. Constructed in <see cref="OnStartup"/> before
@@ -122,9 +136,7 @@ namespace GI_Subtitles
         /// Path to the per-user crash log, written directly (unbuffered) by
         /// the exception handlers below so evidence survives process death.
         /// </summary>
-        private static readonly string CrashLogPath = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "Kaption", "crash.log");
+        private static readonly string CrashLogPath = GameDataPaths.CrashLogFile;
 
         /// <summary>
         /// Write a fatal-crash entry directly to disk without going through log4net
@@ -359,12 +371,25 @@ namespace GI_Subtitles
             catch { /* swallow — logger state may be torn down already */ }
         }
 
+        /// <summary>
+        /// The quit, logged while log4net still runs: the ProcessExit line below comes after log4net's own shutdown
+        /// handler and never reaches app.log.
+        /// </summary>
+        protected override void OnExit(ExitEventArgs e)
+        {
+            try { Logger.Log.Info($"=== Application exit: code={e.ApplicationExitCode} ==="); } catch { /* best-effort */ }
+            base.OnExit(e);
+        }
+
         protected override void OnStartup(StartupEventArgs e)
         {
             // Suspend WPF's auto-shutdown while the pre-MainWindow dialogs run: each
             // dialog close would take Windows.Count to zero and shut the app down.
             // Restored at the end of this method, just before MainWindow is created.
             ShutdownMode = ShutdownMode.OnExplicitShutdown;
+
+            // The region picker's log lives with every other file of the app (the E2E suite's folder in its test mode).
+            global::Screenshot.DebugLogger.Folder = GameDataPaths.Root;
 
             // One-shot migration: older builds let users pick CHS as source language
             // but no Chinese PaddleOCR model ships, so it silently fell back to EN.
@@ -383,6 +408,8 @@ namespace GI_Subtitles
             // when multiple instances have run.
             int pid = System.Diagnostics.Process.GetCurrentProcess().Id;
             Logger.Log.Info($"=== Process start: PID={pid}, version={System.Reflection.Assembly.GetExecutingAssembly().GetName().Version} ===");
+            StartedInTray = GI_Subtitles.Services.Startup.StartupArguments.IsTrayStart(e.Args);
+            if (StartedInTray) Logger.Log.Info("Started with Windows (--tray): the app window stays closed.");
             GI_Subtitles.Core.Runtime.RamDiag.LogCheckpoint("process start");
             GI_Subtitles.Core.Runtime.RamDiag.StartBackgroundMonitor();
 
@@ -470,7 +497,16 @@ namespace GI_Subtitles
             const string appName = "Kaption";
             bool createdNew;
 
-            _mutex = new Mutex(true, appName, out createdNew);
+            // The end-to-end suite runs beside the player's own Kaption: no shared mutex, nothing killed.
+            if (E2EMode.IsActive)
+            {
+                createdNew = true;
+                Logger.Log.Warn($"E2E mode: data in {GameDataPaths.Root}; sign-in, first-run windows and the startup sync are skipped.");
+            }
+            else
+            {
+                _mutex = new Mutex(true, appName, out createdNew);
+            }
 
             if (!createdNew)
             {
@@ -527,7 +563,8 @@ namespace GI_Subtitles
 
             // ── First run: one setup window (language + licence → game → sign-in → key + pack → done). ──
             // It records the same acceptance, activation and key as the windows below, which then pass instantly.
-            if (GI_Subtitles.Views.Shell.OnboardingFlow.IsFirstRunNeeded())
+            // E2E mode (Debug builds only): no sign-in, licence or setup windows; the suite checks the shell signed out.
+            if (!E2EMode.IsActive && GI_Subtitles.Views.Shell.OnboardingFlow.IsFirstRunNeeded())
             {
                 int setupExit = RunFirstRunSetup();
                 if (setupExit != 0)
@@ -545,7 +582,7 @@ namespace GI_Subtitles
             // when the text meaningfully changes and every user sees the
             // prompt again. This also rolls the crash-reporting opt-in into
             // the same dialog so we don't ask twice on a fresh install.
-            if (!EnsureEulaAccepted())
+            if (!E2EMode.IsActive && !EnsureEulaAccepted())
             {
                 Shutdown(2);
                 return;
@@ -555,7 +592,7 @@ namespace GI_Subtitles
             // Must run BEFORE MainWindow shows. If the user has no activation on
             // file, OR their activation has hard-expired, block the main UI
             // behind the LoginWindow until they sign in (or quit).
-            if (!EnsureActivated())
+            if (!E2EMode.IsActive && !EnsureActivated())
             {
                 // User quit instead of signing in. Exit cleanly with non-zero
                 // code so any parent process (installer, launcher) can tell the
@@ -570,7 +607,7 @@ namespace GI_Subtitles
             // the EULA dialog above already handles the crash prompt on a
             // fresh install, so this is a safety net for users who completed
             // onboarding before the combined dialog existed.
-            PromptCrashReportingIfFirstRun();
+            if (!E2EMode.IsActive) PromptCrashReportingIfFirstRun();
 
             // Attach user context so Sentry (next session) can correlate
             // crashes per-install without ever shipping PII.
@@ -596,12 +633,12 @@ namespace GI_Subtitles
             // We also wipe any leftover v1/v3 .gisub files (encrypted under
             // the retired AppSecret scheme) so the next sync re-encrypts
             // them under the per-device key.
-            if (!EnsureFileProtectionSecret())
+            if (!E2EMode.IsActive && !EnsureFileProtectionSecret())
             {
                 Shutdown(3);
                 return;
             }
-            if (InitialSyncTask == null) WipeLegacyProtectedCacheFiles(); // the first-run setup already did
+            if (InitialSyncTask == null && !E2EMode.IsActive) WipeLegacyProtectedCacheFiles(); // the first-run setup already did
 
             // Kick off the first dictionary sync BEFORE MainWindow materialises so
             // the network round-trip runs in parallel with WPF window construction
@@ -612,7 +649,7 @@ namespace GI_Subtitles
             // StartupStatus to DownloadingTranslations here lets the Dashboard
             // render a "please wait" state the moment SettingsWindow shows.
             // The first-run setup has already run (and awaited) it.
-            if (InitialSyncTask == null) KickOffInitialDictionarySync();
+            if (InitialSyncTask == null && !E2EMode.IsActive) KickOffInitialDictionarySync();
 
             // Hand lifetime back to WPF's default. Just flipping the mode
             // doesn't trigger a shutdown — that only happens on a Window-close
@@ -637,6 +674,16 @@ namespace GI_Subtitles
             // returns even when a startup dialog has already shut the app down.
             var main = new Views.MainWindow();
             MainWindow = main;
+            if (E2EMode.IsActive)
+            {
+                // UI Automation drives the windows; keys and clicks from someone using the PC are dropped, focus stays theirs.
+                main.ShowActivated = false;
+                System.Windows.Input.InputManager.Current.PreProcessInput += E2EMode.DropDesktopInput;
+                // The suite quits the way the tray's Quit does (Application.Shutdown); the tray menu is not automatable.
+                var quit = new EventWaitHandle(false, EventResetMode.AutoReset, E2EMode.QuitEventName(pid));
+                ThreadPool.RegisterWaitForSingleObject(quit, (_, _) => Dispatcher.BeginInvoke(new Action(() => Shutdown())),
+                    null, Timeout.Infinite, executeOnlyOnce: true);
+            }
             main.Show();
         }
 
@@ -907,6 +954,13 @@ namespace GI_Subtitles
             return setup.ExitCode;
         }
 
+        /// <summary>
+        /// True when this process was started with <c>--tray</c> ("Start with Windows"): the tray icon and the overlay
+        /// come up, the app window stays closed until the player opens it. Start-up gates and windows that need an
+        /// answer (sign-in, setup) still show.
+        /// </summary>
+        internal static bool StartedInTray { get; private set; }
+
         /// <summary>Where the first-run setup asked to land (Start or Characters); MainWindow reads it once.</summary>
         internal static Views.OnboardingWindow.Outcome FirstRunOutcome { get; set; }
 
@@ -996,9 +1050,7 @@ namespace GI_Subtitles
         {
             try
             {
-                string root = Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                    "Kaption");
+                string root = GameDataPaths.Root;
                 if (!Directory.Exists(root))
                     return;
 

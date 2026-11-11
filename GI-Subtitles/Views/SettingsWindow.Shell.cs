@@ -86,9 +86,13 @@ namespace GI_Subtitles.Views
             SyncAutoStartControls();
             ShowIntro25IfNew();
             InitializeGuessNotify();
+            InitializeNewStory();
+            InitializeCodesCard();
+            InitializeStaminaCard();
             RestoreAdvancedState();
             RefreshBuildCardMemory();
             InitializeLookPage();
+            InitializeSessionCheck();
             CharactersPage?.SyncPaletteWithApp();
             ThemeService.ThemeChanged += OnThemeChanged;
             NetworkChange.NetworkAvailabilityChanged += OnNetworkAvailabilityChanged;
@@ -270,6 +274,7 @@ namespace GI_Subtitles.Views
                 if (AutoTranslateToggle != null) AutoTranslateToggle.IsChecked = on;
                 if (Intro25AutoToggle != null) Intro25AutoToggle.IsChecked = on;
                 if (AutoTranslateFocusCheck != null) AutoTranslateFocusCheck.IsChecked = Config.Get(AutoStartFocusKey, true);
+                if (AutoStartCheckBox != null) AutoStartCheckBox.IsChecked = Config.Get(Services.Startup.WindowsStartup.SettingKey, false);
             }
             finally
             {
@@ -332,7 +337,9 @@ namespace GI_Subtitles.Views
         public void CountTranslatedLine()
         {
             _linesThisSession++;
-            if (_cardState?.Kind == StartCardKind.Translating) UpdateDashboardStatus();
+            bool first = ConfirmFirstLine();
+            // A check state goes with the line that disproves it, so those refresh too.
+            if (first || (_cardState != null && StartCardModel.IsTranslating(_cardState.Kind))) UpdateDashboardStatus();
         }
 
         /// <summary>Refreshes the state card and the status chips. Safe from any thread.</summary>
@@ -348,10 +355,12 @@ namespace GI_Subtitles.Views
                 UpdateDashboardActiveTranslation();
                 StartCardInputs inputs = GatherCardInputs();
                 _cardState = StartCardModel.Compute(inputs);
+                NotifySessionCheckOnCard(_cardState.Kind);
                 ApplyStartCard(_cardState, inputs);
                 ApplyStatusChips(_cardState, inputs);
                 notifyIcon?.SetTrayState(TrayStateFor(_cardState.Kind), DashOcrDetailStatus?.Text);
                 UpdateCardTicker(inputs);
+                UpdateSessionCheckTicker(inputs.Translating);
                 if (DashToggleSubtitleButton != null)
                 {
                     bool subtitleVis = IsSubtitleVisible?.Invoke() ?? true;
@@ -376,9 +385,12 @@ namespace GI_Subtitles.Views
             lock (_activeDownloads) downloadingTab = _activeDownloads.Count > 0;
             var state = Engine;
             bool switchPending = GameSwitchAwaitsRestart?.Invoke() ?? false;
+            bool translating = IsOcrRunning?.Invoke() ?? false;
             return new StartCardInputs
             {
-                Translating = IsOcrRunning?.Invoke() ?? false,
+                Translating = translating,
+                SessionCheck = AdvanceSessionCheck(translating),
+                FirstLineShown = translating && _firstLineShown,
                 LinesThisSession = _linesThisSession,
                 Downloading = App.StartupStatus == App.InitialStartupStatus.DownloadingTranslations || dl != null || downloadingTab,
                 DownloadFraction = dl?.Fraction,
@@ -427,6 +439,22 @@ namespace GI_Subtitles.Views
                         ? string.Format(culture, L("shell_Card_Translating_Lines", "Translating · {0}"),
                             Plural.Format(L("shell_Plural_Lines", "{0:N0} line|{0:N0} lines|{0:N0} lines"), i.LinesThisSession, culture))
                         : L("shell_Card_Translating", "Translating");
+                    break;
+                case StartCardKind.SessionFullScreen:
+                    titleText = L("shell_Card_FullScreen", "Kaption can't see the game");
+                    detail = L("shell_Card_FullScreen_Detail", "The picture from the dialogue area is black. That usually means the game runs in full screen: switch it to Borderless or Windowed. If it already is, check where the dialogue area sits.");
+                    break;
+                case StartCardKind.SessionNoMatch:
+                    titleText = L("shell_Card_NoMatch", "Kaption sees text but can't find the line");
+                    detail = L("shell_Card_NoMatch_Detail", "Is the game's text set to English? Kaption translates from the English text. If it is, check that the dialogue area covers the whole dialogue box.");
+                    break;
+                case StartCardKind.SessionNoDialogue:
+                    titleText = L("shell_Card_NoDialogue", "No dialogue seen yet");
+                    detail = L("shell_Card_NoDialogue_Detail", "Talk to someone in the game and the Polish line shows up. If a dialogue is on screen right now and nothing appears, check where the dialogue area sits.");
+                    break;
+                case StartCardKind.FirstLineWorks:
+                    titleText = L("shell_Card_FirstLine", "It works: subtitles are showing");
+                    detail = L("shell_Card_FirstLine_Detail", "That was your first translated line. From now on Kaption puts subtitles on screen whenever someone in the game speaks.");
                     break;
                 case StartCardKind.WaitingForGame:
                     titleText = L("shell_Card_WaitingForGame", "Waiting for the game");
@@ -518,6 +546,9 @@ namespace GI_Subtitles.Views
                 StartCardAction.RestartApp => L("Dash_EngineFailed_Restart", "Restart Kaption"),
                 StartCardAction.OpenAccount => L("shell_Action_OpenAccount", "Open my _account"),
                 StartCardAction.OpenPacks => L("shell_Action_OpenPacks", "Go to the _packs"),
+                StartCardAction.OpenBorderlessGuide => L("shell_Action_ShowHow", "How to switch to _Borderless"),
+                StartCardAction.OpenLanguageGuide => L("shell_Action_LanguageGuide", "How to set the game's _language"),
+                StartCardAction.CheckArea => L("shell_Action_CheckArea", "Check the dialogue _area"),
                 StartCardAction.ResolveGate => s.RegionAutoFailed
                     ? L("shell_Card_RegionAutoFailed_Action", "_Mark the dialogue area")
                     : GateAction(s.Gate, L),
@@ -534,9 +565,9 @@ namespace GI_Subtitles.Views
             }
             if (find("DashChangeTranslationButton") is Button secondary)
             {
-                // "Zmień grę" sits under the action in every state.
-                secondary.Content = s.Kind == StartCardKind.ReaderFailed
-                    ? L("shell_Action_RunOnCpu", "Run on the _processor")
+                // "Zmień grę" sits under the action, except where a state has a second fix of its own.
+                secondary.Content = s.Kind == StartCardKind.ReaderFailed ? L("shell_Action_RunOnCpu", "Run on the _processor")
+                    : StartCardModel.OffersAreaAsSecondFix(s.Kind) ? L("shell_Action_CheckArea", "Check the dialogue _area")
                     : L("shell_Action_ChangeGame", "Change _game");
             }
 
@@ -579,7 +610,10 @@ namespace GI_Subtitles.Views
         {
             (string text, string dot) = s.Kind switch
             {
-                StartCardKind.Translating => (L("shell_Status_Translating", "Translating"), "SuccessBrush"),
+                // No dialogue yet and the first line are still plain translating; the other two need the player.
+                StartCardKind.Translating or StartCardKind.SessionNoDialogue or StartCardKind.FirstLineWorks
+                    => (L("shell_Status_Translating", "Translating"), "SuccessBrush"),
+                StartCardKind.SessionFullScreen or StartCardKind.SessionNoMatch => (L("shell_Status_Problem", "Needs attention"), "WarnBrush"),
                 StartCardKind.WaitingForGame => (L("shell_Status_WaitingForGame", "Waiting for the game"), "WarnBrush"),
                 StartCardKind.AutoStartBlocked => (L("shell_Status_AutoStartBlocked", "Auto-start on hold"), "WarnBrush"),
                 StartCardKind.GameSwitchPending => (L("shell_Status_Problem", "Needs attention"), "WarnBrush"),
@@ -633,7 +667,8 @@ namespace GI_Subtitles.Views
         /// <summary>The tray icon's state for the Start card's state: the same groups (and colours) as the status chip.</summary>
         internal static Core.UI.TrayState TrayStateFor(StartCardKind kind) => kind switch
         {
-            StartCardKind.Translating => Core.UI.TrayState.Translating,
+            StartCardKind.Translating or StartCardKind.SessionNoDialogue or StartCardKind.FirstLineWorks => Core.UI.TrayState.Translating,
+            StartCardKind.SessionFullScreen or StartCardKind.SessionNoMatch => Core.UI.TrayState.Waiting,
             StartCardKind.Downloading or StartCardKind.BuildingIndex or StartCardKind.StartingReader => Core.UI.TrayState.Busy,
             StartCardKind.WaitingForGame or StartCardKind.AutoStartBlocked or StartCardKind.GameSwitchPending => Core.UI.TrayState.Waiting,
             StartCardKind.ReaderFailed or StartCardKind.ReaderUnavailable or StartCardKind.Offline or StartCardKind.DeviceLimit
@@ -696,6 +731,17 @@ namespace GI_Subtitles.Views
                     break;
                 case StartCardAction.ResolveGate:
                     OnResolveGate?.Invoke(_cardState.Gate);
+                    break;
+                case StartCardAction.OpenBorderlessGuide:
+                    DismissSessionCheck();
+                    OpenUrlInBrowser(L("shell_Url_Guide_Borderless", "https://kaption.one/borderless-mode/"));
+                    break;
+                case StartCardAction.OpenLanguageGuide:
+                    DismissSessionCheck();
+                    OpenUrlInBrowser(L("shell_Url_Guide_Setup", "https://kaption.one/setup-guide/"));
+                    break;
+                case StartCardAction.CheckArea:
+                    OpenDialogueAreaFromCheck();
                     break;
             }
             UpdateDashboardStatus();
@@ -1045,7 +1091,10 @@ namespace GI_Subtitles.Views
                 if (note == null || WhatsNewCard == null) return;
                 if (ApplyWhatsNewTo(FindName, note, Config.Get<string>(WhatsNewSeenKey, null), DateTimeOffset.UtcNow, L,
                         CultureInfo.CurrentUICulture, key => TryFindResource(key) as Brush))
+                {
                     _whatsNew = note;
+                    ApplyNewStoryOverWhatsNew();
+                }
             }
             catch (Exception ex)
             {
@@ -1284,6 +1333,7 @@ namespace GI_Subtitles.Views
             foreach (var kv in manifest.OrderBy(k => k.Key))
                 lines.Add($"Pack {kv.Key}: {kv.Value?.Version} ({kv.Value?.FileVersionId})");
             try { lines.Add(GameOcrTuning.Describe()); } catch { /* best effort */ }
+            if (GetSessionEvidence != null) lines.Add(DescribeSessionEvidence(GetSessionEvidence(), _sessionCheck.Kind));
             HomeAdvancedDetails.Text = string.Join("\n", lines);
         }
 

@@ -30,7 +30,7 @@ namespace GI_Test
         /// <summary>The embedded games with WuWa back at beta, until disposed.</summary>
         private static IDisposable WuWaAsBeta()
         {
-            var manifests = GameManifestLoader.LoadEmbedded().ToList();
+            var manifests = ShippedGames.Manifests().ToList();
             manifests.Single(m => m.Id == "wuwa").Status = GameManifest.StatusBeta;
             return GameRegistry.Use(GameRegistry.FromManifests(manifests));
         }

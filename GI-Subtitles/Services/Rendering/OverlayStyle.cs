@@ -18,7 +18,7 @@ namespace GI_Subtitles.Services.Rendering
     /// <summary>
     /// What the subtitle looks like and where it sits, read from Config. The pre-2.6 keys keep their names and meaning
     /// (Size, SubtitleBgOpacity, Pad, FontFamily), so a saved size, position and panel look the same after the update;
-    /// 2.6 adds Overlay.Font, Overlay.Outline, Overlay.LetterSpacing and Overlay.AutoDarken. Pure apart from
+    /// 2.6 adds Overlay.Font, Overlay.Outline, Overlay.LetterSpacing, Overlay.AutoDarken and Overlay.Mark. Pure apart from
     /// <see cref="FromConfig"/> and <see cref="Save"/>; every derived size scales with <see cref="Size"/> from its value at 22.
     /// </summary>
     public sealed record OverlayStyle
@@ -32,6 +32,7 @@ namespace GI_Subtitles.Services.Rendering
         public const string OutlineKey = "Overlay.Outline";
         public const string LetterSpacingKey = "Overlay.LetterSpacing";
         public const string AutoDarkenKey = "Overlay.AutoDarken";
+        public const string MarkKey = "Overlay.Mark";
 
         public const int MinSize = 10, MaxSize = 36;
         public const int MinPad = -500, MaxPad = 500;
@@ -51,6 +52,8 @@ namespace GI_Subtitles.Services.Rendering
         public double LetterSpacing { get; init; }
         /// <summary>Darken the panel when the scene behind it is bright.</summary>
         public bool AutoDarken { get; init; } = true;
+        /// <summary>The small Kaption mark at the end of the band, for recordings and streams. Off unless the player asks.</summary>
+        public bool Mark { get; init; }
         /// <summary>Offset of the panel's top from the dialogue area's top, in DIPs; null = the game's default.</summary>
         public int? PadVertical { get; init; }
         public int PadHorizontal { get; init; }
@@ -71,7 +74,19 @@ namespace GI_Subtitles.Services.Rendering
         public double Tracking => (Size < 18 ? 0.012 : Size > 30 ? -0.006 : 0) + LetterSpacing;
         public double HeaderSize => Math.Max(11, Math.Round(Size * 0.68));
         public double AnswerSize => Math.Max(12, Size - 3);
-        public Thickness Padding => new(18 * Scale, 10 * Scale, 18 * Scale, 12 * Scale);
+        /// <summary>The panel's padding without the mark (the press kit reads these four numbers).</summary>
+        private Thickness BasePadding => new(18 * Scale, 10 * Scale, 18 * Scale, 12 * Scale);
+        /// <summary>With the mark on, both sides are at least the mark's column, so the text stays centred and clear of it.</summary>
+        public Thickness Padding
+        {
+            get
+            {
+                var pad = BasePadding;
+                if (!Mark) return pad;
+                double side = Math.Max(pad.Left, KaptionMarkLayout.Column(Size));
+                return new(side, pad.Top, side, pad.Bottom);
+            }
+        }
         public double CornerRadius => 10 * Scale;
 
         // ── Presets ──────────────────────────────────────────────────────────
@@ -141,6 +156,7 @@ namespace GI_Subtitles.Services.Rendering
                 Outline = Math.Clamp(Config.Get(OutlineKey, 1.0), 0, 4),
                 LetterSpacing = Math.Clamp(Config.Get(LetterSpacingKey, 0.0), -0.05, 0.12),
                 AutoDarken = Config.Get(AutoDarkenKey, true),
+                Mark = Config.Get(MarkKey, false),
                 PadVertical = Config.Has(PadKey) ? Config.GetPad(0) : null,
                 PadHorizontal = Config.GetPadHorizontal(0),
             };
@@ -155,6 +171,7 @@ namespace GI_Subtitles.Services.Rendering
             if (Math.Abs(Outline - saved.Outline) > 0.001) Config.Set(OutlineKey, Outline);
             if (Math.Abs(LetterSpacing - saved.LetterSpacing) > 0.0001) Config.Set(LetterSpacingKey, LetterSpacing);
             if (AutoDarken != saved.AutoDarken) Config.Set(AutoDarkenKey, AutoDarken);
+            if (Mark != saved.Mark) Config.Set(MarkKey, Mark);
             if (!string.Equals(FontFamily, saved.FontFamily, StringComparison.Ordinal)) Config.Set(FontKey, FontFamily);
             if (PadVertical != saved.PadVertical || PadHorizontal != saved.PadHorizontal)
             {
@@ -166,7 +183,7 @@ namespace GI_Subtitles.Services.Rendering
         /// <summary>"Przywróć domyślne": every key this page owns goes back to its default (the game's own position).</summary>
         public static void ResetConfig()
         {
-            foreach (string key in new[] { SizeKey, OpacityKey, OutlineKey, LetterSpacingKey, AutoDarkenKey, FontKey, LegacyFontKey, PadKey,
+            foreach (string key in new[] { SizeKey, OpacityKey, OutlineKey, LetterSpacingKey, AutoDarkenKey, MarkKey, FontKey, LegacyFontKey, PadKey,
                          "MaxOverlayWidth", "MaxOverlayHeight", "AutoShrinkText" })
                 if (Config.Has(key)) Config.Remove(key);
         }

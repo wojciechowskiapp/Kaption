@@ -49,6 +49,8 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- ApiContractTests: the app's fixtures of the Worker API against contracts/api/*.schema.json (2020-12). -->
+    <PackageReference Include="JsonSchema.Net" Version="9.6.0" />
     <PackageReference Include="log4net" Version="3.5.0" />
     <!-- Microsoft.NET.Test.Sdk is required for `dotnet test` discovery on
          net8+ (MSTest alone doesn't surface the VSTest console host).
@@ -57,9 +59,9 @@
     <PackageReference Include="MSTest.TestAdapter" Version="4.5.2" />
     <PackageReference Include="MSTest.TestFramework" Version="4.5.2" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
-    <PackageReference Include="OpenCvSharp4" Version="4.13.0.20260627" />
-    <PackageReference Include="OpenCvSharp4.Extensions" Version="4.13.0.20260627" />
-    <PackageReference Include="OpenCvSharp4.runtime.win" Version="4.13.0.20260627" />
+    <PackageReference Include="OpenCvSharp4" Version="4.13.0.20261107" />
+    <PackageReference Include="OpenCvSharp4.Extensions" Version="4.13.0.20261107" />
+    <PackageReference Include="OpenCvSharp4.runtime.win" Version="4.13.0.20261107" />
     <!-- System.Drawing.Common dropped: in-box on net10. -->
 
     <!-- DROPPED (in-box on net8): System.Buffers, System.Memory,

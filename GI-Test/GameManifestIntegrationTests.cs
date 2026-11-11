@@ -31,7 +31,8 @@ namespace GI_Test
             Assert.IsTrue(m.Success, "COMMUNITY_TARGETS is in the generated catalog");
             var backend = JsonSerializer.Deserialize<Dictionary<string, string[]>>(m.Groups[1].Value);
 
-            var registry = GameRegistry.Current;
+            // What the app itself takes: its own registry (the run lists every shipped game, see ShippedGames).
+            var registry = ShippedGames.Embedded();
             var desktop = registry.Listed
                 .Select(g => (g.Id, Langs: (g.Translation?.Targets ?? Array.Empty<string>()).Where(l => registry.TakesCommunityFixes(g.Id, l)).ToArray()))
                 .Where(g => g.Langs.Length > 0)
@@ -53,7 +54,7 @@ namespace GI_Test
             string root = RenderTestKit.RepoRoot();
             if (root == null) Assert.Inconclusive("Repository root not found.");
             var fixture = GameManifestLoader.Parse(File.ReadAllText(Path.Combine(root, "GI-Test", "Fixtures", "games", "fixturegame.json")));
-            using (GameRegistry.Use(GameRegistry.FromManifests(GameManifestLoader.LoadEmbedded().Append(fixture))))
+            using (GameRegistry.Use(GameRegistry.FromManifests(ShippedGames.Manifests().Append(fixture))))
             {
                 Assert.IsFalse(SuggestionRules.TakesSuggestions("fixturegame", "pl"), "translation.sources has no \"community\"");
                 Assert.IsTrue(SuggestionRules.TakesSuggestions("genshin", "pl"));
@@ -61,7 +62,7 @@ namespace GI_Test
 
             fixture.Translation.Sources = new[] { GameTranslation.SourceAuto, GameTranslation.SourceCommunity };
             fixture.Translation.Targets = new[] { "pl", "de" };
-            using (GameRegistry.Use(GameRegistry.FromManifests(GameManifestLoader.LoadEmbedded().Append(fixture))))
+            using (GameRegistry.Use(GameRegistry.FromManifests(ShippedGames.Manifests().Append(fixture))))
             {
                 Assert.IsTrue(SuggestionRules.TakesSuggestions("fixturegame", "de"), "a new game and language from the manifest alone");
                 Assert.IsTrue(SuggestionRules.TakesLanguage("de"));
@@ -70,17 +71,20 @@ namespace GI_Test
             }
 
             fixture.Status = GameManifest.StatusPlanned;
-            using (GameRegistry.Use(GameRegistry.FromManifests(GameManifestLoader.LoadEmbedded().Append(fixture))))
+            using (GameRegistry.Use(GameRegistry.FromManifests(ShippedGames.Manifests().Append(fixture))))
                 Assert.IsFalse(SuggestionRules.TakesSuggestions("fixturegame", "de"), "a planned game is not listed yet");
         }
 
         [TestMethod]
         public void WuWa_IsAListedLiveGame_AfterTheThreeShippedOnes()
         {
+            // The app's own registry: the shipped games it still lists, WuWa last; WuWa's profile whatever its status.
+            GameRegistry embedded = ShippedGames.Embedded();
+            CollectionAssert.AreEqual(new[] { "genshin", "starrail", "zzz", "wuwa" }.Where(id => embedded.FindByWireId(id) != null).ToArray(),
+                embedded.WireIds.Where(id => id is "genshin" or "starrail" or "zzz" or "wuwa").ToArray());
             var registry = GameRegistry.Current;
-            CollectionAssert.AreEqual(new[] { "genshin", "starrail", "zzz", "wuwa" }, registry.WireIds.ToArray());
             GameManifest wuwa = registry.FindByWireId("wuwa");
-            Assert.AreEqual(GameManifest.StatusLive, wuwa.Status, "live since session 59");
+            Assert.AreEqual(GameManifest.StatusLive, wuwa.Status, "live since session 59 (or listed again for the run while withdrawn)");
             Assert.AreEqual("WuWa", wuwa.GameId);
             Assert.AreSame(wuwa, registry.Find("Wuthering Waves"));
             Assert.AreEqual(GameDesktop.MirrorNone, wuwa.Desktop.UpstreamTextMap, "minted key space: TextMapEN.json comes from the bundle");

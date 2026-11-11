@@ -169,6 +169,9 @@
     <!-- Subtitle overlay faces (OFL-1.1): Source Sans 3 Semibold/Bold unmodified, Inter Tight 600/700 cut to Latin and
          Latin Extended (tools/fonts/build_overlay_fonts.py). Resolved by Services/Rendering/OverlayFonts. -->
     <Resource Include="Assets\Fonts\*.ttf" />
+    <!-- Stamina icon templates (Services/Stamina/StaminaLocator): one small PNG per game named in a manifest's
+         desktop.staminaScreen.icon, as a 1920x1080 client draws it. -->
+    <EmbeddedResource Include="Assets\Stamina\*.png" LogicalName="Kaption.Stamina.%(Filename)%(Extension)" />
     <!-- Game manifests (games/<id>.json, the registry of supported games), read by Services/Games/GameRegistry. -->
     <GameManifestFile Include="..\games\*.json" Exclude="..\games\*.schema.json;..\games\candidates.json" />
     <EmbeddedResource Include="@(GameManifestFile)" LogicalName="Kaption.Games.%(Filename)%(Extension)" Link="games\%(Filename)%(Extension)" />
@@ -223,9 +226,9 @@
          is in-TFM on net10. Native OpenCvSharpExtern.dll upgraded; dropped x86
          support (we're x64 only). No API changes required in our Mat/Cv2
          usage. -->
-    <PackageReference Include="OpenCvSharp4" Version="4.13.0.20260627" />
-    <PackageReference Include="OpenCvSharp4.Extensions" Version="4.13.0.20260627" />
-    <PackageReference Include="OpenCvSharp4.Windows" Version="4.13.0.20260627" />
+    <PackageReference Include="OpenCvSharp4" Version="4.13.0.20261107" />
+    <PackageReference Include="OpenCvSharp4.Extensions" Version="4.13.0.20261107" />
+    <PackageReference Include="OpenCvSharp4.Windows" Version="4.13.0.20261107" />
 
     <!-- DROPPED on net10 (in-box, NU1510-flagged as unnecessary):
          - System.Drawing.Common (was 8.0.11)

@@ -290,6 +290,21 @@ namespace GI_Subtitles.Services.Detection
         /// Get the client area of a window in screen coordinates.
         /// Returns null if the client area is degenerate (0 width/height).
         /// </summary>
+        /// <summary>
+        /// The window's client area in screen pixels; false for a window without one (minimised, gone). No title is
+        /// read and nothing is allocated, so the capture loop can ask on a tick.
+        /// </summary>
+        public static bool TryGetClientArea(IntPtr hWnd, out System.Drawing.Rectangle area)
+        {
+            area = System.Drawing.Rectangle.Empty;
+            if (hWnd == IntPtr.Zero || !GetClientRect(hWnd, out RECT rect)) return false;
+            int w = rect.Right - rect.Left, h = rect.Bottom - rect.Top;
+            var origin = new POINT { X = 0, Y = 0 };
+            if (w <= 0 || h <= 0 || !ClientToScreen(hWnd, ref origin)) return false;
+            area = new System.Drawing.Rectangle(origin.X, origin.Y, w, h);
+            return true;
+        }
+
         private static WindowInfo? GetWindowClientInfo(IntPtr hWnd)
         {
             if (!GetClientRect(hWnd, out RECT clientRect))

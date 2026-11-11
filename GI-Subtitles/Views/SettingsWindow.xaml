@@ -326,6 +326,30 @@
 
                         <!-- The "once" stack: one-time cards and the ranking strip share row 5, so rows 6-9 keep their numbers. -->
                         <StackPanel x:Name="StartOnceCards" Grid.Row="5">
+                        <!-- A new game version's story is in Polish: one line per game and version, raised when its pack
+                             installs (NewStoryNotices). Closing it, or opening the page, closes it for good. -->
+                        <Border x:Name="NewStoryCard" Visibility="Collapsed" Style="{StaticResource Card}" Margin="0,16,0,0" Padding="0">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="3"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <Border x:Name="NewStoryAccent" Margin="0,12" CornerRadius="0,2,2,0" Background="{StaticResource GameGenshinBrush}"/>
+                                <TextBlock x:Name="NewStoryLine" Grid.Column="1" Style="{StaticResource CardTitle}" Margin="18,12,12,12"
+                                           VerticalAlignment="Center" AutomationProperties.LiveSetting="Polite"/>
+                                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,10,0">
+                                    <Button Style="{StaticResource LinkButton}" Content="{DynamicResource NewStory_Open}"
+                                            Click="NewStoryOpen_Click" Margin="0,0,8,0"/>
+                                    <Button Style="{StaticResource IconButton}" Click="NewStoryDismiss_Click"
+                                            ToolTip="{DynamicResource shell_Action_Dismiss}" AutomationProperties.Name="{DynamicResource shell_Action_Dismiss}">
+                                        <Path Data="{StaticResource IconClose}" Width="16" Height="16" Stretch="None" StrokeThickness="1.6"
+                                              Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                              StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
+                                    </Button>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
                         <!-- Returning users, once: what 2.5 changes, with the auto-start switch right there. New installs
                              learn it in the setup window and never see this card. -->
                         <Border x:Name="Intro25Card" Visibility="Collapsed" Style="{StaticResource Card}" Margin="0,16,0,0" Padding="0">
@@ -410,8 +434,8 @@
                             </Grid>
                         </Border>
 
-                        <!-- Someone passed the player in the guess game's ranking: the tray notice's text, kept here until the
-                             next standing read replaces it (MainWindow.GuessNotify.cs). -->
+                        <!-- Someone passed the player in the guess game's ranking: the tray notice's text, here while the tray
+                             notice waits and after it, until the next standing read replaces it (MainWindow.GuessNotify.cs). -->
                         <Border x:Name="GuessRankStrip" Visibility="Collapsed" Style="{StaticResource Callout}" Margin="0,12,0,0">
                             <Grid>
                                 <Grid.ColumnDefinitions>
@@ -557,8 +581,15 @@
                             </Border>
                         </Grid>
 
+                        <!-- ═══ The selected game's active codes (SettingsWindow.Codes.cs): collapsed until a checked list has one. ═══ -->
+                        <StackPanel Grid.Row="8">
+                        <!-- ═══ The selected game's stamina timer (SettingsWindow.Stamina.cs): its switch is the player's consent to
+                             read the number off the game screen. Hidden for a game whose screen is not measured. ═══ -->
+                        <views:StaminaCard x:Name="StaminaCard"/>
+                        <views:GameCodesCard x:Name="CodesCard"/>
+
                         <!-- ═══ What's new: only when the newest release note is newer than the last one dismissed. ═══ -->
-                        <Border x:Name="WhatsNewCard" Grid.Row="8" Visibility="Collapsed" Style="{StaticResource Card}" Margin="0,16,0,0" Padding="0">
+                        <Border x:Name="WhatsNewCard" Visibility="Collapsed" Style="{StaticResource Card}" Margin="0,16,0,0" Padding="0">
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="3"/>
@@ -583,6 +614,7 @@
                                 </StackPanel>
                             </Grid>
                         </Border>
+                        </StackPanel>
 
                         <!-- Technical details for advanced users: what runs where, which revisions, how fast. Under them the
                              build card's memory: the UID kept per game, and the small action that forgets it. -->
@@ -866,6 +898,20 @@
                             </CheckBox>
                         </Border>
 
+                        <!-- The "new story is in Polish" notice (NewStory.Enabled): on by default, one per game version. -->
+                        <Border x:Name="NewStoryNoticeCard" Style="{StaticResource Card}">
+                            <CheckBox x:Name="NewStoryToggle" Style="{StaticResource ToggleSwitch}" IsChecked="True"
+                                      Checked="NewStoryToggle_Changed" Unchecked="NewStoryToggle_Changed"
+                                      AutomationProperties.Name="{DynamicResource NewStory_Toggle}"
+                                      AutomationProperties.HelpText="{DynamicResource NewStory_Toggle_Hint}">
+                                <StackPanel>
+                                    <TextBlock Text="{DynamicResource NewStory_Toggle}" FontSize="{StaticResource FontSizeCardTitle}"
+                                               FontWeight="SemiBold" Foreground="{DynamicResource TextBrush}" TextWrapping="Wrap"/>
+                                    <TextBlock Text="{DynamicResource NewStory_Toggle_Hint}" Style="{StaticResource HintText}" Margin="0,2,0,0"/>
+                                </StackPanel>
+                            </CheckBox>
+                        </Border>
+
                         <!-- Dialogue area: what Kaption reads, shown as a live thumbnail on its monitor. -->
                         <Border x:Name="RegionCard" Style="{StaticResource Card}">
                             <Grid>
@@ -1129,6 +1175,34 @@
                                             ToolTip="{DynamicResource Tip_Appearance_HorizPad}" ValueChanged="PadHorizontalSlider_ValueChanged"/>
                                 </Grid>
                                 <TextBlock Style="{StaticResource HintText}" Text="{DynamicResource look_Move_Hint}" Margin="0,6,0,0"/>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Recordings and streams: whether screen capture shows the subtitles, and the optional Kaption mark. -->
+                        <Border Style="{StaticResource Card}">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource CardTitle}" Text="{DynamicResource look_Recording_Title}" Margin="0,0,0,8"/>
+                                <CheckBox x:Name="ShowInRecordingsToggle" Style="{StaticResource ToggleSwitch}"
+                                          Checked="ShowInRecordingsToggle_Changed" Unchecked="ShowInRecordingsToggle_Changed"
+                                          AutomationProperties.Name="{DynamicResource look_Recording_Show}">
+                                    <StackPanel>
+                                        <TextBlock Text="{DynamicResource look_Recording_Show}" FontWeight="SemiBold" Foreground="{DynamicResource TextBrush}"
+                                                   TextWrapping="Wrap"/>
+                                        <!-- What a screen recording shows on this PC right now (SyncRecordingCard). -->
+                                        <TextBlock x:Name="RecordingStatusText" Style="{StaticResource HintText}" Margin="0,2,0,0"
+                                                   AutomationProperties.LiveSetting="Polite"/>
+                                    </StackPanel>
+                                </CheckBox>
+                                <CheckBox x:Name="KaptionMarkToggle" Style="{StaticResource ToggleSwitch}" Margin="0,12,0,0"
+                                          Checked="KaptionMarkToggle_Changed" Unchecked="KaptionMarkToggle_Changed"
+                                          AutomationProperties.Name="{DynamicResource look_Recording_Mark}"
+                                          AutomationProperties.HelpText="{DynamicResource look_Recording_Mark_Hint}">
+                                    <StackPanel>
+                                        <TextBlock Text="{DynamicResource look_Recording_Mark}" FontWeight="SemiBold" Foreground="{DynamicResource TextBrush}"
+                                                   TextWrapping="Wrap"/>
+                                        <TextBlock Text="{DynamicResource look_Recording_Mark_Hint}" Style="{StaticResource HintText}" Margin="0,2,0,0"/>
+                                    </StackPanel>
+                                </CheckBox>
                             </StackPanel>
                         </Border>
 

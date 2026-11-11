@@ -203,6 +203,24 @@ namespace GI_Subtitles.Services.Detection
         /// </summary>
         public bool RejectsFadedReads { get; set; } = false;
 
+        // ── Session check (the Start card says why no line shows) ──
+        //
+        // How much evidence each sentence needs (Views/Shell/SessionCheck.cs). Property initializers like the vision
+        // knobs, so a manifest without desktop.sessionCheck gets these; 0 switches a sentence off for that game.
+
+        /// <summary>
+        /// Seconds of unbroken black frames with the game in front, before any line was found in this run of
+        /// translation, before the card says Kaption can't see the game. 30: a game's own launch screens keep the dialogue strip black for
+        /// 10-20 s, and auto-start is already reading then.
+        /// </summary>
+        public int CheckBlackSeconds { get; set; } = 30;
+
+        /// <summary>Different spoken lines (a speaker and a sentence) read in a row without one pack hit, before the card asks about the game's language.</summary>
+        public int CheckUnmatchedReads { get; set; } = 20;
+
+        /// <summary>Seconds with the game in front and nothing dialogue-like read, before a new install's card says no dialogue was seen yet.</summary>
+        public int CheckQuietSeconds { get; set; } = 60;
+
         // ── Registered profiles ──
         //
         // Built from the embedded game manifests (games/<id>.json) by Services/Games/GameRegistry: beta and live

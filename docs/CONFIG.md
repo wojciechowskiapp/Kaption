@@ -71,6 +71,19 @@ Only 9 or 10 digits without a leading zero count; anything else in these keys is
 
 The domain schedule comes from `kaption.one/data/today/genshin.json` and is kept in `%APPDATA%\Kaption\Genshin\today.json`; the showcase is kept, trimmed to names, levels and talent levels, in `showcase.json` next to it. A UID the build card read from the game screen is offered in the field but saved only when you click Save. The log never names the UID, and diagnostic bundles mask it.
 
+## Game codes card (2.6.0)
+
+Start shows a small card with the selected game's active redeem codes: the newest three, each with Copy and, for the HoYoLAB games, Odbierz (Redeem), which opens the publisher's own redeem page with the code filled in; for Wuthering Waves, whose codes are typed in the game, the menu path instead. "Wszystkie kody" ("All codes") opens the game's codes page on kaption.one (`/pl/kody/<game>/` with a Polish interface, `/codes/<game>/` otherwise). The list comes from `api.kaption.one/api/app/codes?game=<id>` (public, no sign-in, nothing about you is sent): about 3 seconds after the window opens, then every 30 minutes while the window is on screen, and again when you open the window or switch game if the last read is older than that. Nothing is read while Kaption sits in the tray. After an error it waits 5, then 15, then 30 minutes (a server's `Retry-After` can make a wait longer, up to 6 hours, never shorter). A list read earlier stays on the card through failed reads for two intervals (1 hour by default) and is then hidden, so an old list never sits there for days. The card is hidden when the game has no active codes, before its codes were ever checked, and before the first read succeeds; it never says "no codes". No notices, no sounds.
+
+| Key | Default | What it does |
+|---|---|---|
+| `Ui.CodesCard.Folded` | `false` | The card's header folds the list away; Kaption remembers it. |
+| `Codes.FirstDelaySeconds` | `3` | Seconds after the window opens before the first read (0 to 300). |
+| `Codes.RefreshMinutes` | `30` | Minutes between reads while the window is on screen (10 to 360). The server caches the list for a minute and checks the games every 15 minutes, so faster buys nothing. |
+| `Codes.RetryMinutes` | `[5, 15, 30]` | Waits after the 1st, 2nd and later failed reads in a row (each 1 to 360, up to 8 steps; the last repeats). |
+
+Every new list leaves one line in `app.log` starting `Codes:` with the server's counts (active, expired in the last 30 days, when the game was last checked). A failure is one Warn line per kind (network, rate limited, server, bad answer) until a read works again, then one Info line; with `LogLevel=DEBUG` each read also logs its time in milliseconds.
+
 ## Guess game and Start notices
 
 Kaption's guess game lives on kaption.one (Gendle, Stardle, Zendle, Wuwdle). The app can tell you, at most once a day, when someone passes you in this month's ranked leaderboard. It reads your place from `api.kaption.one/api/app/guess/standing` about 2 minutes after start and then every 4 hours (every 12 hours while you have played nothing this month; after an error it tries again in 15 minutes, then an hour, then 4 hours), and only while you are signed in. The server can change the two read intervals (`poll` in its answer); a key below pins a value on this PC instead. A drop on the selected game's board or on the overall board becomes one tray notice, never while subtitles run, while a game is in front, or while Windows is in a full-screen app, presentation mode or quiet time; a waiting notice is checked again every 60 seconds. A drop is measured from the newer of two places: the one Kaption last saw, and your place right after your last puzzle that scored, which the server works out from the month's results. So a pass made while Kaption was closed still becomes a notice the next time it runs. Notices count only once you have points this month, and only when the player now just ahead of you has more points than you (a tie-break at equal points is no notice). Start repeats the notice in a strip with "Zobacz swoje miejsce" ("See your place") and "Wyłącz" ("Turn off"); the switch is in Pomoc › Społeczność (Help › Community). If the server turns the request down, Kaption only notes it in the log: your sign-in is never touched. Every read leaves one line in `app.log` starting `Guess standing`: each watched board's place, what it was measured from, the notice it found (if any) and when the next read is.
@@ -78,7 +91,7 @@ Kaption's guess game lives on kaption.one (Gendle, Stardle, Zendle, Wuwdle). The
 | Key | Default | What it does |
 |---|---|---|
 | `GuessNotify.Enabled` | `true` | Off stops the reads and the notices. The switch "Daj znać, gdy ktoś mnie wyprzedzi w rankingu" ("Tell me when someone passes me in the ranking") and "Wyłącz" on the Start strip write it. |
-| `GuessNotify.LastShownDay` | none | Written by Kaption: the local day (`yyyy-MM-dd`) the last notice reached you, as a tray notice or on the Start strip. |
+| `GuessNotify.LastShownDay` | none | Written by Kaption: the local day (`yyyy-MM-dd`) the last tray notice was shown. The strip on Start shows the same text while the tray notice waits; it never counts as the notice. |
 | `GuessNotify.Baseline` | none | Written by Kaption: your place per board the last time it was accepted, as JSON (`{"global":{"period":"2026-11","rank":3,"points":140,"at":"2026-11-08T23:53:55.000Z"}}`; `at` is the server's time of that place, missing in files from 2.5.7 and 2.5.8). A drop is measured from here, or from your place after your last scoring puzzle when that is newer; a new month starts again. |
 | `GuessNotify.FirstDelaySeconds` | `120` | Seconds after start before the first read (10 to 3600). |
 | `GuessNotify.PollMinutes` | the server's, else `240` | Minutes between reads once you have played this month (15 to 1440). |
@@ -91,6 +104,35 @@ Kaption's guess game lives on kaption.one (Gendle, Stardle, Zendle, Wuwdle). The
 | `Ui.Seen.GuessGame` | `false` | The same card's guess game row was closed or used. |
 | `Ui.Spotlight.Shows.WuWaPolish`, `Ui.Spotlight.Shows.GuessGame` | `0` | Written by Kaption: launches on which each row was on screen. A row retires after 3. |
 | `Ui.DismissedAnnouncements` | none | Ids of the announcements you closed on Start (newest last, at most 50), so a closed one never comes back. |
+
+## New story notice (2.6.0)
+
+When a subtitle pack for a new game version installs (7.1 to 7.2), Kaption says so once: one line on Start and one tray notice, "Genshin Impact 7.2: nowa fabuła jest już po polsku" ("the new story is in Polish now"), linking that version's page on kaption.one. Once per game and version. Never for subtitle fixes of a version you already have, never for the first pack of a game you just added. The tray notice waits while subtitles run, a game is in front or Windows is in a full-screen app or quiet time; the line on Start stays until you close it, open its page, or 14 days pass. With two games updated at once, each gets its own tray notice, one after the other. Nothing is sent anywhere: the notice comes from the pack that was just installed on this PC.
+
+| Key | Default | What it does |
+|---|---|---|
+| `NewStory.Enabled` | `true` | Off stops the line and the tray notice. The switch "Daj znać, gdy fabuła nowej wersji gry jest już po polsku" ("Tell me when a new game version's story is in Polish") under Gra i napisy writes it. Turning it off also closes the line on Start; versions that arrive while it is off are not announced later. |
+| `NewStory.Noticed` | none | Written by Kaption: per game, the highest game version already announced (`"genshin/7.2"`, one entry per game), so that version and any below it is never announced again. |
+| `NewStory.Acknowledged` | none | Written by Kaption: per game, the highest game version whose notice you closed or opened (`"genshin/7.2"`). The "Co nowego" ("What's new") card for the same version's article then stays closed too. |
+| `NewStory.Pending` | none | Written by Kaption: lines still on Start, one per game (`"genshin/7.2@1793891896"`: the version and when it was raised). |
+
+## Stamina from the screen
+
+Kaption can keep a timer for the selected game's stamina (Original Resin, Trailblaze Power, Waveplates) by reading the number off the game screen. It is off until you switch it on, on the Start page's card. While subtitles run and the game is in front, Kaption looks every few seconds at the top band of the game picture for the game's stamina icon and reads the `121/200` beside it; it reads nothing else there, and the reading stays in this file. Nothing is sent anywhere, and the game's files and memory are not touched. A number that differs from what the timer expects is believed only after it shows on two looks in a row (three when it is higher than regeneration explains). One tray notice says when the pool is almost full, never while subtitles run, a game is in front, or Windows is in a full-screen app or quiet time. "Otwórz licznik" ("Open the timer") opens the game's timer on kaption.one with the reading (the value, when it was read, the seconds to the next point and when it was last seen on screen) in the part of the address after `#`, which browsers do not send to a server. Games whose screen is not measured yet (Zenless Zone Zero) have no card.
+
+| Key | Default | What it does |
+|---|---|---|
+| `Stamina.Enabled` | `false` | Read the number off the game screen. The switch on the Start card writes it. |
+| `Stamina.Notice` | `true` | The "almost full" tray notice; "Daj znać, gdy będzie prawie pełne" ("Tell me when it is almost full") on the card writes it. |
+| `Stamina.NoticeLeadMinutes` | `30` | How long before the pool fills the notice is due (0 to 600). |
+| `Stamina.GateRetrySeconds` | `60` | Seconds between checks while a notice waits for subtitles to stop, the game to leave the front or Windows to accept notices (15 to 3600). |
+| `Stamina.Reading.<game>` | none | Written by Kaption: the reading the timer runs from, as `value|moment in Unix milliseconds|seconds to the next point` (`<game>` is `genshin`, `starrail`, `wuwa`). |
+| `Stamina.Seen.<game>` | none | Written by Kaption: when the number on screen last agreed with the timer, in Unix milliseconds (the card's "read … ago"). |
+| `Stamina.NoticeArmed.<game>` | `false` | Written by Kaption: a notice is still owed for the current fill. |
+| `Stamina.SaveSamples` | `false` | Testing aid. Keeps a small picture of every number read, every refused read and, once a minute, the strip where no icon was found, in `%APPDATA%\Kaption\<Game>\stamina-samples\`. Send the folder when a read is wrong. |
+| `Stamina.SampleLimit` | `200` | The most pictures kept per game; the oldest are deleted first (10 to 5000). |
+
+Where the icon is looked for and how the number is checked comes with the app per game (`games/<id>.json`, `desktop.staminaScreen`), not from this file. Every ten minutes of looking leaves one line in `app.log` starting `Stamina reader cost`.
 
 ## OCR and translation
 
@@ -162,7 +204,7 @@ Wygląd napisów (Subtitle style) sets these with a true-scale preview. Its thre
 | Key | Default | What it does |
 |---|---|---|
 | `UILang` | Windows display language | App language: `"pl-PL"` or `"en-US"`. Japanese and Chinese still load for old settings but are no longer offered. |
-| `AutoStart` | `false` | Start Kaption with Windows. Gra i napisy › Zaawansowane › Uruchamianie (Startup). |
+| `AutoStart` | `false` | Start Kaption with Windows. Off unless you tick it: in the setup window's last step, or under Gra i napisy › Zaawansowane › Uruchamianie (Startup). On, Kaption keeps one entry named `Kaption` in your Windows start-up list (`HKCU\Software\Microsoft\Windows\CurrentVersion\Run`) that starts it in the tray (`--tray`): the icon appears next to the clock, the window stays closed, and translation starts by itself when the game is on screen. The entry is checked at every start and repaired if an older version left a broken one. Off, the entry is removed at once, along with any left by older versions. |
 | `SetupCompleted` | `false` | Set when the setup window has been finished. |
 | `SetupDismissed` | `false` | Left by the setup wizard of 2.4 and earlier. Like `SetupCompleted`, it keeps the setup window from opening by itself. |
 | `FullscreenTipAcknowledged` | `false` | Set once the Genshin display-mode tip has been read, in the setup window or on Start. |

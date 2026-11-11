@@ -89,6 +89,9 @@ namespace GI_Subtitles.Views
             data.LoadedGame = () => Game;
             _regionAutoFill.Restore(Config.Get<string>(RegionAutoFill.FilledRegionKey, null));
             data.GetRegionAutoFillNote = () => _regionAutoFill.NoteFor(Config.Get<string>("Region", ""), HasConfiguredRegion());
+            data.GetSessionEvidence = _sessionEvidence.Snapshot;
+            // A cloud session ("continue anyway") or the dev switch: no local game window whose black picture means full screen.
+            data.HasLocalGameWindow = () => !_gameGateBypassedThisSession && !Config.Get("DevSkipGameGate", false);
 
             _autoStartWatch = new DispatcherTimer(DispatcherPriority.Background) { Interval = TimeSpan.FromMilliseconds(1500) };
             _autoStartWatch.Tick += (_, __) => WatchGame();

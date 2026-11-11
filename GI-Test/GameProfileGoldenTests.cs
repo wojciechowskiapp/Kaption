@@ -74,8 +74,8 @@ namespace GI_Test
             JsonObject golden = ReadGolden(GoldenPath());
 
             var later = Fixture();
-            later.Order = GameManifestLoader.LoadEmbedded().Max(m => m.Order) + 1; // where the next real game goes
-            using (GameRegistry.Use(GameRegistry.FromManifests(GameManifestLoader.LoadEmbedded().Append(later))))
+            later.Order = ShippedGames.Manifests().Max(m => m.Order) + 1; // where the next real game goes
+            using (GameRegistry.Use(GameRegistry.FromManifests(ShippedGames.Manifests().Append(later))))
             {
                 Assert.AreEqual("FixtureGame", GameRegionProfile.RegisteredGameIds.Last());
                 Assert.IsNull(Difference(golden), "a new game changes nothing recorded");
@@ -83,10 +83,10 @@ namespace GI_Test
 
             var first = Fixture();
             first.Order = 0;
-            using (GameRegistry.Use(GameRegistry.FromManifests(GameManifestLoader.LoadEmbedded().Append(first))))
+            using (GameRegistry.Use(GameRegistry.FromManifests(ShippedGames.Manifests().Append(first))))
                 StringAssert.StartsWith(Difference(golden), "$.registeredGameIds[0]", "the recorded games must stay first, in order");
 
-            var manifests = GameManifestLoader.LoadEmbedded();
+            var manifests = ShippedGames.Manifests();
             manifests.First(m => m.Id == "starrail").Name += " (renamed)";
             using (GameRegistry.Use(GameRegistry.FromManifests(manifests)))
                 StringAssert.StartsWith(Difference(golden), "$.profiles[1].DisplayName", "a recorded value that moves is still caught");

@@ -6,10 +6,10 @@
 //  machine-bound files to wipe, and forgetting the manifest row so the next
 //  sync downloads the bundle even though its published sha has not changed.
 //
-//  GameDataPaths.Root cannot be redirected, so the install test uses a
-//  GUID-suffixed game folder (as ZenlessBundleTextMapTests does) and the
-//  manifest tests a temp manifest path. The real gamedata-manifest.json is
-//  never touched.
+//  GameDataPaths.Root is the test run's temporary folder (TestEnvironment),
+//  shared by every test, so the install test uses a GUID-suffixed game folder
+//  (as ZenlessBundleTextMapTests does) and the manifest tests a temp manifest
+//  path. The real profile is never touched.
 // ─────────────────────────────────────────────────────────────────────────────
 
 using System;

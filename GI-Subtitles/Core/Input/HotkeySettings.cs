@@ -26,7 +26,7 @@ namespace GI_Subtitles.Core.Input
     public static class HotkeySettingsManager
     {
         private static string _settingsPath = Path.Combine(
-            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Kaption"), "hotkeySettings.xml");
+            Services.Data.GameDataPaths.Root, "hotkeySettings.xml");
 
         public static HotkeySettings LoadSettings()
         {

@@ -18,6 +18,12 @@ namespace GI_Subtitles.Services.Guess
         /// sent when the app asks with <c>since</c>). Their points have not moved since, so a lower place now is a pass.
         /// </summary>
         public GuessPlace LastScored { get; init; }
+
+        /// <summary>
+        /// How many players on this board have strictly more points than the player now (the server's <c>ahead</c>).
+        /// Null from a Worker that does not send it; the neighbour above then says it only when they have more points.
+        /// </summary>
+        public int? Ahead { get; init; }
     }
 
     /// <summary>
@@ -142,8 +148,14 @@ namespace GI_Subtitles.Services.Guess
                 e.TryGetProperty("below", out var b) ? ParseNeighbour(b) : null)
             {
                 LastScored = e.TryGetProperty("lastScored", out var ls) ? ParsePlace(ls) : null,
+                Ahead = ParseAhead(e, rank),
             };
         }
+
+        /// <summary>The count of players with more points; null when missing, not a whole number, or more than the places above.</summary>
+        private static int? ParseAhead(JsonElement e, int rank) =>
+            e.TryGetProperty("ahead", out var v) && v.ValueKind == JsonValueKind.Number && v.TryGetInt32(out int n) && n >= 0 && n < rank
+                ? n : null;
 
         /// <summary>Null unless it has a place, the points it had there (checked against the standing's) and a time.</summary>
         private static GuessPlace ParsePlace(JsonElement e)

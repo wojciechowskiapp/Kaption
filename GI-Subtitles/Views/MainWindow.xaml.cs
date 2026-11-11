@@ -189,6 +189,7 @@ namespace GI_Subtitles.Views
         // Screen capture exclusion (Windows 10 2004+)
         [DllImport("user32.dll")]
         private static extern bool SetWindowDisplayAffinity(IntPtr hWnd, uint dwAffinity);
+        private const uint WDA_NONE = 0x00000000;
         private const uint WDA_EXCLUDEFROMCAPTURE = 0x00000011;
 
         // DWM flush — waits for compositor to render the current frame
@@ -231,6 +232,10 @@ namespace GI_Subtitles.Views
         // caches are flushed, so a finished dialogue's line can't come back on a later frame that
         // hashes the same (the Statue prompt used to ghost-pop minutes after the dialogue ended).
         private int _consecutiveEmptyOcrFrames = 0;
+        /// <summary>What this run of translation has seen, for the Start card's session check: counters only.</summary>
+        private readonly Services.Detection.SessionEvidence _sessionEvidence = new();
+        /// <summary>A read finished and the next subtitle tick has not yet said what it came to.</summary>
+        private bool _readAwaitingOutcome;
         private const int EmptyOcrCacheClearThreshold = 3;
         // Sensible defaults match SettingsWindow. Reading Config without a
         // fallback on a clean install returns null, which silently breaks
@@ -260,7 +265,7 @@ namespace GI_Subtitles.Views
         /// process alive after the user quit.
         /// </summary>
         private CancellationTokenSource _dictionarySyncCts;
-        string dataDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Kaption");
+        string dataDir = Services.Data.GameDataPaths.Root;
         internal INotifyIcon notify;
         SettingsWindow data;
         private System.Drawing.Rectangle screenBounds = Screen.PrimaryScreen.Bounds;
@@ -335,7 +340,17 @@ namespace GI_Subtitles.Views
             new ThrottledLogger(TimeSpan.FromSeconds(60));
         private readonly ThrottledLogger _ocrTickFailureLog =
             new ThrottledLogger(TimeSpan.FromSeconds(60));
-        private bool _wdaExcludeActive = false; // True only if SetWindowDisplayAffinity succeeded
+        /// <summary>"Show subtitles in recordings and streams", as last applied by <see cref="ApplyCaptureVisibility"/>.</summary>
+        private bool _showInRecordings = CaptureVisibility.DefaultShowInRecordings;
+        /// <summary>What Windows said when this window last asked to stay out of screen capture.</summary>
+        private WindowsHideAnswer _windowsHideAnswer = WindowsHideAnswer.NotAsked;
+        /// <summary>Where the overlay was at this tick's earlier reads and at the tick before; a frame can still show it there.</summary>
+        private readonly OverlayAreaHistory _overlayAreaHistory = new(CaptureVisibility.HideSettleMs);
+        /// <summary>Where a Ctrl+Q popup was when it closed, and until when reads still mask it (a frame can still show it).</summary>
+        private System.Drawing.Rectangle _closedPopupArea;
+        private long _closedPopupMaskedUntil;
+        /// <summary>Just after Windows agreed to hide the overlay, frames composed before that can still show it: keep masking until then.</summary>
+        private long _maskWhileHidingSettlesUntil;
 
         private volatile DetectedTextResult _lastDetectedText;
 
@@ -427,6 +442,9 @@ namespace GI_Subtitles.Views
 
             Services.Diagnostics.DiagnosticBundle.RegisterStateProvider(
                 "Target language", () => Config.Get<string>("TargetLanguage", "(unset)"));
+
+            Services.Diagnostics.DiagnosticBundle.RegisterStateProvider(
+                "Subtitles in recordings", () => $"{CaptureStatus} (Windows: {_windowsHideAnswer})");
         }
 
         /// <summary>
@@ -456,14 +474,9 @@ namespace GI_Subtitles.Views
             // Only the opaque SubtitleBackground catches mouse input (for drag-to-reposition).
             // User can still toggle via Ctrl+Shift+D if needed.
 
-            // Try to exclude overlay from screen capture.
-            // WDA_EXCLUDEFROMCAPTURE doesn't work with AllowsTransparency (WS_EX_LAYERED),
-            // but MaskOverlayAreas compensates by blacking out the overlay region in captures.
-            _wdaExcludeActive = TryExcludeFromCapture(_mainWindowHandle);
-            if (!_wdaExcludeActive)
-            {
-                Logger.Log.Info("Using MaskOverlayAreas to exclude overlay from captures (WPF layered window)");
-            }
+            // In recordings or hidden from them, as the player chose; Windows may refuse to hide a see-through window,
+            // and then MaskOverlayAreas blacks the overlay out of the frames the app reads.
+            ApplyCaptureVisibility();
 
             _cachedFontSize = Config.Get<int>("Size", SubtitleOverlayDefaults.FontSize);
             ApplyOverlayStyle(relayout: false);
@@ -603,20 +616,28 @@ namespace GI_Subtitles.Views
             data.IsOcrRunning = () => OCRTimer.IsEnabled;
             data.IsSubtitleVisible = () => ShowText;
             data.IsEngineReady = () => _engineReady;
-            data.OverlayScreenAreas = OverlayScreenAreas;
+            data.OverlayScreenAreas = OverlayAreasForOneOffRead;
             data.OnOpenSetupWizard = () => ShowSetupWizard();
             InitAutoStart();
             InitFarmCard();
             InitGuessNotify();
+            InitStamina();
 
             // Always open settings window on startup (non-modal so UI stays responsive)
-            data.Show();
+            // The end-to-end suite drives it through UI Automation and must not take the focus from whoever uses the PC.
+            if (Common.E2EMode.IsActive) data.ShowActivated = false;
+            // Started by Windows (--tray): the window stays closed and Kaption waits in the tray; auto-start
+            // translates once the game is on screen. A setup that ran in this launch always ends in the window.
+            bool quietStart = App.StartedInTray && App.FirstRunOutcome == Views.OnboardingWindow.Outcome.None;
+            if (!quietStart) data.Show();
             if (App.FirstRunOutcome == Views.OnboardingWindow.Outcome.Characters) data.ShowCharactersPage();
             App.FirstRunOutcome = Views.OnboardingWindow.Outcome.None;
+            InitNewStoryNotice();
 
             // Put the first-run wizard above its Settings owner. Previously it
             // was shown first and then immediately covered by this larger window.
-            if (!Config.Get("SetupCompleted", false) &&
+            if (!quietStart &&
+                !Config.Get("SetupCompleted", false) &&
                 !Config.Get("SetupDismissed", false))
                 ShowSetupWizard();
 
@@ -1251,6 +1272,8 @@ namespace GI_Subtitles.Views
                 {
                 try
                 {
+                    // One capture tick: its reads (dialogue, answers, the stamina strip) share one entry of mask history.
+                    _overlayAreaHistory.NextTick();
                     Bitmap target;
                     bool isRegion2Valid = notify.Region2 != null && notify.Region2.Length == 4 &&
                                          int.TryParse(notify.Region2[2], out int region2Width) && region2Width > 0 &&
@@ -1298,6 +1321,10 @@ namespace GI_Subtitles.Views
                         catch (Exception ex) { Logger.Log.Error($"Answer capture failed: {ex.Message}"); }
                     }
 
+                    // The stamina number, when the player switched that on: one small strip every few seconds, read
+                    // off this thread (MainWindow.Stamina.cs). After the dialogue captures, so their frame is untouched.
+                    SampleStaminaIfDue();
+
                     bool passedToOcr = false;
                     Mat frameMat = null;
                     Mat currentBinary = null;
@@ -1313,6 +1340,7 @@ namespace GI_Subtitles.Views
                         if (target == null)
                         {
                             Logger.Log.Debug("Capture returned null bitmap (transient DXGI state) — skipping tick");
+                            _sessionEvidence.OnGameFrame(black: true, Environment.TickCount64);
                         }
                         else
                         {
@@ -1321,6 +1349,7 @@ namespace GI_Subtitles.Views
 
                         if (currentBinary == null || currentBinary.Empty())
                         {
+                            NoteGameFrame(frameMat, 0);
                             if (!_isOcrRunning)
                             {
                                 if (IsOcrIntervalReady())
@@ -1338,6 +1367,7 @@ namespace GI_Subtitles.Views
                         else
                         {
                             int currentForegroundPixels = Cv2.CountNonZero(currentBinary);
+                            NoteGameFrame(frameMat, currentForegroundPixels);
                             // Change vs previous frame, as fed to OcrTriggerGate:
                             //   null              = no previous frame yet (counts as stable)
                             //   PositiveInfinity  = incomparable (size/channel change) => maximally changed
@@ -1906,6 +1936,14 @@ namespace GI_Subtitles.Views
             }
         }
 
+        /// <summary>Session check: one frame read with the game in front. Black is looked for only when nothing is lit.</summary>
+        private void NoteGameFrame(Mat frame, int litPixels)
+        {
+            // An accepted overlap blacks the overlay's rectangle out of the capture: that black is Kaption's, not the game's.
+            bool black = litPixels == 0 && !_overlapOverrideAccepted && Services.Detection.FrameBlackness.IsBlack(frame);
+            _sessionEvidence.OnGameFrame(black, Environment.TickCount64);
+        }
+
         public void UpdateText(object sender, EventArgs e)
         {
             // OCR is deliberately paused in overlap-recovery mode. The normal
@@ -1926,11 +1964,20 @@ namespace GI_Subtitles.Views
                     _subtitleResolver.RequireDialogueEvidence =
                         Services.Detection.GameRegionProfile.ForCurrentGame().RequiresDialogueEvidence;
                     bool hasOcrText = ocrText.Length > 1;
+                    bool gameUi = hasOcrText && GameUiTextFilter.IsLikelyGameUI(ocrText);
                     SubtitleResolution resolution = default;
-                    if (hasOcrText && !GameUiTextFilter.IsLikelyGameUI(ocrText))
+                    if (hasOcrText && !gameUi)
                     {
                         resolution = _subtitleResolver.Resolve(
                             ocrText, _detectedNpcName, data.ContextEngine, data.Matcher, data.contentDict);
+                    }
+
+                    // Session check: a read is counted once, by what it came to. Counters only, nothing allocated.
+                    if (_readAwaitingOutcome)
+                    {
+                        _readAwaitingOutcome = false;
+                        _sessionEvidence.OnRead(
+                            Services.Detection.SessionEvidence.Classify(ocrText, _detectedNpcName, resolution, gameUi), ocrText);
                     }
 
                     // Community fixes, then the player's own, over the pack (exact key, no allocation); with no text
@@ -2178,52 +2225,18 @@ namespace GI_Subtitles.Views
         }
 
         /// <summary>
-        /// Masks overlay window areas from a captured bitmap to prevent OCR from reading its own output.
-        /// Fills overlapping areas with black pixels which are below the OCR threshold.
+        /// Blacks the subtitle panel and the Ctrl+Q popup out of a frame the app is about to read, so it never reads its
+        /// own Polish line. The panel counts while any of it shows, a fade included, where it is drawn in screen pixels
+        /// (right on mixed-DPI monitors); the areas of the previous read are covered too, because a frame can be one
+        /// composition older than the layout.
         /// </summary>
         private void MaskOverlayAreas(Bitmap bitmap, int captureX, int captureY, int captureW, int captureH)
         {
             try
             {
-                // Collect all overlay windows that could interfere
-                var overlayRects = new List<System.Drawing.Rectangle>();
-
-                // Main subtitle overlay (skipped automatically in EI mode because Opacity
-                // is set to 0 before capture, making the Opacity > 0 check false)
-                if (this.Visibility == Visibility.Visible && this.Opacity > 0 && _subtitleVisible)
-                {
-                    int olX = (int)(this.Left * Scale);
-                    int olY = (int)(this.Top * Scale);
-                    int olW = (int)(this.Width * Scale);
-                    int olH = (int)(this.Height * Scale);
-                    overlayRects.Add(new System.Drawing.Rectangle(olX, olY, olW, olH));
-                }
-
-                // Quick-translate popup
-                var quickPopup = _quickTranslatePopup;
-                if (quickPopup != null && quickPopup.IsVisible)
-                {
-                    var qBounds = quickPopup.PhysicalBounds;
-                    if (!qBounds.IsEmpty) overlayRects.Add(qBounds);
-                }
-
-                var captureRect = new System.Drawing.Rectangle(captureX, captureY, captureW, captureH);
-
-                using (Graphics g = Graphics.FromImage(bitmap))
-                {
-                    foreach (var overlayRect in overlayRects)
-                    {
-                        // Calculate intersection
-                        var intersection = System.Drawing.Rectangle.Intersect(overlayRect, captureRect);
-                        if (!intersection.IsEmpty)
-                        {
-                            // Convert to bitmap-relative coordinates
-                            int relX = intersection.X - captureX;
-                            int relY = intersection.Y - captureY;
-                            g.FillRectangle(System.Drawing.Brushes.Black, relX, relY, intersection.Width, intersection.Height);
-                        }
-                    }
-                }
+                var now = OverlayScreenAreas();
+                var before = _overlayAreaHistory.Observe(now, Environment.TickCount64);
+                OverlayMask.Apply(bitmap, new System.Drawing.Rectangle(captureX, captureY, captureW, captureH), now, before);
             }
             catch (Exception ex)
             {
@@ -2233,8 +2246,9 @@ namespace GI_Subtitles.Views
 
         /// <summary>
         /// Where Kaption draws over the game right now, in screen pixels: the subtitle panel while any of it shows (a fade
-        /// included) and the Ctrl+Q popup while it is open. The build card's UID read (Settings) blacks these out of its
-        /// capture, so a subtitle beside the game's corner is never read in place of the UID. Of this window only the panel
+        /// included) and the Ctrl+Q popup while it is open and for a moment after it closed. Every read of the screen blacks these out (the dialogue read,
+        /// Ctrl+Q, the dialogue-area search, the build card's UID read), so Kaption never reads its own text. Call on
+        /// the UI thread. Of this window only the panel
         /// counts: the window is the dialogue area's width plus 200 DIP and see-through beside the panel, where the game,
         /// and its UID, show.
         /// </summary>
@@ -2253,7 +2267,7 @@ namespace GI_Subtitles.Views
             }
             catch (Exception ex)
             {
-                Logger.Log.Info($"Overlay bounds for the UID read unavailable: {ex.Message}");
+                Logger.Log.Info($"Overlay bounds unavailable: {ex.Message}");
             }
             var popup = _quickTranslatePopup;
             if (popup != null && popup.IsVisible)
@@ -2261,8 +2275,18 @@ namespace GI_Subtitles.Views
                 var bounds = popup.PhysicalBounds;
                 if (bounds.Width > 0 && bounds.Height > 0) areas.Add(bounds);
             }
+            if (Environment.TickCount64 < _closedPopupMaskedUntil && _closedPopupArea.Width > 0 && _closedPopupArea.Height > 0)
+                areas.Add(_closedPopupArea);
             return areas;
         }
+
+        /// <summary>
+        /// What a one-off read of the screen blacks out (Ctrl+Q, the dialogue-area search, the build card's UID read):
+        /// <see cref="OverlayScreenAreas"/> plus where the last capture ticks saw the panels, while that is fresh, because
+        /// the frame such a read gets can be a composition behind. Call on the UI thread.
+        /// </summary>
+        internal IReadOnlyList<System.Drawing.Rectangle> OverlayAreasForOneOffRead() =>
+            _overlayAreaHistory.WithRecent(OverlayScreenAreas(), Environment.TickCount64);
 
         /// <summary>
         /// The panel <paramref name="card"/> draws, in screen pixels, inside <paramref name="window"/>: the control's box,
@@ -2303,9 +2327,7 @@ namespace GI_Subtitles.Views
                 int.TryParse(region[2], out int w) && int.TryParse(region[3], out int h))
             {
                 Bitmap bmp = CaptureRegionFromBackend(region);
-                // Only skip MaskOverlayAreas if WDA_EXCLUDEFROMCAPTURE is active
-                // (overlay invisible in captures). Otherwise always mask.
-                if (bmp != null && !_wdaExcludeActive)
+                if (bmp != null && OverlayCanBeInFrame)
                     MaskOverlayAreas(bmp, x, y, w, h);
                 return bmp;
             }
@@ -3103,6 +3125,10 @@ namespace GI_Subtitles.Views
         {
             Logger.Log.Info(Services.Detection.GameOcrTuning.Describe());
             WarmDialogueContextIfNew();
+            // A new run of translation: the session check starts from nothing.
+            _sessionEvidence.Reset();
+            _readAwaitingOutcome = false;
+            data?.ResetSessionCheck();
             OCRTimer.Start();
             UITimer.Start();
         }
@@ -3244,6 +3270,9 @@ namespace GI_Subtitles.Views
         internal void OnCaptureRegionUserChange(System.Windows.Window dialogOwner)
         {
             ResetOcrPipelineState(clearImageCaches: true);
+            // A new dialogue area is a new trial: what the old one read says nothing about it.
+            _sessionEvidence.Reset();
+            data?.ResetSessionCheck();
             ShowOverlapWarnIfNeeded(dialogOwner, clearOverride: true);
         }
 
@@ -3756,6 +3785,7 @@ namespace GI_Subtitles.Views
             {
                 var outcome = w.Result;
                 _setupWindow = null;
+                data?.RefreshAutoStartControls(); // "Start with Windows" may have been ticked on the last step
                 if (outcome == Views.OnboardingWindow.Outcome.Characters) data?.ShowCharactersPage();
                 else if (outcome == Views.OnboardingWindow.Outcome.Start) data?.ShowStartPage();
             };
@@ -3789,6 +3819,7 @@ namespace GI_Subtitles.Views
             Mat frameMat = null;
             try
             {
+                _overlayAreaHistory.NextTick();
                 target = CaptureAndMask(notify.Region);
                 if (target == null) return;
 
@@ -3901,6 +3932,8 @@ namespace GI_Subtitles.Views
                 };
                 target = CaptureRegion(region); // rented from BitmapPool.Default
                 if (target == null) return;
+                // A GDI read: the subtitle panel or an earlier popup inside the area would be read as game text.
+                OverlayMask.Apply(target, selection, OverlayAreasForOneOffRead());
                 frameMat = target.ToMat();
                 if (frameMat == null || frameMat.Empty()) return;
 
@@ -4037,6 +4070,8 @@ namespace GI_Subtitles.Views
             try
             {
                 var popup = new QuickTranslatePopup(segments, QuickTranslateSettings.Load(), selection);
+                // Its own timer, a click or a new Ctrl+Q: every close leaves its place masked for a moment.
+                popup.Closing += (s, e) => RememberClosingPopup(popup);
                 popup.Closed += (s, e) =>
                 {
                     if (ReferenceEquals(_quickTranslatePopup, s)) _quickTranslatePopup = null;
@@ -4056,8 +4091,23 @@ namespace GI_Subtitles.Views
             var popup = _quickTranslatePopup;
             _quickTranslatePopup = null;
             if (popup == null) return;
+            RememberClosingPopup(popup);
             try { popup.CloseNow(); }
             catch (Exception ex) { Logger.Log.Warn($"QuickTranslate popup close: {ex.Message}"); }
+        }
+
+        /// <summary>The next frame can still show a popup that is closing: reads keep masking its place for a moment (OverlayScreenAreas).</summary>
+        private void RememberClosingPopup(QuickTranslatePopup popup)
+        {
+            try
+            {
+                if (popup == null || !popup.IsVisible) return;
+                var bounds = popup.PhysicalBounds;
+                if (bounds.Width <= 0 || bounds.Height <= 0) return;
+                _closedPopupArea = bounds;
+                _closedPopupMaskedUntil = Environment.TickCount64 + CaptureVisibility.HideSettleMs;
+            }
+            catch (Exception ex) { Logger.Log.Info($"QuickTranslate popup bounds at close: {ex.Message}"); }
         }
 
         /// <summary>The region picker activates itself; hand focus back to the game afterwards.</summary>
@@ -4289,6 +4339,7 @@ namespace GI_Subtitles.Views
                             }
 
                             ocrText = detectedText;
+                            _readAwaitingOutcome = true;
                             _detectedNpcName = detectedNpcName;
                             _lastDetectedText = detectedTextLayout;
 
@@ -5423,6 +5474,56 @@ namespace GI_Subtitles.Views
                 return false;
             }
         }
+
+        /// <summary>Undoes <see cref="TryExcludeFromCapture"/>: the window is in screen capture again.</summary>
+        internal static bool TryShowInCapture(IntPtr hWnd)
+        {
+            if (hWnd == IntPtr.Zero) return false;
+            try
+            {
+                return SetWindowDisplayAffinity(hWnd, WDA_NONE);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Applies "Show subtitles in recordings and streams" to the subtitle overlay at once: on, the overlay stops
+        /// asking Windows to hide it; off, it asks again. Only this window follows the setting; the region picker, the
+        /// Ctrl+Q popup, the farm card, the fix window and the overlap alert always ask to stay hidden.
+        /// </summary>
+        internal void ApplyCaptureVisibility()
+        {
+            bool show = CaptureVisibility.ShowInRecordings;
+            var answer = WindowsHideAnswer.NotAsked;
+            if (_mainWindowHandle != IntPtr.Zero)
+            {
+                if (CaptureVisibility.AsksWindowsToHide(show))
+                    answer = TryExcludeFromCapture(_mainWindowHandle) ? WindowsHideAnswer.Hidden : WindowsHideAnswer.Refused;
+                else
+                    answer = CaptureVisibility.AfterAskingToShow(TryShowInCapture(_mainWindowHandle), _windowsHideAnswer);
+            }
+            // Windows hides the window from the next composed frame on; the frames already on their way still show it.
+            if (answer == WindowsHideAnswer.Hidden && _windowsHideAnswer != WindowsHideAnswer.Hidden)
+                _maskWhileHidingSettlesUntil = Environment.TickCount64 + CaptureVisibility.HideSettleMs;
+            _showInRecordings = show;
+            _windowsHideAnswer = answer;
+            Logger.Log.Info($"Subtitles in recordings: {CaptureVisibility.Status(show, answer)} (setting {(show ? "on" : "off")}, Windows: {answer}).");
+        }
+
+        /// <summary>
+        /// Whether a frame the app reads can show its own overlay, and so has to be masked. Only one case is safe to
+        /// leave alone: Windows hides the overlay and the frame came from DXGI. A GDI read does not promise that, and
+        /// recordings that show the overlay never do.
+        /// </summary>
+        private bool OverlayCanBeInFrame =>
+            CaptureVisibility.MasksOverlay(_showInRecordings, _windowsHideAnswer, _captureBackend is DxgiScreenCapture)
+            || Environment.TickCount64 < _maskWhileHidingSettlesUntil;
+
+        /// <summary>What a screen recording shows right now, for the line under the setting.</summary>
+        internal CaptureStatus CaptureStatus => CaptureVisibility.Status(_showInRecordings, _windowsHideAnswer);
 
         /// <summary>
         /// Enables or disables click-through mode on the overlay window.

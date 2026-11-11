@@ -19,6 +19,13 @@ namespace GI_Test
     [TestClass]
     public class BitmapPoolIntegrationTests
     {
+        // A runner installed as a Windows service (the home CI box) runs in session 0, which has no desktop to capture.
+        private static void RequireInteractiveDesktop()
+        {
+            if (!Environment.UserInteractive)
+                Assert.Inconclusive("No interactive desktop: this process runs as a service (a CI runner), so GDI has no screen to capture.");
+        }
+
         /// <summary>
         /// Capture a tiny top-left region into a pool-rented Bitmap, verify dimensions and
         /// that at least one non-zero byte was written. Fails if the backend silently dropped
@@ -29,6 +36,7 @@ namespace GI_Test
         [TestCategory("RequiresScreen")]
         public void Capture_Into_Rented_Bitmap_Writes_Pixels()
         {
+            RequireInteractiveDesktop();
             using (var pool = new BitmapPool())
             using (var gdi = new GdiScreenCapture())
             {
@@ -85,6 +93,7 @@ namespace GI_Test
         [TestCategory("RequiresScreen")]
         public void Return_Then_Rent_After_Real_Capture_Reuses_Instance()
         {
+            RequireInteractiveDesktop();
             using (var pool = new BitmapPool())
             using (var gdi = new GdiScreenCapture())
             {
@@ -120,6 +129,7 @@ namespace GI_Test
         [TestCategory("RequiresScreen")]
         public void Concurrent_Capture_Stress_Respects_MaxPerKey()
         {
+            RequireInteractiveDesktop();
             const int iterationsPerThread = 200;
             const int threads = 2;
             const int w = 20;

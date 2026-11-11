@@ -132,8 +132,47 @@ namespace GI_Test
             var tied = new GuessNeighbour(3, "Ayvruu", null, false, 140, 0);
             var o = GuessOvertakeRule.Evaluate(b, Standing(4, above: tied), null);
             Assert.IsNull(o.Candidate);
-            Assert.AreEqual(4, o.Baselines["global"].Rank, "re-based: a later real pass counts from here");
+            Assert.AreEqual(GuessCheckResult.TieBreak, o.Checks.Single().Result);
             Assert.IsNotNull(GuessOvertakeRule.Evaluate(o.Baselines, Standing(5), null).Candidate);
+        }
+
+        [TestMethod]
+        public void Rule_ATieBreakDrop_KeepsItsReference_SoALaterPassCountsFromIt()
+        {
+            var b = GuessOvertakeRule.Evaluate(GuessBaselines.Empty, Standing(3), null).Baselines;
+            var tied = new GuessNeighbour(3, "Ayvruu", null, false, 140, 0);
+            var o = GuessOvertakeRule.Evaluate(b, Standing(4, above: tied), null);
+            Assert.AreEqual(3, o.Baselines["global"].Rank, "kept: re-based, the tied player would count as someone who was always above");
+            // The tied player scores again: the same place as at the last read, but someone who was behind now has more points.
+            var passed = GuessOvertakeRule.Evaluate(o.Baselines, Standing(4), null);
+            Assert.IsNotNull(passed.Candidate, "three players have more points and only two were above");
+            Assert.AreEqual(3, passed.Candidate.From);
+            Assert.AreEqual(4, passed.Candidate.To);
+            // Back at the old place: nothing to tell, and the reference follows.
+            var back = GuessOvertakeRule.Evaluate(o.Baselines, Standing(3), null);
+            Assert.IsNull(back.Candidate);
+            Assert.AreEqual(GuessCheckResult.NothingNew, back.Checks.Single().Result);
+        }
+
+        [TestMethod]
+        public void Rule_TheCountAhead_DecidesWhenTheNeighbourIsTied()
+        {
+            // #3, so two players were above. Now #5 behind a tied player.
+            var b = GuessOvertakeRule.Evaluate(GuessBaselines.Empty, Standing(3), null).Baselines;
+            GuessStanding Now(int? ahead) => new()
+            {
+                Period = Period,
+                Global = new GuessBoardStanding(5, 140, 9, new GuessNeighbour(4, "Ayvruu", null, false, 140, 0), null) { Ahead = ahead },
+            };
+            Assert.IsNull(GuessOvertakeRule.Evaluate(b, Now(2), null).Candidate, "the same two with more points: both new players above are tie-breaks");
+            Assert.IsNull(GuessOvertakeRule.Evaluate(b, Now(null), null).Candidate, "an older Worker: a tied neighbour proves nothing");
+            var passed = GuessOvertakeRule.Evaluate(b, Now(3), null);
+            Assert.IsNotNull(passed.Candidate, "three with more points, two were above: one of them passed");
+            Assert.AreEqual(3, passed.Candidate.From);
+            Assert.AreEqual(5, passed.Candidate.To);
+            // The count wins over the neighbour: a neighbour with more points next to a count that cannot prove a pass.
+            var odd = new GuessStanding { Period = Period, Global = new GuessBoardStanding(4, 140, 9, new GuessNeighbour(3, "X", null, false, 150, 10), null) { Ahead = 2 } };
+            Assert.IsNull(GuessOvertakeRule.Evaluate(b, odd, null).Candidate);
         }
 
         [TestMethod]
@@ -141,7 +180,7 @@ namespace GI_Test
         {
             var b = GuessOvertakeRule.Evaluate(GuessBaselines.Empty, Standing(3), null).Baselines;
             Assert.IsNull(GuessOvertakeRule.Evaluate(b, Standing(5, noAbove: true), null).Candidate);
-            Assert.IsFalse(GuessOvertakeRule.PassedOnPoints(null));
+            Assert.IsFalse(GuessOvertakeRule.PassedOnPoints(null, 1));
         }
 
         [TestMethod]
@@ -157,7 +196,7 @@ namespace GI_Test
             Assert.IsNull(GuessOvertakeRule.Evaluate(delivered, drop, "genshin").Candidate, "the same notice never comes back");
         }
 
-        // ── GuessNoticeDelivery: strip or balloon ───────────────────────
+        // ── GuessNoticeDelivery: the tray notice, the strip meanwhile ───
 
         private const string Today = "2026-11-05";
 
@@ -177,37 +216,46 @@ namespace GI_Test
         }
 
         [TestMethod]
-        public void Delivery_StripCountsAsSeen_OnlyWhenSettingsIsInFrontOnStart()
+        public void Delivery_SettingsInFrontWhileSubtitlesRun_IsNoDelivery_TheOwnersCase()
         {
-            Assert.IsTrue(GuessNoticeDelivery.StripCountsAsSeen(true, false, true, true));
-            Assert.IsFalse(GuessNoticeDelivery.StripCountsAsSeen(false, false, true, true), "open behind the game");
-            Assert.IsFalse(GuessNoticeDelivery.StripCountsAsSeen(true, true, true, true), "minimised");
-            Assert.IsFalse(GuessNoticeDelivery.StripCountsAsSeen(true, false, false, true), "no strip");
-            Assert.IsFalse(GuessNoticeDelivery.StripCountsAsSeen(true, false, true, false), "another page");
+            // 2026-11-10, 15:32 to 15:38 on the owner's PC: the pass was found while subtitles ran, Settings came to the
+            // front on Start 33 s later and the notice was marked delivered there. No tray notice ever showed, and the
+            // build started three minutes later read "nothing new".
+            var (d, b, drop) = Waiting();
+            var step = d.Next(Today, true, null, translating: true, gameInFront: false, quns: 5);
+            Assert.AreEqual(GuessDeliveryStep.Wait, step.Step, "the strip on Start is where the notice waits, not its delivery");
+            Assert.AreEqual(GuessGateResult.Translating, step.Gate);
+            Assert.IsTrue(d.Undelivered);
+            Assert.AreEqual(3, b["genshin"].Rank, "the place before the pass stays the reference");
+            // Kaption restarted before the tray notice could show: the next read finds the same drop again.
+            var restarted = new GuessNoticeDelivery();
+            restarted.Read(b, drop, "genshin", Today, BuildEn, out var again);
+            Assert.IsNotNull(again);
+            Assert.AreEqual(GuessDeliveryStep.ShowBalloon, restarted.Next(Today, true, null, false, false, 5).Step,
+                "subtitles off, no game in front: the tray notice, with Settings in front or not");
         }
 
         [TestMethod]
-        public void Delivery_SettingsBehindTheGame_WaitsForTheBalloon()
+        public void Delivery_WaitsForTheGate_ThenTheBalloon()
         {
             var (d, _, _) = Waiting();
-            bool seen = GuessNoticeDelivery.StripCountsAsSeen(false, false, true, true);
-            var wait = d.Next(Today, seen, true, null, false, gameInFront: true, quns: 5);
+            var wait = d.Next(Today, true, null, false, gameInFront: true, quns: 5);
             Assert.AreEqual(GuessDeliveryStep.Wait, wait.Step);
             Assert.AreEqual(GuessGateResult.GameInFront, wait.Gate);
-            Assert.AreEqual(GuessDeliveryStep.Wait, d.Next(Today, seen, true, null, true, false, 5).Step, "subtitles on");
-            Assert.AreEqual(GuessDeliveryStep.Wait, d.Next(Today, seen, true, null, false, false, 3).Step, "full screen");
-            Assert.AreEqual(GuessDeliveryStep.ShowBalloon, d.Next(Today, seen, true, null, false, false, 5).Step);
+            Assert.AreEqual(GuessDeliveryStep.Wait, d.Next(Today, true, null, true, false, 5).Step, "subtitles on");
+            Assert.AreEqual(GuessDeliveryStep.Wait, d.Next(Today, true, null, false, false, 3).Step, "full screen");
+            Assert.AreEqual(GuessDeliveryStep.ShowBalloon, d.Next(Today, true, null, false, false, 5).Step);
         }
 
         [TestMethod]
-        public void Delivery_SeenOnTheStrip_NoBalloon_AndTheNextReadClearsIt()
+        public void Delivery_AfterTheBalloon_TheStripKeepsItsText_AndTheNextReadClearsIt()
         {
             var (d, b, drop) = Waiting();
-            Assert.AreEqual(GuessDeliveryStep.SeenOnStrip, d.Next(Today, true, true, null, true, true, 0).Step);
+            Assert.AreEqual(GuessDeliveryStep.ShowBalloon, d.Next(Today, true, null, false, false, 5).Step);
             b = d.Delivered(b, "genshin");
             Assert.IsFalse(d.Undelivered);
             Assert.IsNotNull(d.Notice, "the strip keeps its text until the next read");
-            Assert.AreEqual(GuessDeliveryStep.Idle, d.Next(Today, false, true, Today, false, false, 5).Step);
+            Assert.AreEqual(GuessDeliveryStep.Idle, d.Next(Today, true, Today, false, false, 5).Step);
             d.Read(b, drop, "genshin", Today, BuildEn, out var again);
             Assert.IsNull(again);
             Assert.IsNull(d.Notice, "a read without a drop clears the strip");
@@ -226,30 +274,34 @@ namespace GI_Test
         public void Delivery_CappedToday_KeepsTheStrip()
         {
             var (d, _, _) = Waiting();
-            var capped = d.Next(Today, false, true, Today, false, false, 5);
+            var capped = d.Next(Today, true, Today, false, false, 5);
             Assert.AreEqual(GuessDeliveryStep.CappedToday, capped.Step);
             Assert.IsTrue(d.Undelivered);
             Assert.IsNotNull(d.Notice);
         }
 
         [TestMethod]
-        public void Delivery_YesterdaysNotice_NoBalloon_ButTheStripStillCounts()
+        public void Delivery_YesterdaysNotice_NoBalloon_UntilTheNextReadFindsTheDropAgain()
         {
-            var (d, _, _) = Waiting();
-            Assert.AreEqual(GuessDeliveryStep.Expired, d.Next("2026-11-06", false, true, null, false, false, 5).Step);
-            Assert.AreEqual(GuessDeliveryStep.SeenOnStrip, d.Next("2026-11-06", true, true, null, false, false, 5).Step,
-                "read on the strip: re-based, so it never comes back as a balloon");
+            var (d, b, drop) = Waiting();
+            Assert.AreEqual(GuessDeliveryStep.Expired, d.Next("2026-11-06", true, null, false, false, 5).Step);
+            Assert.IsTrue(d.Undelivered);
+            Assert.AreEqual(3, b["genshin"].Rank, "nothing was delivered: the reference stays");
+            // The next read still sees the drop and makes it today's notice.
+            d.Read(b, drop, "genshin", "2026-11-06", BuildEn, out var again);
+            Assert.IsNotNull(again);
+            Assert.AreEqual(GuessDeliveryStep.ShowBalloon, d.Next("2026-11-06", true, null, false, false, 5).Step);
         }
 
         [TestMethod]
         public void Delivery_TurnedOff_Clears_AndTheLobbyRebases()
         {
             var (d, b, _) = Waiting();
-            Assert.AreEqual(GuessDeliveryStep.Disabled, d.Next(Today, true, false, null, false, false, 5).Step);
+            Assert.AreEqual(GuessDeliveryStep.Disabled, d.Next(Today, false, null, false, false, 5).Step);
             b = d.LobbyOpened(b, "starrail");
             Assert.IsNull(d.Notice);
             Assert.AreEqual(5, b["genshin"].Rank, "the notice's own board, though Star Rail is selected now");
-            Assert.AreEqual(GuessDeliveryStep.Idle, d.Next(Today, true, true, null, false, false, 5).Step);
+            Assert.AreEqual(GuessDeliveryStep.Idle, d.Next(Today, true, null, false, false, 5).Step);
         }
 
         [TestMethod]
@@ -571,6 +623,80 @@ namespace GI_Test
             }
         }
 
+        /// <summary>
+        /// The owner's read on 2026-11-10 at 14:22Z: #5 with 220 on both boards, #1 after the last score. Three players
+        /// have more points (430, 260, 240) and one with the same 220 sits directly above on the tie-break.
+        /// </summary>
+        private static GuessStanding OwnersTiedRead(int? ahead, bool lastScored = true, DateTimeOffset? at = null)
+        {
+            var tied = new GuessNeighbour(4, null, "9412ec", false, 220, 0);
+            GuessBoardStanding Board() => new(5, 220, 7, tied, null) { LastScored = lastScored ? new GuessPlace(1, 220, LastScore) : null, Ahead = ahead };
+            return new GuessStanding
+            {
+                Period = Period,
+                At = at ?? new DateTimeOffset(2026, 11, 10, 14, 22, 1, TimeSpan.Zero),
+                Global = Board(),
+                Games = new Dictionary<string, GuessBoardStanding> { ["genshin"] = Board(), ["starrail"] = null, ["zzz"] = null, ["wuwa"] = null },
+                PlayedThisMonth = true,
+            };
+        }
+
+        [TestMethod]
+        public void Rule_APassHiddenBehindATiedNeighbour_IsFoundFromTheCountAhead_TheOwnersRead()
+        {
+            // 2.5.9 wrote this read off as "a tie-break only" and re-based on #5: three passes, no notice, lost for good.
+            var o = GuessOvertakeRule.Evaluate(GuessBaselines.Empty, OwnersTiedRead(ahead: 3), "genshin");
+            Assert.IsNotNull(o.Candidate, "three players have more points; nobody was above after the last score");
+            Assert.AreEqual("genshin", o.Candidate.Board);
+            Assert.AreEqual(1, o.Candidate.From);
+            Assert.AreEqual(5, o.Candidate.To);
+            Assert.AreEqual(GuessCheckResult.Passed, o.Checks[0].Result);
+
+            // A Worker that does not send the count: nothing is proven, so no notice, but the place after the last score
+            // stays the reference...
+            var old = GuessOvertakeRule.Evaluate(GuessBaselines.Empty, OwnersTiedRead(ahead: null), "genshin");
+            Assert.IsNull(old.Candidate);
+            Assert.AreEqual(GuessCheckResult.TieBreak, old.Checks[0].Result);
+            Assert.AreEqual(1, old.Baselines["genshin"].Rank);
+            Assert.AreEqual(LastScore, old.Baselines["genshin"].At);
+            // ...and the first read that carries the count reports the whole drop (no newer score, so no lastScored).
+            var later = GuessOvertakeRule.Evaluate(old.Baselines, OwnersTiedRead(ahead: 3, lastScored: false, at: ReadAt.AddDays(3)), "genshin");
+            Assert.IsNotNull(later.Candidate);
+            Assert.AreEqual(1, later.Candidate.From);
+            Assert.AreEqual(5, later.Candidate.To);
+        }
+
+        [TestMethod]
+        public void Rule_AKeptPlaceFrom258_IsStampedOnce_SoTheServerIsNotAskedToReplayEveryRead()
+        {
+            // 2.5.8 told the player at #2 with 220 on 2026-11-10 and stored that place without a time. The first read
+            // after the update: #3 behind a player with the same points, and the place after the last score (#1, from
+            // the 6th) is the drop already told. The #2 stays the reference, and it must get a time: without one every
+            // read sends "genshin:0" and the server replays the board again.
+            var stored = GuessBaselines.Parse("{\"genshin\":{\"period\":\"2026-11\",\"rank\":2,\"points\":220}}");
+            var read = OwnersTiedRead(ahead: null);
+            var tied = read.Board("genshin") with { Rank = 3, Above = new GuessNeighbour(2, null, "9412ec", false, 220, 0) };
+            var first = new GuessStanding { Period = Period, At = read.At, Global = null, Games = new Dictionary<string, GuessBoardStanding> { ["genshin"] = tied }, PlayedThisMonth = true };
+            var o = GuessOvertakeRule.Evaluate(stored, first, "genshin", "2026-11-10", UtcDay);
+            Assert.IsNull(o.Candidate);
+            Assert.AreEqual(GuessCheckResult.TieBreak, o.Checks[0].Result);
+            Assert.IsFalse(o.Checks[0].FromLastScore, "the told place, not the one before it");
+            Assert.AreEqual(2, o.Baselines["genshin"].Rank, "the reference stays");
+            Assert.AreEqual(220, o.Baselines["genshin"].Points);
+            Assert.AreEqual(read.At, o.Baselines["genshin"].At, "stamped with the read's server time");
+            StringAssert.Contains(GuessOvertakeRule.Since(o.Baselines, "genshin"), "genshin:2026-11-10T14:22:01.000Z");
+            // A later pass is still measured from the kept place.
+            var passed = new GuessStanding
+            {
+                Period = Period, At = read.At.Value.AddHours(4), PlayedThisMonth = true,
+                Games = new Dictionary<string, GuessBoardStanding> { ["genshin"] = new GuessBoardStanding(4, 220, 7, new GuessNeighbour(3, null, "9412ec", false, 220, 0), null) { Ahead = 2 } },
+            };
+            var later = GuessOvertakeRule.Evaluate(o.Baselines, passed, "genshin", "2026-11-10", UtcDay);
+            Assert.IsNotNull(later.Candidate);
+            Assert.AreEqual(2, later.Candidate.From);
+            Assert.AreEqual(4, later.Candidate.To);
+        }
+
         [TestMethod]
         public void Rule_ThePlaceAfterTheLastScore_LosesToANewerReadOfTheApp()
         {
@@ -613,8 +739,8 @@ namespace GI_Test
             var o = GuessOvertakeRule.Evaluate(GuessBaselines.Empty, new GuessStanding { Period = Period, At = ReadAt, Global = tied, Games = read.Games }, null);
             Assert.IsNull(o.Candidate);
             Assert.AreEqual(GuessCheckResult.TieBreak, o.Checks[0].Result);
-            Assert.AreEqual(3, o.Baselines["global"].Rank, "re-based from now");
-            Assert.AreEqual(ReadAt, o.Baselines["global"].At);
+            Assert.AreEqual(1, o.Baselines["global"].Rank, "the place after the last score stays the reference");
+            Assert.AreEqual(LastScore, o.Baselines["global"].At);
         }
 
         [TestMethod]
@@ -847,6 +973,20 @@ namespace GI_Test
             Assert.IsNull(old.PollEvery);
             Assert.IsNull(old.Global.LastScored, "a Worker older than the app");
             Assert.IsFalse(GuessStanding.Parse("{\"period\":\"2026-11\",\"global\":null}").PlayedThisMonth);
+        }
+
+        [TestMethod]
+        public void Parse_ReadsTheCountAhead_AndDropsOneThatCannotBe()
+        {
+            var s = GuessStanding.Parse(@"{""period"":""2026-11"",""global"":{""rank"":5,""points"":220,""ahead"":3},
+                ""games"":{""genshin"":{""rank"":1,""points"":220,""ahead"":0},""starrail"":{""rank"":2,""points"":90,""ahead"":2},
+                           ""zzz"":{""rank"":2,""points"":90,""ahead"":-1},""wuwa"":{""rank"":2,""points"":90,""ahead"":""1""}}}");
+            Assert.AreEqual(3, s.Global.Ahead);
+            Assert.AreEqual(0, s.Board("genshin").Ahead);
+            Assert.IsNull(s.Board("starrail").Ahead, "more players ahead than places above");
+            Assert.IsNull(s.Board("zzz").Ahead);
+            Assert.IsNull(s.Board("wuwa").Ahead, "not a number");
+            Assert.IsNull(GuessStanding.Parse(Contract).Global.Ahead, "a Worker older than the app");
         }
 
         [TestMethod]

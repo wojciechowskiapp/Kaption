@@ -4,6 +4,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using GI_Subtitles.Core.Config;
+using GI_Subtitles.Services.Capture;
 using GI_Subtitles.Services.Detection;
 using GI_Subtitles.Services.Rendering;
 using GI_Subtitles.Views.Shell;
@@ -73,6 +74,7 @@ namespace GI_Subtitles.Views
                 var scene = LookGeometry.Compute(Config.Get<string>("Region", ""), Scale, game, _lookGameWindow, L);
                 ApplyLookTo(FindName, look, game, scene, GameRegionProfile.ForCurrentGame().SubtitlePadVertical,
                     Config.Get("MaxOverlayWidth", SubtitleOverlayDefaults.MaxOverlayWidth), art: null, L);
+                SyncRecordingCard();
             }
             finally
             {
@@ -139,6 +141,7 @@ namespace GI_Subtitles.Views
             foreach (string swatch in new[] { "SwatchClassic", "SwatchContrast", "SwatchCinema" })
                 if (find(swatch) is PresetSwatch s) s.Face = look.FontFamily;
             if (find("AutoDarkenToggle") is CheckBox darken) darken.IsChecked = look.AutoDarken;
+            if (find("KaptionMarkToggle") is CheckBox mark) mark.IsChecked = look.Mark;
         }
 
         /// <summary>
@@ -199,6 +202,57 @@ namespace GI_Subtitles.Views
         {
             if (_syncingLook || !IsInitialized) return;
             Config.Set(OverlayStyle.AutoDarkenKey, AutoDarkenToggle.IsChecked == true);
+            OverlayLookChanged();
+        }
+
+        /// <summary>
+        /// The recordings switch and the line under it: what a screen recording shows on this PC right now, as the
+        /// running overlay knows it (the setting alone while the overlay is not up). Never writes.
+        /// </summary>
+        private void SyncRecordingCard()
+        {
+            if (ShowInRecordingsToggle == null) return;
+            bool show = CaptureVisibility.ShowInRecordings;
+            var status = System.Windows.Application.Current?.MainWindow is MainWindow overlay
+                ? overlay.CaptureStatus
+                : CaptureVisibility.Status(show, WindowsHideAnswer.NotAsked);
+            ApplyRecordingTo(FindName, show, status, L);
+        }
+
+        /// <summary>Fills the recordings switch and its line (static, so the render tests run the app's code on the loose XAML).</summary>
+        internal static void ApplyRecordingTo(Func<string, object> find, bool show, CaptureStatus status, Func<string, string, string> L)
+        {
+            string line = RecordingStatusLine(status, L);
+            if (find("RecordingStatusText") is TextBlock text) text.Text = line;
+            if (find("ShowInRecordingsToggle") is CheckBox toggle)
+            {
+                toggle.IsChecked = show;
+                System.Windows.Automation.AutomationProperties.SetHelpText(toggle, line);
+            }
+        }
+
+        /// <summary>The sentence under the recordings switch for a status; a neutral one while nothing is known yet.</summary>
+        internal static string RecordingStatusLine(CaptureStatus status, Func<string, string, string> L) =>
+            CaptureVisibility.StatusKey(status) is string key
+                ? L(key, CaptureVisibility.StatusFallback(status))
+                : L("look_Recording_Status_Unknown", "When this is off, Kaption asks Windows to keep the subtitles out of screen capture.");
+
+        /// <summary>Applies at once: the overlay stops (or starts) asking Windows to hide it, no restart.</summary>
+        private void ShowInRecordingsToggle_Changed(object sender, RoutedEventArgs e)
+        {
+            if (_syncingLook || !IsInitialized) return;
+            bool show = ShowInRecordingsToggle.IsChecked == true;
+            Config.Set(CaptureVisibility.ShowInRecordingsKey, show);
+            if (System.Windows.Application.Current?.MainWindow is MainWindow overlay) overlay.ApplyCaptureVisibility();
+            _syncingLook = true;
+            try { SyncRecordingCard(); }
+            finally { _syncingLook = false; }
+        }
+
+        private void KaptionMarkToggle_Changed(object sender, RoutedEventArgs e)
+        {
+            if (_syncingLook || !IsInitialized) return;
+            Config.Set(OverlayStyle.MarkKey, KaptionMarkToggle.IsChecked == true);
             OverlayLookChanged();
         }
 

@@ -182,10 +182,7 @@ namespace GI_Subtitles.Services.Security
         private static readonly object _ioLock = new object();
 
         private static string FilePath =>
-            Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                "Kaption",
-                FileName);
+            Path.Combine(Data.GameDataPaths.Root, FileName);
 
         /// <summary>
         /// Serialize + DPAPI-protect + write to disk. Overwrites any existing

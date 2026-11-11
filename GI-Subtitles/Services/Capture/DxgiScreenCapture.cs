@@ -230,6 +230,24 @@ namespace GI_Subtitles.Services.Capture
         }
 
         /// <summary>
+        /// Copies another region out of the frame the last capture acquired, without asking the desktop for a new one.
+        /// <see cref="CaptureRegionInto"/> waits up to a frame (16 ms) for the next one, which is what the dialogue
+        /// capture wants once per tick and what a second, unhurried reader on the same tick must not pay again.
+        /// Null before the first frame; the same argument rules as <see cref="CaptureRegionInto"/>.
+        /// </summary>
+        public Bitmap CopyFromHeldFrame(int x, int y, int width, int height, Bitmap destination)
+        {
+            if (destination == null) throw new ArgumentNullException(nameof(destination));
+            if (width <= 0) throw new ArgumentOutOfRangeException(nameof(width));
+            if (height <= 0) throw new ArgumentOutOfRangeException(nameof(height));
+            if (destination.Width < width || destination.Height < height || destination.PixelFormat != PixelFormat.Format32bppArgb)
+                throw new ArgumentException("Destination Bitmap must be Format32bppArgb and at least the region's size.", nameof(destination));
+            if (!_initialized || !_hasValidFrame) return null;
+            EnsureRegionBelongsToOutput(x, y, width, height);
+            return CopyStagingIntoBitmap(x, y, width, height, destination);
+        }
+
+        /// <summary>
         /// Maps the staging texture and memcpys the requested region into <paramref name="destination"/>.
         /// Region is clamped to output bounds — if the clamped region is empty, returns null
         /// without touching the destination.

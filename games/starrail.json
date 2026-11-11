@@ -22,7 +22,19 @@
     "vision": {},
     "dialogueContext": "passthrough",
     "upstreamTextMap": "dimbreath-starrail",
-    "displayModeTip": false
+    "displayModeTip": false,
+    "staminaScreen": {
+      "icon": "starrail",
+      "search": { "x": 0.45, "y": 0.02, "w": 0.55, "h": 0.14 },
+      "scales": [0.8, 0.86, 0.93, 1, 1.08, 1.16, 1.25],
+      "minIconScore": 0.86,
+      "digits": { "width": 3.4, "maxStart": 0.8, "inkLevel": 0.6, "maxGap": 0.9 },
+      "minTextScore": 0.8,
+      "sampleSeconds": 3,
+      "confirmations": 2,
+      "refillConfirmations": 3,
+      "measured": { "version": "4.5", "ref": "Footage at 1920x1080 (16:9) and a 2:1 picture: Calyx and Cavern of Corrosion screens, Challenge Completed; .plan/in-progress/STAMINA-FROM-SCREEN.md" }
+    }
   },
   "look": { "accent": "#6FD6E8", "accentDark": "#0B7C90", "glow": "#4F8DFF", "ambience": "starrail" },
   "site": {
@@ -30,7 +42,17 @@
     "guideKey": "honkai",
     "guide": { "pl": "/pl/honkai-star-rail-tlumaczenie/", "en": "/honkai-star-rail-translator/" },
     "ogBackground": "src/assets/og/ai/starrail.jpg",
-    "guessName": "Stardle"
+    "motif": "rails",
+    "guessName": "Stardle",
+    "currency": "Stellar Jade",
+    "library": {
+      "paper": "#E4E9EE",
+      "ink": "#131B2B",
+      "night": "#0D1324",
+      "nightInk": "#DAE3F0",
+      "ornament": "rail",
+      "binding": "board"
+    }
   },
   "source": { "kind": "datamine", "host": "gitlab", "repo": "Dimbreath/turnbasedgamedata", "branch": "main", "keySpace": "upstream-hash" },
   "translation": { "targets": ["pl"], "sources": ["auto", "community"] },
@@ -38,5 +60,10 @@
     "hoyolabGid": 6,
     "officialFeeds": [{ "kind": "youtube", "channelId": "UC2PeMPA8PAOp-bynLoCeMLA" }],
     "codes": { "kind": "hoyolab", "redeemUrl": "https://hsr.hoyoverse.com/gift?code={code}", "officialDiscord": "884849473329692723" }
+  },
+  "stamina": {
+    "name": "Trailblaze Power", "max": 300, "regenSeconds": 360,
+    "reserve": { "name": "Reserved Trailblaze Power", "max": 2400, "regenSeconds": 1080 },
+    "checked": { "version": "4.6.0", "ref": "ExcelOutput/ConstValueCommon Stamina_Maximum_Num, Stamina_Auto_Recover_Interval, ReserveStamina_* at 74a7b96f" }
   }
 }

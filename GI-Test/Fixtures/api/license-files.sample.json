@@ -1,0 +1,30 @@
+{
+  "items": [
+    {
+      "id": "rel_7c41e2a9d05b",
+      "game": "genshin",
+      "language": "pl",
+      "version": "7.2.0-r2",
+      "file_sha256": "3f9a1c0e5b7d24c68e1f0a9b2c3d4e5f60718293a4b5c6d7e8f9011223344556",
+      "file_size": 103809040,
+      "min_tier": "free_beta",
+      "released_at": 1762515600,
+      "gamedata_version_id": "gd_rel_7c41e2a9d05b",
+      "source_revision": "4d2b9e7f1a6c3058b2e19d47c6a80f35e1b29c74:20261107T113000Z",
+      "pack_sha256": "a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90"
+    },
+    {
+      "id": "rel_2b8d6f30c9e1",
+      "game": "genshin",
+      "language": "pl",
+      "version": "7.1.0",
+      "file_sha256": "0c1d2e3f405162738495a6b7c8d9eaf0b1c2d3e4f5061728394a5b6c7d8e9f00",
+      "file_size": 101442816,
+      "min_tier": "free_beta",
+      "released_at": 1759312800,
+      "gamedata_version_id": null,
+      "source_revision": null,
+      "pack_sha256": null
+    }
+  ]
+}

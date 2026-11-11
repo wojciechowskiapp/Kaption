@@ -1,0 +1,194 @@
+<UserControl x:Class="GI_Subtitles.Views.GameCodesCard"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Visibility="Collapsed">
+    <!-- Start › the selected game's active redeem codes (GameCodesCard.xaml.cs, Services/Codes). Shown only while the
+         codes worker has checked the game and something is active; three codes (ending soon first, then the newest) with their dates, Copy on each, the publisher's
+         redeem page for HoYoLAB games, the in-game path otherwise, and the game's codes page on kaption.one. The header
+         folds the list away (remembered). Every colour and size is a palette or token key, DynamicResource, because the
+         host supplies them (the Settings window, or a render test). -->
+    <UserControl.Resources>
+        <Geometry x:Key="GcGift">M2.5,6 H13.5 V8.5 H2.5 Z M3.5,8.5 V13.5 H12.5 V8.5 M8,6 V13.5 M8,6 C6.6,6 5,5.5 5,4.2 C5,3.1 6.2,2.6 7.1,3.3 C7.7,3.8 8,5 8,6 C8,5 8.3,3.8 8.9,3.3 C9.8,2.6 11,3.1 11,4.2 C11,5.5 9.4,6 8,6 Z</Geometry>
+        <Geometry x:Key="GcCopy">M6,5.5 H12 A1,1 0 0 1 13,6.5 V12.5 A1,1 0 0 1 12,13.5 H6 A1,1 0 0 1 5,12.5 V6.5 A1,1 0 0 1 6,5.5 Z M3,10.5 V3.5 A1,1 0 0 1 4,2.5 H10.5</Geometry>
+        <Geometry x:Key="GcCheck">M3.5,8.5 L6.5,11.5 L12.5,4.5</Geometry>
+        <Geometry x:Key="GcChevron">M4,6 L8,10 L12,6</Geometry>
+        <Geometry x:Key="GcExternal">M7,3.5 H4.5 A1,1 0 0 0 3.5,4.5 V11.5 A1,1 0 0 0 4.5,12.5 H11.5 A1,1 0 0 0 12.5,11.5 V9 M9.5,3.5 H12.5 V6.5 M12.5,3.5 L7.5,8.5</Geometry>
+
+        <!-- The fold control: the chevron turns up while the list is open. -->
+        <Style x:Key="GcFold" TargetType="ToggleButton">
+            <Setter Property="Width" Value="32"/>
+            <Setter Property="Height" Value="32"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
+            <Setter Property="FocusVisualStyle" Value="{DynamicResource FocusRing}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToggleButton">
+                        <Border x:Name="Bd" Background="Transparent" CornerRadius="{DynamicResource RadiusButton}">
+                            <Path x:Name="Chevron" Data="{StaticResource GcChevron}" Width="16" Height="16" Stretch="None"
+                                  HorizontalAlignment="Center" VerticalAlignment="Center" RenderTransformOrigin="0.5,0.5"
+                                  Stroke="{TemplateBinding Foreground}" StrokeThickness="1.6" StrokeStartLineCap="Round"
+                                  StrokeEndLineCap="Round" StrokeLineJoin="Round">
+                                <Path.RenderTransform>
+                                    <RotateTransform x:Name="Turn" Angle="0"/>
+                                </Path.RenderTransform>
+                            </Path>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Chevron" Property="RenderTransform">
+                                    <Setter.Value>
+                                        <RotateTransform Angle="180"/>
+                                    </Setter.Value>
+                                </Setter>
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource SurfaceSunkenBrush}"/>
+                                <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Copy: a compact outline button; Tag "copied" swaps it to a check and "Copied" for a moment. -->
+        <Style x:Key="GcCopyButton" TargetType="Button">
+            <Setter Property="Height" Value="28"/>
+            <Setter Property="Padding" Value="10,0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="FontSize" Value="{DynamicResource FontSizeSmall}"/>
+            <Setter Property="FontWeight" Value="Medium"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
+            <Setter Property="FocusVisualStyle" Value="{DynamicResource FocusRing}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="1" CornerRadius="{DynamicResource RadiusButton}" Padding="{TemplateBinding Padding}"
+                                SnapsToDevicePixels="True">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <Path x:Name="Glyph" Data="{StaticResource GcCopy}" Width="16" Height="16" Stretch="None" VerticalAlignment="Center"
+                                      Stroke="{TemplateBinding Foreground}" StrokeThickness="1.4" StrokeStartLineCap="Round"
+                                      StrokeEndLineCap="Round" StrokeLineJoin="Round"/>
+                                <TextBlock x:Name="Label" Text="{DynamicResource codes_Copy}" Margin="5,0,0,0" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource SurfaceSunkenBrush}"/>
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource BorderHoverBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource SurfacePressedBrush}"/>
+                            </Trigger>
+                            <Trigger Property="Tag" Value="copied">
+                                <Setter TargetName="Glyph" Property="Data" Value="{StaticResource GcCheck}"/>
+                                <Setter TargetName="Glyph" Property="Stroke" Value="{DynamicResource SuccessBrush}"/>
+                                <Setter TargetName="Label" Property="Text" Value="{DynamicResource codes_Copied}"/>
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource SuccessBrush}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- A row: the code and its rewards, then its dates (when it came onto the list, until when it works, or that
+             no end was announced) with "New" and "Ends in 7 h" before them. Copy and Redeem sit beside both lines. -->
+        <DataTemplate x:Key="GcRow">
+            <Grid MinHeight="48" Margin="0,3">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" MinWidth="150"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <Grid Grid.Row="1" Grid.ColumnSpan="2" Margin="0,3,12,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Border x:Name="newMark" Background="{DynamicResource SuccessLightBrush}" CornerRadius="{DynamicResource RadiusS}"
+                            Padding="6,1" Margin="0,0,6,0" VerticalAlignment="Center">
+                        <TextBlock Text="{DynamicResource codes_New}" FontSize="{DynamicResource FontSizeCaption}" FontWeight="SemiBold"
+                                   Foreground="{DynamicResource SuccessBrush}"/>
+                    </Border>
+                    <Border x:Name="soonMark" Grid.Column="1" Background="{DynamicResource WarnLightBrush}" CornerRadius="{DynamicResource RadiusS}"
+                            Padding="6,1" Margin="0,0,6,0" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding EndsIn}" FontSize="{DynamicResource FontSizeCaption}" FontWeight="SemiBold"
+                                   Foreground="{DynamicResource WarnBrush}"/>
+                    </Border>
+                    <TextBlock Grid.Column="2" Text="{Binding Dates}" ToolTip="{Binding Dates}" FontSize="{DynamicResource FontSizeSmall}"
+                               Foreground="{DynamicResource TextTertiaryBrush}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
+                </Grid>
+                <TextBlock Text="{Binding Code}" FontFamily="{DynamicResource FontMono}" FontSize="{DynamicResource FontSizeBody}"
+                           FontWeight="SemiBold" Foreground="{DynamicResource TextBrush}" VerticalAlignment="Center" Margin="0,0,16,0"/>
+                <TextBlock x:Name="rewards" Grid.Column="1" Text="{Binding Rewards}" ToolTip="{Binding Rewards}" FontSize="{DynamicResource FontSizeSmall}"
+                           Foreground="{DynamicResource TextSecondaryBrush}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"
+                           Margin="0,0,12,0"/>
+                <Button x:Name="copy" Grid.Column="2" Grid.RowSpan="2" Style="{StaticResource GcCopyButton}" Click="Copy_Click" CommandParameter="{Binding Code}"
+                        VerticalAlignment="Center" ToolTip="{DynamicResource codes_Copy_Tip}" AutomationProperties.Name="{DynamicResource codes_Copy_Tip}"/>
+                <Button x:Name="redeem" Grid.Column="3" Grid.RowSpan="2" Style="{DynamicResource LinkButtonPlain}" Margin="12,0,0,0" Click="Redeem_Click"
+                        CommandParameter="{Binding RedeemUrl}" ToolTip="{DynamicResource codes_Redeem_Tip}" VerticalAlignment="Center">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="{DynamicResource codes_Redeem}" VerticalAlignment="Center" FontSize="{DynamicResource FontSizeSmall}"/>
+                        <Path Data="{StaticResource GcExternal}" Width="16" Height="16" Stretch="None" Margin="3,0,0,0" VerticalAlignment="Center"
+                              Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.4"
+                              StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/>
+                    </StackPanel>
+                </Button>
+            </Grid>
+            <DataTemplate.Triggers>
+                <DataTrigger Binding="{Binding RedeemUrl}" Value="{x:Null}">
+                    <Setter TargetName="redeem" Property="Visibility" Value="Collapsed"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding IsNew}" Value="False">
+                    <Setter TargetName="newMark" Property="Visibility" Value="Collapsed"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding EndsIn}" Value="{x:Null}">
+                    <Setter TargetName="soonMark" Property="Visibility" Value="Collapsed"/>
+                </DataTrigger>
+            </DataTemplate.Triggers>
+        </DataTemplate>
+    </UserControl.Resources>
+
+    <Border x:Name="Frame" Style="{DynamicResource Card}" Padding="16,10,10,10" Margin="0,16,0,0">
+        <StackPanel>
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <Border Width="28" Height="28" CornerRadius="7" Background="{DynamicResource AccentLightBrush}" VerticalAlignment="Center">
+                    <Path Data="{StaticResource GcGift}" Width="16" Height="16" Stretch="None" StrokeThickness="1.4"
+                          Stroke="{DynamicResource AccentTextBrush}" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
+                          HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Border>
+                <TextBlock Grid.Column="1" Margin="12,0,12,0" VerticalAlignment="Center" TextTrimming="CharacterEllipsis">
+                    <Run x:Name="TitleRun" FontSize="{DynamicResource FontSizeBody}" FontWeight="SemiBold" Foreground="{DynamicResource TextBrush}"/><Run
+                         x:Name="CountRun" FontSize="{DynamicResource FontSizeSmall}" Foreground="{DynamicResource TextTertiaryBrush}"/>
+                </TextBlock>
+                <Button x:Name="AllCodesButton" Grid.Column="2" Style="{DynamicResource LinkButton}" VerticalAlignment="Center"
+                        Content="{DynamicResource codes_All}" Click="AllCodes_Click" Margin="0,0,6,0"/>
+                <ToggleButton x:Name="FoldToggle" Grid.Column="3" Style="{StaticResource GcFold}" IsChecked="True"
+                              Click="FoldToggle_Click" VerticalAlignment="Center"/>
+            </Grid>
+
+            <StackPanel x:Name="Body" Margin="40,6,6,2">
+                <ItemsControl x:Name="Rows" ItemTemplate="{StaticResource GcRow}" Focusable="False"/>
+                <TextBlock x:Name="InGameHint" Visibility="Collapsed" Margin="0,4,0,2" FontSize="{DynamicResource FontSizeSmall}"
+                           Foreground="{DynamicResource TextTertiaryBrush}" TextWrapping="Wrap"/>
+            </StackPanel>
+        </StackPanel>
+    </Border>
+</UserControl>

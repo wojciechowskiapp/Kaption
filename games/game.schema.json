@@ -45,7 +45,8 @@
     "site": { "$ref": "#/$defs/site" },
     "source": { "$ref": "#/$defs/source" },
     "translation": { "$ref": "#/$defs/translation" },
-    "news": { "$ref": "#/$defs/news" }
+    "news": { "$ref": "#/$defs/news" },
+    "stamina": { "$ref": "#/$defs/stamina" }
   },
   "allOf": [
     {
@@ -55,6 +56,41 @@
   ],
   "$defs": {
     "wireId": { "type": "string", "pattern": "^[a-z][a-z0-9]{1,31}$" },
+    "staminaPool": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "max", "regenSeconds"],
+      "properties": {
+        "name": { "description": "The game's own English name for it (Original Resin, Reserved Trailblaze Power).", "type": "string", "minLength": 3, "maxLength": 40 },
+        "max": { "description": "Natural regeneration stops here.", "type": "integer", "minimum": 1, "maximum": 100000 },
+        "regenSeconds": { "description": "Seconds per point while under max.", "type": "integer", "minimum": 1, "maximum": 86400 }
+      }
+    },
+    "stamina": {
+      "description": "The game's stamina and how it refills: the site's stamina timer reads it. Every value is checked against the game data of `checked.version` where that data carries it (`checked.ref`), else against the game's own item text or published sources.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "max", "regenSeconds", "checked"],
+      "properties": {
+        "name": { "$ref": "#/$defs/staminaPool/properties/name" },
+        "max": { "$ref": "#/$defs/staminaPool/properties/max" },
+        "regenSeconds": { "$ref": "#/$defs/staminaPool/properties/regenSeconds" },
+        "hold": { "description": "The most the player can hold through refills and rewards (regeneration pauses above max). Absent when the data does not say.", "type": "integer", "minimum": 1, "maximum": 100000 },
+        "reserve": {
+          "description": "A second pool that fills only while the main one is at max (Reserved Trailblaze Power, Backup Battery Charge, Waveplate Crystals).",
+          "$ref": "#/$defs/staminaPool"
+        },
+        "checked": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["version", "ref"],
+          "properties": {
+            "version": { "description": "The game version whose data or text was checked.", "type": "string", "pattern": "^[0-9]+[.][0-9]+(?:[.][0-9]+)?$" },
+            "ref": { "description": "Where: a table and key, an item text, or a source.", "type": "string", "minLength": 8, "maxLength": 300 }
+          }
+        }
+      }
+    },
     "fraction": { "type": "number", "minimum": 0, "maximum": 1 },
     "rect": {
       "description": "A region as fractions of the 16:9 reference area inside the game window.",
@@ -129,6 +165,16 @@
             "fadedReadFilter": { "description": "Treat a read whose body boxes are barely lit (under 2% of pixels past the binary threshold) as empty: the line is fading out, and keeping it would hide the fade from the change gate.", "type": "boolean" }
           }
         },
+        "sessionCheck": {
+          "description": "How much evidence the Start card needs before it says why no line shows. A key left out keeps the app's default (GameRegionProfile); 0 switches that sentence off for the game.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "blackSeconds": { "description": "Seconds of unbroken black frames with the game in front, before any line was found in this run of translation: the game looks like exclusive full screen. Default 30.", "type": "integer", "minimum": 0, "maximum": 600 },
+            "unmatchedReads": { "description": "Different spoken lines (a speaker and a sentence) read in a row without one pack hit: is the game's text in English? Default 20.", "type": "integer", "minimum": 0, "maximum": 500 },
+            "quietSeconds": { "description": "Seconds with the game in front and nothing dialogue-like read, on an install that has not shown a line yet. Default 60.", "type": "integer", "minimum": 0, "maximum": 3600 }
+          }
+        },
         "dialogueContext": {
           "description": "Dialogue strategy set. Only passthrough exists; anything else fails closed like an unknown game.",
           "enum": ["passthrough"]
@@ -146,10 +192,55 @@
           "uniqueItems": true,
           "items": { "type": "string", "minLength": 2, "maxLength": 30, "pattern": "^[\\p{L}][\\p{L} '-]*[\\p{L}]$" }
         },
+        "staminaScreen": { "$ref": "#/$defs/staminaScreen" },
         "notes": {
           "description": "For maintainers: which values are measured and which are provisional. No consumer reads it.",
           "type": "array",
           "items": { "type": "string", "minLength": 1, "maxLength": 400 }
+        }
+      }
+    },
+    "staminaScreen": {
+      "description": "Where the game draws its stamina number (\"160/200\" beside the stamina icon) and how the desktop reads it, for a player who switched that on. Present only for a game measured on real frames (`measured`); without it the feature is off for the game. `search` is in fractions of the game's client area (not the 16:9 band: the pill is anchored to the window's edge); the icon template is drawn for a 1920x1080 client.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["icon", "search", "scales", "minIconScore", "digits", "minTextScore", "sampleSeconds", "confirmations", "refillConfirmations", "measured"],
+      "properties": {
+        "icon": { "description": "Icon template name: GI-Subtitles/Assets/Stamina/<icon>.png.", "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+        "search": { "description": "The part of the client area the icon can be in.", "$ref": "#/$defs/rect" },
+        "scales": {
+          "description": "Icon sizes tried, relative to the template: one game draws the icon larger on its map than in its dialogs, and the interface scale of an unmeasured aspect ratio may differ a little.",
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 9,
+          "uniqueItems": true,
+          "items": { "type": "number", "minimum": 0.5, "maximum": 2 }
+        },
+        "minIconScore": { "description": "Lowest template score (normalised correlation) that counts as the icon.", "type": "number", "minimum": 0.5, "maximum": 1 },
+        "digits": {
+          "description": "The number's place to the right of the icon.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["width", "maxStart", "inkLevel", "maxGap"],
+          "properties": {
+            "width": { "description": "How far right of the icon the number can reach, in icon heights.", "type": "number", "minimum": 1, "maximum": 12 },
+            "maxStart": { "description": "The furthest right of the icon the number may start, in icon heights (a right-aligned number moves with its length).", "type": "number", "exclusiveMinimum": 0, "maximum": 12 },
+            "inkLevel": { "description": "A pixel is ink at this share of the brightest pixel beside the icon; dividers and pill borders are dimmer.", "type": "number", "minimum": 0.3, "maximum": 0.95 },
+            "maxGap": { "description": "The widest gap inside the number, in digit heights; a wider one ends it (the \"+\" button).", "type": "number", "exclusiveMinimum": 0, "maximum": 3 }
+          }
+        },
+        "minTextScore": { "description": "Lowest recognition confidence for the number.", "type": "number", "minimum": 0, "maximum": 1 },
+        "sampleSeconds": { "description": "How often the app looks, while subtitles run and the game is in front.", "type": "integer", "minimum": 1, "maximum": 60 },
+        "confirmations": { "description": "Agreeing samples before a number that differs from the timer's is believed.", "type": "integer", "minimum": 1, "maximum": 5 },
+        "refillConfirmations": { "description": "The same for a number higher than regeneration explains (a refill).", "type": "integer", "minimum": 1, "maximum": 8 },
+        "measured": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["version", "ref"],
+          "properties": {
+            "version": { "description": "The game version of the frames it was measured on.", "type": "string", "pattern": "^[0-9]+[.][0-9]+(?:[.][0-9]+)?$" },
+            "ref": { "description": "Which screens, at which sizes, and where the record is.", "type": "string", "minLength": 8, "maxLength": 300 }
+          }
         }
       }
     },
@@ -161,6 +252,7 @@
         "accent": { "description": "The game's accent on dark surfaces (site, desktop dark palette).", "$ref": "#/$defs/colour" },
         "accentDark": { "description": "The accent deepened for light surfaces (desktop light palette). Defaults to accent.", "$ref": "#/$defs/colour" },
         "glow": { "description": "The Start hero's glow behind the art. Defaults to accent.", "$ref": "#/$defs/colour" },
+        "signal": { "description": "The game's colour where its mark is small on the site (a 20 px tile, a chip): set it when the accent does not read there. Defaults to accent.", "$ref": "#/$defs/colour" },
         "ambience": { "description": "Ambience art name: GI-Subtitles/Assets/Ambience/<ambience>.jpg.", "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
         "elementHues": {
           "description": "Element colours this game draws differently from the shared table, or adds (English element names).",
@@ -186,7 +278,28 @@
           }
         },
         "ogBackground": { "description": "Key art for generated update images, relative to landing/.", "type": "string", "pattern": "^src/assets/[A-Za-z0-9_./-]+\\.(?:jpg|jpeg|png|webp)$" },
-        "guessName": { "description": "The daily guessing game's own name on the site (Gendle). Unique across games.", "type": "string", "pattern": "^[A-Z][A-Za-z]{2,23}$" }
+        "mark": { "description": "The game's drawn mark on the site: an SVG of ours on a 24 unit grid, one colour, relative to landing/. Never a logo. Without it the game's initial stands on the tile.", "type": "string", "pattern": "^src/assets/game-marks/[a-z0-9]+(?:-[a-z0-9]+)*\\.svg$" },
+        "motif": { "description": "The thin pattern behind the game's typographic leads on the site.", "enum": ["stars", "rails", "hatch", "waves"] },
+        "guessName": { "description": "The daily guessing game's own name on the site (Gendle). Unique across games.", "type": "string", "pattern": "^[A-Z][A-Za-z]{2,23}$" },
+        "upcoming": { "description": "How a character that is not out yet shows on the site, in the content API, the Discord bot and the desktop bundle. full (the default when absent): announced with its whole kit. teaser: name, portrait, element, weapon type and release day only, until 00:00 UTC of its own day; a character without a known day is not shown. hide: nothing until that day. A day that is only the version's first day never opens a kit (the next version going live does), and a section without release information is never served whole. See games/README.md.", "enum": ["full", "teaser", "hide"] },
+        "currency": { "description": "The game's premium currency in English, as players search for codes with it (Primogems): the codes pages put it in their titles.", "type": "string", "pattern": "^[A-Z][A-Za-z]+(?: [A-Z][A-Za-z]+)?$", "maxLength": 20 },
+        "library": { "$ref": "#/$defs/library" }
+      }
+    },
+    "library": {
+      "description": "The binding of this game's books on the site (the reading view of a series part and the library): two pages, their inks, the colour of ornaments on each, an ornament set and a cover material. Without it the game reads on the site's own Night and Paper with the plain ornaments. tools/games/validate.cjs checks every pair's contrast.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["paper", "ink", "night", "nightInk", "ornament", "binding"],
+      "properties": {
+        "paper": { "description": "The lit page (the Paper tone).", "$ref": "#/$defs/colour" },
+        "ink": { "description": "Text on the lit page: 10:1 or more, so secondary text mixed toward the page still reads.", "$ref": "#/$defs/colour" },
+        "night": { "description": "The night page (the Night tone, the default).", "$ref": "#/$defs/colour" },
+        "nightInk": { "description": "Text on the night page: 10:1 or more.", "$ref": "#/$defs/colour" },
+        "mark": { "description": "Ornaments, the chapter numeral and the drop cap on the lit page: 3:1 or more. Defaults to look.accentDark, then look.accent.", "$ref": "#/$defs/colour" },
+        "nightMark": { "description": "The same on the night page. Defaults to look.accent.", "$ref": "#/$defs/colour" },
+        "ornament": { "description": "The ornament set (landing/src/data/library-look.ts ORNAMENTS): the mark between sections, the end mark, the corner pieces and the page's faint pattern.", "type": "string", "enum": ["plain", "star", "rail", "tape", "wave"] },
+        "binding": { "description": "The cover material of the game's books in the library (landing/src/components/library/BookCover.astro).", "type": "string", "enum": ["cloth", "board", "sleeve", "field"] }
       }
     },
     "slug": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$", "maxLength": 80 },

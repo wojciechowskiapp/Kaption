@@ -39,7 +39,10 @@
       "UsesSpeakerRowClassifier": false,
       "FiltersOcrJunk": false,
       "RequiresDialogueEvidence": true,
-      "RejectsFadedReads": true
+      "RejectsFadedReads": true,
+      "CheckBlackSeconds": 30,
+      "CheckUnmatchedReads": 20,
+      "CheckQuietSeconds": 60
     },
     {
       "GameId": "StarRail",
@@ -74,7 +77,10 @@
       "UsesSpeakerRowClassifier": false,
       "FiltersOcrJunk": false,
       "RequiresDialogueEvidence": false,
-      "RejectsFadedReads": false
+      "RejectsFadedReads": false,
+      "CheckBlackSeconds": 30,
+      "CheckUnmatchedReads": 20,
+      "CheckQuietSeconds": 60
     },
     {
       "GameId": "ZZZ",
@@ -115,7 +121,10 @@
       "UsesSpeakerRowClassifier": false,
       "FiltersOcrJunk": false,
       "RequiresDialogueEvidence": false,
-      "RejectsFadedReads": false
+      "RejectsFadedReads": false,
+      "CheckBlackSeconds": 30,
+      "CheckUnmatchedReads": 20,
+      "CheckQuietSeconds": 60
     }
   ],
   "fallback": {
@@ -147,7 +156,10 @@
     "UsesSpeakerRowClassifier": false,
     "FiltersOcrJunk": false,
     "RequiresDialogueEvidence": false,
-    "RejectsFadedReads": false
+    "RejectsFadedReads": false,
+    "CheckBlackSeconds": 30,
+    "CheckUnmatchedReads": 20,
+    "CheckQuietSeconds": 60
   },
   "fallbackForNull": {
     "GameId": "Unknown",
@@ -178,7 +190,10 @@
     "UsesSpeakerRowClassifier": false,
     "FiltersOcrJunk": false,
     "RequiresDialogueEvidence": false,
-    "RejectsFadedReads": false
+    "RejectsFadedReads": false,
+    "CheckBlackSeconds": 30,
+    "CheckUnmatchedReads": 20,
+    "CheckQuietSeconds": 60
   },
   "resolve": {
     "[Genshin]": {

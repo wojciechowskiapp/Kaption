@@ -29,13 +29,25 @@
     "upstreamTextMap": "none",
     "displayModeTip": false
   },
-  "look": { "accent": "#C9CEDC", "accentDark": "#5B6272", "glow": "#FF8A2B", "ambience": "zzz", "elementHues": { "Physical": "#E6B83A" } },
+  "look": { "accent": "#C9CEDC", "accentDark": "#5B6272", "glow": "#FF8A2B", "signal": "#FF8A2B", "ambience": "zzz", "elementHues": { "Physical": "#E6B83A" } },
   "site": {
     "hub": "zenless-zone-zero",
     "guideKey": "zzz",
     "guide": { "pl": "/pl/zenless-zone-zero-tlumaczenie/", "en": "/zenless-zone-zero-translator/" },
     "ogBackground": "src/assets/og/ai/zzz.jpg",
-    "guessName": "Zendle"
+    "motif": "hatch",
+    "guessName": "Zendle",
+    "currency": "Polychrome",
+    "library": {
+      "paper": "#E8E5DE",
+      "ink": "#161616",
+      "night": "#121214",
+      "nightInk": "#E5E2DB",
+      "mark": "#B4470A",
+      "nightMark": "#FF8A2B",
+      "ornament": "tape",
+      "binding": "sleeve"
+    }
   },
   "source": { "kind": "datamine", "host": "gitea", "repo": "dimbreath/ZenlessData", "branch": "master", "keySpace": "minted" },
   "translation": { "targets": ["pl"], "sources": ["auto", "community"] },
@@ -43,5 +55,10 @@
     "hoyolabGid": 8,
     "officialFeeds": [{ "kind": "youtube", "channelId": "UC2SpC8rL9LaeQriE4YNdyzA" }],
     "codes": { "kind": "hoyolab", "redeemUrl": "https://zenless.hoyoverse.com/redemption?code={code}", "officialDiscord": "951972846152859699" }
+  },
+  "stamina": {
+    "name": "Battery Charge", "max": 240, "regenSeconds": 360, "hold": 1000,
+    "reserve": { "name": "Backup Battery Charge", "max": 2400, "regenSeconds": 1080 },
+    "checked": { "version": "3.3.0", "ref": "TextMap_ENTemplateTb Item_Energy_des and Item_BackUp_Energy_des (the items' own text)" }
   }
 }

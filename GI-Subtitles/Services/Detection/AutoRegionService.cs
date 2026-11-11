@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Drawing;
 using GI_Subtitles.Services.Capture;
 using OpenCvSharp.Extensions;
@@ -89,7 +90,24 @@ namespace GI_Subtitles.Services.Detection
         /// A <see cref="Result"/> with dialogue/answer regions in screen-absolute
         /// coordinates, ready to be saved to Config.
         /// </returns>
-        public static Result Detect(string gameId, PaddleOCREngine engine)
+        /// <param name="ownOverlay">Asks where Kaption's own panels are on screen right now (screen pixels); called just
+        /// before and just after the capture, from this thread, and both answers are blacked out of the frame so a
+        /// subtitle showing over the game is never taken for the game's dialogue.</param>
+        public static Result Detect(string gameId, PaddleOCREngine engine, Func<IReadOnlyList<Rectangle>> ownOverlay = null)
+            => DetectCore(gameId, engine, ownOverlay);
+
+        /// <summary>The overlay's places, or none when nobody can say (never fails the search).</summary>
+        private static IReadOnlyList<Rectangle> OwnOverlay(Func<IReadOnlyList<Rectangle>> ask)
+        {
+            try { return ask?.Invoke(); }
+            catch (Exception ex)
+            {
+                Logger.Log.Info($"Auto-detect: overlay bounds unavailable: {ex.Message}");
+                return null;
+            }
+        }
+
+        private static Result DetectCore(string gameId, PaddleOCREngine engine, Func<IReadOnlyList<Rectangle>> ownOverlay)
         {
             // 1. Get game profile
             var profile = GameRegionProfile.Get(gameId);
@@ -122,10 +140,13 @@ namespace GI_Subtitles.Services.Detection
             try
             {
                 bitmap = new Bitmap(wi.GameW, wi.GameH, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+                var overlayBefore = OwnOverlay(ownOverlay);
                 using (var gdi = new GdiScreenCapture())
                 {
                     gdi.CaptureRegionInto(wi.GameX, wi.GameY, wi.GameW, wi.GameH, bitmap);
                 }
+                // Asked on both sides of the capture: a subtitle that changed meanwhile is covered where it was and is.
+                OverlayMask.Apply(bitmap, new Rectangle(wi.GameX, wi.GameY, wi.GameW, wi.GameH), OwnOverlay(ownOverlay), overlayBefore);
             }
             catch (Exception ex)
             {

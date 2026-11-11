@@ -73,7 +73,7 @@ namespace GI_Test
         [TestMethod]
         public void RunningGame_AGenericExecutableCountsOnlyWithItsTitle()
         {
-            using (GameRegistry.Use(GameRegistry.FromManifests(GameManifestLoader.LoadEmbedded().Append(UnrealFixture()))))
+            using (GameRegistry.Use(GameRegistry.FromManifests(ShippedGames.Manifests().Append(UnrealFixture()))))
             {
                 var unreal = new[] { Running(Unreal, 10), Running("explorer", 4) };
                 Assert.IsNull(GameDetection.Match(unreal, new[] { Shows(10, "Some Other Unreal Game") }), "another Unreal game");

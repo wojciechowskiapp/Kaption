@@ -250,11 +250,17 @@ namespace GI_Test
         [TestMethod]
         public void ListedGames_AreBetaOrLive_InOrder_WithTheShippedThreeFirst()
         {
-            var listed = GameRegistry.Current.Listed;
-            CollectionAssert.AreEqual(new[] { "genshin", "starrail", "zzz" }, listed.Take(3).Select(m => m.Id).ToArray());
+            // The app's own registry (the run's lists every shipped game, see ShippedGames): a withdrawn game is left out.
+            GameRegistry embedded = ShippedGames.Embedded();
+            var listed = embedded.Listed;
+            var manifests = GameManifestLoader.LoadEmbedded();
+            CollectionAssert.AreEqual(manifests.Where(m => m.IsListed).OrderBy(m => m.Order).Select(m => m.Id).ToArray(), listed.Select(m => m.Id).ToArray());
+            CollectionAssert.AreEqual(new[] { "genshin", "starrail", "zzz" }.Where(id => embedded.FindByWireId(id) != null).ToArray(),
+                listed.Select(m => m.Id).Where(id => id is "genshin" or "starrail" or "zzz").ToArray(), "the shipped three first, in order");
             Assert.IsTrue(listed.All(m => m.Status == "beta" || m.Status == "live"));
             Assert.IsTrue(listed.Zip(listed.Skip(1), (a, b) => a.Order < b.Order).All(x => x), "strictly ordered");
-            CollectionAssert.AreEqual(listed.Select(m => m.GameId).ToArray(), GameRegionProfile.RegisteredGameIds.ToArray());
+            using (GameRegistry.Use(embedded))
+                CollectionAssert.AreEqual(listed.Select(m => m.GameId).ToArray(), GameRegionProfile.RegisteredGameIds.ToArray());
         }
 
         // ── loader and builder guards ───────────────────────────────────────
@@ -305,7 +311,7 @@ namespace GI_Test
         [TestMethod]
         public void AFourthManifest_ReachesTheRegistryPickersFactoryAndColours()
         {
-            var registry = GameRegistry.FromManifests(GameManifestLoader.LoadEmbedded().Append(GameManifestLoader.Parse(FixtureJson())));
+            var registry = GameRegistry.FromManifests(ShippedGames.Manifests().Append(GameManifestLoader.Parse(FixtureJson())));
             using (GameRegistry.Use(registry))
             {
                 // Registry and profile lookups.
@@ -386,7 +392,7 @@ namespace GI_Test
         {
             var odd = GameManifestLoader.Parse(FixtureJson());
             odd.Desktop.DialogueContext = "scripted";
-            using (GameRegistry.Use(GameRegistry.FromManifests(GameManifestLoader.LoadEmbedded().Append(odd))))
+            using (GameRegistry.Use(GameRegistry.FromManifests(ShippedGames.Manifests().Append(odd))))
             {
                 string expected = ExpectedBundleGameOf(GameDialogueContextFactory.Create("FixtureGame"));
                 Assert.AreNotEqual("fixturegame", expected, "its own bundle must not load with the wrong strategies");

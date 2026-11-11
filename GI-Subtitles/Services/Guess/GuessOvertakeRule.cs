@@ -96,9 +96,12 @@ namespace GI_Subtitles.Services.Guess
         First,
         /// <summary>The place has no points yet.</summary>
         NoPoints,
-        /// <summary>Lower than the reference and the player just above has more points: a pass.</summary>
+        /// <summary>Lower than the reference, and more players have more points now than were above then: a pass.</summary>
         Passed,
-        /// <summary>Lower than the reference only on a tie-break at equal points: re-based, no notice.</summary>
+        /// <summary>
+        /// Lower than the reference with no proof that anyone passed on points (tie-breaks, as far as the standing
+        /// shows): no notice, and the reference stays, so a pass that shows later is measured from it.
+        /// </summary>
         TieBreak,
         /// <summary>Fewer points than the reference had (a result of the player's own was voided): re-based, no notice.</summary>
         OwnPointsFell,
@@ -116,8 +119,9 @@ namespace GI_Subtitles.Services.Guess
 
     /// <summary>
     /// When the player has been passed (R4 section 2.4). Pure: the baselines in, the baselines to keep and at most one
-    /// candidate out. A board's baseline moves to the current place unless that board has a drop to report, so a notice
-    /// that waits (capped for the day, the game in front) reports the whole drop when it finally shows.
+    /// candidate out. A board's baseline moves to the current place unless that board is lower than its reference, so a
+    /// notice that waits (capped for the day, the game in front) reports the whole drop when it finally shows, and a
+    /// drop not yet proven to be a pass is not forgotten.
     /// <para>
     /// The reference is the newer of two places: the one the app stored (stamped with the server's time of the read
     /// that saw it) and the server's <see cref="GuessBoardStanding.LastScored"/>, the place right after the player's last
@@ -188,7 +192,7 @@ namespace GI_Subtitles.Services.Guess
                 if (reference == null) result = GuessCheckResult.First;
                 else if (current.Points <= 0) result = GuessCheckResult.NoPoints;
                 else if (current.Points < reference.Points) result = GuessCheckResult.OwnPointsFell;
-                else if (current.Rank > reference.Rank) result = PassedOnPoints(current) ? GuessCheckResult.Passed : GuessCheckResult.TieBreak;
+                else if (current.Rank > reference.Rank) result = PassedOnPoints(current, reference.Rank) ? GuessCheckResult.Passed : GuessCheckResult.TieBreak;
                 else result = GuessCheckResult.NothingNew;
                 checks.Add(new GuessBoardCheck(board, current, reference, fromLastScore, result));
                 if (result == GuessCheckResult.Passed)
@@ -197,7 +201,17 @@ namespace GI_Subtitles.Services.Guess
                     candidate ??= new GuessOvertake(board, reference.Rank, current.Rank, current.Above);
                     continue;
                 }
-                baselines = baselines.With(board, now); // first read, new month, no points yet, same or better, or a tie-break
+                // Re-based on the lower place, the tied player would count as someone who was always above, and a
+                // pass on points behind them could never be proven (2026-11-10: #1 to #5, three passes, no notice).
+                if (result == GuessCheckResult.TieBreak)
+                {
+                    // A kept place from 2.5.7 or 2.5.8 has no time: it gets this read's, or every read would send
+                    // "since 0" and the server would replay the board again.
+                    if (reference.At == null && standing.At is DateTimeOffset readAt)
+                        baselines = baselines.With(board, reference with { At = readAt });
+                    continue;
+                }
+                baselines = baselines.With(board, now); // first read, new month, no points yet, own points fell, same or better
             }
             return new Outcome(candidate, baselines) { Checks = checks };
         }
@@ -239,11 +253,24 @@ namespace GI_Subtitles.Services.Guess
         }
 
         /// <summary>
-        /// The player just above has more points. A drop at equal points is a tie-break the player's own solve can
-        /// cause (more attempts, a slower time), so "someone passed you" would be a claim the board does not back.
+        /// How many players have strictly more points than the player now, as far as the standing proves it: the
+        /// server's count, else every place above when the player just above has more points (the board is sorted by
+        /// points). Null behind a neighbour with equal points and no count: who is ahead on points is not known.
         /// </summary>
-        public static bool PassedOnPoints(GuessBoardStanding current) =>
-            current?.Above != null && current.Above.Points > current.Points;
+        public static int? AheadOnPoints(GuessBoardStanding current)
+        {
+            if (current == null) return null;
+            if (current.Ahead is int ahead) return ahead;
+            return current.Above != null && current.Above.Points > current.Points ? current.Rank - 1 : null;
+        }
+
+        /// <summary>
+        /// Someone passed the player on points since the place <paramref name="referenceRank"/>: only referenceRank - 1
+        /// players were above then, so referenceRank or more with strictly more points now include one who was not.
+        /// A drop at equal points is a tie-break the player's own solve can cause; it backs no "someone passed you".
+        /// </summary>
+        public static bool PassedOnPoints(GuessBoardStanding current, int referenceRank) =>
+            AheadOnPoints(current) is int ahead && ahead >= referenceRank;
 
         /// <summary>
         /// A notice reached the player (or the player opened the ranking): every watched board, and the notice's own
@@ -304,7 +331,9 @@ namespace GI_Subtitles.Services.Guess
                 GuessCheckResult.First => head + " first place seen, kept as the start",
                 GuessCheckResult.NoPoints => head + " no points yet",
                 GuessCheckResult.Passed => $"{head} passed: {from} → #{c.Current.Rank}",
-                GuessCheckResult.TieBreak => $"{head} lower than {from} on a tie-break only, re-based",
+                GuessCheckResult.TieBreak => AheadOnPoints(c.Current) is int ahead
+                    ? $"{head} lower than {from} on tie-breaks only ({ahead} with more points), the reference kept"
+                    : $"{head} lower than {from} behind a player with the same points; who has more is not known, the reference kept",
                 GuessCheckResult.OwnPointsFell => $"{head} own points fell since {from} ({c.Reference.Points} → {c.Current.Points}, a void), re-based",
                 GuessCheckResult.StaleCopy => $"{head} a stale copy (the last score has {c.Current.LastScored?.Points} pts), skipped, the stored place kept",
                 _ => $"{head} nothing new (was {from})",

@@ -2,6 +2,6 @@
 // Regenerated on every release; check-in only updates the fallback.
 using System.Reflection;
 
-[assembly: AssemblyVersion("2.5.9.0")]
-[assembly: AssemblyFileVersion("2.5.9.0")]
-[assembly: AssemblyInformationalVersion("2.5.9")]
+[assembly: AssemblyVersion("2.6.0.0")]
+[assembly: AssemblyFileVersion("2.6.0.0")]
+[assembly: AssemblyInformationalVersion("2.6.0")]

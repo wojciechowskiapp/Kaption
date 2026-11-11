@@ -452,13 +452,18 @@ namespace GI_Test
                         $"mmapLoad={loadSw.ElapsedMilliseconds} ms " +
                         $"1000xLookup={lookupSw.ElapsedMilliseconds} ms " +
                         $"hits={hits} blob={blobSize / 1024} KB entries={n}");
-                    File.WriteAllText(
-                        Path.Combine(Path.GetTempPath(), "kmx-mmap-perf.txt"),
-                        $"build={buildSw.ElapsedMilliseconds}ms " +
-                        $"saveV3={saveSw.ElapsedMilliseconds}ms " +
-                        $"mmapLoad={loadSw.ElapsedMilliseconds}ms " +
-                        $"1000xLookup={lookupSw.ElapsedMilliseconds}ms " +
-                        $"hits={hits} blob={blobSize / 1024}KB entries={n}");
+                    // Best effort: another test process on this machine may write the same file at this instant.
+                    try
+                    {
+                        File.WriteAllText(
+                            Path.Combine(Path.GetTempPath(), "kmx-mmap-perf.txt"),
+                            $"build={buildSw.ElapsedMilliseconds}ms " +
+                            $"saveV3={saveSw.ElapsedMilliseconds}ms " +
+                            $"mmapLoad={loadSw.ElapsedMilliseconds}ms " +
+                            $"1000xLookup={lookupSw.ElapsedMilliseconds}ms " +
+                            $"hits={hits} blob={blobSize / 1024}KB entries={n}");
+                    }
+                    catch (IOException ex) { Console.WriteLine($"kmx-mmap-perf.txt not written: {ex.Message}"); }
 
                     Assert.AreEqual(1000, hits,
                         "All lookups should return a value on the mmap path.");

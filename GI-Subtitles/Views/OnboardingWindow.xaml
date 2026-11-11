@@ -346,7 +346,12 @@
                             </StackPanel>
                             <TextBlock x:Name="DoneStartText" Style="{StaticResource BodyText}" FontSize="{StaticResource FontSizeLarge}"
                                        Foreground="{DynamicResource TextBrush}"/>
-                            <TextBlock x:Name="DoneIndexText" Style="{StaticResource HintText}" Margin="0,4,0,20"/>
+                            <TextBlock x:Name="DoneIndexText" Style="{StaticResource HintText}" Margin="0,4,0,0"/>
+                            <!-- Opt-in, never pre-ticked: Kaption can only start by itself while it is running. -->
+                            <CheckBox x:Name="StartWithWindowsCheck" Style="{StaticResource ModernCheckBox}" Margin="0,14,0,20"
+                                      Click="StartWithWindows_Click">
+                                <TextBlock Text="{DynamicResource onb_Done_StartWithWindows}" TextWrapping="Wrap" MaxWidth="520"/>
+                            </CheckBox>
                             <Border Style="{StaticResource Card}" Width="360" HorizontalAlignment="Left">
                                 <StackPanel>
                                     <TextBlock Text="{DynamicResource onb_Done_Hotkeys}" Style="{StaticResource CardTitle}" Margin="0,0,0,6"/>

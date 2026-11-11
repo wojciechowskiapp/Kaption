@@ -23,6 +23,18 @@
     "dialogueContext": "passthrough",
     "upstreamTextMap": "none",
     "displayModeTip": false,
+    "staminaScreen": {
+      "icon": "wuwa",
+      "search": { "x": 0.45, "y": 0.02, "w": 0.55, "h": 0.12 },
+      "scales": [0.8, 0.86, 0.93, 1, 1.08, 1.16, 1.25],
+      "minIconScore": 0.86,
+      "digits": { "width": 5.6, "maxStart": 2.6, "inkLevel": 0.75, "maxGap": 0.75 },
+      "minTextScore": 0.8,
+      "sampleSeconds": 3,
+      "confirmations": 2,
+      "refillConfirmations": 3,
+      "measured": { "version": "3.7", "ref": "Footage at 1920x1080 (16:9): map, challenge list, Claim Rewards dialog; .plan/in-progress/STAMINA-FROM-SCREEN.md" }
+    },
     "playerNameTokens": ["Rover"],
     "notes": [
       "Regions measured 2026-11-04 on footage from six creators (WuWa 3.4-3.7) at 16:9, 16:10 (one creator, 2304x1440) and 21:9 (3440x1440). 4:3, 5:4 and Steam Deck are not measured; at 4:3 NPC text falls below any band rectangle.",
@@ -37,7 +49,17 @@
     "guideKey": "wuwa",
     "guide": { "pl": "/pl/wuthering-waves-tlumaczenie/", "en": "/wuthering-waves-translator/" },
     "ogBackground": "src/assets/og/ai/wuwa.jpg",
-    "guessName": "Wuwdle"
+    "motif": "waves",
+    "guessName": "Wuwdle",
+    "currency": "Astrite",
+    "library": {
+      "paper": "#ECEEE8",
+      "ink": "#192020",
+      "night": "#0E1516",
+      "nightInk": "#DCE4E0",
+      "ornament": "wave",
+      "binding": "field"
+    }
   },
   "source": {
     "kind": "datamine",
@@ -57,5 +79,10 @@
       "redeemHow": { "path": ["Terminal", "Settings", "Other Settings", "Redemption Code"], "unlock": "Union Level 2" },
       "officialDiscord": "963760374543450182"
     }
+  },
+  "stamina": {
+    "name": "Waveplates", "max": 240, "regenSeconds": 360,
+    "reserve": { "name": "Waveplate Crystals", "max": 480, "regenSeconds": 720 },
+    "checked": { "version": "3.7.0", "ref": "BinData/common_param/commonparam.json renew_energy_* and store_energy_* at 9218d612" }
   }
 }

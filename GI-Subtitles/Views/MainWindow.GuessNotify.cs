@@ -15,7 +15,8 @@ namespace GI_Subtitles.Views
     /// <summary>
     /// "Someone passed you in Gendle": the guess ranking notice (design section 6, R4). A background poller reads the
     /// player's standing; a drop on the selected game's board or the global one becomes one tray balloon a day at most,
-    /// never while subtitles run, a game is in front or Windows says not now. Settings › Start repeats it in a strip.
+    /// never while subtitles run, a game is in front or Windows says not now. Settings › Start shows the same text in a
+    /// strip while the balloon waits and after it; the strip never stands in for the balloon.
     /// Never over the game, and never anything that could end the session: the feature has no path to the licence.
     /// </summary>
     public partial class MainWindow
@@ -37,12 +38,7 @@ namespace GI_Subtitles.Views
             _guessGateTicker = new DispatcherTimer(DispatcherPriority.Background) { Interval = _guessPoller.Schedule.GateRetry };
             _guessGateTicker.Tick += (_, __) => TryDeliverGuessNotice();
             GuessNotifySettings.EnabledChanged += OnGuessNotifyEnabledChanged;
-            if (data != null)
-            {
-                data.GuessLobbyOpened = OnGuessLobbyOpened;
-                // Settings brought to the front on Start while a notice waits: the strip has shown it, no balloon follows.
-                data.GuessStripMayBeSeen = TryDeliverGuessNotice;
-            }
+            if (data != null) data.GuessLobbyOpened = OnGuessLobbyOpened;
             if (GuessNotifySettings.Enabled) _guessPoller.Start();
             Closed += (_, __) =>
             {
@@ -108,18 +104,14 @@ namespace GI_Subtitles.Views
                 return;
             }
             string today = GuessNotifySettings.Today(DateTime.Now);
-            var decision = _guessDelivery.Next(today, data?.GuessRankStripOnScreen == true, GuessNotifySettings.Enabled,
-                GuessNotifySettings.LastShownDay, OCRTimer.IsEnabled, GuessNoticeGate.AnyGameInFront(),
-                GuessNoticeGate.QueryNotificationState());
+            var decision = _guessDelivery.Next(today, GuessNotifySettings.Enabled, GuessNotifySettings.LastShownDay,
+                OCRTimer.IsEnabled, GuessNoticeGate.AnyGameInFront(), GuessNoticeGate.QueryNotificationState());
             switch (decision.Step)
             {
-                case GuessDeliveryStep.SeenOnStrip:
-                    MarkGuessDelivered(today, "on the Start strip");
-                    break;
                 case GuessDeliveryStep.ShowBalloon:
                     var notice = _guessDelivery.Notice;
                     notify?.ShowBalloonTip(notice.Title, notice.Body, onClick: OpenGuessLobbyFromNotice);
-                    MarkGuessDelivered(today, "as a tray notice");
+                    MarkGuessDelivered(today);
                     break;
                 case GuessDeliveryStep.Disabled:
                     LogGuessDecision(decision.Step, "Guess ranking notice dropped: notices are turned off.");
@@ -142,7 +134,7 @@ namespace GI_Subtitles.Views
                     if (_guessGateTicker?.IsEnabled == false)
                     {
                         _guessGateTicker.Interval = _guessPoller.Schedule.GateRetry;
-                        Logger.Log.Info($"Guess ranking notice waits ({decision.Gate}); checking again every {_guessGateTicker.Interval}.");
+                        Logger.Log.Info($"Guess ranking notice waits ({decision.Gate}); the Start strip shows it meanwhile; checking again every {_guessGateTicker.Interval}.");
                         _guessGateTicker.Start();
                     }
                     break;
@@ -157,13 +149,13 @@ namespace GI_Subtitles.Views
             Logger.Log.Info(line);
         }
 
-        private void MarkGuessDelivered(string today, string how)
+        private void MarkGuessDelivered(string today)
         {
             GuessNotifySettings.LastShownDay = today;
             GuessNotifySettings.Baselines = _guessDelivery.Delivered(GuessNotifySettings.Baselines, CurrentGuessBoard());
             _guessGateTicker?.Stop();
             _guessLoggedStep = null;
-            Logger.Log.Info($"Guess ranking notice delivered {how} ({_guessDelivery.Notice?.Board}).");
+            Logger.Log.Info($"Guess ranking notice shown as a tray notice ({_guessDelivery.Notice?.Board}).");
         }
 
         private void ClearGuessNotice()

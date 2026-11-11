@@ -46,10 +46,17 @@ namespace GI_Subtitles.Services.Data
     /// </summary>
     public static class GameDataPaths
     {
-        /// <summary><c>%APPDATA%\Kaption</c>. Created on-demand by callers that write.</summary>
-        public static string Root { get; } = Path.Combine(
+        /// <summary><c>%APPDATA%\Kaption</c>, or the end-to-end suite's own folder (<see cref="Common.E2EMode"/>).
+        /// Created on-demand by callers that write.</summary>
+        public static string Root => TestRoot ?? AppRoot;
+
+        /// <summary>The root the app itself uses; <see cref="Root"/> differs from it only inside a unit-test run.</summary>
+        internal static string AppRoot { get; } = Common.E2EMode.DataDir ?? Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
             "Kaption");
+
+        /// <summary>Unit tests keep their files out of the real profile: set once, before anything reads <see cref="Root"/>.</summary>
+        internal static string TestRoot { get; set; }
 
         /// <summary><c>%APPDATA%\Kaption\manifest.json</c> — DictionarySync state.</summary>
         public static string ManifestFile => Path.Combine(Root, "manifest.json");

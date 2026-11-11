@@ -98,7 +98,7 @@ namespace GI_Subtitles.Views
             Services.Detection.GameRegionProfile.RegisteredProfiles
                 .ToDictionary(p => p.DisplayName ?? p.GameId, p => p.GameId);
         readonly Stopwatch sw = new Stopwatch();
-        readonly static string dataDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Kaption");
+        readonly static string dataDir = Services.Data.GameDataPaths.Root;
         readonly string outpath = Path.Combine(dataDir, "out");
         public PaddleOCREngine engine;
         private readonly object _engineLoadLock = new object();
@@ -564,7 +564,6 @@ namespace GI_Subtitles.Views
             _suppressSliderUpdate = false;
 
             // Boolean flags
-            AutoStartCheckBox.IsChecked = Config.Get("AutoStart", false);
             EnableAnswerTranslationCheckBox.IsChecked = Config.Get("EnableAnswerTranslation", false);
             CrashReportingCheckBox.IsChecked = Config.Get("CrashReportingEnabled", false);
             PlayerNameTextBox.Text = Config.Get<string>("PlayerName", "");
@@ -660,20 +659,25 @@ namespace GI_Subtitles.Views
             // time (tab headers read as StaticResource in some styles, cached tooltips,
             // etc.) get refreshed. If the user says no, the change persists across
             // restarts anyway because SetUILanguage already wrote UILang to Config.
-            try
+            // Queued, not inline: the selection (and its dropdown) completes first, and a UI Automation
+            // Select call returns instead of blocking until the modal prompt is answered.
+            Dispatcher.BeginInvoke(new Action(() =>
             {
-                GI_Subtitles.Views.AppRestartPrompt.PromptAndRestart(
-                    owner: this,
-                    title: L("Dialog_LangRestart_Title", "Restart to apply"),
-                    body: L("Dialog_LangRestart_Body", "Kaption needs to restart to apply the new language. Restart now?"),
-                    restartButtonText: L("Dialog_LangRestart_Restart", "Restart"),
-                    laterButtonText: L("Dialog_LangRestart_Later", "Later"),
-                    severity: GI_Subtitles.Views.DialogSeverity.Question);
-            }
-            catch (Exception ex)
-            {
-                Logger.Log.Error($"UILangCombo: restart-prompt failed: {ex.Message}");
-            }
+                try
+                {
+                    GI_Subtitles.Views.AppRestartPrompt.PromptAndRestart(
+                        owner: this,
+                        title: L("Dialog_LangRestart_Title", "Restart to apply"),
+                        body: L("Dialog_LangRestart_Body", "Kaption needs to restart to apply the new language. Restart now?"),
+                        restartButtonText: L("Dialog_LangRestart_Restart", "Restart"),
+                        laterButtonText: L("Dialog_LangRestart_Later", "Later"),
+                        severity: GI_Subtitles.Views.DialogSeverity.Question);
+                }
+                catch (Exception ex)
+                {
+                    Logger.Log.Error($"UILangCombo: restart-prompt failed: {ex.Message}");
+                }
+            }));
         }
 
         /// <summary>
@@ -2576,9 +2580,7 @@ namespace GI_Subtitles.Views
 
         private void OpenAppDataFolder_Click(object sender, RoutedEventArgs e)
         {
-            string dir = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-        "Kaption");
+            string dir = Services.Data.GameDataPaths.Root;
 
             if (!Directory.Exists(dir))
                 Directory.CreateDirectory(dir);
@@ -2728,6 +2730,9 @@ namespace GI_Subtitles.Views
 
         private void RegisterAllHotkeys()
         {
+            // A test run must not take the player's global shortcuts while it is up (startup and a hotkey save alike).
+            if (GI_Subtitles.Common.E2EMode.IsActive) return;
+
             // First unregister all hotkeys
             UnregisterAllHotkeys();
 
@@ -3118,7 +3123,9 @@ namespace GI_Subtitles.Views
 
             try
             {
-                var result = await Task.Run(() => AutoRegionService.Detect(Game, engine));
+                // The worker asks for the overlay's places at the moment it captures; they are read on this thread.
+                var result = await Task.Run(() => AutoRegionService.Detect(Game, engine,
+                    () => Dispatcher.Invoke(() => OverlayScreenAreas?.Invoke())));
 
                 if (result.Success)
                 {
@@ -3232,6 +3239,11 @@ namespace GI_Subtitles.Views
             if (_cardState?.Kind == Shell.StartCardKind.ReaderFailed)
             {
                 OnRetryEngineLoad?.Invoke(true);
+                return;
+            }
+            if (_cardState != null && Shell.StartCardModel.OffersAreaAsSecondFix(_cardState.Kind))
+            {
+                OpenDialogueAreaFromCheck();
                 return;
             }
             SelectTabByTag(Shell.SettingsNavigation.Game);
@@ -3894,7 +3906,11 @@ namespace GI_Subtitles.Views
 
         private void AutoStartCheckBox_Checked(object sender, RoutedEventArgs e)
         {
-            Config.Set("AutoStart", AutoStartCheckBox.IsChecked == true);
+            if (!IsUserChange) return;
+            bool on = AutoStartCheckBox.IsChecked == true;
+            Config.Set(Services.Startup.WindowsStartup.SettingKey, on);
+            // Now, not at the next launch: unticking must leave nothing in the Run key.
+            Services.Startup.WindowsStartup.ApplySetting(on);
         }
 
         private void EnableAnswerTranslationCheckBox_Changed(object sender, RoutedEventArgs e)
@@ -4269,9 +4285,7 @@ namespace GI_Subtitles.Views
 
         private void OpenLogFileButton_Click(object sender, RoutedEventArgs e)
         {
-            string logPath = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                "Kaption", "app.log");
+            string logPath = Path.Combine(Services.Data.GameDataPaths.Root, "app.log");
             if (File.Exists(logPath))
             {
                 Process.Start(new ProcessStartInfo { FileName = logPath, UseShellExecute = true });
@@ -4799,6 +4813,8 @@ namespace GI_Subtitles.Views
             Game = tag; // keep the SettingsWindow's cached copy in sync for other handlers
             SeedOcrPacingBoxes();   // per-game pacing — see the note on SeedOcrPacingBoxes
             RebindMyFixes();        // My fixes follows the picked game; "Later" on the prompt keeps this page up
+            RefreshCodesCard();     // Start's codes card follows the picked game too
+            RefreshStaminaCard();   // and so does the stamina timer
             Logger.Log.Info($"Translations: game switched to {tag}.");
 
             // Prompt immediately — if the user picks Restart, we skip the

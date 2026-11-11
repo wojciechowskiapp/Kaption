@@ -83,14 +83,19 @@ namespace GI_Test
 
                 // Save the numbers somewhere durable so we can read them in
                 // the agent report. vstest swallows Trace.WriteLine; write
-                // to the temp dir instead.
-                File.WriteAllText(
-                    Path.Combine(Path.GetTempPath(), "kmx-perf.txt"),
-                    $"build={buildSw.ElapsedMilliseconds}ms " +
-                    $"load={loadSw.ElapsedMilliseconds}ms " +
-                    $"1000xLookup={lookupSw.ElapsedMilliseconds}ms " +
-                    $"blob={blobSize} bytes " +
-                    $"entries={Count}");
+                // to the temp dir instead. Best effort: another test process on this machine may write the same file
+                // at this instant, and a lost report must not fail the test.
+                try
+                {
+                    File.WriteAllText(
+                        Path.Combine(Path.GetTempPath(), "kmx-perf.txt"),
+                        $"build={buildSw.ElapsedMilliseconds}ms " +
+                        $"load={loadSw.ElapsedMilliseconds}ms " +
+                        $"1000xLookup={lookupSw.ElapsedMilliseconds}ms " +
+                        $"blob={blobSize} bytes " +
+                        $"entries={Count}");
+                }
+                catch (IOException ex) { Console.WriteLine($"kmx-perf.txt not written: {ex.Message}"); }
             }
         }
     }

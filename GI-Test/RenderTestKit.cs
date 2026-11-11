@@ -9,6 +9,7 @@ using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Documents;
+using System.Windows.Input;
 using System.Windows.Markup;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
@@ -55,14 +56,20 @@ namespace GI_Test
             return null;
         }
 
+        /// <summary>
+        /// Runs a WPF test on its own STA thread: one UI test at a time on this machine, whichever test process runs it
+        /// (<see cref="MachineUiLock"/>), and no input from the desktop reaches its windows (<see cref="DropDesktopInput"/>).
+        /// </summary>
         public static void RunSta(Action action)
         {
+            using var uiLock = MachineUiLock.Acquire();
             Exception error = null;
             var thread = new Thread(() =>
             {
                 // As on the UI thread: awaits inside views resume on this dispatcher, which DoEvents pumps.
                 SynchronizationContext.SetSynchronizationContext(new DispatcherSynchronizationContext(Dispatcher.CurrentDispatcher));
                 Dispatcher.CurrentDispatcher.UnhandledException += (s, e) => Console.WriteLine("Dispatcher: " + e.Exception);
+                InputManager.Current.PreProcessInput += DropDesktopInput;
                 try { action(); }
                 catch (Exception ex) { error = ex; }
                 finally { Dispatcher.CurrentDispatcher.InvokeShutdown(); }
@@ -71,6 +78,83 @@ namespace GI_Test
             thread.Start();
             thread.Join();
             if (error != null) ExceptionDispatchInfo.Capture(error).Throw();
+        }
+
+        /// <summary>
+        /// UI tests never type or click, so keys, text and mouse clicks from the desktop are dropped. Windows the
+        /// product shows take the foreground (the fix window calls Activate and focuses its box), and on a desktop
+        /// someone is using, their keystrokes landed there: a "/" or a Backspace in the fix box failed its test.
+        /// Focus and activation still go through.
+        /// </summary>
+        internal static void DropDesktopInput(object sender, PreProcessInputEventArgs e)
+        {
+            if (e.StagingItem.Input is KeyEventArgs or TextCompositionEventArgs or MouseButtonEventArgs or MouseWheelEventArgs)
+                e.Cancel();
+        }
+
+        /// <summary>
+        /// A machine-wide mutex around each WPF UI test. CI runs two Windows runners in one desktop session (and agents
+        /// run GI-Test there too), so without it two test processes show and activate windows at once and take each
+        /// other's focus, and write same-named renders (%TEMP%\kaption-render, the review folder) at once. Tests outside
+        /// <see cref="RunSta"/> still run side by side. Acquired and released on the calling thread (a mutex is owned
+        /// by a thread).
+        /// </summary>
+        internal sealed class MachineUiLock : IDisposable
+        {
+            public const string Name = @"Global\KaptionGiTestWpfUi";
+
+            /// <summary>Far longer than any UI test (the slowest render takes ~16 s), under CI's 10-minute hang timeout.</summary>
+            public static readonly TimeSpan Timeout = TimeSpan.FromMinutes(5);
+
+            private readonly Mutex _mutex;
+            private readonly Thread _owner = Thread.CurrentThread;
+
+            private MachineUiLock(Mutex mutex) => _mutex = mutex;
+
+            public static MachineUiLock Acquire() => Acquire(Name, Timeout);
+
+            internal static MachineUiLock Acquire(string name, TimeSpan timeout)
+            {
+                Mutex mutex;
+                try { mutex = new Mutex(false, name); }
+                catch (UnauthorizedAccessException)
+                {
+                    // Created by another Windows account (its default ACL shuts us out): that account has its own desktop.
+                    Console.WriteLine($"WPF UI lock: {name} belongs to another account; running without it.");
+                    return new MachineUiLock(null);
+                }
+                var waited = System.Diagnostics.Stopwatch.StartNew();
+                bool busy = false;
+                try
+                {
+                    if (!mutex.WaitOne(0))
+                    {
+                        busy = true;
+                        if (!mutex.WaitOne(timeout))
+                        {
+                            mutex.Dispose();
+                            Assert.Fail($"WPF UI lock: another test process held {name} for over {timeout.TotalSeconds:0} s. " +
+                                "A UI test there is hung, or a stuck testhost.exe still holds it.");
+                        }
+                    }
+                }
+                catch (AbandonedMutexException)
+                {
+                    // Ours now: its last holder was killed mid-test (a cancelled run, a hang dump).
+                    Console.WriteLine($"WPF UI lock: {name} was abandoned by a test process that exited; taking it over.");
+                }
+                if (busy) Console.WriteLine($"WPF UI lock: waited {waited.ElapsedMilliseconds} ms for another test process's UI test.");
+                return new MachineUiLock(mutex);
+            }
+
+            public void Dispose()
+            {
+                if (_mutex == null) return;
+                if (Thread.CurrentThread != _owner)
+                    throw new InvalidOperationException("WPF UI lock: released on another thread than the one that took it.");
+                _mutex.ReleaseMutex();
+                _mutex.Dispose();
+            }
         }
 
         public static void DoEvents()

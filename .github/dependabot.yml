@@ -1,38 +1,153 @@
-# Dependabot security + version updates for Kaption.
-# Free for public repos; weekly cadence keeps the noise level low while
-# still surfacing CVEs within ~7 days. Open one PR per advisory.
+# Dependabot version and security updates for Kaption.
+#
+# One weekly run per ecosystem and directory, grouped so each run opens at most two PRs: one with every patch and
+# minor bump, one with the majors. tools/review/merge_when_green.py arms auto-merge on a group of patch and minor bumps
+# as tier A (it reads the update-type metadata in Dependabot's commits), so GitHub merges it once the required Summary
+# check is green; a major waits for a review
+# (CLAUDE.md, "Pull requests"). Security updates still come one PR per advisory, as soon as they are published.
+#
+# Titles follow the house rule (tools/review/pr_title.py): the commit message's first line is the PR title, and the
+# prefix "chore(deps)" (dev dependencies too) makes it "chore(deps): bump ...". No `include: scope`: it adds "(deps)"
+# or "(deps-dev)" after the prefix, and deps-dev is not a house scope. Group names stay short because Dependabot
+# writes them into the title ("bump the site group in /landing with 4 updates" fits 72 characters). A
+# single-dependency or pip range title can still run over (long package names, "from <3,>=1.40 to >=3.46.0,<4");
+# Dependabot cannot shorten its summary, so the reviewer renames those by hand.
+#
+# The repository's pins (CLAUDE.md, "Working rules") are ignore rules here, each with its reason. Two pins have no
+# manifest Dependabot reads, so they need no rule: Python 3.12 (the VPS runs Ubuntu 24.04) is PYTHON_VERSION in
+# .github/workflows/ci.yml, and Actions stay pinned to a commit SHA because Dependabot bumps the SHA and its version
+# comment together. The vpk version follows the Velopack package (release.yml reads it from GI-Subtitles.csproj), so
+# the Velopack rule holds both.
 
 version: 2
 updates:
   - package-ecosystem: nuget
-    directory: /
+    # PRs go to master; GitHub's default branch (main) is only the Cloudflare deploy mirror.
+    target-branch: "master"
+    # benchmark/ is not in GI-Subtitles.sln, so "/" alone misses it; it references GI-Subtitles and PaddleOCRSharp,
+    # and its own OpenCvSharp4 references must move with theirs (an older one is a package downgrade, NU1605).
+    # Kaption.DesktopE2E is outside the solution the same way, and only the nightly job builds it.
+    directories:
+      - /
+      - /benchmark/Kaption.Benchmark
+      - /Kaption.DesktopE2E
     schedule:
       interval: weekly
       day: monday
-    open-pull-requests-limit: 5
+      time: "05:00"
+      timezone: Europe/Warsaw
+    open-pull-requests-limit: 3
     labels:
       - dependencies
       - nuget
     commit-message:
-      prefix: "deps"
-      include: scope
+      prefix: "chore(deps)"
+    groups:
+      nuget:
+        update-types: ["minor", "patch"]
+      nuget-major:
+        update-types: ["major"]
     ignore:
-      # Must match the native onnxruntime.dll of Microsoft.ML.OnnxRuntime.DirectML (last release
-      # 1.24.4). A newer Managed builds clean, then every session fails: "API version [31] is not available".
+      # Microsoft.ML.OnnxRuntime.DirectML 1.24.4 is the last DirectML package, and Managed must match its native
+      # onnxruntime.dll: a newer Managed builds clean, then every session fails ("API version [31] is not available").
+      # Never bump one without the other (GI-Subtitles.csproj). Held exactly: a 1.24.5 of either alone would break
+      # the pairing too.
+      - dependency-name: "Microsoft.ML.OnnxRuntime.DirectML"
+        versions: ["> 1.24.4"]
       - dependency-name: "Microsoft.ML.OnnxRuntime.Managed"
-        versions: [">= 1.25.0"]
-      # 1.x is an installer/update-feed migration for clients on 0.0.1298, not a routine bump.
+        versions: ["> 1.24.4"]
+      # DirectML.dll is the native runtime under that pair: ORT DirectML 1.24.4 declares Microsoft.AI.DirectML 1.15.4,
+      # and GI-Subtitles.csproj and the benchmark reference it directly to pin it ("RTX 50 support"). A newer one
+      # changes the GPU path under a pinned ORT, so it moves by hand with a GPU check (KAPTION_TEST_DIRECTML=1), never
+      # as a patch group.
+      - dependency-name: "Microsoft.AI.DirectML"
+        versions: ["> 1.15.4"]
+      # Held at 0.0.1298: the vpk the release workflow installs is read from this package's version, 1.x is an
+      # installer and update-feed migration for clients on 0.0.1298, and a 0.0.x bump (which Dependabot calls a
+      # patch) can break a release too. Move it by hand, as its own verified round.
       - dependency-name: "Velopack"
-        update-types: ["version-update:semver-major"]
+        versions: ["> 0.0.1298"]
+
+  - package-ecosystem: npm
+    # PRs go to master; GitHub's default branch (main) is only the Cloudflare deploy mirror.
+    target-branch: "master"
+    directory: /backend
+    schedule:
+      interval: weekly
+      day: monday
+      time: "05:00"
+      timezone: Europe/Warsaw
+    open-pull-requests-limit: 3
+    labels:
+      - dependencies
+    commit-message:
+      prefix: "chore(deps)"
+      prefix-development: "chore(deps)"
+    groups:
+      worker:
+        update-types: ["minor", "patch"]
+      worker-major:
+        update-types: ["major"]
+
+  - package-ecosystem: npm
+    # PRs go to master; GitHub's default branch (main) is only the Cloudflare deploy mirror.
+    target-branch: "master"
+    directory: /landing
+    schedule:
+      interval: weekly
+      day: monday
+      time: "05:00"
+      timezone: Europe/Warsaw
+    open-pull-requests-limit: 3
+    labels:
+      - dependencies
+    commit-message:
+      prefix: "chore(deps)"
+      prefix-development: "chore(deps)"
+    groups:
+      site:
+        update-types: ["minor", "patch"]
+      site-major:
+        update-types: ["major"]
+
+  - package-ecosystem: pip
+    # PRs go to master; GitHub's default branch (main) is only the Cloudflare deploy mirror.
+    target-branch: "master"
+    directory: /updater
+    schedule:
+      interval: weekly
+      day: monday
+      time: "05:00"
+      timezone: Europe/Warsaw
+    open-pull-requests-limit: 3
+    labels:
+      - dependencies
+    commit-message:
+      prefix: "chore(deps)"
+      prefix-development: "chore(deps)"
+    groups:
+      updater:
+        update-types: ["minor", "patch"]
+      updater-major:
+        update-types: ["major"]
 
   - package-ecosystem: github-actions
+    # PRs go to master; GitHub's default branch (main) is only the Cloudflare deploy mirror.
+    target-branch: "master"
     directory: /
     schedule:
       interval: weekly
       day: monday
-    open-pull-requests-limit: 3
+      time: "05:00"
+      timezone: Europe/Warsaw
+    open-pull-requests-limit: 2
     labels:
       - dependencies
       - github-actions
     commit-message:
-      prefix: "ci"
+      prefix: "chore(deps)"
+    groups:
+      actions:
+        update-types: ["minor", "patch"]
+      actions-major:
+        update-types: ["major"]

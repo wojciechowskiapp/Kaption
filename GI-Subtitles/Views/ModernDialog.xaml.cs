@@ -86,6 +86,8 @@ namespace GI_Subtitles.Views
         private ModernDialog()
         {
             InitializeComponent();
+            // The end-to-end suite answers dialogs through UI Automation; the PC's user keeps the focus.
+            if (Common.E2EMode.IsActive) ShowActivated = false;
         }
 
         // ────────────────────────────────────────────────────────────────────

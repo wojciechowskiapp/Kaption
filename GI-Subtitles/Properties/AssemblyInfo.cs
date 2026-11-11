@@ -27,6 +27,7 @@ using System.Windows;
 // is just the short assembly name.
 [assembly: InternalsVisibleTo("GI-Test")]
 [assembly: InternalsVisibleTo("Kaption.Benchmark")]
+[assembly: InternalsVisibleTo("Kaption.DesktopE2E")]
 
 //若要开始生成可本地化的应用程序，请设置
 //.csproj 文件中的 <UICulture>CultureYouAreCodingWith</UICulture>

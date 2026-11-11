@@ -25,10 +25,18 @@ namespace GI_Subtitles.Views.Shell
         AutoStartBlocked,
         /// <summary>Another game was picked and "Later" chosen: the loaded data is still the old game's until the restart.</summary>
         GameSwitchPending,
+        /// <summary>Translating, but every frame is black: the game looks like exclusive full screen.</summary>
+        SessionFullScreen,
+        /// <summary>Translating and reading lines, none of which the pack knows: the game's language, or the area.</summary>
+        SessionNoMatch,
+        /// <summary>Translating on a new install with nothing dialogue-like read yet.</summary>
+        SessionNoDialogue,
+        /// <summary>The first line this install has ever shown: said once.</summary>
+        FirstLineWorks,
     }
 
     /// <summary>The card's single action (None hides the button).</summary>
-    public enum StartCardAction { None, Start, Stop, StartAnyway, Retry, RetryReader, RestartApp, OpenAccount, OpenPacks, ResolveGate }
+    public enum StartCardAction { None, Start, Stop, StartAnyway, Retry, RetryReader, RestartApp, OpenAccount, OpenPacks, ResolveGate, OpenBorderlessGuide, OpenLanguageGuide, CheckArea }
 
     public enum ReaderState { Loading, Ready, Failed, Unavailable }
 
@@ -64,6 +72,10 @@ namespace GI_Subtitles.Views.Shell
         public string LoadedGameName { get; init; }
         /// <summary>This session's automatic dialogue area: still the saved one (Set), or it could not be found (Failed).</summary>
         public RegionAutoFillNote RegionAutoFill { get; init; }
+        /// <summary>Why no line shows while translating (SessionCheckModel); None when lines show or nothing is known.</summary>
+        public SessionCheckKind SessionCheck { get; init; }
+        /// <summary>This run of translation showed the install's first line ever.</summary>
+        public bool FirstLineShown { get; init; }
     }
 
     public sealed class StartCardState
@@ -89,6 +101,29 @@ namespace GI_Subtitles.Views.Shell
         public static bool IsGradientAction(StartCardAction action) => action is StartCardAction.Start or StartCardAction.Stop;
 
         /// <summary>
+        /// A black picture and unmatched lines both also fit a dialogue area in the wrong place, so those two states
+        /// offer the area under their first fix (where "Change game" sits otherwise).
+        /// </summary>
+        public static bool OffersAreaAsSecondFix(StartCardKind kind) => kind is StartCardKind.SessionFullScreen or StartCardKind.SessionNoMatch;
+
+        /// <summary>The problems that have a card state of their own below the Translating branch.</summary>
+        private static bool HasKnownProblem(StartCardInputs i) =>
+            i.GameSwitchPending || (i.Offline && !i.PackOnDisk) || i.Reader is ReaderState.Failed or ReaderState.Unavailable || i.PackMissing;
+
+        /// <summary>The session check a card state shows, None for every other state.</summary>
+        public static SessionCheckKind SessionCheckOf(StartCardKind kind) => kind switch
+        {
+            StartCardKind.SessionFullScreen => SessionCheckKind.FullScreen,
+            StartCardKind.SessionNoMatch => SessionCheckKind.NoMatch,
+            StartCardKind.SessionNoDialogue => SessionCheckKind.NoDialogue,
+            _ => SessionCheckKind.None,
+        };
+
+        /// <summary>The states shown while translation runs: plain, the session check's three, the first-line confirmation.</summary>
+        public static bool IsTranslating(StartCardKind kind) => kind is StartCardKind.Translating or StartCardKind.SessionFullScreen
+            or StartCardKind.SessionNoMatch or StartCardKind.SessionNoDialogue or StartCardKind.FirstLineWorks;
+
+        /// <summary>
         /// Blocking problems first (device limit, nothing to translate with), then work in progress, then the steady
         /// states. Running translation wins over background work: the user's session matters more than a download.
         /// </summary>
@@ -100,7 +135,22 @@ namespace GI_Subtitles.Views.Shell
             if (i.DeviceLimit)
                 return new StartCardState { Kind = StartCardKind.DeviceLimit, Action = StartCardAction.OpenAccount };
             if (i.Translating)
-                return new StartCardState { Kind = StartCardKind.Translating, Action = StartCardAction.Stop, ShowOfflineNote = offlineNote, ShowCpuNote = cpuNote, ShowRegionAutoSetNote = areaNote };
+            {
+                // Below every blocking problem, above plain "Translating": the session check, then the one-time confirmation.
+                // With a problem the card already knows (it reads "Translating" then, as before) no check is laid on top:
+                // advice about the game's language under a reader that failed would be wrong.
+                SessionCheckKind sessionCheck = HasKnownProblem(i) ? SessionCheckKind.None : i.SessionCheck;
+                (StartCardKind kind, StartCardAction action) = sessionCheck switch
+                {
+                    SessionCheckKind.FullScreen => (StartCardKind.SessionFullScreen, StartCardAction.OpenBorderlessGuide),
+                    SessionCheckKind.NoMatch => (StartCardKind.SessionNoMatch, StartCardAction.OpenLanguageGuide),
+                    SessionCheckKind.NoDialogue => (StartCardKind.SessionNoDialogue, StartCardAction.CheckArea),
+                    _ => (i.FirstLineShown ? StartCardKind.FirstLineWorks : StartCardKind.Translating, StartCardAction.Stop),
+                };
+                // The area note would sit under a sentence that already talks about the area.
+                bool check = sessionCheck != SessionCheckKind.None;
+                return new StartCardState { Kind = kind, Action = action, ShowOfflineNote = offlineNote, ShowCpuNote = cpuNote, ShowRegionAutoSetNote = areaNote && !check };
+            }
             // Before downloads and gates: whatever they say is about data this process will not use.
             if (i.GameSwitchPending)
                 return new StartCardState { Kind = StartCardKind.GameSwitchPending, Action = StartCardAction.RestartApp };

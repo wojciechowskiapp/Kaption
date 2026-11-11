@@ -1,0 +1,14 @@
+{
+  "game": "genshin",
+  "lang": "pl",
+  "full": false,
+  "until": "2026-11-09T11:58:00.000Z",
+  "items": [
+    { "en": "We should get going before it gets dark.", "target": "Powinniśmy ruszać, zanim się ściemni.", "acceptedAt": "2026-11-08T14:12:31.000Z" },
+    { "en": "Thanks for the help, Traveler.", "target": "Dzięki za pomoc, Podróżniku.", "acceptedAt": "2026-11-09T08:05:47.000Z" }
+  ],
+  "removed": [
+    { "en": "The wind is calm today.", "removedAt": "2026-11-09T10:21:13.000Z" }
+  ],
+  "next": null
+}

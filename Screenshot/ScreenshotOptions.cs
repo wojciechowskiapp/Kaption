@@ -9,12 +9,19 @@ namespace Screenshot
 
     public static class DebugLogger
     {
+        /// <summary>
+        /// Where screenshot_log.txt goes. The app sets it to its data root at startup (the end-to-end suite's folder in
+        /// its test mode); this project cannot see that root itself.
+        /// </summary>
+        public static string Folder { get; set; } =
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Kaption");
+
         public static void Log(string message)
         {
             try
             {
                 // Screenshot diagnostics belong exclusively to Kaption.
-                string folder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Kaption");
+                string folder = Folder;
                 if (!Directory.Exists(folder)) Directory.CreateDirectory(folder);
 
                 string filePath = Path.Combine(folder, "screenshot_log.txt");

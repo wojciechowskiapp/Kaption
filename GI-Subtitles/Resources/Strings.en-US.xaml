@@ -27,6 +27,16 @@
     <sys:String x:Key="look_Font_Default" xmlns:sys="clr-namespace:System;assembly=mscorlib">Source Sans 3 (default)</sys:String>
     <sys:String x:Key="look_AutoDarken" xmlns:sys="clr-namespace:System;assembly=mscorlib">Darker panel on bright scenes</sys:String>
     <sys:String x:Key="look_AutoDarken_Hint" xmlns:sys="clr-namespace:System;assembly=mscorlib">When snow or sky sits behind the subtitles, the panel darkens so the text stays readable.</sys:String>
+    <!-- Recordings and streams (the subtitle look page): its own block, keep together. -->
+    <sys:String x:Key="look_Recording_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">Recordings and streams</sys:String>
+    <sys:String x:Key="look_Recording_Show" xmlns:sys="clr-namespace:System;assembly=mscorlib">Show subtitles in recordings and streams</sys:String>
+    <sys:String x:Key="look_Recording_Status_Shown" xmlns:sys="clr-namespace:System;assembly=mscorlib">Visible to screen capture. OBS game capture shows only the game: use display capture.</sys:String>
+    <sys:String x:Key="look_Recording_Status_Hidden" xmlns:sys="clr-namespace:System;assembly=mscorlib">Hidden from recordings, streams and screenshots on this PC.</sys:String>
+    <sys:String x:Key="look_Recording_Status_Refused" xmlns:sys="clr-namespace:System;assembly=mscorlib">Windows can't hide the subtitles on this PC, so screen capture still shows them.</sys:String>
+    <sys:String x:Key="look_Recording_Status_StillHidden" xmlns:sys="clr-namespace:System;assembly=mscorlib">Windows didn't let the subtitles back into screen capture. Restart Kaption to show them.</sys:String>
+    <sys:String x:Key="look_Recording_Status_Unknown" xmlns:sys="clr-namespace:System;assembly=mscorlib">When this is off, Kaption asks Windows to keep the subtitles out of screen capture.</sys:String>
+    <sys:String x:Key="look_Recording_Mark" xmlns:sys="clr-namespace:System;assembly=mscorlib">Show the Kaption mark beside the subtitle</sys:String>
+    <sys:String x:Key="look_Recording_Mark_Hint" xmlns:sys="clr-namespace:System;assembly=mscorlib">A small K at the end of the panel, so viewers can tell where the Polish subtitles come from.</sys:String>
     <sys:String x:Key="look_Sample_Speaker" xmlns:sys="clr-namespace:System;assembly=mscorlib">Paimon</sys:String>
     <sys:String x:Key="look_Sample_Line" xmlns:sys="clr-namespace:System;assembly=mscorlib">Ej, poczekaj! Paimon też chce zobaczyć, co jest za tą bramą.</sys:String>
     <sys:String x:Key="look_Sample_Short" xmlns:sys="clr-namespace:System;assembly=mscorlib">Ej, poczekaj!</sys:String>
@@ -256,7 +266,7 @@
     <sys:String x:Key="shell_Tray_Toast_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">Kaption is still running</sys:String>
     <sys:String x:Key="shell_Tray_Toast_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">You'll find it in the tray, next to the clock.</sys:String>
     <sys:String x:Key="onb_Window_Subtitle" xmlns:sys="clr-namespace:System;assembly=mscorlib">Setup</sys:String>
-    <sys:String x:Key="onb_Rail_Tagline" xmlns:sys="clr-namespace:System;assembly=mscorlib">Polish subtitles for HoYoverse games</sys:String>
+    <sys:String x:Key="onb_Rail_Tagline" xmlns:sys="clr-namespace:System;assembly=mscorlib">Polish subtitles for your games</sys:String>
     <sys:String x:Key="onb_Rail_Welcome" xmlns:sys="clr-namespace:System;assembly=mscorlib">Welcome</sys:String>
     <sys:String x:Key="onb_Rail_Game" xmlns:sys="clr-namespace:System;assembly=mscorlib">Game</sys:String>
     <sys:String x:Key="onb_Rail_SignIn" xmlns:sys="clr-namespace:System;assembly=mscorlib">Sign-in</sys:String>
@@ -306,17 +316,17 @@
     <sys:String x:Key="onb_Prepare_Pack_Working_Format" xmlns:sys="clr-namespace:System;assembly=mscorlib">Downloading Polish subtitles for {0}: {1}% of {2}</sys:String>
     <sys:String x:Key="onb_Prepare_Pack_Done_Format" xmlns:sys="clr-namespace:System;assembly=mscorlib">Polish subtitles for {0} are ready</sys:String>
     <sys:String x:Key="onb_Prepare_Pack_Failed" xmlns:sys="clr-namespace:System;assembly=mscorlib">Couldn't download the subtitles. Kaption tries again after start.</sys:String>
-    <sys:String x:Key="onb_Prepare_Index" xmlns:sys="clr-namespace:System;assembly=mscorlib">Building the index (about 20 s the first time)</sys:String>
-    <sys:String x:Key="onb_Prepare_Index_Later" xmlns:sys="clr-namespace:System;assembly=mscorlib">Built in the background once you finish</sys:String>
-    <sys:String x:Key="onb_Prepare_Index_Done" xmlns:sys="clr-namespace:System;assembly=mscorlib">Index ready</sys:String>
+    <sys:String x:Key="onb_Prepare_Index" xmlns:sys="clr-namespace:System;assembly=mscorlib">Loading the subtitles (about 20 s the first time)</sys:String>
+    <sys:String x:Key="onb_Prepare_Index_Later" xmlns:sys="clr-namespace:System;assembly=mscorlib">They load in the background once you finish</sys:String>
+    <sys:String x:Key="onb_Prepare_Index_Done" xmlns:sys="clr-namespace:System;assembly=mscorlib">Subtitles loaded</sys:String>
     <sys:String x:Key="onb_Prepare_Reader_Format" xmlns:sys="clr-namespace:System;assembly=mscorlib">Starting the text reader ({0})</sys:String>
     <sys:String x:Key="onb_Prepare_Reader_Later" xmlns:sys="clr-namespace:System;assembly=mscorlib">Starts together with Kaption</sys:String>
     <sys:String x:Key="onb_Prepare_Reader_Done_Format" xmlns:sys="clr-namespace:System;assembly=mscorlib">Text reader running ({0})</sys:String>
     <sys:String x:Key="onb_Done_Heading" xmlns:sys="clr-namespace:System;assembly=mscorlib">All set, go play</sys:String>
-    <sys:String x:Key="onb_Done_AutoStart" xmlns:sys="clr-namespace:System;assembly=mscorlib">Kaption starts by itself when the game is on screen.</sys:String>
+    <sys:String x:Key="onb_Done_AutoStart" xmlns:sys="clr-namespace:System;assembly=mscorlib">While Kaption is running, it starts translating by itself when the game is on screen.</sys:String>
     <sys:String x:Key="onb_Done_Manual" xmlns:sys="clr-namespace:System;assembly=mscorlib">Start translating on Home or with Ctrl+Shift+S.</sys:String>
-    <sys:String x:Key="onb_Done_Index" xmlns:sys="clr-namespace:System;assembly=mscorlib">The index builds in the background (about 20 s); translation then starts by itself.</sys:String>
-    <sys:String x:Key="onb_Done_IndexManual" xmlns:sys="clr-namespace:System;assembly=mscorlib">The index builds in the background (about 20 s).</sys:String>
+    <sys:String x:Key="onb_Done_Index" xmlns:sys="clr-namespace:System;assembly=mscorlib">The subtitles load in the background (about 20 s); translation then starts by itself.</sys:String>
+    <sys:String x:Key="onb_Done_IndexManual" xmlns:sys="clr-namespace:System;assembly=mscorlib">The subtitles load in the background (about 20 s).</sys:String>
     <sys:String x:Key="onb_Done_Game_Format" xmlns:sys="clr-namespace:System;assembly=mscorlib">Game: {0}</sys:String>
     <sys:String x:Key="onb_Done_Region_Set" xmlns:sys="clr-namespace:System;assembly=mscorlib">Dialogue area: set</sys:String>
     <sys:String x:Key="onb_Done_Region_None" xmlns:sys="clr-namespace:System;assembly=mscorlib">Dialogue area: not set. Set it under Game and subtitles.</sys:String>
@@ -1165,7 +1175,7 @@ Answer: X: {0}   Y: {1}   W: {2}   H: {3}</sys:String>
     <sys:String x:Key="Tip_Appearance_MaxWidth" xmlns:sys="clr-namespace:System;assembly=mscorlib">Maximum subtitle width in pixels. 0 means auto, fit to the text.</sys:String>
     <sys:String x:Key="Tip_Appearance_MaxHeight" xmlns:sys="clr-namespace:System;assembly=mscorlib">Maximum subtitle height in pixels. 0 means auto, fit to the text.</sys:String>
 
-    <sys:String x:Key="Tip_Settings_AutoStart" xmlns:sys="clr-namespace:System;assembly=mscorlib">Launch Kaption automatically when you sign into Windows.</sys:String>
+    <sys:String x:Key="Tip_Settings_AutoStart" xmlns:sys="clr-namespace:System;assembly=mscorlib">Kaption starts when you sign in to Windows and waits in the tray, next to the clock. Open the window from its icon.</sys:String>
     <sys:String x:Key="Tip_Settings_HideSubs" xmlns:sys="clr-namespace:System;assembly=mscorlib">Start with the subtitle box hidden. Use Ctrl+Shift+H in-game to show it.</sys:String>
     <sys:String x:Key="Tip_Settings_CrashReports" xmlns:sys="clr-namespace:System;assembly=mscorlib">Send anonymous crash reports so we can fix bugs faster. No personal data is included.</sys:String>
     <sys:String x:Key="Tip_Settings_PlayerName" xmlns:sys="clr-namespace:System;assembly=mscorlib">Your in-game character name. Dialogue lines addressed to you will use it. Leave blank to fall back to the game's default ("Traveler").</sys:String>
@@ -1455,6 +1465,18 @@ Answer: X: {0}   Y: {1}   W: {2}   H: {3}</sys:String>
     <sys:String x:Key="shell_Card_RegionAutoSet" xmlns:sys="clr-namespace:System;assembly=mscorlib">Kaption set the dialogue area for you. If subtitles miss the text, adjust the frame on Game and subtitles.</sys:String>
     <sys:String x:Key="shell_Card_RegionAutoFailed" xmlns:sys="clr-namespace:System;assembly=mscorlib">Kaption couldn't find the dialogue area by itself. Mark it once and translation starts.</sys:String>
     <sys:String x:Key="shell_Card_RegionAutoFailed_Action" xmlns:sys="clr-namespace:System;assembly=mscorlib">_Mark the dialogue area</sys:String>
+    <!-- The first-session check: why no line shows while Kaption translates, and the one-time "it works". -->
+    <sys:String x:Key="shell_Card_FullScreen" xmlns:sys="clr-namespace:System;assembly=mscorlib">Kaption can't see the game</sys:String>
+    <sys:String x:Key="shell_Card_FullScreen_Detail" xmlns:sys="clr-namespace:System;assembly=mscorlib">The picture from the dialogue area is black. That usually means the game runs in full screen: switch it to Borderless or Windowed. If it already is, check where the dialogue area sits.</sys:String>
+    <sys:String x:Key="shell_Card_NoMatch" xmlns:sys="clr-namespace:System;assembly=mscorlib">Kaption sees text but can't find the line</sys:String>
+    <sys:String x:Key="shell_Card_NoMatch_Detail" xmlns:sys="clr-namespace:System;assembly=mscorlib">Is the game's text set to English? Kaption translates from the English text. If it is, check that the dialogue area covers the whole dialogue box.</sys:String>
+    <sys:String x:Key="shell_Card_NoDialogue" xmlns:sys="clr-namespace:System;assembly=mscorlib">No dialogue seen yet</sys:String>
+    <sys:String x:Key="shell_Card_NoDialogue_Detail" xmlns:sys="clr-namespace:System;assembly=mscorlib">Talk to someone in the game and the Polish line shows up. If a dialogue is on screen right now and nothing appears, check where the dialogue area sits.</sys:String>
+    <sys:String x:Key="shell_Card_FirstLine" xmlns:sys="clr-namespace:System;assembly=mscorlib">It works: subtitles are showing</sys:String>
+    <sys:String x:Key="shell_Card_FirstLine_Detail" xmlns:sys="clr-namespace:System;assembly=mscorlib">That was your first translated line. From now on Kaption puts subtitles on screen whenever someone in the game speaks.</sys:String>
+    <sys:String x:Key="shell_Action_ShowHow" xmlns:sys="clr-namespace:System;assembly=mscorlib">How to switch to _Borderless</sys:String>
+    <sys:String x:Key="shell_Action_LanguageGuide" xmlns:sys="clr-namespace:System;assembly=mscorlib">How to set the game's _language</sys:String>
+    <sys:String x:Key="shell_Action_CheckArea" xmlns:sys="clr-namespace:System;assembly=mscorlib">Check the dialogue _area</sys:String>
     <sys:String x:Key="shell_Chip_Subtitles" xmlns:sys="clr-namespace:System;assembly=mscorlib">Subtitles ready</sys:String>
     <sys:String x:Key="shell_Chip_SubtitlesLoading" xmlns:sys="clr-namespace:System;assembly=mscorlib">Loading subtitles</sys:String>
     <sys:String x:Key="Dialog_AppCrash_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">Kaption needs to close</sys:String>
@@ -1462,4 +1484,63 @@ Answer: X: {0}   Y: {1}   W: {2}   H: {3}</sys:String>
     <sys:String x:Key="Dialog_StartFailed_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">Kaption couldn't start</sys:String>
     <sys:String x:Key="Dialog_StartFailed_Welcome_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">We couldn't show the welcome screen. Reinstall Kaption or write to us at contact@kaption.one.</sys:String>
     <sys:String x:Key="Dialog_StartFailed_Account_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">Kaption couldn't prepare the sign-in to your account. Reinstalling the app usually fixes this.</sys:String>
+
+    <!-- Start › game codes card (Views/GameCodesCard.xaml). Game terms and codes stay as the game writes them. -->
+    <sys:String x:Key="codes_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">{0} codes</sys:String>
+    <sys:String x:Key="codes_Count" xmlns:sys="clr-namespace:System;assembly=mscorlib">{0} active|{0} active|{0} active</sys:String>
+    <sys:String x:Key="codes_All" xmlns:sys="clr-namespace:System;assembly=mscorlib">All codes</sys:String>
+    <sys:String x:Key="codes_All_More" xmlns:sys="clr-namespace:System;assembly=mscorlib">All codes (+{0})</sys:String>
+    <sys:String x:Key="codes_Copy" xmlns:sys="clr-namespace:System;assembly=mscorlib">Copy</sys:String>
+    <sys:String x:Key="codes_Copied" xmlns:sys="clr-namespace:System;assembly=mscorlib">Copied</sys:String>
+    <sys:String x:Key="codes_Copy_Tip" xmlns:sys="clr-namespace:System;assembly=mscorlib">Copy the code</sys:String>
+    <sys:String x:Key="codes_Redeem" xmlns:sys="clr-namespace:System;assembly=mscorlib">Redeem</sys:String>
+    <sys:String x:Key="codes_Redeem_Tip" xmlns:sys="clr-namespace:System;assembly=mscorlib">Opens the official page with the code already filled in</sys:String>
+    <sys:String x:Key="codes_InGame" xmlns:sys="clr-namespace:System;assembly=mscorlib">Enter it in the game: {0}.</sys:String>
+    <sys:String x:Key="codes_InGame_Unlock" xmlns:sys="clr-namespace:System;assembly=mscorlib">Enter it in the game: {0} (unlocks at {1}).</sys:String>
+    <sys:String x:Key="codes_Fold" xmlns:sys="clr-namespace:System;assembly=mscorlib">Hide codes</sys:String>
+    <sys:String x:Key="codes_Unfold" xmlns:sys="clr-namespace:System;assembly=mscorlib">Show codes</sys:String>
+    <sys:String x:Key="codes_New" xmlns:sys="clr-namespace:System;assembly=mscorlib">New</sys:String>
+    <sys:String x:Key="codes_EndsIn" xmlns:sys="clr-namespace:System;assembly=mscorlib">Ends in {0}</sys:String>
+    <sys:String x:Key="codes_Added" xmlns:sys="clr-namespace:System;assembly=mscorlib">Added {0}</sys:String>
+    <sys:String x:Key="codes_Listed" xmlns:sys="clr-namespace:System;assembly=mscorlib">On the list since {0}</sys:String>
+    <sys:String x:Key="codes_Until" xmlns:sys="clr-namespace:System;assembly=mscorlib">valid until {0}</sys:String>
+    <sys:String x:Key="codes_NoEnd" xmlns:sys="clr-namespace:System;assembly=mscorlib">no end date announced</sys:String>
+    <sys:String x:Key="codes_Days" xmlns:sys="clr-namespace:System;assembly=mscorlib">{0} day|{0} days|{0} days</sys:String>
+    <!-- Stamina from the screen (Services/Stamina, Views/StaminaCard): the timer card on Start, its switch and the tray notice. {0} in the pool texts is the game's own English name (Original Resin, Trailblaze Power, Waveplates). -->
+    <sys:String x:Key="Stamina_Toggle" xmlns:sys="clr-namespace:System;assembly=mscorlib">Read {0} from the game screen</sys:String>
+    <sys:String x:Key="Stamina_Off" xmlns:sys="clr-namespace:System;assembly=mscorlib">Kaption can read your {0} from the game screen while subtitles are running, and keep a timer for you. It reads that one number and keeps it on this PC.</sys:String>
+    <sys:String x:Key="Stamina_Waiting" xmlns:sys="clr-namespace:System;assembly=mscorlib">Waiting for the number. {0} Kaption reads it while subtitles are running.</sys:String>
+    <sys:String x:Key="Stamina_Where_Genshin" xmlns:sys="clr-namespace:System;assembly=mscorlib">It shows on the map and on domain and reward screens.</sys:String>
+    <sys:String x:Key="Stamina_Where_StarRail" xmlns:sys="clr-namespace:System;assembly=mscorlib">It shows on challenge screens, such as a Calyx or a Cavern of Corrosion.</sys:String>
+    <sys:String x:Key="Stamina_Where_WuWa" xmlns:sys="clr-namespace:System;assembly=mscorlib">It shows on the map and on challenge and reward screens.</sys:String>
+    <sys:String x:Key="Stamina_Where_Other" xmlns:sys="clr-namespace:System;assembly=mscorlib">It shows beside the stamina icon in the game.</sys:String>
+    <sys:String x:Key="Stamina_FullAt" xmlns:sys="clr-namespace:System;assembly=mscorlib">Full {0}, in {1}.</sys:String>
+    <sys:String x:Key="Stamina_FullSince" xmlns:sys="clr-namespace:System;assembly=mscorlib">Full. It filled {0}.</sys:String>
+    <sys:String x:Key="Stamina_At" xmlns:sys="clr-namespace:System;assembly=mscorlib">at {0}</sys:String>
+    <sys:String x:Key="Stamina_Tomorrow" xmlns:sys="clr-namespace:System;assembly=mscorlib">tomorrow at {0}</sys:String>
+    <sys:String x:Key="Stamina_Yesterday" xmlns:sys="clr-namespace:System;assembly=mscorlib">yesterday at {0}</sys:String>
+    <sys:String x:Key="Stamina_OnDay" xmlns:sys="clr-namespace:System;assembly=mscorlib">on {0} at {1}</sys:String>
+    <sys:String x:Key="Stamina_Unit_Day" xmlns:sys="clr-namespace:System;assembly=mscorlib">d</sys:String>
+    <sys:String x:Key="Stamina_Unit_Hour" xmlns:sys="clr-namespace:System;assembly=mscorlib">h</sys:String>
+    <sys:String x:Key="Stamina_Unit_Minute" xmlns:sys="clr-namespace:System;assembly=mscorlib">min</sys:String>
+    <sys:String x:Key="Stamina_Read_Now" xmlns:sys="clr-namespace:System;assembly=mscorlib">Read from the game just now.</sys:String>
+    <sys:String x:Key="Stamina_Read_Ago" xmlns:sys="clr-namespace:System;assembly=mscorlib">Read from the game {0} ago.</sys:String>
+    <sys:String x:Key="Stamina_OpenTimer" xmlns:sys="clr-namespace:System;assembly=mscorlib">Open the timer</sys:String>
+    <sys:String x:Key="Stamina_OpenTimer_Tip" xmlns:sys="clr-namespace:System;assembly=mscorlib">Opens the timer on kaption.one with this reading filled in. The reading travels in the link itself and is not sent to any server.</sys:String>
+    <sys:String x:Key="Stamina_Notice_Toggle" xmlns:sys="clr-namespace:System;assembly=mscorlib">Tell me when it is almost full</sys:String>
+    <sys:String x:Key="Stamina_Notice_Hint" xmlns:sys="clr-namespace:System;assembly=mscorlib">One notice, {0} before it fills, never over the game.</sys:String>
+    <sys:String x:Key="Stamina_Notice_Almost_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">{0} is almost full</sys:String>
+    <sys:String x:Key="Stamina_Notice_Almost_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">About {0}/{1} now, full {2}.</sys:String>
+    <sys:String x:Key="Stamina_Notice_Full_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">{0} is full</sys:String>
+    <sys:String x:Key="Stamina_Notice_Full_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">{0}/{1}. It filled {2}; anything more is lost until you spend some.</sys:String>
+    <sys:String x:Key="Stamina_Notice_Full_Body_Reserve" xmlns:sys="clr-namespace:System;assembly=mscorlib">{0}/{1}. It filled {2}; from here only {3} grows, and slower.</sys:String>
+
+    <!-- The come-back loop: start with Windows offered in setup, one notice per new game version. -->
+    <sys:String x:Key="onb_Done_StartWithWindows" xmlns:sys="clr-namespace:System;assembly=mscorlib">Start Kaption with Windows, so subtitles are there when you launch the game.</sys:String>
+    <sys:String x:Key="NewStory_Line_Format" xmlns:sys="clr-namespace:System;assembly=mscorlib">{0} {1}: the new story is in Polish now</sys:String>
+    <sys:String x:Key="NewStory_Balloon_Title_Format" xmlns:sys="clr-namespace:System;assembly=mscorlib">{0} {1}</sys:String>
+    <sys:String x:Key="NewStory_Balloon_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">The new story is in Polish now. Click to see what's in it.</sys:String>
+    <sys:String x:Key="NewStory_Open" xmlns:sys="clr-namespace:System;assembly=mscorlib">See what's new</sys:String>
+    <sys:String x:Key="NewStory_Toggle" xmlns:sys="clr-namespace:System;assembly=mscorlib">Tell me when a new game version's story is in Polish</sys:String>
+    <sys:String x:Key="NewStory_Toggle_Hint" xmlns:sys="clr-namespace:System;assembly=mscorlib">One notice per game version, here and next to the clock. Never for subtitle fixes.</sys:String>
 </ResourceDictionary>

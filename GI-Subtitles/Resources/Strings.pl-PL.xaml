@@ -28,6 +28,16 @@
     <sys:String x:Key="look_Font_Default" xmlns:sys="clr-namespace:System;assembly=mscorlib">Source Sans 3 (domyślny)</sys:String>
     <sys:String x:Key="look_AutoDarken" xmlns:sys="clr-namespace:System;assembly=mscorlib">Ciemniejsze tło na jasnej scenie</sys:String>
     <sys:String x:Key="look_AutoDarken_Hint" xmlns:sys="clr-namespace:System;assembly=mscorlib">Gdy za napisami jest śnieg albo niebo, tło ciemnieje, żeby tekst był czytelny.</sys:String>
+    <!-- Recordings and streams (the subtitle look page): its own block, keep together. -->
+    <sys:String x:Key="look_Recording_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">Nagrania i streamy</sys:String>
+    <sys:String x:Key="look_Recording_Show" xmlns:sys="clr-namespace:System;assembly=mscorlib">Pokazuj napisy na nagraniach i streamach</sys:String>
+    <sys:String x:Key="look_Recording_Status_Shown" xmlns:sys="clr-namespace:System;assembly=mscorlib">Napisy widać przy przechwytywaniu ekranu. Przechwytywanie gry w OBS łapie samą grę, więc wybierz przechwytywanie ekranu.</sys:String>
+    <sys:String x:Key="look_Recording_Status_Hidden" xmlns:sys="clr-namespace:System;assembly=mscorlib">Na tym komputerze napisów nie widać na nagraniach, streamach ani zrzutach ekranu.</sys:String>
+    <sys:String x:Key="look_Recording_Status_Refused" xmlns:sys="clr-namespace:System;assembly=mscorlib">Na tym komputerze Windows nie potrafi ukryć napisów, więc przechwytywanie ekranu i tak je pokazuje.</sys:String>
+    <sys:String x:Key="look_Recording_Status_StillHidden" xmlns:sys="clr-namespace:System;assembly=mscorlib">Windows nie przywrócił napisów do przechwytywania ekranu. Uruchom Kaption ponownie, żeby je pokazać.</sys:String>
+    <sys:String x:Key="look_Recording_Status_Unknown" xmlns:sys="clr-namespace:System;assembly=mscorlib">Gdy to wyłączysz, Kaption prosi Windows, żeby napisów nie było widać przy przechwytywaniu ekranu.</sys:String>
+    <sys:String x:Key="look_Recording_Mark" xmlns:sys="clr-namespace:System;assembly=mscorlib">Pokazuj znak Kaption przy napisie</sys:String>
+    <sys:String x:Key="look_Recording_Mark_Hint" xmlns:sys="clr-namespace:System;assembly=mscorlib">Małe K na końcu tła napisów. Widzowie od razu wiedzą, skąd są polskie napisy.</sys:String>
     <sys:String x:Key="look_Sample_Speaker" xmlns:sys="clr-namespace:System;assembly=mscorlib">Paimon</sys:String>
     <sys:String x:Key="look_Sample_Line" xmlns:sys="clr-namespace:System;assembly=mscorlib">Ej, poczekaj! Paimon też chce zobaczyć, co jest za tą bramą.</sys:String>
     <sys:String x:Key="look_Sample_Short" xmlns:sys="clr-namespace:System;assembly=mscorlib">Ej, poczekaj!</sys:String>
@@ -257,7 +267,7 @@
     <sys:String x:Key="shell_Tray_Toast_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">Kaption działa w tle</sys:String>
     <sys:String x:Key="shell_Tray_Toast_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">Znajdziesz go w zasobniku, obok zegara.</sys:String>
     <sys:String x:Key="onb_Window_Subtitle" xmlns:sys="clr-namespace:System;assembly=mscorlib">Konfiguracja</sys:String>
-    <sys:String x:Key="onb_Rail_Tagline" xmlns:sys="clr-namespace:System;assembly=mscorlib">Polskie napisy do gier HoYoverse</sys:String>
+    <sys:String x:Key="onb_Rail_Tagline" xmlns:sys="clr-namespace:System;assembly=mscorlib">Polskie napisy do Twoich gier</sys:String>
     <sys:String x:Key="onb_Rail_Welcome" xmlns:sys="clr-namespace:System;assembly=mscorlib">Witaj</sys:String>
     <sys:String x:Key="onb_Rail_Game" xmlns:sys="clr-namespace:System;assembly=mscorlib">Gra</sys:String>
     <sys:String x:Key="onb_Rail_SignIn" xmlns:sys="clr-namespace:System;assembly=mscorlib">Logowanie</sys:String>
@@ -307,17 +317,17 @@
     <sys:String x:Key="onb_Prepare_Pack_Working_Format" xmlns:sys="clr-namespace:System;assembly=mscorlib">Pobieram polskie napisy do {0}: {1} % z {2}</sys:String>
     <sys:String x:Key="onb_Prepare_Pack_Done_Format" xmlns:sys="clr-namespace:System;assembly=mscorlib">Polskie napisy do {0} są gotowe</sys:String>
     <sys:String x:Key="onb_Prepare_Pack_Failed" xmlns:sys="clr-namespace:System;assembly=mscorlib">Nie udało się pobrać napisów. Kaption spróbuje ponownie po starcie.</sys:String>
-    <sys:String x:Key="onb_Prepare_Index" xmlns:sys="clr-namespace:System;assembly=mscorlib">Buduję indeks (pierwszy raz ok. 20 s)</sys:String>
-    <sys:String x:Key="onb_Prepare_Index_Later" xmlns:sys="clr-namespace:System;assembly=mscorlib">Zbuduję go w tle, gdy skończysz</sys:String>
-    <sys:String x:Key="onb_Prepare_Index_Done" xmlns:sys="clr-namespace:System;assembly=mscorlib">Indeks gotowy</sys:String>
+    <sys:String x:Key="onb_Prepare_Index" xmlns:sys="clr-namespace:System;assembly=mscorlib">Wczytuję napisy (pierwszy raz ok. 20 s)</sys:String>
+    <sys:String x:Key="onb_Prepare_Index_Later" xmlns:sys="clr-namespace:System;assembly=mscorlib">Wczytam je w tle, gdy skończysz</sys:String>
+    <sys:String x:Key="onb_Prepare_Index_Done" xmlns:sys="clr-namespace:System;assembly=mscorlib">Napisy wczytane</sys:String>
     <sys:String x:Key="onb_Prepare_Reader_Format" xmlns:sys="clr-namespace:System;assembly=mscorlib">Uruchamiam czytnik ({0})</sys:String>
     <sys:String x:Key="onb_Prepare_Reader_Later" xmlns:sys="clr-namespace:System;assembly=mscorlib">Wystartuje razem z Kaption</sys:String>
     <sys:String x:Key="onb_Prepare_Reader_Done_Format" xmlns:sys="clr-namespace:System;assembly=mscorlib">Czytnik działa ({0})</sys:String>
     <sys:String x:Key="onb_Done_Heading" xmlns:sys="clr-namespace:System;assembly=mscorlib">Gotowe, możesz grać</sys:String>
-    <sys:String x:Key="onb_Done_AutoStart" xmlns:sys="clr-namespace:System;assembly=mscorlib">Kaption startuje sam, gdy gra jest na ekranie.</sys:String>
+    <sys:String x:Key="onb_Done_AutoStart" xmlns:sys="clr-namespace:System;assembly=mscorlib">Gdy Kaption jest włączony, sam zaczyna tłumaczyć, kiedy gra jest na ekranie.</sys:String>
     <sys:String x:Key="onb_Done_Manual" xmlns:sys="clr-namespace:System;assembly=mscorlib">Tłumaczenie uruchomisz na Starcie albo skrótem Ctrl+Shift+S.</sys:String>
-    <sys:String x:Key="onb_Done_Index" xmlns:sys="clr-namespace:System;assembly=mscorlib">Indeks buduje się w tle (ok. 20 s), tłumaczenie wystartuje samo.</sys:String>
-    <sys:String x:Key="onb_Done_IndexManual" xmlns:sys="clr-namespace:System;assembly=mscorlib">Indeks buduje się w tle (ok. 20 s).</sys:String>
+    <sys:String x:Key="onb_Done_Index" xmlns:sys="clr-namespace:System;assembly=mscorlib">Napisy wczytują się w tle (ok. 20 s), tłumaczenie wystartuje samo.</sys:String>
+    <sys:String x:Key="onb_Done_IndexManual" xmlns:sys="clr-namespace:System;assembly=mscorlib">Napisy wczytują się w tle (ok. 20 s).</sys:String>
     <sys:String x:Key="onb_Done_Game_Format" xmlns:sys="clr-namespace:System;assembly=mscorlib">Gra: {0}</sys:String>
     <sys:String x:Key="onb_Done_Region_Set" xmlns:sys="clr-namespace:System;assembly=mscorlib">Obszar dialogu: ustawiony</sys:String>
     <sys:String x:Key="onb_Done_Region_None" xmlns:sys="clr-namespace:System;assembly=mscorlib">Obszar dialogu: nie ustawiono. Ustawisz go w Gra i napisy.</sys:String>
@@ -1024,7 +1034,7 @@
     <sys:String x:Key="Tip_Appearance_MaxWidth" xmlns:sys="clr-namespace:System;assembly=mscorlib">Maksymalna szerokość pudełka napisów w pikselach. 0 = auto, dopasuj do tekstu.</sys:String>
     <sys:String x:Key="Tip_Appearance_MaxHeight" xmlns:sys="clr-namespace:System;assembly=mscorlib">Maksymalna wysokość pudełka napisów w pikselach. 0 = auto, dopasuj do tekstu.</sys:String>
 
-    <sys:String x:Key="Tip_Settings_AutoStart" xmlns:sys="clr-namespace:System;assembly=mscorlib">Uruchamiaj Kaption automatycznie po zalogowaniu do Windows.</sys:String>
+    <sys:String x:Key="Tip_Settings_AutoStart" xmlns:sys="clr-namespace:System;assembly=mscorlib">Kaption uruchamia się po zalogowaniu do Windows i czeka w zasobniku, obok zegara. Okno otworzysz z ikony.</sys:String>
     <sys:String x:Key="Tip_Settings_HideSubs" xmlns:sys="clr-namespace:System;assembly=mscorlib">Startuj z ukrytym pudełkiem napisów. W grze pokażesz je skrótem Ctrl+Shift+H.</sys:String>
     <sys:String x:Key="Tip_Settings_CrashReports" xmlns:sys="clr-namespace:System;assembly=mscorlib">Wysyłaj anonimowe raporty awarii, żebyśmy szybciej łatali błędy. Bez danych osobistych.</sys:String>
     <sys:String x:Key="Tip_Settings_PlayerName" xmlns:sys="clr-namespace:System;assembly=mscorlib">Imię Twojej postaci w grze. Linie dialogu skierowane do Ciebie będą go używać. Puste = zostaje domyślny „Wędrowiec".</sys:String>
@@ -1323,6 +1333,18 @@
     <sys:String x:Key="shell_Card_RegionAutoSet" xmlns:sys="clr-namespace:System;assembly=mscorlib">Kaption sam ustawił obszar dialogu. Jeśli napisy omijają tekst, popraw ramkę w zakładce Gra i napisy.</sys:String>
     <sys:String x:Key="shell_Card_RegionAutoFailed" xmlns:sys="clr-namespace:System;assembly=mscorlib">Kaption nie znalazł sam obszaru dialogu. Zaznacz go raz i tłumaczenie ruszy.</sys:String>
     <sys:String x:Key="shell_Card_RegionAutoFailed_Action" xmlns:sys="clr-namespace:System;assembly=mscorlib">_Zaznacz obszar dialogu</sys:String>
+    <!-- The first-session check: why no line shows while Kaption translates, and the one-time "it works". -->
+    <sys:String x:Key="shell_Card_FullScreen" xmlns:sys="clr-namespace:System;assembly=mscorlib">Kaption nie widzi gry</sys:String>
+    <sys:String x:Key="shell_Card_FullScreen_Detail" xmlns:sys="clr-namespace:System;assembly=mscorlib">Obraz z obszaru dialogu jest czarny. Zwykle znaczy to, że gra działa w pełnym ekranie: przełącz ją na Bez ramki albo Okno. Jeśli już tak jest, sprawdź, gdzie leży obszar dialogu.</sys:String>
+    <sys:String x:Key="shell_Card_NoMatch" xmlns:sys="clr-namespace:System;assembly=mscorlib">Kaption widzi tekst, ale nie znajduje tej kwestii</sys:String>
+    <sys:String x:Key="shell_Card_NoMatch_Detail" xmlns:sys="clr-namespace:System;assembly=mscorlib">Czy tekst w grze jest ustawiony na angielski? Kaption tłumaczy z angielskiego. Jeśli tak, sprawdź, czy obszar dialogu obejmuje całe okno dialogowe.</sys:String>
+    <sys:String x:Key="shell_Card_NoDialogue" xmlns:sys="clr-namespace:System;assembly=mscorlib">Nie widzę jeszcze żadnego dialogu</sys:String>
+    <sys:String x:Key="shell_Card_NoDialogue_Detail" xmlns:sys="clr-namespace:System;assembly=mscorlib">Zagadaj do kogoś w grze, a polska kwestia pojawi się sama. Jeśli dialog jest teraz na ekranie i nic się nie pokazuje, sprawdź, gdzie leży obszar dialogu.</sys:String>
+    <sys:String x:Key="shell_Card_FirstLine" xmlns:sys="clr-namespace:System;assembly=mscorlib">Działa: napisy są na ekranie</sys:String>
+    <sys:String x:Key="shell_Card_FirstLine_Detail" xmlns:sys="clr-namespace:System;assembly=mscorlib">To była Twoja pierwsza przetłumaczona kwestia. Od teraz Kaption pokazuje napisy zawsze, gdy ktoś w grze się odezwie.</sys:String>
+    <sys:String x:Key="shell_Action_ShowHow" xmlns:sys="clr-namespace:System;assembly=mscorlib">Jak włączyć tryb _Bez ramki</sys:String>
+    <sys:String x:Key="shell_Action_LanguageGuide" xmlns:sys="clr-namespace:System;assembly=mscorlib">Jak ustawić _język gry</sys:String>
+    <sys:String x:Key="shell_Action_CheckArea" xmlns:sys="clr-namespace:System;assembly=mscorlib">Sprawdź _obszar dialogu</sys:String>
     <sys:String x:Key="shell_Chip_Subtitles" xmlns:sys="clr-namespace:System;assembly=mscorlib">Napisy gotowe</sys:String>
     <sys:String x:Key="shell_Chip_SubtitlesLoading" xmlns:sys="clr-namespace:System;assembly=mscorlib">Wczytuję napisy</sys:String>
     <sys:String x:Key="Dialog_AppCrash_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">Kaption musi się zamknąć</sys:String>
@@ -1330,4 +1352,63 @@
     <sys:String x:Key="Dialog_StartFailed_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">Nie udało się uruchomić Kaption</sys:String>
     <sys:String x:Key="Dialog_StartFailed_Welcome_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">Nie udało się pokazać ekranu powitalnego. Zainstaluj Kaption ponownie albo napisz do nas: contact@kaption.one.</sys:String>
     <sys:String x:Key="Dialog_StartFailed_Account_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">Kaption nie przygotował logowania do konta. Zwykle pomaga ponowna instalacja.</sys:String>
+
+    <!-- Start › karta kodów (Views/GameCodesCard.xaml). Nazwy z gry i kody zostają w oryginale. -->
+    <sys:String x:Key="codes_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">Kody do {0}</sys:String>
+    <sys:String x:Key="codes_Count" xmlns:sys="clr-namespace:System;assembly=mscorlib">{0} aktywny|{0} aktywne|{0} aktywnych</sys:String>
+    <sys:String x:Key="codes_All" xmlns:sys="clr-namespace:System;assembly=mscorlib">Wszystkie kody</sys:String>
+    <sys:String x:Key="codes_All_More" xmlns:sys="clr-namespace:System;assembly=mscorlib">Wszystkie kody (+{0})</sys:String>
+    <sys:String x:Key="codes_Copy" xmlns:sys="clr-namespace:System;assembly=mscorlib">Kopiuj</sys:String>
+    <sys:String x:Key="codes_Copied" xmlns:sys="clr-namespace:System;assembly=mscorlib">Skopiowano</sys:String>
+    <sys:String x:Key="codes_Copy_Tip" xmlns:sys="clr-namespace:System;assembly=mscorlib">Skopiuj kod</sys:String>
+    <sys:String x:Key="codes_Redeem" xmlns:sys="clr-namespace:System;assembly=mscorlib">Odbierz</sys:String>
+    <sys:String x:Key="codes_Redeem_Tip" xmlns:sys="clr-namespace:System;assembly=mscorlib">Otwiera oficjalną stronę z już wpisanym kodem</sys:String>
+    <sys:String x:Key="codes_InGame" xmlns:sys="clr-namespace:System;assembly=mscorlib">Kod wpiszesz w grze: {0}.</sys:String>
+    <sys:String x:Key="codes_InGame_Unlock" xmlns:sys="clr-namespace:System;assembly=mscorlib">Kod wpiszesz w grze: {0} (od {1}).</sys:String>
+    <sys:String x:Key="codes_Fold" xmlns:sys="clr-namespace:System;assembly=mscorlib">Zwiń kody</sys:String>
+    <sys:String x:Key="codes_Unfold" xmlns:sys="clr-namespace:System;assembly=mscorlib">Pokaż kody</sys:String>
+    <sys:String x:Key="codes_New" xmlns:sys="clr-namespace:System;assembly=mscorlib">Nowy</sys:String>
+    <sys:String x:Key="codes_EndsIn" xmlns:sys="clr-namespace:System;assembly=mscorlib">Kończy się za {0}</sys:String>
+    <sys:String x:Key="codes_Added" xmlns:sys="clr-namespace:System;assembly=mscorlib">Dodany {0}</sys:String>
+    <sys:String x:Key="codes_Listed" xmlns:sys="clr-namespace:System;assembly=mscorlib">Na liście od {0}</sys:String>
+    <sys:String x:Key="codes_Until" xmlns:sys="clr-namespace:System;assembly=mscorlib">ważny do {0}</sys:String>
+    <sys:String x:Key="codes_NoEnd" xmlns:sys="clr-namespace:System;assembly=mscorlib">bez podanej daty końca</sys:String>
+    <sys:String x:Key="codes_Days" xmlns:sys="clr-namespace:System;assembly=mscorlib">{0} dzień|{0} dni|{0} dni</sys:String>
+    <!-- Stamina from the screen (Services/Stamina, Views/StaminaCard): the timer card on Start, its switch and the tray notice. {0} in the pool texts is the game's own English name (Original Resin, Trailblaze Power, Waveplates). -->
+    <sys:String x:Key="Stamina_Toggle" xmlns:sys="clr-namespace:System;assembly=mscorlib">Czytaj {0} z ekranu gry</sys:String>
+    <sys:String x:Key="Stamina_Off" xmlns:sys="clr-namespace:System;assembly=mscorlib">Kaption może odczytywać {0} z ekranu gry, kiedy działają napisy, i sam pilnować licznika. Czyta tylko tę jedną liczbę i trzyma ją na tym komputerze.</sys:String>
+    <sys:String x:Key="Stamina_Waiting" xmlns:sys="clr-namespace:System;assembly=mscorlib">Czekam na liczbę. {0} Kaption odczyta ją, kiedy działają napisy.</sys:String>
+    <sys:String x:Key="Stamina_Where_Genshin" xmlns:sys="clr-namespace:System;assembly=mscorlib">Widać ją na mapie oraz na ekranach domen i nagród.</sys:String>
+    <sys:String x:Key="Stamina_Where_StarRail" xmlns:sys="clr-namespace:System;assembly=mscorlib">Widać ją na ekranach wyzwań, na przykład Calyx albo Cavern of Corrosion.</sys:String>
+    <sys:String x:Key="Stamina_Where_WuWa" xmlns:sys="clr-namespace:System;assembly=mscorlib">Widać ją na mapie oraz na ekranach wyzwań i nagród.</sys:String>
+    <sys:String x:Key="Stamina_Where_Other" xmlns:sys="clr-namespace:System;assembly=mscorlib">Widać ją w grze obok ikony energii.</sys:String>
+    <sys:String x:Key="Stamina_FullAt" xmlns:sys="clr-namespace:System;assembly=mscorlib">Zapełni się {0}, za {1}.</sys:String>
+    <sys:String x:Key="Stamina_FullSince" xmlns:sys="clr-namespace:System;assembly=mscorlib">Limit osiągnięty. Zapełniło się {0}.</sys:String>
+    <sys:String x:Key="Stamina_At" xmlns:sys="clr-namespace:System;assembly=mscorlib">o {0}</sys:String>
+    <sys:String x:Key="Stamina_Tomorrow" xmlns:sys="clr-namespace:System;assembly=mscorlib">jutro o {0}</sys:String>
+    <sys:String x:Key="Stamina_Yesterday" xmlns:sys="clr-namespace:System;assembly=mscorlib">wczoraj o {0}</sys:String>
+    <sys:String x:Key="Stamina_OnDay" xmlns:sys="clr-namespace:System;assembly=mscorlib">{0} o {1}</sys:String>
+    <sys:String x:Key="Stamina_Unit_Day" xmlns:sys="clr-namespace:System;assembly=mscorlib">d</sys:String>
+    <sys:String x:Key="Stamina_Unit_Hour" xmlns:sys="clr-namespace:System;assembly=mscorlib">h</sys:String>
+    <sys:String x:Key="Stamina_Unit_Minute" xmlns:sys="clr-namespace:System;assembly=mscorlib">min</sys:String>
+    <sys:String x:Key="Stamina_Read_Now" xmlns:sys="clr-namespace:System;assembly=mscorlib">Odczytane z gry przed chwilą.</sys:String>
+    <sys:String x:Key="Stamina_Read_Ago" xmlns:sys="clr-namespace:System;assembly=mscorlib">Odczytane z gry {0} temu.</sys:String>
+    <sys:String x:Key="Stamina_OpenTimer" xmlns:sys="clr-namespace:System;assembly=mscorlib">Otwórz licznik</sys:String>
+    <sys:String x:Key="Stamina_OpenTimer_Tip" xmlns:sys="clr-namespace:System;assembly=mscorlib">Otwiera licznik na kaption.one z tym odczytem. Odczyt jest zapisany w samym linku i nie trafia na żaden serwer.</sys:String>
+    <sys:String x:Key="Stamina_Notice_Toggle" xmlns:sys="clr-namespace:System;assembly=mscorlib">Daj znać, gdy będzie prawie pełne</sys:String>
+    <sys:String x:Key="Stamina_Notice_Hint" xmlns:sys="clr-namespace:System;assembly=mscorlib">Jedno powiadomienie, {0} przed zapełnieniem. Nigdy w trakcie gry.</sys:String>
+    <sys:String x:Key="Stamina_Notice_Almost_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">{0}: zaraz limit</sys:String>
+    <sys:String x:Key="Stamina_Notice_Almost_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">Masz teraz około {0}/{1}, zapełni się {2}.</sys:String>
+    <sys:String x:Key="Stamina_Notice_Full_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">{0}: limit osiągnięty</sys:String>
+    <sys:String x:Key="Stamina_Notice_Full_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">{0}/{1}. Zapełniło się {2}, więc reszta przepada, dopóki czegoś nie wydasz.</sys:String>
+    <sys:String x:Key="Stamina_Notice_Full_Body_Reserve" xmlns:sys="clr-namespace:System;assembly=mscorlib">{0}/{1}. Zapełniło się {2}, teraz rośnie już tylko {3}, i to wolniej.</sys:String>
+
+    <!-- The come-back loop: start with Windows offered in setup, one notice per new game version. -->
+    <sys:String x:Key="onb_Done_StartWithWindows" xmlns:sys="clr-namespace:System;assembly=mscorlib">Uruchamiaj Kaption razem z Windows, żeby napisy czekały, gdy włączysz grę.</sys:String>
+    <sys:String x:Key="NewStory_Line_Format" xmlns:sys="clr-namespace:System;assembly=mscorlib">{0} {1}: nowa fabuła jest już po polsku</sys:String>
+    <sys:String x:Key="NewStory_Balloon_Title_Format" xmlns:sys="clr-namespace:System;assembly=mscorlib">{0} {1}</sys:String>
+    <sys:String x:Key="NewStory_Balloon_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">Nowa fabuła jest już po polsku. Kliknij, żeby zobaczyć, co doszło.</sys:String>
+    <sys:String x:Key="NewStory_Open" xmlns:sys="clr-namespace:System;assembly=mscorlib">Zobacz, co nowego</sys:String>
+    <sys:String x:Key="NewStory_Toggle" xmlns:sys="clr-namespace:System;assembly=mscorlib">Daj znać, gdy fabuła nowej wersji gry jest już po polsku</sys:String>
+    <sys:String x:Key="NewStory_Toggle_Hint" xmlns:sys="clr-namespace:System;assembly=mscorlib">Jedna wiadomość na wersję gry, tutaj i obok zegara. Nigdy przy poprawkach napisów.</sys:String>
 </ResourceDictionary>

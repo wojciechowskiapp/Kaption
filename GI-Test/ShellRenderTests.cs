@@ -31,7 +31,12 @@ namespace GI_Test
         public static string GuidesDir => Path.Combine(Path.GetTempPath(), "kaption-w15", "guides");
         private const double GuideWidth = 1280, GuideHeight = 800;
 
-        public enum Scene { Stopped, Translating, WaitingForGame, Downloading, Updated25, OnHold, AreaAutoSet, AreaAutoFailed, GameSwitch }
+        public enum Scene
+        {
+            Stopped, Translating, WaitingForGame, Downloading, Updated25, OnHold, AreaAutoSet, AreaAutoFailed, GameSwitch,
+            // The first-session check: why no line shows, and the first line a new install shows.
+            CheckFullScreen, CheckNoMatch, CheckNoDialogue, FirstLine,
+        }
 
         [TestMethod]
         public void RendersTheStartPageInEveryState()
@@ -87,6 +92,26 @@ namespace GI_Test
                         case Scene.AreaAutoFailed:
                             Assert.IsFalse(string.IsNullOrEmpty(detail), $"{lang}: a failed try is said, never a silent closed gate");
                             Assert.IsFalse(string.IsNullOrEmpty(action), $"{lang}: the picker is one click away");
+                            break;
+                        case Scene.CheckFullScreen:
+                        case Scene.CheckNoMatch:
+                        case Scene.CheckNoDialogue:
+                        {
+                            Assert.IsFalse(string.IsNullOrEmpty(detail), $"{lang} {scene}: the card says why no line shows");
+                            Assert.IsFalse(string.IsNullOrEmpty(action), $"{lang} {scene}: with one fix");
+                            Assert.AreNotEqual(host.TryFindResource("shell_Action_Stop") as string, action, $"{lang} {scene}: the action is the fix");
+                            string title = ((TextBlock)window.FindName("StateCardTitle")).Text;
+                            Assert.IsFalse(System.Text.RegularExpressions.Regex.IsMatch(title + " " + detail, @"\bOCR\b"), $"{lang} {scene}: no jargon");
+                            string second = ((Button)window.FindName("DashChangeTranslationButton")).Content as string;
+                            if (scene != Scene.CheckNoDialogue)
+                                Assert.AreEqual(host.TryFindResource("shell_Action_CheckArea") as string, second, $"{lang} {scene}: the area is the second fix");
+                            else
+                                Assert.AreEqual(host.TryFindResource("shell_Action_ChangeGame") as string, second);
+                            break;
+                        }
+                        case Scene.FirstLine:
+                            Assert.IsFalse(string.IsNullOrEmpty(detail), $"{lang}: the card says the subtitles are showing");
+                            Assert.AreEqual(host.TryFindResource("shell_Action_Stop") as string, action, $"{lang}: translation runs, Stop stays");
                             break;
                         case Scene.GameSwitch:
                             Assert.AreEqual(host.TryFindResource("Dash_EngineFailed_Restart") as string, action, $"{lang}: the card offers the restart");
@@ -324,6 +349,54 @@ namespace GI_Test
             foreach (string p in written) Console.WriteLine(p);
         }
 
+        /// <summary>
+        /// The recordings card on the look page: the switch and its honest line for each state the app can be in, and
+        /// the mark switch with the mark in the preview. Both languages, both palettes, at the page's two widths.
+        /// </summary>
+        [TestMethod]
+        public void RendersTheRecordingsCard_InEveryState()
+        {
+            var written = new List<string>();
+            RunSta(() =>
+            {
+                foreach (string palette in WindowRenderTests.Palettes)
+                foreach (string lang in new[] { "pl-PL", "en-US" })
+                {
+                    var host = LoadLooseWindow("Views/SettingsWindow.xaml", lang, out var window, palette);
+                    Fill(host, window, Scene.Stopped, lang);
+                    Select(window, SettingsNavigation.Look);
+                    string L(string key, string fallback) => host.TryFindResource(key) as string ?? fallback;
+                    var toggle = (CheckBox)window.FindName("ShowInRecordingsToggle");
+                    var status = (TextBlock)window.FindName("RecordingStatusText");
+                    var card = (FrameworkElement)((FrameworkElement)toggle.Parent).Parent;
+                    foreach (var (state, show, mark) in new[]
+                    {
+                        (GI_Subtitles.Services.Capture.CaptureStatus.Shown, true, true),
+                        (GI_Subtitles.Services.Capture.CaptureStatus.Hidden, false, false),
+                        (GI_Subtitles.Services.Capture.CaptureStatus.ShownWindowsRefused, false, false),
+                    })
+                    foreach (double width in new[] { GuideWidth, 980.0 })
+                    {
+                        ApplyLook(window, OverlayStyle.Default with { Mark = mark }, "Genshin", LookFixture, L);
+                        SettingsWindow.ApplyRecordingTo(window.FindName, show, state, L);
+                        Layout(host, width, 1500);
+                        Assert.AreEqual(show, toggle.IsChecked, $"{state}: the switch follows the setting");
+                        Assert.AreEqual(SettingsWindow.RecordingStatusLine(state, L), status.Text, $"{state}: the line under the switch");
+                        Assert.AreEqual(mark, ((CheckBox)window.FindName("KaptionMarkToggle")).IsChecked, "the mark switch follows the look");
+                        Assert.IsTrue(status.ActualHeight > 0 && status.ActualWidth <= card.ActualWidth, $"{state} {lang} {width}: the line fits its card");
+                        var at = card.TranslatePoint(new Point(0, 0), host);
+                        var shot = Snapshot(host);
+                        var crop = new CroppedBitmap(shot, new Int32Rect((int)at.X, (int)at.Y,
+                            (int)Math.Min(card.ActualWidth, shot.PixelWidth - at.X), (int)Math.Min(card.ActualHeight, shot.PixelHeight - at.Y)));
+                        written.Add(SaveReview(crop, $"look/recording-{state.ToString().ToLowerInvariant()}-{lang.Substring(0, 2)}-{palette.ToLowerInvariant()}-{width:0}.png"));
+                        if (mark && width == GuideWidth)
+                            written.Add(SaveReview(shot, $"look/look-with-mark-{lang.Substring(0, 2)}-{palette.ToLowerInvariant()}.png"));
+                    }
+                }
+            });
+            foreach (string p in written) Console.WriteLine(p);
+        }
+
         /// <summary>The page as the app fills it, plus the sliders (code-behind keeps them in step in the app).</summary>
         private static void ApplyLook(Window window, OverlayStyle look, string game, LookScene scene, Func<string, string, string> L)
         {
@@ -513,6 +586,10 @@ namespace GI_Test
             Scene.AreaAutoSet => "obszar-sam",
             Scene.AreaAutoFailed => "obszar-nie-wyszlo",
             Scene.GameSwitch => "zmiana-gry",
+            Scene.CheckFullScreen => "pelny-ekran",
+            Scene.CheckNoMatch => "brak-kwestii",
+            Scene.CheckNoDialogue => "brak-dialogu",
+            Scene.FirstLine => "pierwsza-kwestia",
             _ => "zatrzymano",
         };
 
@@ -556,6 +633,11 @@ namespace GI_Test
                 // Star Rail picked, "Later" chosen: Genshin's data stays loaded until the restart.
                 Scene.GameSwitch => new StartCardInputs { Reader = ReaderState.Ready, PackOnDisk = true, GameName = "Honkai: Star Rail", GameSwitchPending = true,
                     LoadedGameName = "Genshin Impact" },
+                // Translating with no line on screen: the session check's three sentences, then a new install's first line.
+                Scene.CheckFullScreen => new StartCardInputs { Translating = true, Reader = ReaderState.Ready, PackOnDisk = true, SessionCheck = SessionCheckKind.FullScreen },
+                Scene.CheckNoMatch => new StartCardInputs { Translating = true, Reader = ReaderState.Ready, PackOnDisk = true, SessionCheck = SessionCheckKind.NoMatch },
+                Scene.CheckNoDialogue => new StartCardInputs { Translating = true, Reader = ReaderState.Ready, PackOnDisk = true, SessionCheck = SessionCheckKind.NoDialogue },
+                Scene.FirstLine => new StartCardInputs { Translating = true, LinesThisSession = 1, Reader = ReaderState.Ready, PackOnDisk = true, FirstLineShown = true },
                 _ => new StartCardInputs { Reader = ReaderState.Ready, PackOnDisk = true },
             };
             var state = StartCardModel.Compute(inputs);
@@ -644,6 +726,8 @@ namespace GI_Test
 
             // Wygląd napisów: the saved look (defaults here), the game's art and its dialogue area.
             SettingsWindow.ApplyLookTo(Find, OverlayStyle.Default, "Genshin", LookFixture, -140, 900, Art("Genshin"), L);
+            // Recordings: the switch off on a Windows that cannot hide the overlay (Windows 10 22H2).
+            SettingsWindow.ApplyRecordingTo(Find, false, GI_Subtitles.Services.Capture.CaptureStatus.ShownWindowsRefused, L);
 
             // Shortcuts page: the real defaults and descriptions.
             var hotkeys = new List<HotkeyViewModel>();

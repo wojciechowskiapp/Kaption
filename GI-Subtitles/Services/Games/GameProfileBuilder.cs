@@ -37,6 +37,14 @@ namespace GI_Subtitles.Services.Games
                 ForceOcrAfterSeconds = d.Pacing?.ForceOcrAfterSeconds,
             };
 
+            if (d.SessionCheck is GameSessionCheck check)
+            {
+                // The schema refuses a negative; here it reads as 0, which switches that sentence off.
+                if (check.BlackSeconds is int black) p.CheckBlackSeconds = Math.Max(0, black);
+                if (check.UnmatchedReads is int unmatched) p.CheckUnmatchedReads = Math.Max(0, unmatched);
+                if (check.QuietSeconds is int quiet) p.CheckQuietSeconds = Math.Max(0, quiet);
+            }
+
             GameVision v = d.Vision;
             if (v == null) return p;
             if (v.Classifier != null)

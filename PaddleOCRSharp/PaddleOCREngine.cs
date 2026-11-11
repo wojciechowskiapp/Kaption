@@ -636,6 +636,44 @@ namespace PaddleOCRSharp
         }
 
         /// <summary>
+        /// Reads one already-cropped text line with the recognizer only, and only when the engine is free: it never
+        /// waits behind (or in front of) a dialogue pass. No text detection runs, so no new detector shape is compiled
+        /// under DirectML, and a short line pads into the recognition bucket the warm-up compiled.
+        /// </summary>
+        /// <returns>False when the engine is busy or disposed; the caller tries again on its next sample.</returns>
+        public bool TryRecognizeLine(Mat line, out string text, out float score, CancellationToken cancellationToken = default)
+        {
+            text = string.Empty;
+            score = 0f;
+            if (line == null || line.IsDisposed || line.Empty())
+                throw new ArgumentException("Invalid Mat object", nameof(line));
+            if (_disposed || !_gate.Wait(0)) return false;
+            try
+            {
+                if (_disposed) return false;
+                using var runOptions = new RunOptions();
+                using var cancellationRegistration = cancellationToken.Register(() =>
+                {
+                    try { runOptions.Terminate = true; }
+                    catch (ObjectDisposedException) { /* inference already completed */ }
+                });
+                var results = RecognizeText(new[] { line }, runOptions, cancellationToken);
+                if (results.Count == 0) return true;
+                text = results[0].Text ?? string.Empty;
+                score = results[0].Score;
+                return true;
+            }
+            catch (Exception ex) when (cancellationToken.IsCancellationRequested)
+            {
+                throw new OperationCanceledException("Line recognition was cancelled.", ex, cancellationToken);
+            }
+            finally
+            {
+                _gate.Release();
+            }
+        }
+
+        /// <summary>
         /// Text detection
         /// </summary>
         private RotatedRect[] DetectTextRegions(

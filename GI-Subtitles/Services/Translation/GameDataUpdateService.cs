@@ -197,8 +197,7 @@ namespace GI_Subtitles.Services.Translation
             catch { return "0"; }
         }
 
-        private static readonly string KaptionRoot = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Kaption");
+        private static readonly string KaptionRoot = Data.GameDataPaths.Root;
 
         // Languages Dimbreath's GitLab mirrors carry for Genshin and Star Rail.
         // User confirmed via directory listing on 2026-04-15. Polish is

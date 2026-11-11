@@ -17,16 +17,13 @@ namespace GI_Subtitles.Views
 {
     /// <summary>
     /// The guess game in Settings: the Start page's "Nowość w Kaption" card (Wuthering Waves in Polish, the guess game),
-    /// the strip that repeats a ranking notice, and the Help page's row with the notice switch. Nothing here polls;
+    /// the strip that shows a ranking notice's text, and the Help page's row with the notice switch. Nothing here polls;
     /// MainWindow.GuessNotify.cs owns the standing reads and hands the notice over.
     /// </summary>
     public partial class SettingsWindow
     {
         /// <summary>The player opened the ranking from the strip: MainWindow starts the baselines again from now.</summary>
         public Action GuessLobbyOpened;
-
-        /// <summary>Settings came to the front or Start was picked: a waiting notice may now count as seen on the strip.</summary>
-        public Action GuessStripMayBeSeen;
 
         private SpotlightRows _spotlightRows = SpotlightRows.None;
         private bool _spotlightCounted;
@@ -40,12 +37,6 @@ namespace GI_Subtitles.Views
             if (GuessCommunityBody != null)
                 GuessCommunityBody.Text = GuessCommunityText(L);
             GuessNotifySettings.EnabledChanged += OnGuessNotifyEnabledChanged;
-            Activated += (_, __) => GuessStripMayBeSeen?.Invoke();
-            if (NavTabs != null)
-                NavTabs.SelectionChanged += (_, e) =>
-                {
-                    if (ReferenceEquals(e.OriginalSource, NavTabs)) GuessStripMayBeSeen?.Invoke();
-                };
             Loaded += (_, __) => _ = ShowSpotlightAsync();
             Closed += (_, __) => GuessNotifySettings.EnabledChanged -= OnGuessNotifyEnabledChanged;
         }
@@ -113,15 +104,6 @@ namespace GI_Subtitles.Views
             strip.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
             return show;
         }
-
-        /// <summary>
-        /// The player has the strip in front of them: Settings is the active window on Start. Open behind the game
-        /// (the default after every launch) does not count.
-        /// </summary>
-        internal bool GuessRankStripOnScreen =>
-            GuessNoticeDelivery.StripCountsAsSeen(IsActive, WindowState == WindowState.Minimized,
-                GuessRankStrip?.Visibility == Visibility.Visible,
-                (NavTabs?.SelectedItem as TabItem)?.Tag as string == SettingsNavigation.Home);
 
         private void GuessRankOpen_Click(object sender, RoutedEventArgs e)
         {

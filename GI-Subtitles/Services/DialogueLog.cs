@@ -8,9 +8,7 @@ namespace GI_Subtitles.Services
     /// </summary>
     public static class DialogueLog
     {
-        private static readonly string _logDir = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "Kaption", "logs");
+        private static readonly string _logDir = Path.Combine(Data.GameDataPaths.Root, "logs");
 
         private static readonly object _lock = new object();
         private static string _currentFile;

@@ -37,7 +37,7 @@ namespace GI_Subtitles.Core.UI
         ToolStripMenuItem farmTodayItem;
         private TrayState _trayState = TrayState.Idle;
         private int Size = Config.Config.Get<int>("Size");
-        private bool AutoStart = Config.Config.Get("AutoStart", false);
+        private bool AutoStart = Config.Config.Get(Services.Startup.WindowsStartup.SettingKey, false);
         public string[] Region = Config.Config.Get<string>("Region", "").Split(',');
         public string[] Region2 = Config.Config.Get<string>("Region2", "").Split(',');
         public string[] AnswerRegion = Config.Config.Get<string>("AnswerRegion", "").Split(',');
@@ -204,7 +204,8 @@ namespace GI_Subtitles.Core.UI
                 try { data?.ShowStartPage(); }
                 catch (Exception ex) { Logger.Log.Warn($"Tray double-click failed: {ex.Message}"); }
             };
-            SetAutoStart(AutoStart);
+            // Repairs the Run entry at every launch: an older build may have left one Windows cannot run.
+            Services.Startup.WindowsStartup.ApplySetting(AutoStart);
             _trayIcon = notifyIcon;
             return notifyIcon;
         }
@@ -646,45 +647,6 @@ namespace GI_Subtitles.Core.UI
             }
         }
 
-        private void SetAutoStart(bool autoStart)
-        {
-            try
-            {
-                string appPath = System.Reflection.Assembly.GetExecutingAssembly().Location;
-                RegistryKey key = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run", true);
-
-                if (key == null)
-                {
-                    Logger.Log.Error("Failed to open registry key for auto-start");
-                    return;
-                }
-
-                using (key)
-                {
-                    string existingValue = (string)key.GetValue(Process.GetCurrentProcess().ProcessName, null);
-                    if (autoStart)
-                    {
-                        if (existingValue != appPath)
-                        {
-                            key.SetValue(Process.GetCurrentProcess().ProcessName, appPath);
-                            Logger.Log.Info("Startup item added successfully!");
-                        }
-                    }
-                    else
-                    {
-                        if (existingValue != null)
-                        {
-                            key.DeleteValue(Process.GetCurrentProcess().ProcessName, false);
-                            Logger.Log.Info("Startup item removed!");
-                        }
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                Logger.Log.Error($"SetAutoStart failed: {ex}");
-            }
-        }
         private void ContextMenuStrip_Opening(object sender, System.ComponentModel.CancelEventArgs e)
         {
             isContextMenuOpen = true;

@@ -14,10 +14,12 @@ namespace GI_Subtitles.Core.Config
     public static class Config
     {
         // KAPTION_CONFIG_DIR is for tests: they point the settings at a temporary folder, never a real profile.
+        // The E2E mode's folder wins over it, so an inherited override cannot pull the suite's app elsewhere.
         private static readonly string SettingsFolder =
-            Environment.GetEnvironmentVariable("KAPTION_CONFIG_DIR") is string dir && dir.Length > 0
+            GI_Subtitles.Common.E2EMode.IsActive ? Services.Data.GameDataPaths.Root
+            : Environment.GetEnvironmentVariable("KAPTION_CONFIG_DIR") is string dir && dir.Length > 0
                 ? dir
-                : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Kaption");
+                : Services.Data.GameDataPaths.Root;
         private static readonly string SettingsFile = Path.Combine(SettingsFolder, "Config.json");
         private static readonly Dictionary<string, JsonNode> _settings = new Dictionary<string, JsonNode>();
         private static readonly object _settingsLock = new object();

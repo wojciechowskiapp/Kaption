@@ -378,7 +378,9 @@ namespace GI_Subtitles.Views
             try
             {
                 var engine = GetEngine?.Invoke();
-                var result = await Task.Run(() => AutoRegionService.Detect(gameId, engine));
+                // The worker asks for the overlay's places at the moment it captures; they are read on this thread.
+                var result = await Task.Run(() => AutoRegionService.Detect(gameId, engine,
+                    () => Dispatcher.Invoke(() => (System.Windows.Application.Current?.MainWindow as MainWindow)?.OverlayAreasForOneOffRead())));
                 if (result?.Success != true || string.IsNullOrEmpty(result.DialogueRegion)) return false;
                 Config.Set("Region", result.DialogueRegion);
                 _regionAuto = true;
@@ -700,6 +702,15 @@ namespace GI_Subtitles.Views
 
         // ── 5 · Gotowe ──────────────────────────────────────────────────────
 
+        /// <summary>"Start Kaption with Windows": saved and written to the Run key at once, so it holds however the window closes.</summary>
+        private void StartWithWindows_Click(object sender, RoutedEventArgs e)
+        {
+            bool on = StartWithWindowsCheck.IsChecked == true;
+            Config.Set(Services.Startup.WindowsStartup.SettingKey, on);
+            Services.Startup.WindowsStartup.ApplySetting(on);
+            Logger.Log.Info($"Setup: start with Windows turned {(on ? "on" : "off")}.");
+        }
+
         private void EnterDone()
         {
             var culture = CultureInfo.CurrentUICulture;
@@ -718,12 +729,15 @@ namespace GI_Subtitles.Views
             DoneStartText.Text = L(auto ? "onb_Done_AutoStart" : "onb_Done_Manual", "");
             DoneIndexText.Text = Mode == OnboardingMode.FirstRun ? L(auto ? "onb_Done_Index" : "onb_Done_IndexManual", "") : string.Empty;
             DoneIndexText.Visibility = Vis(Mode == OnboardingMode.FirstRun);
+            // Shows the saved choice (off unless the player ticked it before); setup never ticks it for them.
+            StartWithWindowsCheck.IsChecked = Config.Get(Services.Startup.WindowsStartup.SettingKey, false);
             DoneHotkeys.ItemsSource = HotkeyRows();
             if (Mode == OnboardingMode.FirstRun)
             {
                 Config.Set("SetupCompleted", true);
                 Config.Set("SetupDismissed", false);
                 Config.Set(SettingsWindow.Intro25SeenKey, true); // the setup already said what 2.5 does
+                Config.Set(SettingsWindow.FirstLinePendingKey, true); // the Start card confirms this install's first line, once
                 Config.Set(Shell.SpotlightRules.SeenWuWaKey, true); // a new player just picked from a list that has WuWa
             }
             FinishButton.Focus();
@@ -805,6 +819,7 @@ namespace GI_Subtitles.Views
                 Config.Set("SetupCompleted", true);
                 Config.Set("SetupDismissed", false);
                 Config.Set(SettingsWindow.Intro25SeenKey, true);
+                Config.Set(SettingsWindow.FirstLinePendingKey, true);
                 Config.Set(Shell.SpotlightRules.SeenWuWaKey, true); // a new player just picked from a list that has WuWa
             }
             _signInCts?.Cancel();

@@ -14,9 +14,9 @@
 //  `h` against whatever ended up at TextMapEN.json, which is exactly the join
 //  that was broken.
 //
-//  Note on paths: GameDataPaths.Root is a static readonly rooted at %APPDATA%
-//  and cannot be redirected, so these tests use a GUID-suffixed game name and
-//  delete the folder in cleanup. Nothing touches a real game's data.
+//  Note on paths: GameDataPaths.Root is the test run's temporary folder
+//  (TestEnvironment), shared by every test, so these tests use a GUID-suffixed
+//  game name and delete the folder in cleanup. Nothing touches the real profile.
 // ─────────────────────────────────────────────────────────────────────────────
 
 using System;

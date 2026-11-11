@@ -236,6 +236,7 @@ namespace GI_Subtitles.Services.Rendering
             double pw = double.IsNaN(PanelWidth) ? w : PanelWidth;
             double ph = double.IsNaN(PanelHeight) ? h : PanelHeight;
             var rect = new Rect((w - pw) / 2, GrowsUpward ? h - ph : 0, Math.Max(0, pw), Math.Max(0, ph));
+            var drawn = rect;
             double r = Math.Min(CornerRadius.TopLeft, Math.Min(rect.Width, rect.Height) / 2);
             Pen pen = null;
             if (BorderBrush != null && BorderThickness.Left > 0)
@@ -245,6 +246,25 @@ namespace GI_Subtitles.Services.Rendering
                 rect.Inflate(-t / 2, -t / 2);
             }
             dc.DrawRoundedRectangle(EffectivePanelBrush(), pen, rect, r, r);
+            if (Look.Mark) DrawMark(dc, drawn);
+        }
+
+        /// <summary>
+        /// The Kaption mark at the end of the band: part of the panel, so it moves, fades and is masked with it. Its
+        /// place comes from the layout the text already has; while the panel is still growing towards that layout
+        /// (<see cref="PanelWidth"/>) and does not reach the mark's place yet, the mark waits, so it is never over text.
+        /// </summary>
+        private void DrawMark(DrawingContext dc, Rect drawn)
+        {
+            var mark = OverlayTokens.Mark;
+            var box = KaptionMarkLayout.Box(new Rect(RenderSize), Look.Size, Padding, SubtitleText.FontSize);
+            if (mark == null || box.IsEmpty || !drawn.Contains(box)) return;
+            double scale = box.Width / OverlayTokens.MarkUnits;
+            dc.PushOpacity(KaptionMarkLayout.Opacity);
+            dc.PushTransform(new MatrixTransform(scale, 0, 0, scale, box.X, box.Y));
+            dc.DrawDrawing(mark);
+            dc.Pop();
+            dc.Pop();
         }
 
         protected override void OnRenderSizeChanged(SizeChangedInfo info)

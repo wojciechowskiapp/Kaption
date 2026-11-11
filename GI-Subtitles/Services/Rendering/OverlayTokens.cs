@@ -39,6 +39,33 @@ namespace GI_Subtitles.Services.Rendering
             return Own.Value.TryGetValue(key, out var c) ? c : fallback;
         }
 
+        private static readonly Lazy<Drawing> OwnMark = new(LoadMark);
+
+        /// <summary>The brand mark (Themes/Tokens.xaml, KaptionMark) as a frozen 32 x 32 drawing; null when it cannot load.</summary>
+        public static Drawing Mark => OwnMark.Value;
+
+        /// <summary>The side of <see cref="Mark"/>'s square, in its own units.</summary>
+        public const double MarkUnits = 32;
+
+        private static Drawing LoadMark()
+        {
+            try
+            {
+                var tokens = new ResourceDictionary { Source = new Uri(OverlayFonts.PackBase, "Themes/Tokens.xaml") };
+                if (tokens["KaptionMark"] is DrawingImage image && image.Drawing is Drawing drawing)
+                {
+                    var copy = drawing.CloneCurrentValue();
+                    copy.Freeze();
+                    return copy;
+                }
+            }
+            catch (Exception)
+            {
+                // No mark: the panel is drawn without it.
+            }
+            return null;
+        }
+
         public static SolidColorBrush Brush(Color c)
         {
             var b = new SolidColorBrush(c);

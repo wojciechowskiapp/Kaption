@@ -548,6 +548,32 @@ namespace GI_Test
             return (bool)args[4];
         }
 
+        [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern IntPtr GetForegroundWindow();
+        [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint processId);
+        [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern bool GetLastInputInfo(ref LastInputInfo info);
+
+        [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+        private struct LastInputInfo { public uint Size; public uint Time; }
+
+        // The window's state, who has the foreground and when the desktop last had input: the window takes the focus,
+        // so on a shared desktop a keystroke meant for another app can land in it (it did: a "/" in the fix box).
+        private static string Describe(SuggestFixWindow w, IReadOnlyList<string> typed)
+        {
+            string owner = "none";
+            IntPtr fg = GetForegroundWindow();
+            if (fg != IntPtr.Zero)
+            {
+                GetWindowThreadProcessId(fg, out uint pid);
+                try { owner = System.Diagnostics.Process.GetProcessById((int)pid).ProcessName; } catch (ArgumentException) { owner = "exited"; }
+                if (pid == Environment.ProcessId) owner += " (this test process)";
+            }
+            var last = new LastInputInfo { Size = (uint)System.Runtime.InteropServices.Marshal.SizeOf<LastInputInfo>() };
+            string idle = GetLastInputInfo(ref last) ? $"{unchecked((uint)Environment.TickCount - last.Time)} ms ago" : "unknown";
+            return $"untouched={w.IsUntouched} fix=\"{((TextBox)w.FindName("FixBox")).Text}\" note=\"{((TextBox)w.FindName("NoteBox")).Text}\"" +
+                $" active={w.IsActive} foreground={owner} text input=[{string.Join(", ", typed.Select(t => "\"" + t + "\""))}]" +
+                $" last desktop input {idle}";
+        }
+
         [TestMethod]
         public void TheHotkey_OpensTheLastLine_ReplacesAnUntouchedWindow_AndKeepsAnEdit()
         {
@@ -586,15 +612,18 @@ namespace GI_Test
                     PressFixHotkey(main);
                     var first = Opened();
                     Assert.IsNotNull(first);
+                    var typed = new List<string>(); // the test never types: anything here came from the desktop
+                    first.PreviewTextInput += (s, e) => typed.Add(e.Text);
                     Assert.AreEqual("Hotkey line A.", first.Line.EnKey);
                     Assert.IsTrue(first.IsVisible);
                     PressFixHotkey(main);
                     Assert.AreSame(first, Opened(), "the same line: the open window comes forward");
 
                     main.LastShownLine.Record("Genshin", "pl", "Hotkey line B.", "Linia B.", "Linia B.", "Paimon", at.AddSeconds(4));
+                    string before = Describe(first, typed);
                     PressFixHotkey(main);
                     var second = Opened();
-                    Assert.AreNotSame(first, second);
+                    Assert.AreNotSame(first, second, "the newer line kept the first window; before the press: " + before);
                     Assert.IsFalse(open.Contains(first), "an untouched window gives way to the newer line");
                     Assert.AreEqual("Hotkey line B.", second.Line.EnKey);
                     Assert.AreEqual("Hotkey line A.", second.Line.PrevEn, "the line before goes along as context");

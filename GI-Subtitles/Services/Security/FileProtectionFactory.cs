@@ -39,6 +39,8 @@ namespace GI_Subtitles.Services.Security
             ActivationData activation = ResolveActivation();
             if (activation == null || !activation.HasDeviceFileProtectionSecret)
             {
+                // The end-to-end suite runs signed out: a key that lives as long as the process (nothing persists).
+                if (Common.E2EMode.IsActive) return new ServerKeyFileProtectionService(() => E2EActivation.Value);
                 throw new InvalidOperationException(
                     "FileProtectionFactory.Create called before a per-device secret "
                     + "was provisioned. Foreground bootstrap (App.OnStartup) must run "
@@ -49,6 +51,18 @@ namespace GI_Subtitles.Services.Security
 
             return new ServerKeyFileProtectionService(ResolveActivation);
         }
+
+        /// <summary>The E2E mode's signed-out key: random, held in memory for this process only.</summary>
+        private static readonly Lazy<ActivationData> E2EActivation = new(() =>
+        {
+            byte[] secret = System.Security.Cryptography.RandomNumberGenerator.GetBytes(32);
+            return new ActivationData
+            {
+                DeviceFileProtectionSecret = secret,
+                DeviceFileProtectionSchemeVersion = Network.KaptionApiClient.FileProtectionSchemeVersion,
+                DeviceFileProtectionPbkdf2Iterations = 100_000,
+            };
+        });
 
         /// <summary>
         /// In-memory first, disk fallback. Reads the live

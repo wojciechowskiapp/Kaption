@@ -7,9 +7,10 @@
 //  from the 3.7.0 dump, kept in step by tools/test-build-gamedata-wuwa.cjs. Ids
 //  are looked up in that file by text, so regenerating it never edits this test.
 //
-//  GameDataPaths.Root cannot be redirected, so the bundle installs under a
-//  GUID-suffixed game name (its extension.game rewritten to match) and the
-//  folder is deleted in cleanup, as in ZenlessBundleTextMapTests.
+//  GameDataPaths.Root is the test run's temporary folder (TestEnvironment),
+//  shared by every test, so the bundle installs under a GUID-suffixed game
+//  name (its extension.game rewritten to match) and the folder is deleted in
+//  cleanup, as in ZenlessBundleTextMapTests.
 //
 //  The public source mirror (scripts/publish-source.sh) ships GI-Test without
 //  tools/, so there the fixture is absent and every test is inconclusive.

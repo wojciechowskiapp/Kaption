@@ -103,6 +103,8 @@ namespace GI_Subtitles.Services.Translation
         public int Skipped { get; internal set; }     // tier-gated, etc.
         public int Failed { get; internal set; }
         public List<string> Messages { get; } = new List<string>();
+        /// <summary>Installed packs whose version moved in this sync, downloaded or relabelled; never a first install.</summary>
+        public List<Notices.PackVersionChange> VersionChanges { get; } = new List<Notices.PackVersionChange>();
 
         /// <summary>True when nothing actually went wrong — failures = 0.</summary>
         public bool Ok => Failed == 0;
@@ -412,6 +414,13 @@ namespace GI_Subtitles.Services.Translation
             }
 
             result.SettleAfterDownloads();
+
+            // A new game version's pack is news for the player: one notice per game and version (NewStoryNotices).
+            // Before the manifest is saved: stopped between the two, the next sync still sees the old version, reports
+            // the step again and the once-only mark keeps it to one notice. The other order would lose it for good.
+            try { Notices.NewStoryNotices.Default.Offer(result.VersionChanges, DateTimeOffset.UtcNow); }
+            catch (Exception ex) { Logger.Log.Warn($"DictionarySync: new story notice failed (non-fatal): {ex.Message}"); }
+
             SaveManifest(manifest);
 
             syncWatch.Stop();
@@ -539,6 +548,7 @@ namespace GI_Subtitles.Services.Translation
                     $"DictionarySync: pack unchanged, version relabelled — {meta.Game}/{meta.Language} v{previous} → v{meta.Version} " +
                     $"({reason}); no download, no index rebuild.");
                 result.Relabelled++;
+                NoteVersionChange(result, meta, previous);
                 return;
             }
 
@@ -650,6 +660,14 @@ namespace GI_Subtitles.Services.Translation
                 FileSizeBytes = meta.Size,
             };
             result.Downloaded++;
+            NoteVersionChange(result, meta, existing?.Version);
+        }
+
+        /// <summary>Records a version move of a pack that was installed before; the notice rules decide if it is news.</summary>
+        private static void NoteVersionChange(DictionarySyncResult result, FileMetadata meta, string previousVersion)
+        {
+            if (string.IsNullOrWhiteSpace(previousVersion) || string.Equals(previousVersion, meta.Version, StringComparison.OrdinalIgnoreCase)) return;
+            result.VersionChanges.Add(new Notices.PackVersionChange(meta.Game, meta.Language, previousVersion, meta.Version));
         }
 
         // ───────────────────────────────────────────────────────────────────

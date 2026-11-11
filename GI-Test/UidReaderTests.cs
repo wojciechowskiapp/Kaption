@@ -192,8 +192,16 @@ namespace GI_Test
         {
             string path = Path.Combine(RenderTestKit.ReviewDir, "uid", name);
             Directory.CreateDirectory(Path.GetDirectoryName(path));
-            screen.Save(path, ImageFormat.Png);
-            Console.WriteLine(path);
+            // Best effort, outside the UI lock: the folder is per minute, so another test process may write this file now.
+            try
+            {
+                screen.Save(path, ImageFormat.Png);
+                Console.WriteLine(path);
+            }
+            catch (Exception ex) when (ex is IOException or System.Runtime.InteropServices.ExternalException)
+            {
+                Console.WriteLine($"{path} not written: {ex.Message}");
+            }
         }
 
         // A generous budget for the real reader: a slow CI machine must not turn a read into a timeout. The 1.5 s
