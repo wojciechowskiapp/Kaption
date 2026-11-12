@@ -60,5 +60,15 @@
     "name": "Battery Charge", "max": 240, "regenSeconds": 360, "hold": 1000,
     "reserve": { "name": "Backup Battery Charge", "max": 2400, "regenSeconds": 1080 },
     "checked": { "version": "3.3.0", "ref": "TextMap_ENTemplateTb Item_Energy_des and Item_BackUp_Energy_des (the items' own text)" }
+  },
+  "resets": {
+    "servers": [
+      { "id": "europe", "name": "Europe", "utcOffset": 1 },
+      { "id": "america", "name": "America", "utcOffset": -5 },
+      { "id": "asia", "name": "Asia", "utcOffset": 8 }
+    ],
+    "dailyHour": 4,
+    "weeklyDay": 1,
+    "checked": { "at": "2026-11-11", "ref": "Official update details: the week turns over on Monday 04:00 server time (Ridu Weekly, Version 1.4, zenless.hoyoverse.com/en-us/news/127445; Hollow Zero, Version 1.1, zenless.hoyoverse.com/en-us/news/125244). The servers' fixed UTC offsets are the ones the site's today page has used since 2026-11; no official page restating them was found on 2026-11-11." }
   }
 }

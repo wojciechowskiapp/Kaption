@@ -25,7 +25,7 @@ Table of contents
    11.  DirectML                          Microsoft system library (notice)
    12.  qew21/Genshin-Subtitles           Apache-2.0  (upstream fork)
    13.  PaddleOCR model weights            Apache-2.0
-   14.  .NET 10.0.14 runtime               MIT
+   14.  .NET 11.0.0 runtime                MIT
    15.  Source Sans 3, Inter Tight         OFL-1.1  (subtitle fonts)
 
 ================================================================================
@@ -437,14 +437,14 @@ Notice:    Kaption bundles ONNX runtime copies of the official PP-OCRv6 Small,
 
 
 ================================================================================
-14. .NET 10.0.14 runtime
+14. .NET 11.0.0 runtime
 ================================================================================
 
 Project:   https://github.com/dotnet/runtime
            https://github.com/dotnet/wpf  https://github.com/dotnet/winforms
 License:   MIT License
 Copyright: Copyright (c) .NET Foundation and Contributors
-Notice:    Kaption is published self-contained: the .NET 10.0.14 runtime
+Notice:    Kaption is published self-contained: the .NET 11.0.0 runtime
            (Microsoft.NETCore.App) and the Windows Desktop runtime
            (Microsoft.WindowsDesktop.App, WPF and Windows Forms) are bundled
            in the install directory. Their own third-party notices:

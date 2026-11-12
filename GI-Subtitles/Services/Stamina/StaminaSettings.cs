@@ -59,8 +59,11 @@ namespace GI_Subtitles.Services.Stamina
         public static TimeSpan GateRetry =>
             TimeSpan.FromSeconds(Math.Clamp(Config.Get(GateRetrySecondsKey, DefaultGateRetrySeconds), MinGateRetrySeconds, MaxGateRetrySeconds));
 
-        /// <summary>Testing aid: keep a small picture of every number read (and of misses) in the game's data folder.</summary>
-        public static bool SaveSamples => Config.Get(SaveSamplesKey, false);
+        /// <summary>
+        /// Testing aid: keep a small picture of every number read (and of misses) in the game's data folder. On with
+        /// its own key or with the in-game helper's Diagnostics switch.
+        /// </summary>
+        public static bool SaveSamples => Assist.AssistSettings.SaveSamples;
 
         /// <summary>The most sample pictures kept per game; the oldest go first.</summary>
         public static int SampleLimit => Math.Clamp(Config.Get(SampleLimitKey, DefaultSampleLimit), MinSampleLimit, MaxSampleLimit);
@@ -100,6 +103,34 @@ namespace GI_Subtitles.Services.Stamina
         {
             if (string.IsNullOrEmpty(wireId) || Config.Get(ArmedKeyPrefix + wireId, false) == armed) return;
             Config.Set(ArmedKeyPrefix + wireId, armed);
+        }
+
+        /// <summary>
+        /// An accepted reading with what belongs to it, in one write of Config.json: the reading, when it was seen and,
+        /// unless <paramref name="armed"/> is null (a one-point correction keeps what is owed), whether a notice is
+        /// owed for this fill. Written apart, a crash between the two could leave a new fill with no notice owed.
+        /// </summary>
+        public static void SaveAccepted(string wireId, StaminaReading reading, bool? armed, DateTimeOffset seen)
+        {
+            if (string.IsNullOrEmpty(wireId) || reading == null) return;
+            var values = new System.Collections.Generic.List<System.Collections.Generic.KeyValuePair<string, object>>
+            {
+                new(ReadingKeyPrefix + wireId, FormatReading(reading)),
+                new(SeenKeyPrefix + wireId, seen.ToUnixTimeMilliseconds()),
+            };
+            if (armed is bool owed) values.Add(new(ArmedKeyPrefix + wireId, owed));
+            Config.SetMany(values);
+        }
+
+        /// <summary>Forgets a game's reading, when it was seen and the notice owed for it ("delete what was read").</summary>
+        public static void Forget(string wireId)
+        {
+            if (string.IsNullOrEmpty(wireId)) return;
+            Config.SetMany(new System.Collections.Generic.KeyValuePair<string, object>[]
+            {
+                new(ReadingKeyPrefix + wireId, null), new(SeenKeyPrefix + wireId, null), new(ArmedKeyPrefix + wireId, null),
+            });
+            Changed?.Invoke();
         }
 
         /// <summary>"value|unix milliseconds|seconds to the next point", invariant culture.</summary>

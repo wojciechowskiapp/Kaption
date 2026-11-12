@@ -622,6 +622,7 @@ namespace GI_Subtitles.Views
             InitFarmCard();
             InitGuessNotify();
             InitStamina();
+            InitAssist();
 
             // Always open settings window on startup (non-modal so UI stays responsive)
             // The end-to-end suite drives it through UI Automation and must not take the focus from whoever uses the PC.
@@ -633,6 +634,7 @@ namespace GI_Subtitles.Views
             if (App.FirstRunOutcome == Views.OnboardingWindow.Outcome.Characters) data.ShowCharactersPage();
             App.FirstRunOutcome = Views.OnboardingWindow.Outcome.None;
             InitNewStoryNotice();
+            InitStartupNotices(windowShown: !quietStart);
 
             // Put the first-run wizard above its Settings owner. Previously it
             // was shown first and then immediately covered by this larger window.
@@ -1272,7 +1274,7 @@ namespace GI_Subtitles.Views
                 {
                 try
                 {
-                    // One capture tick: its reads (dialogue, answers, the stamina strip) share one entry of mask history.
+                    // One capture tick: its reads (dialogue, answers, the screen watch) share one entry of mask history.
                     _overlayAreaHistory.NextTick();
                     Bitmap target;
                     bool isRegion2Valid = notify.Region2 != null && notify.Region2.Length == 4 &&
@@ -1321,9 +1323,11 @@ namespace GI_Subtitles.Views
                         catch (Exception ex) { Logger.Log.Error($"Answer capture failed: {ex.Message}"); }
                     }
 
-                    // The stamina number, when the player switched that on: one small strip every few seconds, read
-                    // off this thread (MainWindow.Stamina.cs). After the dialogue captures, so their frame is untouched.
-                    SampleStaminaIfDue();
+                    // What else the player asked Kaption to read off the game screen (the stamina number): the screen
+                    // watch copies the small rectangles that are due out of the frame these captures already hold and
+                    // reads them off this thread (MainWindow.Assist.cs). After the dialogue captures, so their frame
+                    // is untouched; one comparison when nothing is switched on.
+                    _assist?.OnCaptureTick();
 
                     bool passedToOcr = false;
                     Mat frameMat = null;

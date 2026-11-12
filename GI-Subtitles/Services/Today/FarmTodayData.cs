@@ -20,7 +20,7 @@ namespace GI_Subtitles.Services.Today
     /// </summary>
     public static class FarmTodayData
     {
-        private static readonly HttpClient Http = CreateClient();
+        internal static readonly HttpClient Http = CreateClient();
         private static readonly SemaphoreSlim Gate = new(1, 1);
 
         public static string Dir => GameDataPaths.GameDir(FarmCardSettings.GameId);
@@ -146,7 +146,7 @@ namespace GI_Subtitles.Services.Today
             }
         }
 
-        private static string ReadText(string path)
+        internal static string ReadText(string path)
         {
             try
             {
@@ -159,7 +159,7 @@ namespace GI_Subtitles.Services.Today
             }
         }
 
-        private static void WriteAtomic(string path, string text)
+        internal static void WriteAtomic(string path, string text)
         {
             try
             {

@@ -33,6 +33,12 @@
       "confirmations": 2,
       "refillConfirmations": 3,
       "measured": { "version": "6.3", "ref": "Footage at 1920x1080 (16:9): map, domain list, reward dialogs, Ley Line prompt, rewards screen; .plan/in-progress/STAMINA-FROM-SCREEN.md" }
+    },
+    "assist": {
+      "checked": { "version": "6.3", "aspects": ["16:9"], "source": "Footage at 1920x1080; the stamina reader searches for its icon, so it is not bound to this shape. .plan/in-progress/STAMINA-FROM-SCREEN.md" },
+      "readers": {
+        "stamina": { "kind": "fraction", "locate": "search", "spec": "staminaScreen", "cap": "stamina.max" }
+      }
     }
   },
   "look": { "accent": "#F2B84B", "accentDark": "#A86A05", "glow": "#F2B84B", "ambience": "genshin" },
@@ -63,5 +69,15 @@
   "stamina": {
     "name": "Original Resin", "max": 200, "regenSeconds": 480, "hold": 2000,
     "checked": { "version": "7.2.0", "ref": "ExcelBinOutput/ConstValueExcelConfigData CONST_VALUE_RESIN_PARAM (2000, 200, 8 minutes) at d7f2135c" }
+  },
+  "resets": {
+    "servers": [
+      { "id": "europe", "name": "Europe", "utcOffset": 1 },
+      { "id": "america", "name": "America", "utcOffset": -5 },
+      { "id": "asia", "name": "Asia", "utcOffset": 8 }
+    ],
+    "dailyHour": 4,
+    "weeklyDay": 1,
+    "checked": { "at": "2026-11-11", "ref": "Official update details: the daily refresh at 04:00 server time (Version 1.2, genshin.hoyoverse.com/en/news/detail/7632) and the weekly one on Monday 04:00 server time (Version 1.5, genshin.hoyoverse.com/en/news/detail/12376). The servers' fixed UTC offsets are the ones the site's today page has used since 2026-11; no official page restating them was found on 2026-11-11." }
   }
 }

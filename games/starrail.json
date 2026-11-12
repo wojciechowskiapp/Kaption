@@ -34,6 +34,12 @@
       "confirmations": 2,
       "refillConfirmations": 3,
       "measured": { "version": "4.5", "ref": "Footage at 1920x1080 (16:9) and a 2:1 picture: Calyx and Cavern of Corrosion screens, Challenge Completed; .plan/in-progress/STAMINA-FROM-SCREEN.md" }
+    },
+    "assist": {
+      "checked": { "version": "4.5", "aspects": ["16:9"], "source": "Footage at 1920x1080; the stamina reader searches for its icon, so it is not bound to this shape. .plan/in-progress/STAMINA-FROM-SCREEN.md" },
+      "readers": {
+        "stamina": { "kind": "fraction", "locate": "search", "spec": "staminaScreen", "cap": "stamina.max" }
+      }
     }
   },
   "look": { "accent": "#6FD6E8", "accentDark": "#0B7C90", "glow": "#4F8DFF", "ambience": "starrail" },
@@ -65,5 +71,15 @@
     "name": "Trailblaze Power", "max": 300, "regenSeconds": 360,
     "reserve": { "name": "Reserved Trailblaze Power", "max": 2400, "regenSeconds": 1080 },
     "checked": { "version": "4.6.0", "ref": "ExcelOutput/ConstValueCommon Stamina_Maximum_Num, Stamina_Auto_Recover_Interval, ReserveStamina_* at 74a7b96f" }
+  },
+  "resets": {
+    "servers": [
+      { "id": "europe", "name": "Europe", "utcOffset": 1 },
+      { "id": "america", "name": "America", "utcOffset": -5 },
+      { "id": "asia", "name": "Asia", "utcOffset": 8 }
+    ],
+    "dailyHour": 4,
+    "weeklyDay": 1,
+    "checked": { "at": "2026-11-11", "ref": "Official update details: game periods turn over at 04:00 server time (Version 4.2, hsr.hoyoverse.com/en-us/news/163625) and the week on Monday 04:00 (Version 3.3, hsr.hoyoverse.com/en-us/news/156002). The servers' fixed UTC offsets are the ones the site's today page has used since 2026-11; no official page restating them was found on 2026-11-11." }
   }
 }

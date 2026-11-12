@@ -32,7 +32,7 @@ If you cannot use email, open a **private security advisory** on the GitHub repo
 
 In scope:
 
-- The desktop client in this repository (C# 12 / .NET 10 WPF).
+- The desktop client in this repository (C# 15 / .NET 11 WPF).
 - The backend at `api.kaption.one` (Cloudflare Worker, not in this repository).
 - The landing site at `kaption.one`.
 - The translation pipeline that ingests Hoyoverse textmaps and ships encrypted `.gisub-dist` files over R2 (private; not in this repository).

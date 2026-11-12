@@ -17,6 +17,8 @@ namespace GI_Subtitles.Views
         public event EventHandler DontShowRequested;
         public event EventHandler AddUidRequested;
         public event EventHandler FullListRequested;
+        /// <summary>A line's link was clicked (an article, the stamina timer): the host opens it.</summary>
+        public event Action<string> LinkRequested;
         /// <summary>Any click inside the card but closing: the host pins it.</summary>
         public event EventHandler Interacted;
 
@@ -26,11 +28,20 @@ namespace GI_Subtitles.Views
             ApplyAccent("Genshin");
         }
 
-        public FarmCardViewModel ViewModel => DataContext as FarmCardViewModel;
+        public FarmCardViewModel ViewModel => (DataContext as TodayCardViewModel)?.Farm;
 
-        public void Show(FarmCardViewModel vm)
+        /// <summary>The farm card alone, as before the other games had a card.</summary>
+        public void Show(FarmCardViewModel vm) => Show(vm == null ? null : new TodayCardViewModel(vm));
+
+        /// <summary>Any game's Today card. The farm parts (week strip, books, rows, tip) show only with Genshin's content.</summary>
+        public void Show(TodayCardViewModel vm)
         {
             DataContext = vm;
+            if (vm?.Eyebrow != null) EyebrowText.Text = vm.Eyebrow;
+            var farm = vm?.HasFarm == true ? Visibility.Visible : Visibility.Collapsed;
+            WeekStrip.Visibility = farm;
+            WeekBlock.Visibility = farm;
+            ResetChip.Visibility = vm == null || vm.HasReset ? Visibility.Visible : Visibility.Collapsed;
             TipLine.Visibility = string.IsNullOrEmpty(vm?.Tip) ? Visibility.Collapsed : Visibility.Visible;
         }
 
@@ -101,6 +112,7 @@ namespace GI_Subtitles.Views
             int i = 0;
             Rise(DayTitle, i++);
             Rise(WeekBlock, i++);
+            foreach (var item in Containers(SectionList)) Rise(item, i++);
             foreach (var item in Containers(BookTiles)) Rise(item, i++);
             foreach (var item in Containers(RowList)) Rise(item, i++);
             Rise(PlayerNote, i++);
@@ -133,6 +145,21 @@ namespace GI_Subtitles.Views
         {
             Interacted?.Invoke(this, EventArgs.Empty);
             AddUidRequested?.Invoke(this, EventArgs.Empty);
+        }
+
+        // A line that is a link as a whole (an article): the click pins the card and asks the host to open it.
+        private void Line_Click(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            if ((sender as FrameworkElement)?.DataContext is not TodayCardViewModel.LineVm { IsLink: true } line) return;
+            Interacted?.Invoke(this, EventArgs.Empty);
+            LinkRequested?.Invoke(line.Url);
+        }
+
+        private void LineLink_Click(object sender, RoutedEventArgs e)
+        {
+            if ((sender as FrameworkElement)?.DataContext is not TodayCardViewModel.LineVm line || string.IsNullOrEmpty(line.Url)) return;
+            Interacted?.Invoke(this, EventArgs.Empty);
+            LinkRequested?.Invoke(line.Url);
         }
 
         private void FullListButton_Click(object sender, RoutedEventArgs e)

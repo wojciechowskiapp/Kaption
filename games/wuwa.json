@@ -35,6 +35,12 @@
       "refillConfirmations": 3,
       "measured": { "version": "3.7", "ref": "Footage at 1920x1080 (16:9): map, challenge list, Claim Rewards dialog; .plan/in-progress/STAMINA-FROM-SCREEN.md" }
     },
+    "assist": {
+      "checked": { "version": "3.7", "aspects": ["16:9"], "source": "Footage at 1920x1080; the stamina reader searches for its icon, so it is not bound to this shape. .plan/in-progress/STAMINA-FROM-SCREEN.md" },
+      "readers": {
+        "stamina": { "kind": "fraction", "locate": "search", "spec": "staminaScreen", "cap": "stamina.max" }
+      }
+    },
     "playerNameTokens": ["Rover"],
     "notes": [
       "Regions measured 2026-11-04 on footage from six creators (WuWa 3.4-3.7) at 16:9, 16:10 (one creator, 2304x1440) and 21:9 (3440x1440). 4:3, 5:4 and Steam Deck are not measured; at 4:3 NPC text falls below any band rectangle.",

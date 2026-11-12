@@ -391,7 +391,7 @@ namespace GI_Subtitles.Core.Input
 
         public string ButtonText => IsEditing ? "Cancel" : "Edit";
 
-        public ICommand ToggleEditCommand => new RelayCommand(ToggleEdit);
+        public ICommand ToggleEditCommand => field ??= new RelayCommand(ToggleEdit);
 
         public string GetHotkeyText()
         {

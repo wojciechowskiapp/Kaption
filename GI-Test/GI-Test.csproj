@@ -1,8 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <!-- net48 → net8.0-windows on 2026-04-23 → net10.0-windows on 2026-04-24. -->
-    <TargetFramework>net10.0-windows</TargetFramework>
+    <!-- net48 → net8.0-windows on 2026-04-23 → net10.0-windows on 2026-04-24 → net11.0-windows on 2026-11-12. -->
+    <TargetFramework>net11.0-windows</TargetFramework>
     <UseWPF>true</UseWPF>
     <OutputType>Library</OutputType>
     <RootNamespace>GI_Test</RootNamespace>
@@ -55,9 +55,9 @@
     <!-- Microsoft.NET.Test.Sdk is required for `dotnet test` discovery on
          net8+ (MSTest alone doesn't surface the VSTest console host).
          Adds IsTestProject=true implicitly. -->
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.11.0" />
-    <PackageReference Include="MSTest.TestAdapter" Version="4.5.2" />
-    <PackageReference Include="MSTest.TestFramework" Version="4.5.2" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.12.0" />
+    <PackageReference Include="MSTest.TestAdapter" Version="4.5.3" />
+    <PackageReference Include="MSTest.TestFramework" Version="4.5.3" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
     <PackageReference Include="OpenCvSharp4" Version="4.13.0.20261107" />
     <PackageReference Include="OpenCvSharp4.Extensions" Version="4.13.0.20261107" />

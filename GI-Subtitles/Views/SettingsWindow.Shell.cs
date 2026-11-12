@@ -85,10 +85,13 @@ namespace GI_Subtitles.Views
             SyncThemeRadios();
             SyncAutoStartControls();
             ShowIntro25IfNew();
+            InitializeWhatsNewLead();
             InitializeGuessNotify();
             InitializeNewStory();
             InitializeCodesCard();
             InitializeStaminaCard();
+            InitializeTodayBlock();
+            InitializeAssistCard();
             RestoreAdvancedState();
             RefreshBuildCardMemory();
             InitializeLookPage();

@@ -1,4 +1,5 @@
 using System;
+using GI_Subtitles.Services.Notices;
 
 namespace GI_Subtitles.Services.Guess
 {
@@ -88,6 +89,26 @@ namespace GI_Subtitles.Services.Guess
                 GuessGateResult.Show => new GuessDeliveryDecision(GuessDeliveryStep.ShowBalloon, gate),
                 GuessGateResult.ShownToday => new GuessDeliveryDecision(GuessDeliveryStep.CappedToday, gate),
                 _ => new GuessDeliveryDecision(GuessDeliveryStep.Wait, gate),
+            };
+        }
+
+        /// <summary>
+        /// The next step when the app's shared gate has answered (Services/Notices/NoticeGate): the same steps, with
+        /// the whole app's daily cap read like the ranking's own once a day (the strip keeps the notice).
+        /// </summary>
+        public GuessDeliveryDecision Next(string today, bool enabled, NoticeGateResult gate)
+        {
+            if (Notice == null || !Undelivered) return new GuessDeliveryDecision(GuessDeliveryStep.Idle, GuessGateResult.Show);
+            if (!enabled || gate == NoticeGateResult.Disabled) return new GuessDeliveryDecision(GuessDeliveryStep.Disabled, GuessGateResult.Disabled);
+            if (!string.Equals(today, PendingDay, StringComparison.Ordinal))
+                return new GuessDeliveryDecision(GuessDeliveryStep.Expired, GuessGateResult.Show);
+            return gate switch
+            {
+                NoticeGateResult.Show => new GuessDeliveryDecision(GuessDeliveryStep.ShowBalloon, GuessGateResult.Show),
+                NoticeGateResult.KindShownToday or NoticeGateResult.CapReached => new GuessDeliveryDecision(GuessDeliveryStep.CappedToday, GuessGateResult.ShownToday),
+                NoticeGateResult.Translating => new GuessDeliveryDecision(GuessDeliveryStep.Wait, GuessGateResult.Translating),
+                NoticeGateResult.GameInFront => new GuessDeliveryDecision(GuessDeliveryStep.Wait, GuessGateResult.GameInFront),
+                _ => new GuessDeliveryDecision(GuessDeliveryStep.Wait, GuessGateResult.WindowsBusy),
             };
         }
 

@@ -9,7 +9,7 @@ This repository is the Windows desktop app. The backend, the website and the tra
 ## Prerequisites
 
 - Windows 10 or 11, 64-bit
-- [.NET 10 SDK](https://dotnet.microsoft.com/download) 10.0.403 or newer (`global.json` pins the feature band)
+- [.NET 11 SDK](https://dotnet.microsoft.com/download) 11.0.100 or newer (`global.json` pins the feature band)
 
 NuGet restores everything else, ONNX Runtime and DirectML included.
 
@@ -56,7 +56,7 @@ Each game is one entry in `Services/Detection/GameRegionProfile.cs`: process nam
 - **Two string files.** Every new UI string goes into `Strings.en-US.xaml` and `Strings.pl-PL.xaml`, and a test checks that their keys match. The app ships English and Polish only.
 - **No em dashes** in the string files. A test fails on them; use a comma, a colon or a full stop.
 - **Tests must not depend on your machine.** They run on a clean Windows runner with no Kaption install and no sign-in on disk. If your change touches start-up, sign-in or file protection, run the tests once with `%APPDATA%\Kaption\activation.dat` renamed, then rename it back. Use `TestProtection` for a fake activation, and never let a test write to the real profile.
-- Match the surrounding code: the newest C# on .NET 10, four-space indents, comments that say why. Window code-behind stays next to its XAML.
+- Match the surrounding code: the newest C# on .NET 11, four-space indents, comments that say why. Window code-behind stays next to its XAML.
 
 ## Issues
 

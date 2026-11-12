@@ -1,0 +1,102 @@
+{
+  "schema": 1,
+  "entries": [
+    {
+      "id": "stamina-notice-2.6.1",
+      "since": "2.6.1",
+      "order": 10,
+      "kind": "ask",
+      "feature": "stamina-notice",
+      "requires": "stamina-screen",
+      "icon": "hourglass",
+      "en": {
+        "title": "Tell me before my {stamina} hits the cap",
+        "body": "While subtitles are running, Kaption reads the number next to the {stamina} icon at the top of the game screen. {staminaWhere} From there it keeps the timer itself and sends one notice by the clock, {staminaLead} before the cap, never over the game. Nothing leaves this PC.",
+        "done": "On. Kaption picks the number up the next time it is on screen. {staminaWhere}"
+      },
+      "pl": {
+        "title": "Daj znać, zanim {stamina} dobije do limitu",
+        "body": "Kiedy działają napisy, Kaption odczytuje liczbę obok ikony {stamina} u góry ekranu gry. {staminaWhere} Dalej sam pilnuje licznika i wyśle jedno powiadomienie obok zegara, {staminaLead} przed limitem, nigdy w trakcie gry. Nic nie opuszcza tego komputera.",
+        "done": "Włączone. Kaption złapie liczbę, gdy tylko pojawi się na ekranie. {staminaWhere}"
+      }
+    },
+    {
+      "id": "day-notice-genshin-2.6.1",
+      "since": "2.6.1",
+      "order": 20,
+      "kind": "info",
+      "feature": "day-notice",
+      "requires": "today-card",
+      "games": ["genshin"],
+      "icon": "calendar",
+      "action": "today-card",
+      "en": {
+        "title": "Today's books, the moment you start",
+        "body": "On the first start of the day Kaption sends one notice: which talent books are open in {game} today and, once your UID is saved, which of your characters need them. Never over the game. A click opens the whole card.",
+        "action": "Show today's card"
+      },
+      "pl": {
+        "title": "Dzisiejsze książki od razu na starcie",
+        "body": "Przy pierwszym uruchomieniu danego dnia Kaption wysyła jedno powiadomienie: które książki talentów są dziś otwarte w {game} i, jeśli zapiszesz UID, którym z Twoich postaci się przydadzą. Nigdy w trakcie gry. Kliknięcie otwiera całą kartę.",
+        "action": "Pokaż dzisiejszą kartę"
+      }
+    },
+    {
+      "id": "day-notice-2.6.1",
+      "since": "2.6.1",
+      "order": 20,
+      "kind": "info",
+      "feature": "day-notice",
+      "requires": "today-card",
+      "games": ["starrail", "zzz", "wuwa"],
+      "icon": "calendar",
+      "action": "today-card",
+      "en": {
+        "title": "What is worth doing today, once a day",
+        "body": "On the first start of the day Kaption sends one notice when something in {game} is worth it today: stamina that reached its cap, where Kaption reads it, or an event or banner on its last day. Never over the game. A click opens the day's card.",
+        "action": "Show today's card"
+      },
+      "pl": {
+        "title": "Co dziś warto zrobić, raz dziennie",
+        "body": "Przy pierwszym uruchomieniu danego dnia Kaption wysyła jedno powiadomienie, gdy w {game} jest dziś coś wartego uwagi: energia, która dobiła do limitu, jeśli Kaption ją odczytuje, albo event czy banner w ostatnim dniu. Nigdy w trakcie gry. Kliknięcie otwiera kartę dnia.",
+        "action": "Pokaż dzisiejszą kartę"
+      }
+    },
+    {
+      "id": "start-with-windows-2.6.1",
+      "since": "2.6.1",
+      "order": 30,
+      "kind": "ask",
+      "feature": "start-with-windows",
+      "icon": "power",
+      "en": {
+        "title": "Start Kaption with Windows",
+        "body": "Kaption waits quietly by the clock and starts translating when the game comes up, so its notices reach you without opening anything. No window pops up when you sign in.",
+        "done": "On. After your next sign-in Kaption will be waiting by the clock."
+      },
+      "pl": {
+        "title": "Uruchamiaj Kaption razem z Windows",
+        "body": "Kaption czeka cicho obok zegara i sam rusza z tłumaczeniem, gdy włączysz grę, więc powiadomienia docierają bez otwierania czegokolwiek. Przy logowaniu nie wyskakuje żadne okno.",
+        "done": "Włączone. Po następnym logowaniu Kaption będzie czekał obok zegara."
+      }
+    },
+    {
+      "id": "show-in-recordings-2.6.1",
+      "since": "2.6.1",
+      "order": 40,
+      "kind": "ask",
+      "feature": "show-in-recordings",
+      "icon": "record",
+      "en": {
+        "title": "Show subtitles in recordings and streams",
+        "body": "Kaption normally asks Windows to keep the subtitles out of screen capture. Turn this on if you record or stream, and the Polish line becomes part of what OBS or Discord picks up.",
+        "done": "On. The subtitles are now part of what a recording picks up."
+      },
+      "pl": {
+        "title": "Pokazuj napisy na nagraniach i streamach",
+        "body": "Kaption zwykle prosi Windows, żeby napisów nie było na przechwytywanym obrazie. Włącz, jeśli nagrywasz albo streamujesz, a polska linijka będzie częścią tego, co łapie OBS czy Discord.",
+        "done": "Włączone. Napisy są teraz częścią tego, co łapie nagranie."
+      }
+    }
+  ]
+}

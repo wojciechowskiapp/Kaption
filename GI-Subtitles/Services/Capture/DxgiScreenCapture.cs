@@ -60,7 +60,18 @@ namespace GI_Subtitles.Services.Capture
         /// </summary>
         public bool LastFrameWasNew { get; private set; }
 
+        private static long _frameSerial;
+
+        /// <summary>
+        /// A number that moves every time any instance takes a new frame off the desktop. Two equal readings mean
+        /// the held frame is still the one seen then, however many captures timed out in between (a second capture
+        /// on one tick overwrites <see cref="LastFrameWasNew"/>; this does not go back).
+        /// </summary>
+        public static long FrameSerial => System.Threading.Interlocked.Read(ref _frameSerial);
+
         public bool IsAvailable => _initialized;
+
+        public bool HoldsFrame => true;
 
         public DxgiScreenCapture(int adapterIndex = 0, int outputIndex = 0)
         {
@@ -196,6 +207,7 @@ namespace GI_Subtitles.Services.Capture
                 }
 
                 LastFrameWasNew = true;
+                System.Threading.Interlocked.Increment(ref _frameSerial);
 
                 IntPtr desktopTexture = IntPtr.Zero;
                 hr = IUnknown_QueryInterface(desktopResource, ref IID_ID3D11Texture2D, out desktopTexture);
@@ -230,21 +242,53 @@ namespace GI_Subtitles.Services.Capture
         }
 
         /// <summary>
-        /// Copies another region out of the frame the last capture acquired, without asking the desktop for a new one.
-        /// <see cref="CaptureRegionInto"/> waits up to a frame (16 ms) for the next one, which is what the dialogue
-        /// capture wants once per tick and what a second, unhurried reader on the same tick must not pay again.
-        /// Null before the first frame; the same argument rules as <see cref="CaptureRegionInto"/>.
+        /// Copies small rectangles out of the frame the last capture acquired: one map, the row copies, no new frame
+        /// (<see cref="IScreenCapture.TryCopyFromLastFrame"/>). <see cref="CaptureRegionInto"/> waits up to a frame
+        /// (16 ms) for the next one, which is what the dialogue capture wants once per tick and what a second,
+        /// unhurried reader on the same tick must not pay again. A rectangle off this output is an answer, not an
+        /// exception: a caller that looks once a second must not throw once a second.
         /// </summary>
-        public Bitmap CopyFromHeldFrame(int x, int y, int width, int height, Bitmap destination)
+        public FrameCopy TryCopyFromLastFrame(ReadOnlySpan<Rectangle> regions, Span<byte> destination)
         {
-            if (destination == null) throw new ArgumentNullException(nameof(destination));
-            if (width <= 0) throw new ArgumentOutOfRangeException(nameof(width));
-            if (height <= 0) throw new ArgumentOutOfRangeException(nameof(height));
-            if (destination.Width < width || destination.Height < height || destination.PixelFormat != PixelFormat.Format32bppArgb)
-                throw new ArgumentException("Destination Bitmap must be Format32bppArgb and at least the region's size.", nameof(destination));
-            if (!_initialized || !_hasValidFrame) return null;
-            EnsureRegionBelongsToOutput(x, y, width, height);
-            return CopyStagingIntoBitmap(x, y, width, height, destination);
+            int need = FrameRegions.BytesFor(regions);
+            if (destination.Length < need) throw new ArgumentException("The destination is smaller than the rectangles.", nameof(destination));
+            if (!_initialized || !_hasValidFrame || _stagingTexture == IntPtr.Zero) return FrameCopy.NoFrame;
+            foreach (Rectangle r in regions)
+            {
+                if (!TryTranslateRegionToOutput(r.X, r.Y, r.Width, r.Height, _outputLeft, _outputTop, _outputWidth, _outputHeight, out _, out _))
+                    return FrameCopy.OutsideOutput;
+            }
+            if (regions.Length == 0) return FrameCopy.Copied;
+
+            int hr = ID3D11DeviceContext_Map(_context, _stagingTexture, 0, D3D11_MAP_READ, 0, out D3D11_MAPPED_SUBRESOURCE mapped);
+            if (hr < 0) return FrameCopy.NoFrame;
+            try
+            {
+                unsafe
+                {
+                    fixed (byte* dst = destination)
+                    {
+                        byte* to = dst;
+                        foreach (Rectangle r in regions)
+                        {
+                            int rowBytes = r.Width * FrameRegions.BytesPerPixel;
+                            byte* from = (byte*)mapped.pData + (long)(r.Y - _outputTop) * mapped.RowPitch
+                                         + (long)(r.X - _outputLeft) * FrameRegions.BytesPerPixel;
+                            for (int row = 0; row < r.Height; row++)
+                            {
+                                Buffer.MemoryCopy(from, to, rowBytes, rowBytes);
+                                from += mapped.RowPitch;
+                                to += rowBytes;
+                            }
+                        }
+                    }
+                }
+            }
+            finally
+            {
+                ID3D11DeviceContext_Unmap(_context, _stagingTexture, 0);
+            }
+            return FrameCopy.Copied;
         }
 
         /// <summary>

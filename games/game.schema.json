@@ -46,7 +46,8 @@
     "source": { "$ref": "#/$defs/source" },
     "translation": { "$ref": "#/$defs/translation" },
     "news": { "$ref": "#/$defs/news" },
-    "stamina": { "$ref": "#/$defs/stamina" }
+    "stamina": { "$ref": "#/$defs/stamina" },
+    "resets": { "$ref": "#/$defs/resets" }
   },
   "allOf": [
     {
@@ -87,6 +88,41 @@
           "properties": {
             "version": { "description": "The game version whose data or text was checked.", "type": "string", "pattern": "^[0-9]+[.][0-9]+(?:[.][0-9]+)?$" },
             "ref": { "description": "Where: a table and key, an item text, or a source.", "type": "string", "minLength": 8, "maxLength": 300 }
+          }
+        }
+      }
+    },
+    "resets": {
+      "description": "When the game's day and week turn over: its servers with their fixed UTC offsets, the daily reset hour and the weekly reset day, both in server time. The desktop's Today card and the site's today page read it (the site through landing/src/data/generated/resets.ts, node tools/games/generate.cjs). Only from the publisher's own pages (`checked.ref`); a game whose reset cannot be confirmed leaves the block out and shows no reset countdown.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["servers", "dailyHour", "weeklyDay", "checked"],
+      "properties": {
+        "servers": {
+          "description": "The servers a player can be on, the default first. An offset has no daylight saving.",
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 8,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "name", "utcOffset"],
+            "properties": {
+              "id": { "description": "What Config and the site's saved choice hold.", "type": "string", "pattern": "^[a-z][a-z0-9]{1,15}$" },
+              "name": { "description": "The server's English name.", "type": "string", "minLength": 2, "maxLength": 24 },
+              "utcOffset": { "description": "Whole hours from UTC.", "type": "integer", "minimum": -12, "maximum": 14 }
+            }
+          }
+        },
+        "dailyHour": { "description": "The hour of the daily reset, server time.", "type": "integer", "minimum": 0, "maximum": 23 },
+        "weeklyDay": { "description": "The weekday of the weekly reset at `dailyHour`, server time: 0 Sunday to 6 Saturday.", "type": "integer", "minimum": 0, "maximum": 6 },
+        "checked": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["at", "ref"],
+          "properties": {
+            "at": { "description": "The day it was checked.", "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" },
+            "ref": { "description": "The official source, and what could not be confirmed.", "type": "string", "minLength": 8, "maxLength": 600 }
           }
         }
       }
@@ -193,6 +229,7 @@
           "items": { "type": "string", "minLength": 2, "maxLength": 30, "pattern": "^[\\p{L}][\\p{L} '-]*[\\p{L}]$" }
         },
         "staminaScreen": { "$ref": "#/$defs/staminaScreen" },
+        "assist": { "$ref": "#/$defs/assist" },
         "notes": {
           "description": "For maintainers: which values are measured and which are provisional. No consumer reads it.",
           "type": "array",
@@ -240,6 +277,104 @@
           "properties": {
             "version": { "description": "The game version of the frames it was measured on.", "type": "string", "pattern": "^[0-9]+[.][0-9]+(?:[.][0-9]+)?$" },
             "ref": { "description": "Which screens, at which sizes, and where the record is.", "type": "string", "minLength": 8, "maxLength": 300 }
+          }
+        }
+      }
+    },
+    "assistBox": {
+      "description": "A rectangle in canvas pixels, placed from an edge or a corner of the game's window: games pin HUD pieces to the window's edges, so a place is never a fraction of the picture.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["edge", "x", "y", "w", "h"],
+      "properties": {
+            "edge": { "description": "The point of the window the place is measured from.", "enum": ["topLeft", "top", "topRight", "left", "center", "right", "bottomLeft", "bottom", "bottomRight"] },
+            "x": { "description": "Canvas pixels from that point to the box's left edge (negative: to the left of it).", "type": "integer", "minimum": -7680, "maximum": 7680 },
+            "y": { "description": "Canvas pixels from that point to the box's top edge (negative: above it).", "type": "integer", "minimum": -4320, "maximum": 4320 },
+            "w": { "type": "integer", "minimum": 1, "maximum": 1920 },
+            "h": { "type": "integer", "minimum": 1, "maximum": 1080 }
+      }
+    },
+    "assist": {
+      "description": "What the desktop may read off this game's screen besides the dialogue, for a player who switched a reader on (the in-game helper; GI-Subtitles/Services/Assist). A game without the block gets nothing. `screens` are told apart by small templates at fixed places; `readers` say what is read and where. Fixed places are in pixels of `canvas`, count only in a window whose shape is in `checked.aspects`, and need `canvas`. A reader with `locate: search` finds its own anchor instead (the stamina number) and is not bound to those shapes.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["checked", "readers"],
+      "properties": {
+        "canvas": {
+          "description": "The size the game draws its interface for, and how it grows with the window. Measured per game, never assumed.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["width", "height", "scale"],
+          "properties": {
+            "width": { "type": "integer", "minimum": 640, "maximum": 7680 },
+            "height": { "type": "integer", "minimum": 360, "maximum": 4320 },
+            "scale": { "description": "min: by the smaller of width/canvas width and height/canvas height; height or width: by that ratio alone.", "enum": ["min", "height", "width"] }
+          }
+        },
+        "checked": {
+          "description": "What the places were measured on. A game update can move the interface; this is the record to check against.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["version", "aspects", "source"],
+          "properties": {
+            "version": { "description": "The game version of the frames.", "type": "string", "pattern": "^[0-9]+[.][0-9]+(?:[.][0-9]+)?$" },
+            "aspects": {
+              "description": "Window shapes measured. A window of another shape gets no fixed place. \"21:9\" covers 2560x1080 and 3440x1440.",
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 8,
+              "uniqueItems": true,
+              "items": { "type": "string", "pattern": "^[1-9][0-9]?:[1-9][0-9]?$" }
+            },
+            "source": { "description": "Which frames, and where the record is.", "type": "string", "minLength": 8, "maxLength": 300 }
+          }
+        },
+        "screens": {
+          "description": "Screen id to its anchors: one or two small pictures that are on that screen and nowhere else, each at a declared place. Choose pictures that do not change with the input device (no key or button glyphs).",
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["anchors"],
+            "properties": {
+              "anchors": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 2,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["template", "edge", "x", "y", "w", "h", "threshold"],
+                  "properties": {
+                    "template": { "description": "GI-Subtitles/Assets/Assist/<game>/<template>.png, exactly w x h, at most 64x64.", "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+            "edge": { "description": "The point of the window the place is measured from.", "enum": ["topLeft", "top", "topRight", "left", "center", "right", "bottomLeft", "bottom", "bottomRight"] },
+            "x": { "description": "Canvas pixels from that point to the box's left edge (negative: to the left of it).", "type": "integer", "minimum": -7680, "maximum": 7680 },
+            "y": { "description": "Canvas pixels from that point to the box's top edge (negative: above it).", "type": "integer", "minimum": -4320, "maximum": 4320 },
+            "w": { "type": "integer", "minimum": 1, "maximum": 64 },
+            "h": { "type": "integer", "minimum": 1, "maximum": 64 },
+                    "threshold": { "description": "Lowest match (normalised correlation) that counts.", "type": "number", "minimum": 0.5, "maximum": 1 }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "readers": {
+          "description": "Reader id to what it reads. Every reader is off until the player switches it on.",
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["kind", "locate"],
+            "properties": {
+              "kind": { "description": "fraction: value/cap. count: a bare number. names: names from a list. packText: a line of the translation pack. panel: a block of text. A kind the desktop build has no reader for stays off.", "enum": ["fraction", "count", "names", "packText", "panel"] },
+              "locate": { "description": "box: a fixed place on `screen`. search: the reader finds its own anchor, described by `spec`.", "enum": ["box", "search"] },
+              "screen": { "description": "For box: the screen it is on.", "type": "string", "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$" },
+              "box": { "$ref": "#/$defs/assistBox" },
+              "spec": { "description": "For search: the desktop block that describes the search.", "enum": ["staminaScreen"] },
+              "cap": { "description": "For fraction: where the cap the number must show comes from.", "enum": ["stamina.max"] },
+              "vocabulary": { "description": "For names: the list a name must be in.", "type": "string", "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$" }
+            }
           }
         }
       }

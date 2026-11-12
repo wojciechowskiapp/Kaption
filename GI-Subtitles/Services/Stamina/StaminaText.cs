@@ -51,7 +51,7 @@ namespace GI_Subtitles.Services.Stamina
                 string body = string.IsNullOrWhiteSpace(stamina.Reserve?.Name)
                     ? string.Format(culture, l("Stamina_Notice_Full_Body", "{0}/{1}. It filled {2}; anything more is lost until you spend some."),
                         value, stamina.Max, Moment(full, now, l, culture))
-                    : string.Format(culture, l("Stamina_Notice_Full_Body_Reserve", "{0}/{1}. It filled {2}; from here only {3} grows, and slower."),
+                    : string.Format(culture, l("Stamina_Notice_Full_Body_Reserve", "{0}/{1}. It filled {2}; what comes next goes to {3}, slower, until that is full too."),
                         value, stamina.Max, Moment(full, now, l, culture), stamina.Reserve.Name);
                 return new StaminaNoticeText(string.Format(culture, l("Stamina_Notice_Full_Title", "{0} is full"), stamina.Name), body);
             }

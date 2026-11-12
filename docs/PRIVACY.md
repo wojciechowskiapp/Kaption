@@ -8,7 +8,8 @@ Data controller: Michał Wojciechowski DEV, ul. Wałowa 3a/10, 37-450 Stalowa Wo
 
 - The app reads the part of the screen you chose and recognises the text on your PC. Screen images never leave it.
 - `%APPDATA%\Kaption` holds your settings, the activation (protected with Windows DPAPI), the subtitle packs (encrypted for this machine) and `app.log`. We can't see these files unless you send them to us.
-- The app does not read game memory or game files, record keystrokes, or talk to the game's servers.
+- **The in-game helper, only if you switch it on.** Each thing it can read off the game screen has its own switch (Ustawienia › Gra i napisy › Pomocnik w grze); all are off by default. Today that is one number: the game's stamina beside its icon, for a timer. It reads the frame the subtitles already captured, only while subtitles run, and keeps what it read in `%APPDATA%\Kaption\<Game>\assist.json` and in your settings. Nothing of it is sent to us or anyone else, and one button on the same card deletes it.
+- The app does not read game memory or game files, record keystrokes, send any input to the game, or talk to the game's servers.
 
 ## What the app sends
 

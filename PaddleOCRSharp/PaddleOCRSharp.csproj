@@ -1,8 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <!-- net48 → net8.0-windows on 2026-04-23 → net10.0-windows on 2026-04-24. -->
-    <TargetFramework>net10.0-windows</TargetFramework>
+    <!-- net48 → net8.0-windows on 2026-04-23 → net10.0-windows on 2026-04-24 → net11.0-windows on 2026-11-12. -->
+    <TargetFramework>net11.0-windows</TargetFramework>
     <OutputType>Library</OutputType>
     <RootNamespace>PaddleOCRSharp</RootNamespace>
     <AssemblyName>PaddleOCRSharp</AssemblyName>

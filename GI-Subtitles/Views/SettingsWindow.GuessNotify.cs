@@ -133,7 +133,8 @@ namespace GI_Subtitles.Views
                 {
                     SetupCompleted = Config.Get("SetupCompleted", false),
                     OnboardingRanThisLaunch = _onboardingRanThisLaunch,
-                    Intro25Visible = Intro25Card?.Visibility == Visibility.Visible,
+                    // The news card leads the once-cards the same way the 2.5 card does: one at a time.
+                    Intro25Visible = Intro25Card?.Visibility == Visibility.Visible || WhatsNewLeadUp,
                     WuWaPolishListed = listed,
                     WuWaComing = PackAvailability.IsComing(wuwaId, "pl"),
                     WuWaGameVersion = version,

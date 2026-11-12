@@ -326,6 +326,9 @@
 
                         <!-- The "once" stack: one-time cards and the ranking strip share row 5, so rows 6-9 keep their numbers. -->
                         <StackPanel x:Name="StartOnceCards" Grid.Row="5">
+                        <!-- New in Kaption, once per release: what the update brings this player, with the question right there
+                             where a thing is theirs to switch on (SettingsWindow.WhatsNew.cs). It leads the once-cards. -->
+                        <views:WhatsNewLead x:Name="WhatsNewLeadCard"/>
                         <!-- A new game version's story is in Polish: one line per game and version, raised when its pack
                              installs (NewStoryNotices). Closing it, or opening the page, closes it for good. -->
                         <Border x:Name="NewStoryCard" Visibility="Collapsed" Style="{StaticResource Card}" Margin="0,16,0,0" Padding="0">
@@ -586,6 +589,9 @@
                         <!-- ═══ The selected game's stamina timer (SettingsWindow.Stamina.cs): its switch is the player's consent to
                              read the number off the game screen. Hidden for a game whose screen is not measured. ═══ -->
                         <views:StaminaCard x:Name="StaminaCard"/>
+                        <!-- ═══ Today in the selected game (SettingsWindow.Today.cs): the Today card's model as a block; collapsed
+                             when it has nothing to say. ═══ -->
+                        <views:TodayBlock x:Name="TodayBlock"/>
                         <views:GameCodesCard x:Name="CodesCard"/>
 
                         <!-- ═══ What's new: only when the newest release note is newer than the last one dismissed. ═══ -->
@@ -910,6 +916,54 @@
                                     <TextBlock Text="{DynamicResource NewStory_Toggle_Hint}" Style="{StaticResource HintText}" Margin="0,2,0,0"/>
                                 </StackPanel>
                             </CheckBox>
+                        </Border>
+
+                        <!-- The notice of the day (DayNotice.Enabled) and the news card after an update (WhatsNew.Enabled): both on
+                             by default, each at most once (a game day, a release). SettingsWindow.WhatsNew.cs. -->
+                        <Border x:Name="DayNoticeCard" Style="{StaticResource Card}">
+                            <CheckBox x:Name="DayNoticeToggle" Style="{StaticResource ToggleSwitch}" IsChecked="True"
+                                      Checked="DayNoticeToggle_Changed" Unchecked="DayNoticeToggle_Changed"
+                                      AutomationProperties.Name="{DynamicResource DayNotice_Toggle}"
+                                      AutomationProperties.HelpText="{DynamicResource DayNotice_Toggle_Hint}">
+                                <StackPanel>
+                                    <TextBlock Text="{DynamicResource DayNotice_Toggle}" FontSize="{StaticResource FontSizeCardTitle}"
+                                               FontWeight="SemiBold" Foreground="{DynamicResource TextBrush}" TextWrapping="Wrap"/>
+                                    <TextBlock Text="{DynamicResource DayNotice_Toggle_Hint}" Style="{StaticResource HintText}" Margin="0,2,0,0"/>
+                                </StackPanel>
+                            </CheckBox>
+                        </Border>
+                        <Border x:Name="WhatsNewNoticeCard" Style="{StaticResource Card}">
+                            <CheckBox x:Name="WhatsNewToggle" Style="{StaticResource ToggleSwitch}" IsChecked="True"
+                                      Checked="WhatsNewToggle_Changed" Unchecked="WhatsNewToggle_Changed"
+                                      AutomationProperties.Name="{DynamicResource WhatsNew_Toggle}"
+                                      AutomationProperties.HelpText="{DynamicResource WhatsNew_Toggle_Hint}">
+                                <StackPanel>
+                                    <TextBlock Text="{DynamicResource WhatsNew_Toggle}" FontSize="{StaticResource FontSizeCardTitle}"
+                                               FontWeight="SemiBold" Foreground="{DynamicResource TextBrush}" TextWrapping="Wrap"/>
+                                    <TextBlock Text="{DynamicResource WhatsNew_Toggle_Hint}" Style="{StaticResource HintText}" Margin="0,2,0,0"/>
+                                </StackPanel>
+                            </CheckBox>
+                        </Border>
+
+                        <!-- In-game helper (SettingsWindow.Assist.cs): what Kaption may read off the game screen besides the
+                             dialogue. Every reader of the selected game with its own switch, off until switched on; what
+                             has been read; one button forgets it. -->
+                        <Border x:Name="AssistCard" Style="{StaticResource Card}">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource CardTitle}" Text="{DynamicResource Assist_Title}" Margin="0"/>
+                                <TextBlock Style="{StaticResource HintText}" Text="{DynamicResource Assist_Hint}" Margin="0,4,0,14"/>
+                                <StackPanel x:Name="AssistReaderList"/>
+                                <TextBlock x:Name="AssistNone" Style="{StaticResource BodyText}" TextWrapping="Wrap" Visibility="Collapsed"/>
+                                <StackPanel x:Name="AssistReadBlock" Margin="0,8,0,0">
+                                    <TextBlock Style="{StaticResource FieldLabel}" Text="{DynamicResource Assist_Read_Title}"/>
+                                    <StackPanel x:Name="AssistReadLines" Margin="0,2,0,0"/>
+                                    <Button x:Name="AssistDeleteButton" Style="{StaticResource SecondaryButton}" HorizontalAlignment="Left"
+                                            Margin="0,12,0,0" Content="{DynamicResource Assist_Delete}" ToolTip="{DynamicResource Assist_Delete_Tip}"
+                                            AutomationProperties.HelpText="{DynamicResource Assist_Delete_Tip}" Click="AssistDelete_Click"/>
+                                    <TextBlock x:Name="AssistDeleteNote" Style="{StaticResource HintText}" Foreground="{DynamicResource WarnBrush}"
+                                               Text="{DynamicResource Assist_Delete_Failed}" Margin="0,8,0,0" Visibility="Collapsed"/>
+                                </StackPanel>
+                            </StackPanel>
                         </Border>
 
                         <!-- Dialogue area: what Kaption reads, shown as a live thumbnail on its monitor. -->
@@ -1520,6 +1574,22 @@
                             </Grid>
                         </Border>
 
+                        <!-- The list behind Start's "New in Kaption" card: every entry for this game, each with its switch. -->
+                        <Border Style="{StaticResource Card}">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel VerticalAlignment="Center" Margin="0,0,16,0">
+                                    <TextBlock Style="{StaticResource CardTitle}" Text="{DynamicResource WhatsNew_Help_Title}" Margin="0,0,0,2"/>
+                                    <TextBlock Style="{StaticResource HintText}" Text="{DynamicResource WhatsNew_Help_Body}"/>
+                                </StackPanel>
+                                <Button x:Name="WhatsNewListButton" Grid.Column="1" Style="{StaticResource SecondaryButton}" VerticalAlignment="Center"
+                                        Content="{DynamicResource WhatsNew_Help_Button}" Click="WhatsNewList_Click"/>
+                            </Grid>
+                        </Border>
+
                         <Border Style="{StaticResource Card}">
                             <StackPanel>
                                 <TextBlock Style="{StaticResource CardTitle}" Text="{DynamicResource shell_Help_Trouble}"/>
@@ -1767,6 +1837,12 @@
                                         <CheckBox x:Name="DetailedLoggingCheckBox" Style="{StaticResource ModernCheckBox}"
                                                   Content="{DynamicResource Logs_DetailedLogging}" ToolTip="{DynamicResource Tip_Logs_DetailedLogging}"
                                                   Checked="DetailedLogging_Changed" Unchecked="DetailedLogging_Changed"/>
+                                        <!-- The in-game helper's sample pictures (Assist.SaveSamples): small cut-outs, never a whole screen. -->
+                                        <CheckBox x:Name="AssistSamplesCheckBox" Style="{StaticResource ModernCheckBox}" Margin="0,12,0,0"
+                                                  Content="{DynamicResource Assist_Samples}"
+                                                  AutomationProperties.HelpText="{DynamicResource Assist_Samples_Hint}"
+                                                  Checked="AssistSamples_Changed" Unchecked="AssistSamples_Changed"/>
+                                        <TextBlock Text="{DynamicResource Assist_Samples_Hint}" Style="{StaticResource HintText}" Margin="28,4,0,0"/>
                                     </StackPanel>
                                 </Border>
                             </StackPanel>

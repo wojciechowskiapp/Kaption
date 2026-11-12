@@ -21,14 +21,14 @@ namespace GI_Subtitles.Services.Rendering
         private static readonly ConcurrentDictionary<string, FontFamily> Cache = new(StringComparer.OrdinalIgnoreCase);
 
         /// <summary>pack://application:,,,/Kaption;component/ (assembly-qualified, so it also resolves in tests).</summary>
-        public static Uri PackBase
+        public static Uri PackBase => field ??= CreatePackBase();
+
+        private static Uri CreatePackBase()
         {
-            get
-            {
-                System.Runtime.CompilerServices.RuntimeHelpers.RunClassConstructor(typeof(System.Windows.Application).TypeHandle);
-                string asm = typeof(OverlayFonts).Assembly.GetName().Name;
-                return new Uri($"pack://application:,,,/{asm};component/", UriKind.Absolute);
-            }
+            // The pack:// scheme is registered by Application's static constructor.
+            System.Runtime.CompilerServices.RuntimeHelpers.RunClassConstructor(typeof(System.Windows.Application).TypeHandle);
+            string asm = typeof(OverlayFonts).Assembly.GetName().Name;
+            return new Uri($"pack://application:,,,/{asm};component/", UriKind.Absolute);
         }
 
         public static bool IsBundled(string name) =>

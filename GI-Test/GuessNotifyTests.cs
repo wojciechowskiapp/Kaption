@@ -13,6 +13,7 @@ using System.Xml.Linq;
 using GI_Subtitles.Services.Games;
 using GI_Subtitles.Services.Guess;
 using GI_Subtitles.Services.Network;
+using GI_Subtitles.Services.Notices;
 using GI_Subtitles.Views.Shell;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
@@ -245,6 +246,26 @@ namespace GI_Test
             Assert.AreEqual(GuessDeliveryStep.Wait, d.Next(Today, true, null, true, false, 5).Step, "subtitles on");
             Assert.AreEqual(GuessDeliveryStep.Wait, d.Next(Today, true, null, false, false, 3).Step, "full screen");
             Assert.AreEqual(GuessDeliveryStep.ShowBalloon, d.Next(Today, true, null, false, false, 5).Step);
+        }
+
+        [TestMethod]
+        public void Delivery_ThroughTheAppsGate_TheSameSteps_AndTheDaysCapKeepsItOnTheStrip()
+        {
+            var (d, _, _) = Waiting();
+            Assert.AreEqual(GuessDeliveryStep.ShowBalloon, d.Next(Today, true, NoticeGateResult.Show).Step);
+            var wait = d.Next(Today, true, NoticeGateResult.GameInFront);
+            Assert.AreEqual((GuessDeliveryStep.Wait, GuessGateResult.GameInFront), (wait.Step, wait.Gate));
+            Assert.AreEqual(GuessGateResult.Translating, d.Next(Today, true, NoticeGateResult.Translating).Gate);
+            foreach (var later in new[] { NoticeGateResult.WindowsBusy, NoticeGateResult.Outranked, NoticeGateResult.TooSoon })
+                Assert.AreEqual(GuessDeliveryStep.Wait, d.Next(Today, true, later).Step, later.ToString());
+            // The app has sent its notices for today, or this kind has: no balloon, the strip keeps it.
+            Assert.AreEqual(GuessDeliveryStep.CappedToday, d.Next(Today, true, NoticeGateResult.CapReached).Step);
+            Assert.AreEqual(GuessDeliveryStep.CappedToday, d.Next(Today, true, NoticeGateResult.KindShownToday).Step);
+            Assert.AreEqual(GuessDeliveryStep.Disabled, d.Next(Today, false, NoticeGateResult.Show).Step);
+            // A notice found on an earlier day expires unseen as a balloon, whatever the gate says; the strip keeps it.
+            Assert.AreEqual(GuessDeliveryStep.Expired, d.Next("2026-11-06", true, NoticeGateResult.Show).Step);
+            Assert.IsNotNull(d.Notice);
+            Assert.AreEqual(GuessDeliveryStep.Idle, new GuessNoticeDelivery().Next(Today, true, NoticeGateResult.Show).Step);
         }
 
         [TestMethod]

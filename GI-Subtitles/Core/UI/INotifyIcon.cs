@@ -98,8 +98,8 @@ namespace GI_Subtitles.Core.UI
                 try { (System.Windows.Application.Current?.MainWindow as Views.MainWindow)?.OpenSuggestFix(fromHotkey: false); }
                 catch (Exception ex) { Logger.Log.Warn($"Tray fix line failed: {ex.Message}"); }
             };
-            // The farm card on demand (Genshin only: the other games have no weekday rotation).
-            farmTodayItem = new ToolStripMenuItem(GetLocalizedString("Tray_FarmToday", "What to farm today"));
+            // The Today card on demand: "What to farm today" for Genshin, "Today in the game" for the others.
+            farmTodayItem = new ToolStripMenuItem(TodayItemText());
             farmTodayItem.Click += (sender, e) =>
             {
                 try { (System.Windows.Application.Current?.MainWindow as Views.MainWindow)?.ShowFarmCardOnDemand(); }
@@ -271,12 +271,16 @@ namespace GI_Subtitles.Core.UI
         /// self-unsubscribe after a single fire so multiple calls don't stack
         /// handlers. Safe to call from any thread — we marshal back to the
         /// icon's synchronisation context.
+        ///
+        /// Returns whether the notice was handed to Windows. False when there is no tray icon to hang it on (not
+        /// built yet, hidden, or gone) or the call failed: a caller that remembers "shown" must not on a false.
         /// </summary>
-        public void ShowBalloonTip(string title, string body, Action onClick = null)
+        public bool ShowBalloonTip(string title, string body, Action onClick = null)
         {
             try
             {
-                if (_trayIcon == null) return;
+                // WinForms drops a balloon for an icon that is not in the tray without a word.
+                if (!CanShowBalloon(_trayIcon != null, _trayIcon?.Visible == true)) return false;
                 // Microsoft recommends 0 to use the system default (~5-10s on
                 // Windows 10+). Explicit timeout would be ignored on modern
                 // Windows anyway because toast notifications aren't timed.
@@ -301,12 +305,17 @@ namespace GI_Subtitles.Core.UI
                     _trayIcon.BalloonTipClosed += closed;
                 }
                 _trayIcon.ShowBalloonTip(0, title ?? string.Empty, body ?? string.Empty, ToolTipIcon.Info);
+                return true;
             }
             catch (Exception ex)
             {
                 Logger.Log.Warn($"ShowBalloonTip failed: {ex.Message}");
+                return false;
             }
         }
+
+        /// <summary>A balloon needs an icon that exists and is in the tray.</summary>
+        internal static bool CanShowBalloon(bool hasIcon, bool iconVisible) => hasIcon && iconVisible;
 
         /// <summary>
         /// Captured NotifyIcon reference for out-of-band callers (e.g. update
@@ -339,7 +348,7 @@ namespace GI_Subtitles.Core.UI
                 exitItem.Text = GetLocalizedString("shell_Tray_Exit", "Quit Kaption");
                 if (charactersItem != null) charactersItem.Text = GetLocalizedString("shell_Tray_Characters", "Characters");
                 if (fixLineItem != null) fixLineItem.Text = GetLocalizedString("Tray_FixLine", "Fix the last subtitle…");
-                if (farmTodayItem != null) farmTodayItem.Text = GetLocalizedString("Tray_FarmToday", "What to farm today");
+                if (farmTodayItem != null) farmTodayItem.Text = TodayItemText();
                 if (startStopItem != null)
                     startStopItem.Text = (data?.IsOcrRunning?.Invoke() ?? false)
                         ? GetLocalizedString("shell_Tray_Stop", "Stop translating")
@@ -647,10 +656,19 @@ namespace GI_Subtitles.Core.UI
             }
         }
 
+        private string TodayItemText() =>
+            Services.Today.FarmCardSettings.IsActiveGame()
+                ? GetLocalizedString("Tray_FarmToday", "What to farm today")
+                : GetLocalizedString("Tray_Today", "Today in the game");
+
         private void ContextMenuStrip_Opening(object sender, System.ComponentModel.CancelEventArgs e)
         {
             isContextMenuOpen = true;
-            if (farmTodayItem != null) farmTodayItem.Visible = Services.Today.FarmCardSettings.IsActiveGame();
+            if (farmTodayItem != null)
+            {
+                farmTodayItem.Visible = Services.Today.TodayCardSettings.HasCard(Services.Today.TodayCardSettings.ActiveGame());
+                farmTodayItem.Text = TodayItemText();
+            }
             if (startStopItem != null)
             {
                 bool running = data?.IsOcrRunning?.Invoke() ?? false;

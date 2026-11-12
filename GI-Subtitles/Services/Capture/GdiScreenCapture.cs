@@ -2,6 +2,7 @@ using System;
 using System.Drawing;
 using System.Drawing.Imaging;
 using GI_Subtitles.Common;
+using GI_Subtitles.Core.Pooling;
 
 namespace GI_Subtitles.Services.Capture
 {
@@ -21,6 +22,8 @@ namespace GI_Subtitles.Services.Capture
             new ThrottledLogger(TimeSpan.FromSeconds(60));
 
         public bool IsAvailable => true;
+
+        public bool HoldsFrame => false;
 
         /// <summary>
         /// Allocates a fresh Bitmap and captures into it. Convenience overload — the OCR
@@ -90,6 +93,56 @@ namespace GI_Subtitles.Services.Capture
                 }
                 throw;
             }
+        }
+
+        /// <summary>
+        /// GDI holds no frame, so "the last frame" is the screen now: one screen copy per rectangle
+        /// (<see cref="IScreenCapture.TryCopyFromLastFrame"/>). A screen that cannot be copied (the secure desktop,
+        /// a locked PC) answers <see cref="FrameCopy.NoFrame"/> and logs nothing: the dialogue capture reports it.
+        /// </summary>
+        public FrameCopy TryCopyFromLastFrame(ReadOnlySpan<Rectangle> regions, Span<byte> destination)
+        {
+            int need = FrameRegions.BytesFor(regions);
+            if (destination.Length < need) throw new ArgumentException("The destination is smaller than the rectangles.", nameof(destination));
+            int at = 0;
+            foreach (Rectangle r in regions)
+            {
+                Bitmap shot = BitmapPool.Default.Rent(r.Width, r.Height, PixelFormat.Format32bppArgb);
+                try
+                {
+                    using (Graphics g = Graphics.FromImage(shot))
+                    {
+                        g.CopyFromScreen(r.X, r.Y, 0, 0, r.Size);
+                    }
+                    BitmapData bits = shot.LockBits(new Rectangle(0, 0, r.Width, r.Height), ImageLockMode.ReadOnly, PixelFormat.Format32bppArgb);
+                    try
+                    {
+                        int rowBytes = r.Width * FrameRegions.BytesPerPixel;
+                        unsafe
+                        {
+                            for (int row = 0; row < r.Height; row++)
+                            {
+                                new ReadOnlySpan<byte>((byte*)bits.Scan0 + (long)row * bits.Stride, rowBytes).CopyTo(destination.Slice(at, rowBytes));
+                                at += rowBytes;
+                            }
+                        }
+                    }
+                    finally
+                    {
+                        shot.UnlockBits(bits);
+                    }
+                }
+                catch (Exception ex) when (ex is System.ComponentModel.Win32Exception || ex is System.Runtime.InteropServices.ExternalException
+                                           || ex is InvalidOperationException)
+                {
+                    return FrameCopy.NoFrame;
+                }
+                finally
+                {
+                    BitmapPool.Default.Return(shot);
+                }
+            }
+            return FrameCopy.Copied;
         }
 
         public void Dispose() { }

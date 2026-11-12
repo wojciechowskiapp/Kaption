@@ -4815,6 +4815,8 @@ namespace GI_Subtitles.Views
             RebindMyFixes();        // My fixes follows the picked game; "Later" on the prompt keeps this page up
             RefreshCodesCard();     // Start's codes card follows the picked game too
             RefreshStaminaCard();   // and so does the stamina timer
+            RefreshTodayBlock();    // and today's resets and periods
+            RefreshAssistCard();    // and the in-game helper lists that game's readers
             Logger.Log.Info($"Translations: game switched to {tag}.");
 
             // Prompt immediately — if the user picks Restart, we skip the

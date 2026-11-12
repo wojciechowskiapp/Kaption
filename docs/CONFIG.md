@@ -71,6 +71,26 @@ Only 9 or 10 digits without a leading zero count; anything else in these keys is
 
 The domain schedule comes from `kaption.one/data/today/genshin.json` and is kept in `%APPDATA%\Kaption\Genshin\today.json`; the showcase is kept, trimmed to names, levels and talent levels, in `showcase.json` next to it. A UID the build card read from the game screen is offered in the field but saved only when you click Save. The log never names the UID, and diagnostic bundles mask it.
 
+## Today card
+
+The card "Co dziś farmić" grew into a Today card for every game: once per game day, the first time the selected game is in front, Kaption shows what it knows about today. Each part is there only when it has something to say: your stamina by the timer (from the number read off the game screen, when you switched that on, always with the time it was read), this week's daily and weekly reset, banners and events that end within seven days (from `kaption.one/data/today/week.json`, the same list as the site's today page, kept in `%APPDATA%\Kaption\today-week.json` and read again at most every six hours), and for Genshin the books and characters as before. A game with nothing but reset times gets no card by itself that day. The same content is a block on the Start page, and the tray has "Dzisiaj w grze" ("Today in the game"). Reset hours and servers come from each game's data (`games/<id>.json`, `resets`); Wuthering Waves has none yet, so its card shows no reset countdown.
+
+| Key | Default | What it does |
+|---|---|---|
+| `FarmCardEnabled` | `true` | The one switch for every game's card ("Nie pokazuj" on the card turns it off). |
+| `FarmCardRegion` | `"europe"` | Your server for every game: `"europe"`, `"america"` or `"asia"`. A game without that server uses its first one. |
+| `TodayCard.LastShownDay.<game>` | none | Written by Kaption: the game day that game's card last showed by itself (`<game>` is `genshin`, `starrail`, `zzz`, `wuwa`). |
+
+## Notices
+
+Kaption sends five kinds of tray notice on its own: the new story is in Polish (once per game version), someone passed you on a guess board (once a day), stamina is nearly full (once per fill), Kaption has been updated (once per release, only on a start with Windows) and the notice of the day (once per game day). Each keeps its own switch. All of them pass one gate: never while subtitles run, never with a game in front, only when Windows accepts a notification, one at a time, and the story notice first when two wait. A notice that is turned away stays where it already is on the Start page.
+
+| Key | Default | What it does |
+|---|---|---|
+| `Notices.MaxPerDay` | `2` | The most tray notices of these kinds in one day, all kinds together (0 to 20). `0` sends none; they stay on Start. |
+| `Notices.GapSeconds` | `45` | The pause between two notices, so the second does not replace the first (0 to 600). |
+| `Notices.Day`, `Notices.ShownToday` | none | Written by Kaption: the day the count belongs to, and the count. |
+
 ## Game codes card (2.6.0)
 
 Start shows a small card with the selected game's active redeem codes: the newest three, each with Copy and, for the HoYoLAB games, Odbierz (Redeem), which opens the publisher's own redeem page with the code filled in; for Wuthering Waves, whose codes are typed in the game, the menu path instead. "Wszystkie kody" ("All codes") opens the game's codes page on kaption.one (`/pl/kody/<game>/` with a Polish interface, `/codes/<game>/` otherwise). The list comes from `api.kaption.one/api/app/codes?game=<id>` (public, no sign-in, nothing about you is sent): about 3 seconds after the window opens, then every 30 minutes while the window is on screen, and again when you open the window or switch game if the last read is older than that. Nothing is read while Kaption sits in the tray. After an error it waits 5, then 15, then 30 minutes (a server's `Retry-After` can make a wait longer, up to 6 hours, never shorter). A list read earlier stays on the card through failed reads for two intervals (1 hour by default) and is then hidden, so an old list never sits there for days. The card is hidden when the game has no active codes, before its codes were ever checked, and before the first read succeeds; it never says "no codes". No notices, no sounds.
@@ -116,9 +136,24 @@ When a subtitle pack for a new game version installs (7.1 to 7.2), Kaption says 
 | `NewStory.Acknowledged` | none | Written by Kaption: per game, the highest game version whose notice you closed or opened (`"genshin/7.2"`). The "Co nowego" ("What's new") card for the same version's article then stays closed too. |
 | `NewStory.Pending` | none | Written by Kaption: lines still on Start, one per game (`"genshin/7.2@1793891896"`: the version and when it was raised). |
 
+## In-game helper
+
+Besides the dialogue, Kaption can read a few things off the game screen for you. Each one is a "reader" with its own switch in Ustawienia › Gra i napisy › Pomocnik w grze (Settings › Game and subtitles › In-game helper), and every reader is off until you switch it on. Readers look only while subtitles run and the game is in front, they read the frame the subtitles already captured (the app never takes a second screenshot for them), and what they read stays on this PC. Nothing is sent anywhere, no key or click is ever sent to the game, and the game's files and memory are not touched. A reader that is not sure refuses: a number outside its range, a cap that is not the game's, or a window whose shape was not measured gives no reading. Today there is one reader, the stamina timer (next section).
+
+What was read is kept per game in `%APPDATA%\Kaption\<Game>\assist.json`: the value, when it was seen, and for each reader when it last read anything and how many app sessions it has been switched on since (so a reader that a game update broke shows up in a diagnostic bundle as "not seen for N sessions"). "Usuń odczytane dane" ("Delete what was read") on the same card removes that file, the stamina timer's reading and any sample pictures for the selected game.
+
+| Key | Default | What it does |
+|---|---|---|
+| `Assist.Reader.<id>` | `false` | A reader's switch (`<id>` as in the game's manifest). The stamina reader uses `Stamina.Enabled` instead, the key it shipped with; the switch on the Start card and the one in Settings write the same key. |
+| `Assist.SaveSamples` | `false` | Testing aid; the checkbox is in Pomoc › Zaawansowane (Help › Advanced). Keeps a small cut-out of every read, every refused read and every near miss of a screen anchor, never a whole screen: the stamina reader's go to `%APPDATA%\Kaption\<Game>\stamina-samples\`, screen anchors' to `%APPDATA%\Kaption\assist-samples\<Game>\`. Send the folder when a read is wrong. |
+| `Assist.SampleLimit` | `200` | The most pictures kept per folder, oldest out first (10 to 5000). |
+| `Assist.SampleMegabytes` | `20` | The most a sample folder may hold, in megabytes (1 to 500). |
+
+While a reader is on, `app.log` gets one line every ten minutes of looking: `In-game helper cost: N copies on the capture tick, … ms each (worst …); N reader looks off the UI thread, … ms each (worst …); N text reads, … ms each; N screen probes, … ms each (worst …).`
+
 ## Stamina from the screen
 
-Kaption can keep a timer for the selected game's stamina (Original Resin, Trailblaze Power, Waveplates) by reading the number off the game screen. It is off until you switch it on, on the Start page's card. While subtitles run and the game is in front, Kaption looks every few seconds at the top band of the game picture for the game's stamina icon and reads the `121/200` beside it; it reads nothing else there, and the reading stays in this file. Nothing is sent anywhere, and the game's files and memory are not touched. A number that differs from what the timer expects is believed only after it shows on two looks in a row (three when it is higher than regeneration explains). One tray notice says when the pool is almost full, never while subtitles run, a game is in front, or Windows is in a full-screen app or quiet time. "Otwórz licznik" ("Open the timer") opens the game's timer on kaption.one with the reading (the value, when it was read, the seconds to the next point and when it was last seen on screen) in the part of the address after `#`, which browsers do not send to a server. Games whose screen is not measured yet (Zenless Zone Zero) have no card.
+Kaption can keep a timer for the selected game's stamina (Original Resin, Trailblaze Power, Waveplates) by reading the number off the game screen. It is off until you switch it on, on the Start page's card or in Settings under "Pomocnik w grze" ("In-game helper"); both switches are the same setting. While subtitles run and the game is in front, Kaption looks every few seconds at the top band of the game picture for the game's stamina icon and reads the `121/200` beside it; it reads nothing else there, and the reading stays in this file. Nothing is sent anywhere, and the game's files and memory are not touched. A number that differs from what the timer expects is believed only after it shows on two looks in a row (three when it is higher than regeneration explains). One tray notice says when the pool is almost full, never while subtitles run, a game is in front, or Windows is in a full-screen app or quiet time. "Otwórz licznik" ("Open the timer") opens the game's timer on kaption.one with the reading (the value, when it was read, the seconds to the next point and when it was last seen on screen) in the part of the address after `#`, which browsers do not send to a server. Games whose screen is not measured yet (Zenless Zone Zero) have no card.
 
 | Key | Default | What it does |
 |---|---|---|
@@ -129,10 +164,34 @@ Kaption can keep a timer for the selected game's stamina (Original Resin, Trailb
 | `Stamina.Reading.<game>` | none | Written by Kaption: the reading the timer runs from, as `value|moment in Unix milliseconds|seconds to the next point` (`<game>` is `genshin`, `starrail`, `wuwa`). |
 | `Stamina.Seen.<game>` | none | Written by Kaption: when the number on screen last agreed with the timer, in Unix milliseconds (the card's "read … ago"). |
 | `Stamina.NoticeArmed.<game>` | `false` | Written by Kaption: a notice is still owed for the current fill. |
-| `Stamina.SaveSamples` | `false` | Testing aid. Keeps a small picture of every number read, every refused read and, once a minute, the strip where no icon was found, in `%APPDATA%\Kaption\<Game>\stamina-samples\`. Send the folder when a read is wrong. |
+| `Stamina.SaveSamples` | `false` | Testing aid, the older key for the same pictures as `Assist.SaveSamples`: while it is `true` the checkbox in Pomoc › Zaawansowane shows ticked, and unticking it removes this key. Keeps a small picture of every number read, every refused read and, once a minute, the strip where no icon was found, in `%APPDATA%\Kaption\<Game>\stamina-samples\`. Send the folder when a read is wrong. |
 | `Stamina.SampleLimit` | `200` | The most pictures kept per game; the oldest are deleted first (10 to 5000). |
 
 Where the icon is looked for and how the number is checked comes with the app per game (`games/<id>.json`, `desktop.staminaScreen`), not from this file. Every ten minutes of looking leaves one line in `app.log` starting `Stamina reader cost`.
+
+## New in Kaption
+
+On the first start after an update the Start page leads with the two or three new things that matter for the selected game, each in a sentence or two. Where a thing is yours to switch on (the stamina notice, starting with Windows, subtitles in recordings) the card asks: "Włącz" ("Turn on"), "Nie teraz" ("Not now") or "Nie pytaj więcej" ("Don't ask again"). Whatever you answer, Kaption does not ask about that thing again on its own, in this release or a later one; a thing that is already on is not offered at all. The card is shown once per release: after the start on which it was on screen, later starts do not lead with it, also if you closed Kaption without answering. A new install starts from the current release and is shown nothing. Started with Windows, Kaption opens no window: the tray says once that there is news, and the card waits on Start until you open the window. Help › "Pokaż nowości" ("Show what's new") opens the whole list at any time, each row with its switch, questions you left open included.
+
+| Key | Default | What it does |
+|---|---|---|
+| `WhatsNew.Enabled` | `true` | Show the card after an update; "Pokazuj nowości po aktualizacji" on Gra i napisy writes it. Off, a release still counts as shown, so switching it on later brings no old news. |
+| `WhatsNew.SeenThrough` | none | Written by Kaption: the newest release whose card was shown (`"2.6.1"`). |
+| `WhatsNew.Answers` | none | Written by Kaption: what you answered, one item per thing (`"stamina-notice=on"`, `"start-with-windows=later"`, `"show-in-recordings=never"`). Removing an item lets a later release ask about that thing again. |
+| `WhatsNew.TrayTold` | none | Written by Kaption: the release the tray announced on a start with Windows. |
+
+The entries come with the app (one per feature and release, in English and Polish), not from this file.
+
+## Notice of the day
+
+On the first start of a game day Kaption sends one tray notice with what is worth doing today in the games you play with it, built from the same data as the Today card: for Genshin Impact the talent books that are open, named with which of your characters need them once your UID is saved; for any game whose stamina Kaption reads, a pool that is at its cap or reaches it before the day ends; and an event or banner on its last day. "The games you play" are the selected game and any other whose stamina was read in the last 14 days. A game whose Today card already came up by itself that day is left out, and a day with nothing to say sends nothing. A click opens the selected game's card of the day (Start when the notice is about another game). It is one of the notices under *Notices* above: never while subtitles run or a game is in front, inside `Notices.MaxPerDay` for all of them together, and after any that waited longer. A start gives at most one notice of its own: on the first start after an update the "New in Kaption" card is that notice, and the notice of the day comes at the next start. The day counts as told only once the notice really went out, and only a later day than the last one told gets a notice (a clock set back repeats nothing). The notice is built for the game, server, UID and game day saved at that moment; when one of them changes while its data loads, it is not sent and is built again. A game day turns at the selected game's reset on your server (`FarmCardRegion`). While Kaption keeps running into a new game day, that day's notice comes when the screen allows it.
+
+| Key | Default | What it does |
+|---|---|---|
+| `DayNotice.Enabled` | `true` | Send the notice; "Przy pierwszym uruchomieniu dnia powiedz, co dziś warto zrobić" on Gra i napisy writes it. |
+| `DayNotice.LastDay` | none | Written by Kaption: the game day the notice last went out (`"2026-11-11"`). |
+| `DayNotice.DelaySeconds` | `20` | Seconds after the start before the first look (5 to 600). |
+| `DayNotice.RetrySeconds` | `60` | Seconds between checks while the notice waits for subtitles to stop, the game to leave the front or Windows to accept notices (15 to 3600). |
 
 ## OCR and translation
 

@@ -80,7 +80,7 @@ namespace GI_Test
         /// is given) the stamina pill in the top band at <paramref name="xFraction"/> of the width, drawn
         /// <paramref name="iconScale"/> times the template's size (Genshin's dialogs draw it at 0.86 of the map's).
         /// </summary>
-        private static Bitmap Frame(Size client, GameManifest game, string text, double xFraction = 0.78, double iconScale = 1.0,
+        internal static Bitmap Frame(Size client, GameManifest game, string text, double xFraction = 0.78, double iconScale = 1.0,
             int seed = 3, string iconOf = null, bool plus = true, double tracking = 0)
         {
             double ui = StaminaLocator.InterfaceScale(client);
@@ -142,7 +142,7 @@ namespace GI_Test
             return bmp;
         }
 
-        private static StaminaSample Read(GameManifest game, Bitmap frame, StaminaScreenReader reader = null, StaminaLineReader line = null)
+        internal static StaminaSample Read(GameManifest game, Bitmap frame, StaminaScreenReader reader = null, StaminaLineReader line = null)
         {
             StaminaScreenReader own = reader ?? StaminaScreenReader.ForGame(game);
             try

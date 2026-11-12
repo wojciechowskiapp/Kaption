@@ -181,6 +181,52 @@ namespace GI_Subtitles.Services.Stamina
         }
 
         /// <summary>
+        /// The icon at a place it was found before, without the search: only the strip around the remembered box is
+        /// looked at, at the remembered size. False sends the caller back to <see cref="FindIcons"/>, so a place
+        /// that stopped matching costs one small comparison and changes nothing.
+        /// </summary>
+        public bool TryConfirmAt(Mat strip, System.Drawing.Size client, StaminaAnchor remembered, out StaminaAnchor anchor)
+        {
+            anchor = default;
+            if (strip == null || strip.Empty()) return false;
+            int size = Array.IndexOf(_scales, remembered.Scale);
+            double ui = InterfaceScale(client);
+            if (size < 0 || !(ui > 0)) return false;
+            bool scaled = Math.Abs(ui - 1) > 0.02;
+            double back = scaled ? ui : 1;
+            int margin = (int)Math.Ceiling(RefineMargin * back);
+            var near = new CvRect(remembered.Icon.X - margin, remembered.Icon.Y - margin, remembered.Icon.Width + margin * 2, remembered.Icon.Height + margin * 2)
+                & new CvRect(0, 0, strip.Width, strip.Height);
+            if (near.Width <= 0 || near.Height <= 0) return false;
+
+            using var cut = new Mat(strip, near);
+            using Mat bgr = ToBgr(cut);
+            Mat norm = bgr;
+            try
+            {
+                if (scaled)
+                {
+                    norm = new Mat();
+                    Cv2.Resize(bgr, norm, new CvSize(Math.Max(1, (int)Math.Round(bgr.Width / ui)), Math.Max(1, (int)Math.Round(bgr.Height / ui))),
+                        0, 0, ui > 1 ? InterpolationFlags.Area : InterpolationFlags.Linear);
+                }
+                Mat t = _templates[size];
+                if (norm.Width < t.Width || norm.Height < t.Height) return false;
+                using var result = new Mat();
+                Cv2.MatchTemplate(norm, t, result, TemplateMatchModes.CCoeffNormed);
+                Cv2.MinMaxLoc(result, out _, out double score, out _, out Point shift);
+                if (!(score >= _spec.MinIconScore) || score > 1.001) return false;
+                anchor = new StaminaAnchor(new CvRect(near.X + (int)Math.Round(shift.X * back), near.Y + (int)Math.Round(shift.Y * back),
+                    (int)Math.Round(t.Width * back), (int)Math.Round(t.Height * back)), score, _scales[size]);
+                return true;
+            }
+            finally
+            {
+                if (scaled) norm.Dispose();
+            }
+        }
+
+        /// <summary>
         /// The box of the number to the right of <paramref name="anchor"/>, in the strip's pixels: the run of bright
         /// glyphs that starts beside the icon and ends at the first gap wider than the spec allows.
         /// </summary>

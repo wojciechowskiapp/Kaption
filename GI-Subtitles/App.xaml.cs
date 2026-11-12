@@ -55,9 +55,12 @@ namespace GI_Subtitles
                 Environment.Exit(E2ERefusedExitCode);
             }
             // Uninstall takes the "Start with Windows" entry with it (no logging in a hook: see above).
-            VelopackApp.Build()
-                .OnBeforeUninstallFastCallback(_ => GI_Subtitles.Services.Startup.WindowsStartup.RemoveForUninstall())
-                .Run();
+            var velopack = VelopackApp.Build()
+                .OnBeforeUninstallFastCallback(_ => GI_Subtitles.Services.Startup.WindowsStartup.RemoveForUninstall());
+            // The E2E mode's app writes nothing outside its data folder, Velopack's shared log included.
+            if (GI_Subtitles.Services.Update.VelopackStartup.LocatorFor(E2EMode.IsActive) is { } locator)
+                velopack.SetLocator(locator);
+            velopack.Run();
 
             var app = new App();
             app.InitializeComponent();
@@ -408,6 +411,9 @@ namespace GI_Subtitles
             // when multiple instances have run.
             int pid = System.Diagnostics.Process.GetCurrentProcess().Id;
             Logger.Log.Info($"=== Process start: PID={pid}, version={System.Reflection.Assembly.GetExecutingAssembly().GetName().Version} ===");
+            // Local log only: tells a "slow start" report on a CPU without AVX2 apart from a real fault.
+            try { Logger.Log.Info(GI_Subtitles.Services.Diagnostics.CpuBaseline.DescribeCurrent()); }
+            catch (Exception ex) { Logger.Log.Warn($"CPU line skipped: {ex.Message}"); }
             StartedInTray = GI_Subtitles.Services.Startup.StartupArguments.IsTrayStart(e.Args);
             if (StartedInTray) Logger.Log.Info("Started with Windows (--tray): the app window stays closed.");
             GI_Subtitles.Core.Runtime.RamDiag.LogCheckpoint("process start");

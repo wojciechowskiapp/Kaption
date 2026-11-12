@@ -8,6 +8,9 @@
          LTS (Nov 2025 → Nov 2028 support), vs net8 LTS ending Nov 2026.
          net9 was deliberately skipped because dotnet/sdk#43461 excluded
          PresentationCore from publish; net10 resolves that path.
+         net10.0-windows → net11.0-windows on 2026-11-12 (session 65), two
+         days after .NET 11 GA (STS, supported to 2028-11-14). Record:
+         .plan/in-progress/DOTNET-11-ROUND.md.
 
          Key carry-overs:
            * Workstation GC + DATAS explicitly disabled via runtimeconfig
@@ -15,7 +18,7 @@
            * All phase 1-6 perf work (float[128*128], FrozenDictionary,
              [GeneratedRegex], Span<char>, SocketsHttpHandler, stackalloc)
              carries forward unchanged — net10 is an additive step. -->
-    <TargetFramework>net10.0-windows</TargetFramework>
+    <TargetFramework>net11.0-windows</TargetFramework>
     <UseWPF>true</UseWPF>
     <!-- MainWindow + Screenshot use System.Windows.Forms types (Screen,
          NotifyIcon). UseWPF alone does not pull Windows Forms in. -->
@@ -32,7 +35,7 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 
     <!-- Silence warnings that don't apply to our shape:
-         - CA1416: net10.0-windows + manifest + Velopack Windows-only dist
+         - CA1416: net11.0-windows + manifest + Velopack Windows-only dist
            make Windows-platform warnings pure noise (600+ fires).
          - WFO0003: WinForms asks us to migrate DPI settings from
            app.manifest to the ApplicationHighDpiMode MSBuild property.
@@ -104,9 +107,10 @@
     <PublishReadyToRun>true</PublishReadyToRun>
     <PublishReadyToRunComposite>false</PublishReadyToRunComposite>
     <SelfContained>true</SelfContained>
-    <!-- Pin self-contained Release artifacts to the latest serviced .NET 10
-         runtime even when an older feature-band SDK performs the publish. -->
-    <RuntimeFrameworkVersion Condition="'$(Configuration)' == 'Release'">10.0.14</RuntimeFrameworkVersion>
+    <!-- Pin self-contained Release artifacts to the latest serviced .NET 11
+         runtime even when an older feature-band SDK performs the publish
+         (scripts/check-runtime-pin.mjs tells when a patch is out). -->
+    <RuntimeFrameworkVersion Condition="'$(Configuration)' == 'Release'">11.0.0</RuntimeFrameworkVersion>
     <PublishTrimmed>false</PublishTrimmed>
     <!-- Only the satellite resources of languages the UI ships (EN, PL): the self-contained runtime otherwise brings
          WPF/WinForms framework messages in 13 languages (~18 MB on disk). The app's own strings are XAML dictionaries. -->
@@ -150,7 +154,7 @@
     <!-- Framework references that net48 carried by name ("System.Web",
          "System.Management", etc.) are not available as framework refs on
          net8. Replacements for the ones we actually use move to NuGet. -->
-    <PackageReference Include="System.Management" Version="10.0.14" />
+    <PackageReference Include="System.Management" Version="11.0.0" />
     <!-- System.Web dropped: LoopbackAuthListener.cs's HttpUtility.ParseQueryString +
          HttpUtility.HtmlEncode calls rewritten to System.Net.WebUtility +
          a 20-line ParseQueryString replacement. System.Web.HttpUtility as
@@ -172,6 +176,11 @@
     <!-- Stamina icon templates (Services/Stamina/StaminaLocator): one small PNG per game named in a manifest's
          desktop.staminaScreen.icon, as a 1920x1080 client draws it. -->
     <EmbeddedResource Include="Assets\Stamina\*.png" LogicalName="Kaption.Stamina.%(Filename)%(Extension)" />
+    <!-- "New in Kaption": one entry per feature and release, in English and Polish (Services/Notices/WhatsNew). -->
+    <EmbeddedResource Include="Resources\WhatsNew\entries.json" LogicalName="Kaption.WhatsNew.entries.json" />
+    <!-- Screen anchors of the in-game helper (Services/Assist/ScreenProbe): Assets/Assist/<game>/<template>.png, at
+         most 64x64, named by a manifest's desktop.assist.screens. None yet: the first fixed screen brings its own. -->
+    <EmbeddedResource Include="Assets\Assist\**\*.png" LogicalName="Kaption.Assist.$([System.String]::Copy('%(RecursiveDir)').TrimEnd('\').TrimEnd('/')).%(Filename)%(Extension)" />
     <!-- Game manifests (games/<id>.json, the registry of supported games), read by Services/Games/GameRegistry. -->
     <GameManifestFile Include="..\games\*.json" Exclude="..\games\*.schema.json;..\games\candidates.json" />
     <EmbeddedResource Include="@(GameManifestFile)" LogicalName="Kaption.Games.%(Filename)%(Extension)" Link="games\%(Filename)%(Extension)" />
@@ -214,10 +223,13 @@
          Debug, MaxBreadcrumbs, SendDefaultPii, AttachStacktrace, Release,
          Environment, Dsn) preserved unchanged through 6.x. -->
     <PackageReference Include="Sentry" Version="6.12.1" />
-    <!-- Velopack: pinned at the known-good 0.0.1298. Current 1.x releases
-         are stable but require a separately tested installer/updater
-         migration. scripts/build-release.bat enforces the matching CLI. -->
-    <PackageReference Include="Velopack" Version="0.0.1298" />
+    <!-- Velopack: moved from 0.0.1298 by hand after the update lab showed
+         0.0.1298 installs take 1.x packages (delta, delta chain, full,
+         portable; .plan/in-progress/VELOPACK-1X-SPIKE.md). Every bump changes
+         the updater players run: repeat that lab, never a Dependabot merge.
+         The release workflow and build-release.bat read the vpk version from
+         this line. -->
+    <PackageReference Include="Velopack" Version="1.2.161" />
     <!-- OpenCvSharp4.Windows is the metapackage — it pulls Core +
          Extensions + runtime.win transitively. -->
     <!-- OpenCvSharp 4.13 patch (2026-06-27). Unblocked by the net10 TFM jump: 4.13

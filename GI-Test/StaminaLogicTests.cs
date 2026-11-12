@@ -301,7 +301,7 @@ namespace GI_Test
             {
                 GameStamina pool = GameRegistry.Current.FindByWireId(id).Stamina;
                 StaminaNoticeText body = StaminaText.Notice(pool, new StaminaReading(pool.Max, T0, pool.RegenSeconds), T0.AddHours(1), En, culture);
-                StringAssert.EndsWith(body.Body, $"from here only {pool.Reserve.Name} grows, and slower.", id);
+                StringAssert.EndsWith(body.Body, $"what comes next goes to {pool.Reserve.Name}, slower, until that is full too.", id);
                 Assert.IsFalse(body.Body.Contains("lost"), id);
             }
             Assert.IsNull(GameRegistry.Current.FindByWireId("genshin").Stamina.Reserve);

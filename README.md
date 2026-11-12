@@ -26,7 +26,13 @@ Kaption shows Polish subtitles over the dialogue in Genshin Impact, Honkai: Star
 
 ## Requirements
 
-- Windows 10 version 2004 or later, 64-bit, on a CPU with AVX
+- Windows 10 version 2004 or later (or Windows 11), 64-bit
+- A processor from about 2013 or newer with AVX2, which nearly every gaming PC has. Older processors with SSE4.2 but
+  no AVX2 (Intel Core 1st to 3rd generation, AMD FX, Pentium, Celeron and Atom chips sold until about 2021) run
+  Kaption but start it more slowly. Processors without SSE4.2 (Intel Core 2, AMD Phenom and Athlon II, the oldest
+  Pentium, Celeron and Atom chips) cannot run versions after 2.6.0, which is built on .NET 10; its installer stays
+  on the [2.6.0 release](https://github.com/wojciechowskiapp/Kaption/releases/tag/v2.6.0). If you go back to it,
+  don't install the updates it offers.
 - A DirectX 12 graphics card is recommended; without one, reading runs on the processor, more slowly
 - About 500 MB of disk space for the subtitle packs
 
@@ -50,7 +56,7 @@ Your screen is read on your own computer and screen images never leave it; subti
 
 ## Building
 
-Windows and the [.NET 10 SDK](https://dotnet.microsoft.com/download) (10.0.403 or newer) are all you need. Kaption keeps up with the newest stable .NET and C#, so expect it to move to .NET 11 soon after that comes out.
+Windows and the [.NET 11 SDK](https://dotnet.microsoft.com/download) (11.0.100 or newer) are all you need. Kaption keeps up with the newest stable .NET and C#.
 
 ```
 dotnet build GI-Subtitles.sln -c Release

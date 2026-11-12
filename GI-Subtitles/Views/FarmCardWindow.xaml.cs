@@ -49,6 +49,12 @@ namespace GI_Subtitles.Views
         /// <param name="workAreaPx">The game monitor's work area in physical pixels.</param>
         /// <param name="avoidPx">Boxes the card must not cover (the dialogue region), physical pixels.</param>
         public FarmCardWindow(FarmCardViewModel vm, System.Drawing.Rectangle workAreaPx, IReadOnlyList<Rect> avoidPx, bool dark)
+            : this(new TodayCardViewModel(vm), workAreaPx, avoidPx, dark)
+        {
+        }
+
+        /// <summary>Any game's Today card, in that game's accent.</summary>
+        public FarmCardWindow(TodayCardViewModel vm, System.Drawing.Rectangle workAreaPx, IReadOnlyList<Rect> avoidPx, bool dark)
         {
             InitializeComponent();
             _workAreaPx = workAreaPx;
@@ -57,7 +63,7 @@ namespace GI_Subtitles.Views
             double scale = MainWindow.GetScaleForScreen(screen);
             if (!(scale > 0)) scale = 1;
             MaxHeight = Math.Max(320, workAreaPx.Height / scale - 2 * FarmCardPlacement.Margin);
-            Card.ApplyAccent("Genshin");
+            Card.ApplyAccent(string.IsNullOrEmpty(vm.Model.GameId) ? "Genshin" : vm.Model.GameId);
             Card.UsePalette(dark);
             Card.Show(vm);
 

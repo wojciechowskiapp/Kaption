@@ -37,6 +37,39 @@ second pool that fills only while the first is full). The site's stamina timers 
 (`/tools/stamina-timer/<hub>/`); a game without it gets no timer. Every value is checked against the game data and
 `checked` says in which version and where (`version`, `ref`): change the numbers only together with that line.
 
+`resets` (optional) is when the game's day and week turn over: `servers` (id, English name, fixed `utcOffset` in
+whole hours, the default first), `dailyHour` and `weeklyDay` (0 Sunday to 6 Saturday), both in server time. The
+desktop's Today card and its "once per game day" read it, and so does the site's today page, through
+`landing/src/data/generated/resets.ts` (`node tools/games/generate.cjs`; a test fails when it is stale). Nothing else
+may hard-code a reset. `checked` names the publisher's own page (`at`, `ref`) and says what could not be confirmed.
+A game whose reset is not confirmed on its publisher's pages leaves the block out: it then shows no reset countdown
+and counts local days (Wuthering Waves today).
+
+`desktop.assist` (optional) is what else the desktop may read off the game's screen for a player who switched a
+reader on (the in-game helper, `GI-Subtitles/Services/Assist`). A game without the block gets nothing.
+
+- `checked` is the record: the game version, the window shapes measured (`aspects`, like `"16:9"`) and the source.
+  A window of a shape that is not listed gets no fixed place. That is the refusal rule, as data.
+- `canvas` is the size the game draws its interface for and how it scales (`min`, `height` or `width`). Measure
+  the rule for each game; it is required as soon as anything has a fixed place. Wuthering Waves draws for
+  1920x1080 and scales by `min`, and pins HUD pieces to the window's own edges, so on a 21:9 window they sit
+  outside the centred 16:9 band. That is why a place here is "this far from that corner" and never a fraction.
+- `screens` maps a screen id to one or two anchors: a template (`GI-Subtitles/Assets/Assist/<game>/<template>.png`,
+  exactly `w` x `h`, at most 64x64), the `edge` it is measured from (`topLeft` … `bottomRight`, `center`), `x` and
+  `y` in canvas pixels from that point to the box's top-left corner (negative: left of it, above it), and a
+  `threshold`. Pick pictures that do not change with the input device: a controller player sees other button
+  glyphs than a keyboard player.
+- `readers` maps a reader id to its `kind` (`fraction`, `count`, `names`, `packText`, `panel`) and how it is
+  located: `"locate": "box"` with a `screen` and a `box`, or `"locate": "search"` with a `spec` naming the desktop
+  block that describes the search. A fraction names its `cap` (`"stamina.max"`), names their `vocabulary`. A
+  reader the desktop build has no code for stays off. Each reader id needs its words in both Strings dictionaries
+  (`Assist_Reader_<id>_Title`, `Assist_Reader_<id>_Body`: one sentence saying exactly what is read); a test checks.
+
+The one reader today is `stamina`: `fraction`, located by `search` with `spec: "staminaScreen"`. It finds its own
+icon in the top band (`desktop.staminaScreen`), so it is not bound to `checked.aspects`; where the icon is not
+found nothing is read. A `desktop.staminaScreen` without that reader fails validation, because the screen watch
+runs only what `desktop.assist.readers` lists.
+
 When the executable name is generic (Unreal's `Client-Win64-Shipping` is shared by many games), set
 `"detect": { …, "requireTitle": true }`: the app then counts a process as the game only while one of its windows
 has a title from `windowTitles`. Two manifests may share an executable only if both set it.

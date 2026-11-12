@@ -58,7 +58,11 @@ namespace GI_Subtitles.Views
         {
             var now = DateTimeOffset.UtcNow;
             _newStoryBalloons.KeepOnly(n => NewStoryNotices.Default.IsPending(n, now));
-            if (_newStoryBalloons.Count == 0) _newStoryRetry?.Stop();
+            if (_newStoryBalloons.Count == 0)
+            {
+                _newStoryRetry?.Stop();
+                NoticeGate.Default.Withdraw(NoticeKind.StoryReady);
+            }
         }
 
         private void DeliverNewStoryBalloons()
@@ -69,13 +73,15 @@ namespace GI_Subtitles.Views
             if (_newStoryBalloons.Count == 0)
             {
                 _newStoryRetry?.Stop();
+                NoticeGate.Default.Withdraw(NoticeKind.StoryReady);
                 return;
             }
-            // The ranking notice's gate, minus its once-a-day cap: not while translating, not over a game, and only
-            // when Windows would show a notification now.
-            var gate = GuessNoticeGate.Check(enabled: true, lastShownDay: null, today: null, translating: OCRTimer.IsEnabled,
-                gameInFront: GuessNoticeGate.AnyGameInFront(), quns: GuessNoticeGate.QueryNotificationState());
-            if (gate != GuessGateResult.Show)
+            // The app's one gate (Services/Notices/NoticeGate): not while translating, not over a game, only when
+            // Windows would show a notification now, and within the day's cap for every notice together. This kind has
+            // no once-a-day of its own (one per game version), and goes first when another kind waits too. Past the
+            // cap it waits for tomorrow; Start shows the line meanwhile.
+            var gate = NoticeGate.Default.Ask(NoticeKind.StoryReady, true, false, now, () => NoticeScreen.Read(OCRTimer.IsEnabled));
+            if (gate != NoticeGateResult.Show)
             {
                 if (!_newStoryRetry.IsEnabled)
                 {
@@ -90,6 +96,7 @@ namespace GI_Subtitles.Views
             string title = NewStoryText.Line(LocalizedString("NewStory_Balloon_Title_Format", "{0} {1}"), game, notice.Version);
             string body = LocalizedString("NewStory_Balloon_Body", "The new story is in Polish now. Click to see what's in it.");
             notify?.ShowBalloonTip(title, body, onClick: () => OpenNewStoryPage(notice));
+            NoticeGate.Default.Shown(NoticeKind.StoryReady, now);
             Logger.Log.Info($"New story notice shown as a tray notice: {notice.Id}.");
             if (_newStoryBalloons.Count > 0) _newStoryRetry.Start();
             else _newStoryRetry.Stop();

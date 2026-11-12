@@ -34,6 +34,8 @@ namespace GI_Subtitles.Services.Games
         public GameNews News { get; set; }
         /// <summary>The game's stamina and how it refills; null for a game without one.</summary>
         public GameStamina Stamina { get; set; }
+        /// <summary>When the game's day and week turn over; null while that is not confirmed on the publisher's own pages.</summary>
+        public GameResets Resets { get; set; }
 
         /// <summary>Beta and live games are offered in the app; planned and withdrawn ones are not.</summary>
         public bool IsListed => Status == StatusBeta || Status == StatusLive;
@@ -107,6 +109,8 @@ namespace GI_Subtitles.Services.Games
         public string[] PlayerNameTokens { get; set; }
         /// <summary>Where the game draws its stamina number and how to read it; null until measured on real frames.</summary>
         public GameStaminaScreen StaminaScreen { get; set; }
+        /// <summary>What else the app may read off this game's screen, as data (Services/Assist); null: nothing.</summary>
+        public GameAssist Assist { get; set; }
 
         /// <summary>What every game replaced before manifests had the field: Genshin's "Traveler".</summary>
         public static readonly string[] DefaultPlayerNameTokens = { "Traveler", "traveler" };
@@ -191,6 +195,33 @@ namespace GI_Subtitles.Services.Games
         public string Unlock { get; set; }
     }
 
+    /// <summary>The manifest's resets block: the servers, the daily reset hour and the weekly reset day, in server time.</summary>
+    public sealed class GameResets
+    {
+        public GameResetServer[] Servers { get; set; }
+        /// <summary>The hour of the daily reset, server time.</summary>
+        public int DailyHour { get; set; }
+        /// <summary>The weekday of the weekly reset at <see cref="DailyHour"/>: 0 Sunday to 6 Saturday.</summary>
+        public int WeeklyDay { get; set; }
+
+        /// <summary>The server with this id, else the first one (the default); null when the block lists none.</summary>
+        public GameResetServer Server(string id)
+        {
+            if (Servers == null) return null;
+            foreach (GameResetServer s in Servers)
+                if (s != null && string.Equals(s.Id, id?.Trim(), System.StringComparison.OrdinalIgnoreCase)) return s;
+            return Servers.Length > 0 ? Servers[0] : null;
+        }
+    }
+
+    /// <summary>A game server: a fixed offset from UTC, no daylight saving.</summary>
+    public sealed class GameResetServer
+    {
+        public string Id { get; set; }
+        public string Name { get; set; }
+        public int UtcOffset { get; set; }
+    }
+
     /// <summary>A stamina pool: the game's English name, where regeneration stops, seconds per point.</summary>
     public class GameStaminaPool
     {
@@ -226,6 +257,83 @@ namespace GI_Subtitles.Services.Games
         public int Confirmations { get; set; }
         /// <summary>The same for a number higher than regeneration explains (a refill).</summary>
         public int RefillConfirmations { get; set; }
+    }
+
+    /// <summary>
+    /// desktop.assist: the screens the app can tell apart and what it may read on them, for a player who switched a
+    /// reader on. A game without the block gets nothing. Fixed places are in pixels of <see cref="Canvas"/>, measured
+    /// from a window edge, and count only in a window whose shape is in <see cref="Checked"/>.
+    /// </summary>
+    public sealed class GameAssist
+    {
+        /// <summary>The size the game's interface is drawn for and how it scales; needed once anything has a fixed place.</summary>
+        public GameAssistCanvas Canvas { get; set; }
+        public GameAssistChecked Checked { get; set; }
+        public System.Collections.Generic.Dictionary<string, GameAssistScreen> Screens { get; set; }
+        public System.Collections.Generic.Dictionary<string, GameAssistReader> Readers { get; set; }
+    }
+
+    public sealed class GameAssistCanvas
+    {
+        public const string ScaleMin = "min", ScaleHeight = "height", ScaleWidth = "width";
+
+        public int Width { get; set; }
+        public int Height { get; set; }
+        /// <summary>How the interface grows with the window: by the smaller of the two ratios, by height or by width. Measured per game.</summary>
+        public string Scale { get; set; }
+    }
+
+    /// <summary>What the places were measured on: the record a game update is checked against.</summary>
+    public sealed class GameAssistChecked
+    {
+        public string Version { get; set; }
+        /// <summary>Window shapes measured ("16:9"); a window of another shape gets no fixed place.</summary>
+        public string[] Aspects { get; set; }
+        public string Source { get; set; }
+    }
+
+    /// <summary>A rectangle in canvas pixels: its top-left corner is <see cref="X"/>, <see cref="Y"/> away from the named point of the window.</summary>
+    public class GameAssistBox
+    {
+        /// <summary>topLeft, top, topRight, left, center, right, bottomLeft, bottom or bottomRight.</summary>
+        public string Edge { get; set; }
+        public int X { get; set; }
+        public int Y { get; set; }
+        public int W { get; set; }
+        public int H { get; set; }
+    }
+
+    /// <summary>A small picture that is on a screen and nowhere else: Assets/Assist/&lt;game&gt;/&lt;template&gt;.png, at most 64x64.</summary>
+    public sealed class GameAssistAnchor : GameAssistBox
+    {
+        public string Template { get; set; }
+        /// <summary>Lowest match (normalised correlation) that counts.</summary>
+        public double Threshold { get; set; }
+    }
+
+    public sealed class GameAssistScreen
+    {
+        /// <summary>One or two; all must match.</summary>
+        public GameAssistAnchor[] Anchors { get; set; }
+    }
+
+    public sealed class GameAssistReader
+    {
+        public const string KindFraction = "fraction", KindCount = "count", KindNames = "names", KindPackText = "packText", KindPanel = "panel";
+        public const string LocateBox = "box", LocateSearch = "search";
+        public const string SpecStaminaScreen = "staminaScreen", CapStaminaMax = "stamina.max";
+
+        public string Kind { get; set; }
+        /// <summary>"box": a fixed place on <see cref="Screen"/>. "search": the reader finds its own anchor (<see cref="Spec"/>).</summary>
+        public string Locate { get; set; }
+        public string Screen { get; set; }
+        public GameAssistBox Box { get; set; }
+        /// <summary>For "search": the desktop block that describes the search ("staminaScreen").</summary>
+        public string Spec { get; set; }
+        /// <summary>Where the cap a fraction must show comes from ("stamina.max").</summary>
+        public string Cap { get; set; }
+        /// <summary>The list a name must be in.</summary>
+        public string Vocabulary { get; set; }
     }
 
     /// <summary>The number's place to the right of the icon.</summary>

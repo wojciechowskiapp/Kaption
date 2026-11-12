@@ -1506,6 +1506,46 @@ Answer: X: {0}   Y: {1}   W: {2}   H: {3}</sys:String>
     <sys:String x:Key="codes_Until" xmlns:sys="clr-namespace:System;assembly=mscorlib">valid until {0}</sys:String>
     <sys:String x:Key="codes_NoEnd" xmlns:sys="clr-namespace:System;assembly=mscorlib">no end date announced</sys:String>
     <sys:String x:Key="codes_Days" xmlns:sys="clr-namespace:System;assembly=mscorlib">{0} day|{0} days|{0} days</sys:String>
+    <!-- In-game helper (Services/Assist, SettingsWindow.Assist.cs): the Settings card that lists what Kaption may read off the game screen, one switch per reader, and the Diagnostics switch for sample pictures. {0} in the stamina texts is the pool's own English name (Original Resin), {1} its cap. -->
+    <sys:String x:Key="Assist_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">In-game helper</sys:String>
+    <sys:String x:Key="Assist_Hint" xmlns:sys="clr-namespace:System;assembly=mscorlib">Kaption can read a few things off the game screen for you, besides the dialogue. It looks only while subtitles are running, reads only what you switch on here, and keeps it on this PC.</sys:String>
+    <sys:String x:Key="Assist_None" xmlns:sys="clr-namespace:System;assembly=mscorlib">There is nothing to read in {0} yet.</sys:String>
+    <sys:String x:Key="Assist_Reader_stamina_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">{0} timer</sys:String>
+    <sys:String x:Key="Assist_Reader_stamina_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">Reads the {0} number beside its icon at the top of the game screen (like 121/{1}) and keeps a timer for you. Nothing else is read there.</sys:String>
+    <sys:String x:Key="Assist_Read_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">What Kaption has read</sys:String>
+    <sys:String x:Key="Assist_Read_Line" xmlns:sys="clr-namespace:System;assembly=mscorlib">{0}: {1}, read {2}</sys:String>
+    <sys:String x:Key="Assist_Read_Nothing" xmlns:sys="clr-namespace:System;assembly=mscorlib">Nothing yet.</sys:String>
+    <sys:String x:Key="Assist_Delete" xmlns:sys="clr-namespace:System;assembly=mscorlib">Delete what was read</sys:String>
+    <sys:String x:Key="Assist_Delete_Tip" xmlns:sys="clr-namespace:System;assembly=mscorlib">Forgets everything read off this game's screen, the timer included.</sys:String>
+    <sys:String x:Key="Assist_Delete_Failed" xmlns:sys="clr-namespace:System;assembly=mscorlib">Some files could not be deleted because something still has them open. Close it and try again.</sys:String>
+    <sys:String x:Key="Assist_Samples" xmlns:sys="clr-namespace:System;assembly=mscorlib">Keep small pictures of what the in-game helper reads</sys:String>
+    <sys:String x:Key="Assist_Samples_Hint" xmlns:sys="clr-namespace:System;assembly=mscorlib">For checking a wrong or missed read: a small cut-out of every read and every near miss stays on this PC. Never a whole screen.</sys:String>
+    <!-- The Today card for every game (Services/Today/TodayCardModel, Views/TodayCardViewModel): its sections over
+         the game and the block on Start. A reading is worded as a reading ("Read at 19:40"), never as the present. -->
+    <sys:String x:Key="TodayCard_Eyebrow_Format" xmlns:sys="clr-namespace:System;assembly=mscorlib">Today in {0}</sys:String>
+    <sys:String x:Key="TodayCard_ReadAt_Format" xmlns:sys="clr-namespace:System;assembly=mscorlib">Read {0}</sys:String>
+    <sys:String x:Key="TodayCard_FullAbout_Today" xmlns:sys="clr-namespace:System;assembly=mscorlib">Full since about {0}.</sys:String>
+    <sys:String x:Key="TodayCard_FullAbout_Yesterday" xmlns:sys="clr-namespace:System;assembly=mscorlib">Full since about yesterday, {0}.</sys:String>
+    <sys:String x:Key="TodayCard_FullAbout_Day" xmlns:sys="clr-namespace:System;assembly=mscorlib">Full since about {0}, {1}.</sys:String>
+    <sys:String x:Key="TodayCard_Reserve_Format" xmlns:sys="clr-namespace:System;assembly=mscorlib">{0}: about +{1} since it filled.</sys:String>
+    <sys:String x:Key="TodayCard_Reserve_Cap_Format" xmlns:sys="clr-namespace:System;assembly=mscorlib">{0}: full by the timer as well ({1}).</sys:String>
+    <sys:String x:Key="TodayCard_Week" xmlns:sys="clr-namespace:System;assembly=mscorlib">This week</sys:String>
+    <sys:String x:Key="TodayCard_Daily" xmlns:sys="clr-namespace:System;assembly=mscorlib">Daily reset</sys:String>
+    <sys:String x:Key="TodayCard_Weekly_Format" xmlns:sys="clr-namespace:System;assembly=mscorlib">Weekly reset, {0}</sys:String>
+    <sys:String x:Key="TodayCard_In_Format" xmlns:sys="clr-namespace:System;assembly=mscorlib">in {0}</sys:String>
+    <sys:String x:Key="TodayCard_Ending" xmlns:sys="clr-namespace:System;assembly=mscorlib">Ending soon</sys:String>
+    <sys:String x:Key="TodayCard_EndsIn_Format" xmlns:sys="clr-namespace:System;assembly=mscorlib">ends in {0}</sys:String>
+    <sys:String x:Key="TodayCard_MoreEnding_Format" xmlns:sys="clr-namespace:System;assembly=mscorlib">+{0} more on the site</sys:String>
+    <sys:String x:Key="TodayCard_Seen" xmlns:sys="clr-namespace:System;assembly=mscorlib">Seen on this PC</sys:String>
+    <sys:String x:Key="TodayCard_SeenAt_Format" xmlns:sys="clr-namespace:System;assembly=mscorlib">Seen {0}</sys:String>
+    <sys:String x:Key="TodayCard_Nothing_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">Nothing for today yet</sys:String>
+    <sys:String x:Key="TodayCard_Nothing_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">The card fills in once Kaption has read your stamina in the game or can reach kaption.one.</sys:String>
+    <sys:String x:Key="TodayBlock_Show" xmlns:sys="clr-namespace:System;assembly=mscorlib">Show the card</sys:String>
+    <sys:String x:Key="TodayBlock_Show_Tip" xmlns:sys="clr-namespace:System;assembly=mscorlib">The same card Kaption shows once a day when you start the game.</sys:String>
+    <sys:String x:Key="TodayBlock_Level_Format" xmlns:sys="clr-namespace:System;assembly=mscorlib">Talents to level today: {0}</sys:String>
+    <sys:String x:Key="TodayBlock_Server" xmlns:sys="clr-namespace:System;assembly=mscorlib">Your server</sys:String>
+    <sys:String x:Key="Tray_Today" xmlns:sys="clr-namespace:System;assembly=mscorlib">Today in the game</sys:String>
+
     <!-- Stamina from the screen (Services/Stamina, Views/StaminaCard): the timer card on Start, its switch and the tray notice. {0} in the pool texts is the game's own English name (Original Resin, Trailblaze Power, Waveplates). -->
     <sys:String x:Key="Stamina_Toggle" xmlns:sys="clr-namespace:System;assembly=mscorlib">Read {0} from the game screen</sys:String>
     <sys:String x:Key="Stamina_Off" xmlns:sys="clr-namespace:System;assembly=mscorlib">Kaption can read your {0} from the game screen while subtitles are running, and keep a timer for you. It reads that one number and keeps it on this PC.</sys:String>
@@ -1533,7 +1573,7 @@ Answer: X: {0}   Y: {1}   W: {2}   H: {3}</sys:String>
     <sys:String x:Key="Stamina_Notice_Almost_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">About {0}/{1} now, full {2}.</sys:String>
     <sys:String x:Key="Stamina_Notice_Full_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">{0} is full</sys:String>
     <sys:String x:Key="Stamina_Notice_Full_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">{0}/{1}. It filled {2}; anything more is lost until you spend some.</sys:String>
-    <sys:String x:Key="Stamina_Notice_Full_Body_Reserve" xmlns:sys="clr-namespace:System;assembly=mscorlib">{0}/{1}. It filled {2}; from here only {3} grows, and slower.</sys:String>
+    <sys:String x:Key="Stamina_Notice_Full_Body_Reserve" xmlns:sys="clr-namespace:System;assembly=mscorlib">{0}/{1}. It filled {2}; what comes next goes to {3}, slower, until that is full too.</sys:String>
 
     <!-- The come-back loop: start with Windows offered in setup, one notice per new game version. -->
     <sys:String x:Key="onb_Done_StartWithWindows" xmlns:sys="clr-namespace:System;assembly=mscorlib">Start Kaption with Windows, so subtitles are there when you launch the game.</sys:String>
@@ -1543,4 +1583,35 @@ Answer: X: {0}   Y: {1}   W: {2}   H: {3}</sys:String>
     <sys:String x:Key="NewStory_Open" xmlns:sys="clr-namespace:System;assembly=mscorlib">See what's new</sys:String>
     <sys:String x:Key="NewStory_Toggle" xmlns:sys="clr-namespace:System;assembly=mscorlib">Tell me when a new game version's story is in Polish</sys:String>
     <sys:String x:Key="NewStory_Toggle_Hint" xmlns:sys="clr-namespace:System;assembly=mscorlib">One notice per game version, here and next to the clock. Never for subtitle fixes.</sys:String>
+    <!-- New in Kaption and the notice of the day (Services/Notices; the entries' own words are Resources/WhatsNew/entries.json). -->
+    <sys:String x:Key="WhatsNew_Eyebrow" xmlns:sys="clr-namespace:System;assembly=mscorlib">New in Kaption</sys:String>
+    <sys:String x:Key="WhatsNew_List_Eyebrow" xmlns:sys="clr-namespace:System;assembly=mscorlib">What's new in Kaption</sys:String>
+    <sys:String x:Key="WhatsNew_TurnOn" xmlns:sys="clr-namespace:System;assembly=mscorlib">Turn on</sys:String>
+    <sys:String x:Key="WhatsNew_NotNow" xmlns:sys="clr-namespace:System;assembly=mscorlib">Not now</sys:String>
+    <sys:String x:Key="WhatsNew_Never" xmlns:sys="clr-namespace:System;assembly=mscorlib">Don't ask again</sys:String>
+    <sys:String x:Key="WhatsNew_GotIt" xmlns:sys="clr-namespace:System;assembly=mscorlib">Got it</sys:String>
+    <sys:String x:Key="WhatsNew_Close" xmlns:sys="clr-namespace:System;assembly=mscorlib">Close</sys:String>
+    <sys:String x:Key="WhatsNew_Footer" xmlns:sys="clr-namespace:System;assembly=mscorlib">You can open this list again in Help.</sys:String>
+    <sys:String x:Key="WhatsNew_Help_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">What's new in Kaption</sys:String>
+    <sys:String x:Key="WhatsNew_Help_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">The new things from the last updates, each with its switch.</sys:String>
+    <sys:String x:Key="WhatsNew_Help_Button" xmlns:sys="clr-namespace:System;assembly=mscorlib">Show what's new</sys:String>
+    <sys:String x:Key="WhatsNew_Toggle" xmlns:sys="clr-namespace:System;assembly=mscorlib">Show what's new after an update</sys:String>
+    <sys:String x:Key="WhatsNew_Toggle_Hint" xmlns:sys="clr-namespace:System;assembly=mscorlib">Once per update, at the top of Start: the two or three things worth knowing, and a question when something needs your yes.</sys:String>
+    <sys:String x:Key="WhatsNew_Tray_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">Kaption has been updated</sys:String>
+    <sys:String x:Key="WhatsNew_Tray_Body_One" xmlns:sys="clr-namespace:System;assembly=mscorlib">New: {0}. Click to see.</sys:String>
+    <sys:String x:Key="WhatsNew_Tray_Body_More" xmlns:sys="clr-namespace:System;assembly=mscorlib">New: {0}, and {1} more. Click to see.</sys:String>
+    <sys:String x:Key="DayNotice_Toggle" xmlns:sys="clr-namespace:System;assembly=mscorlib">Tell me at the first start of the day what is worth doing</sys:String>
+    <sys:String x:Key="DayNotice_Toggle_Hint" xmlns:sys="clr-namespace:System;assembly=mscorlib">One notice next to the clock, when there is something to say: today's talent books and who they are for, stamina at its cap, an event or banner on its last day. Never over the game.</sys:String>
+    <sys:String x:Key="DayNotice_Title_Game" xmlns:sys="clr-namespace:System;assembly=mscorlib">{0} today, {1}</sys:String>
+    <sys:String x:Key="DayNotice_Title_Games" xmlns:sys="clr-namespace:System;assembly=mscorlib">Today in your games, {0}</sys:String>
+    <sys:String x:Key="DayNotice_Books_Series_Format" xmlns:sys="clr-namespace:System;assembly=mscorlib">{0} ({1})</sys:String>
+    <sys:String x:Key="DayNotice_Books_Mine" xmlns:sys="clr-namespace:System;assembly=mscorlib">Books for your characters: {0}.</sys:String>
+    <sys:String x:Key="DayNotice_Books_More" xmlns:sys="clr-namespace:System;assembly=mscorlib">Plus {0} more.</sys:String>
+    <sys:String x:Key="DayNotice_Books_Sunday" xmlns:sys="clr-namespace:System;assembly=mscorlib">Sunday: every talent book Domain is open.</sys:String>
+    <sys:String x:Key="DayNotice_Books_Open" xmlns:sys="clr-namespace:System;assembly=mscorlib">Talent books open today: {0}.</sys:String>
+    <sys:String x:Key="DayNotice_Books_AddUid" xmlns:sys="clr-namespace:System;assembly=mscorlib">Save your UID in Kaption to see who they are for.</sys:String>
+    <sys:String x:Key="DayNotice_Stamina_Full" xmlns:sys="clr-namespace:System;assembly=mscorlib">{0} is at the cap; it filled {1}.</sys:String>
+    <sys:String x:Key="DayNotice_Stamina_FillsToday" xmlns:sys="clr-namespace:System;assembly=mscorlib">{0}: about {1}/{2}, at the cap {3}.</sys:String>
+    <sys:String x:Key="DayNotice_Stamina_FullLongAgo" xmlns:sys="clr-namespace:System;assembly=mscorlib">{0} has been at the cap for a while.</sys:String>
+    <sys:String x:Key="DayNotice_Ends_Today" xmlns:sys="clr-namespace:System;assembly=mscorlib">Last day: {0}.</sys:String>
 </ResourceDictionary>

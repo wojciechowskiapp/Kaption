@@ -7,6 +7,7 @@ using GI_Subtitles.Core.Config;
 using GI_Subtitles.Services.Games;
 using GI_Subtitles.Services.Guess;
 using GI_Subtitles.Services.Network;
+using GI_Subtitles.Services.Notices;
 using GI_Subtitles.Views.Shell;
 using Logger = GI_Subtitles.Common.Logger;
 
@@ -100,17 +101,32 @@ namespace GI_Subtitles.Views
         {
             if (_guessDelivery.Notice == null || !_guessDelivery.Undelivered)
             {
+                // Nothing waits any more (a read without a drop replaced it): its place in the gate's order goes too.
+                NoticeGate.Default.Withdraw(NoticeKind.GuessRank);
                 _guessGateTicker?.Stop();
                 return;
             }
             string today = GuessNotifySettings.Today(DateTime.Now);
-            var decision = _guessDelivery.Next(today, GuessNotifySettings.Enabled, GuessNotifySettings.LastShownDay,
-                OCRTimer.IsEnabled, GuessNoticeGate.AnyGameInFront(), GuessNoticeGate.QueryNotificationState());
+            // The notice's own state first (switched off, from an earlier day); only one that could show asks the
+            // app's gate, where it takes its place among the other notices (Services/Notices/NoticeGate).
+            DateTimeOffset now = DateTimeOffset.Now;
+            var decision = _guessDelivery.Next(today, GuessNotifySettings.Enabled, NoticeGateResult.Show);
+            if (decision.Step == GuessDeliveryStep.ShowBalloon)
+            {
+                bool shownToday = string.Equals(GuessNotifySettings.LastShownDay, today, StringComparison.Ordinal);
+                decision = _guessDelivery.Next(today, true, NoticeGate.Default.Ask(NoticeKind.GuessRank, true, shownToday, now,
+                    () => NoticeScreen.Read(OCRTimer.IsEnabled)));
+            }
+            else
+            {
+                NoticeGate.Default.Withdraw(NoticeKind.GuessRank);
+            }
             switch (decision.Step)
             {
                 case GuessDeliveryStep.ShowBalloon:
                     var notice = _guessDelivery.Notice;
                     notify?.ShowBalloonTip(notice.Title, notice.Body, onClick: OpenGuessLobbyFromNotice);
+                    NoticeGate.Default.Shown(NoticeKind.GuessRank, now);
                     MarkGuessDelivered(today);
                     break;
                 case GuessDeliveryStep.Disabled:
@@ -161,6 +177,7 @@ namespace GI_Subtitles.Views
         private void ClearGuessNotice()
         {
             _guessDelivery.Clear();
+            NoticeGate.Default.Withdraw(NoticeKind.GuessRank);
             _guessGateTicker?.Stop();
             data?.ShowGuessRankNotice(null);
         }

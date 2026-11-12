@@ -1,7 +1,6 @@
 using System;
 using System.Globalization;
 using System.IO;
-using System.Linq;
 using GI_Subtitles.Services.Data;
 using OpenCvSharp;
 using CvRect = OpenCvSharp.Rect;
@@ -23,17 +22,20 @@ namespace GI_Subtitles.Services.Stamina
         public static readonly TimeSpan MissEvery = TimeSpan.FromMinutes(1);
 
         private readonly string _dir;
-        private readonly int _limit;
+        private readonly Assist.AssistSampleSaver _files;
         private DateTimeOffset _lastMiss = DateTimeOffset.MinValue;
         private StaminaSample _lastSaved;
 
-        public StaminaSampleSaver(string gameId, int limit) : this(Path.Combine(GameDataPaths.GameDir(gameId), FolderName), limit, false) { }
+        public StaminaSampleSaver(string gameId, int limit) : this(FolderFor(gameId), limit, false) { }
 
         internal StaminaSampleSaver(string dir, int limit, bool _)
         {
             _dir = dir;
-            _limit = Math.Max(1, limit);
+            _files = new Assist.AssistSampleSaver(dir, limit, Assist.AssistSettings.SampleBytes);
         }
+
+        /// <summary>The folder a game's stamina pictures go to.</summary>
+        public static string FolderFor(string gameId) => Path.Combine(GameDataPaths.GameDir(gameId), FolderName);
 
         public string Folder => _dir;
 
@@ -65,13 +67,7 @@ namespace GI_Subtitles.Services.Stamina
                         break;
                 }
                 _lastSaved = sample;
-                Directory.CreateDirectory(_dir);
-                // UTC in the name: the folder is pruned by name, and local time repeats an hour when the clocks go back.
-                string file = Path.Combine(_dir, now.UtcDateTime.ToString("yyyyMMdd-HHmmss-fff", CultureInfo.InvariantCulture) + "Z-" + tag + ".png");
-                if (!Cv2.ImEncode(".png", picture, out byte[] png)) return null;
-                File.WriteAllBytes(file, png);
-                Prune();
-                return file;
+                return _files.Save(picture, tag, now);
             }
             finally
             {
@@ -85,17 +81,6 @@ namespace GI_Subtitles.Services.Stamina
             int pad = line.Height;
             return new CvRect(line.X - pad * 3, line.Y - pad / 2, line.Width + pad * 5, line.Height + pad)
                 & new CvRect(0, 0, strip.Width, strip.Height);
-        }
-
-        private void Prune()
-        {
-            var files = new DirectoryInfo(_dir).GetFiles("*.png").OrderByDescending(f => f.Name, StringComparer.Ordinal).Skip(_limit);
-            foreach (FileInfo old in files)
-            {
-                try { old.Delete(); }
-                catch (IOException) { }
-                catch (UnauthorizedAccessException) { }
-            }
         }
     }
 }

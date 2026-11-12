@@ -8,6 +8,7 @@
     { "pattern": "^Char_Tab_", "builtBy": "ProgressionKey, Views/CharacterOverviewViewModel.cs" },
     { "pattern": "^Char_Tip_Weapon_", "builtBy": "\"Char_Tip_Weapon_\" + type, Views/CharacterOverviewViewModel.cs" },
     { "pattern": "^FarmCard_(On|Tip|Talent)_", "builtBy": "$\"FarmCard_On_{twin}\", $\"FarmCard_Tip_{i}\", $\"FarmCard_Talent_{kind}\", Views/FarmCardViewModel.cs" },
+    { "pattern": "^Assist_Reader_", "builtBy": "\"Assist_Reader_\" + readerId + \"_Title\" / \"_Body\", Services/Assist/AssistCardModel.cs and Views/TodayCardViewModel.cs" },
     { "pattern": "^onb_[A-Za-z]+_(Heading|Lead)$", "builtBy": "$\"onb_{step}_Heading\" and _Lead, Views/OnboardingWindow.xaml.cs" },
     { "pattern": "^shell_Hotkey_Short_", "builtBy": "$\"shell_Hotkey_Short_{id}\", Views/SettingsWindow.Shell.cs and Views/OnboardingWindow.xaml.cs" },
     { "pattern": "^look_Sample_", "builtBy": "$\"look_Sample_{id}_Speaker\" and _Line, Views/SettingsWindow.Look.cs" },

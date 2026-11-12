@@ -3,7 +3,9 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:local="clr-namespace:GI_Subtitles.Views"
              Width="404" UseLayoutRounding="True" TextOptions.TextFormattingMode="Display">
-    <!-- "What to farm today" (Genshin): the day, its open book series as the game's own item tiles, and the player's
+    <!-- The Today card. Every game: the day, then sections that are there only when they have something to say
+         (stamina by the timer, this week's resets, what ends soon, what was seen on this PC; TodayCardViewModel).
+         Genshin adds "what to farm today": its open book series as the game's own item tiles, and the player's
          characters with the talent levels worth taking. Colours: the Char_* palette (dark or light, UsePalette) plus
          Char_Accent per game; tier frames are the game's 2/3/4-star item colours (FarmCardViewModel.TierBrush). -->
     <UserControl.Resources>
@@ -137,6 +139,79 @@
                 </DataTemplate.Triggers>
             </DataTemplate>
 
+            <!-- A line of a section: an optional big lead (the stamina number), the text, a note on the right
+                 ("in 5 h"), and under it a small line with when it was read and a link. A line that is itself a link
+                 (an article) is one row, trimmed, with the hand cursor. -->
+            <DataTemplate x:Key="FcLine">
+                <Border x:Name="Row" Margin="-8,0,-8,0" Padding="8,4,8,4" CornerRadius="8" Background="Transparent"
+                        MouseLeftButtonUp="Line_Click" SnapsToDevicePixels="True">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+                        <TextBlock Text="{Binding Lead}" Margin="0,0,10,0" FontFamily="{DynamicResource FontDisplay}" FontSize="20"
+                                   FontWeight="SemiBold" Foreground="{DynamicResource Char_Fg}" VerticalAlignment="Center"
+                                   Visibility="{Binding HasLead, Converter={StaticResource FcBoolVis}}"/>
+                        <TextBlock x:Name="LineText" Grid.Column="1" Text="{Binding Text}" FontSize="12.5" TextWrapping="Wrap"
+                                   Foreground="{DynamicResource Char_Fg}" VerticalAlignment="Center"
+                                   Visibility="{Binding HasText, Converter={StaticResource FcBoolVis}}"/>
+                        <TextBlock x:Name="LineNote" Grid.Column="2" Text="{Binding Note}" Margin="10,0,0,0" FontSize="11.5"
+                                   Foreground="{DynamicResource Char_FgMuted}" VerticalAlignment="Center"
+                                   Visibility="{Binding HasNote, Converter={StaticResource FcBoolVis}}"/>
+                        <StackPanel Grid.Row="1" Grid.ColumnSpan="3" Orientation="Horizontal" Margin="0,2,0,0"
+                                    Visibility="{Binding HasSub, Converter={StaticResource FcBoolVis}}">
+                            <TextBlock x:Name="LineSub" Text="{Binding Sub}" FontSize="11.5" Foreground="{DynamicResource Char_FgSubtle}"
+                                       VerticalAlignment="Center"/>
+                            <Button Style="{StaticResource FcTextButton}" Height="22" Padding="6,0" Margin="4,0,0,0" FontSize="11.5"
+                                    Foreground="{DynamicResource Char_Accent}" VerticalAlignment="Center" Click="LineLink_Click"
+                                    Visibility="{Binding HasLinkText, Converter={StaticResource FcBoolVis}}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="{Binding LinkText}" VerticalAlignment="Center"/>
+                                    <Path Data="{StaticResource FcOutGlyph}" Width="16" Height="16" Stretch="None" StrokeThickness="1.4" Margin="3,0,0,0"
+                                          Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                          StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" VerticalAlignment="Center">
+                                        <Path.LayoutTransform>
+                                            <ScaleTransform ScaleX="0.8" ScaleY="0.8"/>
+                                        </Path.LayoutTransform>
+                                    </Path>
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+                <DataTemplate.Triggers>
+                    <DataTrigger Binding="{Binding IsLink}" Value="True">
+                        <Setter TargetName="Row" Property="Cursor" Value="Hand"/>
+                        <Setter TargetName="Row" Property="ToolTip" Value="{Binding Text}"/>
+                        <Setter TargetName="LineText" Property="TextWrapping" Value="NoWrap"/>
+                        <Setter TargetName="LineText" Property="TextTrimming" Value="CharacterEllipsis"/>
+                        <Setter TargetName="LineSub" Property="Foreground" Value="{DynamicResource Char_Accent}"/>
+                    </DataTrigger>
+                    <MultiDataTrigger>
+                        <MultiDataTrigger.Conditions>
+                            <Condition Binding="{Binding IsLink}" Value="True"/>
+                            <Condition Binding="{Binding IsMouseOver, ElementName=Row}" Value="True"/>
+                        </MultiDataTrigger.Conditions>
+                        <Setter TargetName="Row" Property="Background" Value="{DynamicResource Char_Selected}"/>
+                    </MultiDataTrigger>
+                </DataTemplate.Triggers>
+            </DataTemplate>
+
+            <!-- A section: its small label and its lines. -->
+            <DataTemplate x:Key="FcSection">
+                <StackPanel Margin="0,14,0,0">
+                    <TextBlock Text="{Binding Title}" FontSize="11.5" FontWeight="SemiBold" Foreground="{DynamicResource Char_FgSubtle}"
+                               Margin="0,0,0,4"/>
+                    <ItemsControl ItemsSource="{Binding Lines}" ItemTemplate="{StaticResource FcLine}" Focusable="False"/>
+                </StackPanel>
+            </DataTemplate>
+
             <!-- A character: portrait in its element ring, name and level, its steps under the name. -->
             <DataTemplate x:Key="FcRow">
                 <Grid Margin="0,0,0,10" Background="Transparent">
@@ -195,10 +270,10 @@
                     </Grid.ColumnDefinitions>
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                         <Ellipse Width="7" Height="7" Fill="{DynamicResource Char_Accent}" VerticalAlignment="Center"/>
-                        <TextBlock Text="{DynamicResource FarmCard_Eyebrow}" Margin="8,0,0,0" FontSize="12" FontWeight="SemiBold"
+                        <TextBlock x:Name="EyebrowText" Text="{DynamicResource FarmCard_Eyebrow}" Margin="8,0,0,0" FontSize="12" FontWeight="SemiBold"
                                    Foreground="{DynamicResource Char_Accent}" VerticalAlignment="Center"/>
                     </StackPanel>
-                    <Border Grid.Column="1" Height="24" Padding="7,0,9,0" CornerRadius="12" Background="{DynamicResource Char_ChipBg}"
+                    <Border x:Name="ResetChip" Grid.Column="1" Height="24" Padding="7,0,9,0" CornerRadius="12" Background="{DynamicResource Char_ChipBg}"
                             VerticalAlignment="Center" Margin="0,0,4,0">
                         <StackPanel Orientation="Horizontal">
                             <Path Data="{StaticResource FcClockGlyph}" Width="13" Height="13" Stretch="Uniform" StrokeThickness="1.4"
@@ -236,6 +311,10 @@
                 </Grid>
                 <TextBlock x:Name="WeekBlock" Text="{Binding TwinText}" Margin="18,2,18,0" FontSize="12" TextWrapping="Wrap"
                            Foreground="{DynamicResource Char_FgMuted}"/>
+
+                <!-- The sections every game can have; nothing here when none has anything to say. -->
+                <ItemsControl x:Name="SectionList" Margin="18,0,18,0" ItemsSource="{Binding Sections}" ItemTemplate="{StaticResource FcSection}"
+                              Focusable="False" Visibility="{Binding HasSections, Converter={StaticResource FcBoolVis}}"/>
 
                 <!-- Today's books. -->
                 <StackPanel x:Name="BooksBlock" Margin="18,16,18,0" Visibility="{Binding HasBooks, Converter={StaticResource FcBoolVis}}">

@@ -26,10 +26,12 @@ updates:
     target-branch: "master"
     # benchmark/ is not in GI-Subtitles.sln, so "/" alone misses it; it references GI-Subtitles and PaddleOCRSharp,
     # and its own OpenCvSharp4 references must move with theirs (an older one is a package downgrade, NU1605).
-    # Kaption.DesktopE2E is outside the solution the same way, and only the nightly job builds it.
+    # Kaption.DesktopE2E is outside the solution the same way, and only the nightly job builds it. The harness's own
+    # tests (benchmark/Kaption.Benchmark.Tests) carry the test packages GI-Test carries, so they move together.
     directories:
       - /
       - /benchmark/Kaption.Benchmark
+      - /benchmark/Kaption.Benchmark.Tests
       - /Kaption.DesktopE2E
     schedule:
       interval: weekly
@@ -62,11 +64,13 @@ updates:
       # as a patch group.
       - dependency-name: "Microsoft.AI.DirectML"
         versions: ["> 1.15.4"]
-      # Held at 0.0.1298: the vpk the release workflow installs is read from this package's version, 1.x is an
-      # installer and update-feed migration for clients on 0.0.1298, and a 0.0.x bump (which Dependabot calls a
-      # patch) can break a release too. Move it by hand, as its own verified round.
+      # Held at 1.2.161 (moved from 0.0.1298 in session 65 after a local update lab). Every Velopack release changes
+      # the installer and the updater the players run, and patch releases have changed the delta format (1.2.158
+      # dropped bsdiff), so it moves by hand: repeat .plan/research/velopack-1x-lab/ (the installed old version must
+      # update itself to the new one) before the bump. vpk follows this version in the release workflow and
+      # build-release.bat.
       - dependency-name: "Velopack"
-        versions: ["> 0.0.1298"]
+        versions: ["> 1.2.161"]
 
   - package-ecosystem: npm
     # PRs go to master; GitHub's default branch (main) is only the Cloudflare deploy mirror.
