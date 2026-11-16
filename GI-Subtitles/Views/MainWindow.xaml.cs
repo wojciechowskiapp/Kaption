@@ -80,6 +80,7 @@ namespace GI_Subtitles.Views
             new GI_Subtitles.Services.OCR.OcrRecoveryPolicy();
         private int _runtimeOcrRecoveryLevel;
         private int _runtimeOcrRecoveryInFlight;
+        private readonly GI_Subtitles.Services.OCR.OcrDeviceLossPolicy _ocrDeviceLossPolicy = new();
         // A stalled provider must not be handed the next frame immediately.
         // Back-to-back 15s stalls kept a struggling DirectML device pinned at
         // ~50% load with nothing to show for it, and they starve the recovery
@@ -890,7 +891,8 @@ namespace GI_Subtitles.Views
         private void KickOffEngineInit(
             bool forceCpuForSession = false,
             string profileOverride = null,
-            int runtimeRecoveryLevel = 0)
+            int runtimeRecoveryLevel = 0,
+            string deviceLossNote = null)
         {
             // Volatile flag flips back off here (not inside the catch) so
             // any OCR tick that fires during the retry window sees the
@@ -905,7 +907,8 @@ namespace GI_Subtitles.Views
                 {
                     data.LoadEngine(
                         forceCpuForSession ? false : (bool?)null,
-                        profileOverride);
+                        profileOverride,
+                        releaseCurrentFirst: deviceLossNote != null);
                     if (generation != Volatile.Read(ref _engineInitGeneration))
                     {
                         Logger.Log.Debug("Ignoring completion from a superseded OCR-engine initialization.");
@@ -915,6 +918,13 @@ namespace GI_Subtitles.Views
                     _ocrRecoveryPolicy.Reset();
                     Interlocked.Exchange(ref _runtimeOcrRecoveryLevel, runtimeRecoveryLevel);
                     Interlocked.Exchange(ref _runtimeOcrRecoveryInFlight, 0);
+                    if (deviceLossNote != null)
+                    {
+                        PaddleOCREngine rebuilt = data.engine;
+                        Logger.Log.Warn($"OCR recovered from a lost GPU device ({deviceLossNote}): reading again on " +
+                                        $"{(rebuilt?.IsUsingGpu == true ? "the GPU" : "the processor")} " +
+                                        $"(provider {rebuilt?.ExecutionProvider ?? "unknown"}).");
+                    }
                     Logger.Log.Debug("OCR engine loaded and ready");
                     NotifyGpuQuarantineIfJustEngaged();
                     data.SetEngineStatus(SettingsWindow.EngineStatus.Ready);
@@ -1070,6 +1080,46 @@ namespace GI_Subtitles.Views
                 forceCpuForSession: true,
                 profileOverride: profileOverride,
                 runtimeRecoveryLevel: nextLevel);
+        }
+
+        /// <summary>
+        /// A read failed because Windows took the GPU device away (issue #261): the DirectML sessions never work again,
+        /// so rebuild them once (GPU, else the processor for this session; never the quarantine, the GPU is not at
+        /// fault). True when <paramref name="error"/> was a device loss, which the caller then logs as Warn, not Error.
+        /// </summary>
+        /// <param name="failedEngine">The engine the read ran on: a late failure from a replaced one changes nothing.</param>
+        private bool TryRecoverFromOcrDeviceLoss(Exception error, PaddleOCREngine failedEngine, string where)
+        {
+            if (!GI_Subtitles.Services.OCR.OcrDeviceLoss.IsDeviceLost(error)) return false;
+            if (failedEngine == null || !ReferenceEquals(failedEngine, data?.engine))
+            {
+                Logger.Log.Warn($"OCR {where} failed on a lost GPU device, on a reader that was already replaced.");
+                return true;
+            }
+            if (!failedEngine.IsUsingGpu) return false;
+
+            // In-flight first, so a read that loses this race does not use up the GPU rebuild.
+            if (Interlocked.CompareExchange(ref _runtimeOcrRecoveryInFlight, 1, 0) != 0)
+            {
+                Logger.Log.Warn($"OCR {where} failed on a lost GPU device; the reader is already being rebuilt.");
+                return true;
+            }
+
+            bool onGpu = _ocrDeviceLossPolicy.Decide(DateTime.UtcNow) ==
+                         GI_Subtitles.Services.OCR.OcrDeviceLossAction.RebuildOnGpu;
+            Logger.Log.Warn(
+                $"OCR {where} failed: the GPU device was lost ({error.GetType().Name}: {error.Message}). " +
+                (onGpu
+                    ? "Rebuilding the reader on the GPU."
+                    : $"Lost again within {GI_Subtitles.Services.OCR.OcrDeviceLossPolicy.Cooldown.TotalMinutes:F0} min; " +
+                      "reading on the processor until Kaption restarts."));
+            void Rebuild() => KickOffEngineInit(
+                forceCpuForSession: !onGpu,
+                runtimeRecoveryLevel: onGpu ? 0 : 1,
+                deviceLossNote: onGpu ? "GPU tried again" : "lost twice in a short time");
+            if (Dispatcher.CheckAccess()) Rebuild();
+            else Dispatcher.BeginInvoke(new Action(Rebuild));
+            return true;
         }
 
         // Memo for the foreground process name. See ResolveForegroundProcessName.
@@ -3993,7 +4043,8 @@ namespace GI_Subtitles.Views
             }
             catch (Exception ex)
             {
-                Logger.Log.Error($"QuickTranslate OCR error: {ex}");
+                if (!TryRecoverFromOcrDeviceLoss(ex, engine, "quick translate"))
+                    Logger.Log.Error($"QuickTranslate OCR error: {ex}");
                 return none;
             }
             finally
@@ -4152,6 +4203,7 @@ namespace GI_Subtitles.Views
             bool inferenceAttempted = false;
             bool inferenceTimedOut = false;
             Exception inferenceError = null;
+            PaddleOCREngine readEngine = null;
             var cts = new CancellationTokenSource(
                 TimeSpan.FromSeconds(OcrInferenceTimeoutSeconds));
             try
@@ -4180,7 +4232,8 @@ namespace GI_Subtitles.Views
                             // Exact hash only. A fuzzy fallback here kept touching stale LRU entries and
                             // showed old lines on similar frames; the stability gate already makes frames identical.
                             inferenceAttempted = true;
-                            OCRResult ocrResult = data.engine.DetectTextFromMat(frameToProcess, cts.Token);
+                            readEngine = data.engine;
+                            OCRResult ocrResult = readEngine.DetectTextFromMat(frameToProcess, cts.Token);
 
                             // Speaker-name vs dialogue split. Which signal separates
                             // them is per-game: Genshin and Star Rail print the name
@@ -4255,11 +4308,12 @@ namespace GI_Subtitles.Views
                         if (FeatureAnswerTranslationEnabled && answerTarget != null &&
                             detectedText.Length > 1 && !GameUiTextFilter.IsLikelyGameUI(detectedText))
                         {
+                            PaddleOCREngine answerEngine = data.engine;
                             try
                             {
                                 using (var answerMat = answerTarget.ToMat())
                                 {
-                                    var answerOcr = data.engine.DetectTextFromMat(answerMat, cts.Token);
+                                    var answerOcr = answerEngine.DetectTextFromMat(answerMat, cts.Token);
                                     if (answerOcr?.TextBlocks != null && answerOcr.TextBlocks.Count > 0)
                                     {
                                         var answerLines = MergeAnswerBlocks(answerOcr.TextBlocks);
@@ -4285,7 +4339,8 @@ namespace GI_Subtitles.Views
                             }
                             catch (Exception ex)
                             {
-                                Logger.Log.Error($"Answer OCR failed: {ex.Message}");
+                                if (!TryRecoverFromOcrDeviceLoss(ex, answerEngine, "answer read"))
+                                    Logger.Log.Error($"Answer OCR failed: {ex.Message}");
                                 // Keep existing predictions on error
                             }
                         }
@@ -4320,18 +4375,27 @@ namespace GI_Subtitles.Views
 
                             if (inferenceError != null)
                             {
-                                inferenceTimedOut = cts.IsCancellationRequested || IsOcrTimeout(inferenceError);
-                                if (inferenceTimedOut)
+                                // A lost device first: a hung GPU may throw only after the watchdog fired, and the
+                                // timeout ladder would quarantine a GPU that is not at fault.
+                                if (TryRecoverFromOcrDeviceLoss(inferenceError, readEngine, "read"))
                                 {
-                                    RecordOcrTimeout(
-                                        data.engine?.ExecutionProvider,
-                                        data.engine?.ModelName);
-                                    Logger.Log.Debug(inferenceError);
+                                    _ocrRecoveryPolicy.RecordSuccess();
                                 }
                                 else
                                 {
-                                    _ocrRecoveryPolicy.RecordSuccess();
-                                    Logger.Log.Error(inferenceError);
+                                    inferenceTimedOut = cts.IsCancellationRequested || IsOcrTimeout(inferenceError);
+                                    if (inferenceTimedOut)
+                                    {
+                                        RecordOcrTimeout(
+                                            data.engine?.ExecutionProvider,
+                                            data.engine?.ModelName);
+                                        Logger.Log.Debug(inferenceError);
+                                    }
+                                    else
+                                    {
+                                        _ocrRecoveryPolicy.RecordSuccess();
+                                        Logger.Log.Error(inferenceError);
+                                    }
                                 }
                                 detectedText = string.Empty;
                                 detectedNpcName = string.Empty;

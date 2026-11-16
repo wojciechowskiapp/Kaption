@@ -195,7 +195,7 @@
          verified). GHSA-4f7c-pmjv-c25w (NU1902) is fixed in 3.3.0 — NOT in 3.x
          generally: OSV shows 3.0.0 and 3.2.0 still carry it. Never go below 3.3.0.
          3.5.0 (2026-09-25) adds the audit hardening of 3.4.0 and appender fixes. -->
-    <PackageReference Include="log4net" Version="3.5.0" />
+    <PackageReference Include="log4net" Version="3.6.0" />
     <!-- FST-indexed matcher blob. Lucene.Net 4.8.0-beta00018 multi-targets
          netstandard2.0 + net6.0; runs cleanly on net8. Only the Fst
          subsystem is used — no IO/Directory dependencies. Apache-2.0. -->
@@ -214,15 +214,12 @@
          Microsoft_AI_DirectML_SkipLibraryCopy=false property above
          re-enables .targets-based copy so we don't need a manual target. -->
     <PackageReference Include="Microsoft.AI.DirectML" Version="1.15.4" />
-    <!-- Sentry 6.x: the "4.13.0 was last line with net462 support" comment
-         was stale advice. Sentry 6.x still ships a net462 TFM alongside
-         net8/net9/netstandard2.0/2.1. The 5.0 class renames (User →
-         SentryUser, Transaction → SentryTransaction) don't affect
-         CrashReportingService.cs — we use none of the renamed types.
-         Options API (AutoSessionTracking, TracesSampleRate, SetBeforeSend,
-         Debug, MaxBreadcrumbs, SendDefaultPii, AttachStacktrace, Release,
-         Environment, Dsn) preserved unchanged through 6.x. -->
-    <PackageReference Include="Sentry" Version="6.12.1" />
+    <!-- Sentry 7.x ships a net11.0 build. A major moves in its own verified
+         round: GI-Test/CrashReportingSdkTests.cs sends through the real SDK
+         to a local listener and checks the options CrashReportingService
+         sets (7.0 removed EnableLogs/EnableMetrics; Configure drops logs and
+         metrics with SetBeforeSendLog/SetBeforeSendMetric instead). -->
+    <PackageReference Include="Sentry" Version="7.0.0" />
     <!-- Velopack: moved from 0.0.1298 by hand after the update lab showed
          0.0.1298 installs take 1.x packages (delta, delta chain, full,
          portable; .plan/in-progress/VELOPACK-1X-SPIKE.md). Every bump changes

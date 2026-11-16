@@ -332,51 +332,8 @@ namespace GI_Subtitles.Services.Observability
 
                 SentrySdk.Init(o =>
                 {
-                    o.Dsn = dsn;
-                    o.Release = release;                  // e.g. "Kaption@2.0.0.0"
-                    o.Environment = environment;          // "production" / "beta" / "dev"
-
-                    // Privacy: never enrich with OS username, local IP, or
-                    // request bodies. We opt-in only to what's already in
-                    // the caught Exception.
-                    o.SendDefaultPii = false;
-
-                    // Stack traces: always include, even for non-throw paths
-                    // (breadcrumbs/messages) — costs nothing at crash-report
-                    // volumes and makes grouping heuristics much sharper.
-                    o.AttachStacktrace = true;
-
-                    // Session tracking reports every app start and how it
-                    // ended: usage analytics. Owner rule: no analytics, only
-                    // the crash reports the user opted in to. Off for good.
-                    o.AutoSessionTracking = false;
-
-                    // No performance tracing: transactions would be usage
-                    // data too (same owner rule), and the app instruments
-                    // none. 0 keeps the SDK from sending any transaction.
-                    o.TracesSampleRate = 0;
-
-                    // Disable Sentry's own diagnostic logger — it pipes into
-                    // System.Diagnostics.Trace by default, which we don't use,
-                    // and it would double-log transport errors that already
-                    // land via the SDK's regular `OnError` path.
-                    o.Debug = false;
-
-                    // Reasonable upper bounds — desktop apps rarely generate
-                    // more than a handful of events per session.
-                    o.MaxBreadcrumbs = 50;
-
-                    // Redact exception messages before send: free-form .NET
-                    // exception messages occasionally include absolute file
-                    // paths (IOException) which can leak the Windows username
-                    // (e.g. C:\Users\<name>\...). BeforeSend lets us scrub
-                    // without turning off the rest of Sentry's enrichment.
-                    o.SetBeforeSend((SentryEvent e, SentryHint _) =>
-                    {
-                        try { ScrubUserPath(e); }
-                        catch { /* never block the send path on a scrub failure */ }
-                        return e;
-                    });
+                    Configure(o, dsn, release, environment);
+                    TestOptions?.Invoke(o);
                 });
 
                 _sdkStarted = true;
@@ -386,6 +343,72 @@ namespace GI_Subtitles.Services.Observability
                 _sdkStarted = false;
                 Logger.Log.Warn($"CrashReportingService.StartSdk failed: {ex.Message}");
             }
+        }
+
+        /// <summary>
+        /// Tests only, applied after <see cref="Configure"/>: GI-Test turns the SDK's own file writes off
+        /// (its install id under %LOCALAPPDATA%\Sentry) so a test run never writes under the real profile.
+        /// </summary>
+        internal static Action<SentryOptions> TestOptions;
+
+        /// <summary>
+        /// The options the SDK runs with. Separate from <see cref="StartSdk"/> so a test can read the
+        /// effective settings without starting the SDK (a major SDK release can flip a default).
+        /// </summary>
+        internal static void Configure(SentryOptions o, string dsn, string release, string environment)
+        {
+            o.Dsn = dsn;
+            o.Release = release;                  // e.g. "Kaption@2.0.0.0"
+            o.Environment = environment;          // "production" / "beta" / "dev"
+
+            // Privacy: never enrich with OS username, local IP, or
+            // request bodies. We opt-in only to what's already in
+            // the caught Exception.
+            o.SendDefaultPii = false;
+
+            // Stack traces: always include, even for non-throw paths
+            // (breadcrumbs/messages) — costs nothing at crash-report
+            // volumes and makes grouping heuristics much sharper.
+            o.AttachStacktrace = true;
+
+            // Session tracking reports every app start and how it
+            // ended: usage analytics. Owner rule: no analytics, only
+            // the crash reports the user opted in to. Off for good.
+            o.AutoSessionTracking = false;
+
+            // No performance tracing: transactions would be usage
+            // data too (same owner rule), and the app instruments
+            // none. 0 keeps the SDK from sending any transaction.
+            o.TracesSampleRate = 0;
+
+            // Structured logs and metrics are usage data as well. The app emits
+            // neither, but SDK 6.13 sent both once called (EnableLogs=false did
+            // not stop SentrySdk.Logger) and 7.0 removed both switches; dropping
+            // them here keeps every send an error event whatever the SDK does.
+            o.SetBeforeSendLog(_ => null);
+            o.SetBeforeSendMetric(_ => null);
+
+            // Disable Sentry's own diagnostic logger — it pipes into
+            // System.Diagnostics.Trace by default, which we don't use,
+            // and it would double-log transport errors that already
+            // land via the SDK's regular `OnError` path.
+            o.Debug = false;
+
+            // Reasonable upper bounds — desktop apps rarely generate
+            // more than a handful of events per session.
+            o.MaxBreadcrumbs = 50;
+
+            // Redact exception messages before send: free-form .NET
+            // exception messages occasionally include absolute file
+            // paths (IOException) which can leak the Windows username
+            // (e.g. C:\Users\<name>\...). BeforeSend lets us scrub
+            // without turning off the rest of Sentry's enrichment.
+            o.SetBeforeSend((SentryEvent e, SentryHint _) =>
+            {
+                try { ScrubUserPath(e); }
+                catch { /* never block the send path on a scrub failure */ }
+                return e;
+            });
         }
 
         /// <summary>

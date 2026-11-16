@@ -2174,18 +2174,22 @@ namespace GI_Subtitles.Views
             Environment.Exit(0);
         }
 
-        public void LoadEngine(bool? useGpuOverride = null, string profileOverride = null)
+        /// <param name="releaseCurrentFirst">Dispose the current engine before building: after a lost GPU device,
+        /// Windows refuses a new D3D12 device on that adapter while the removed one is still held.</param>
+        public void LoadEngine(bool? useGpuOverride = null, string profileOverride = null, bool releaseCurrentFirst = false)
         {
             // Build and swap as one serial operation. Retry, startup and the
             // Settings test buttons can otherwise dispose a session while a
             // second initialization is still publishing it.
             lock (_engineLoadLock)
             {
+                // The field keeps pointing at the disposed engine until the swap: its calls refuse, none dereference null.
+                if (releaseCurrentFirst) engine?.Dispose();
                 PaddleOCREngine replacement = LoadEngine(
                     InputLanguage, useGpuOverride, profileOverride);
                 PaddleOCREngine previous = engine;
                 engine = replacement;
-                previous?.Dispose();
+                previous?.Dispose(); // a no-op when already released above
             }
         }
 

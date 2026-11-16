@@ -15,8 +15,9 @@ counts). Everything an agent or reviewer needs goes inside the <details> block b
 
 ## Screenshots
 
-<!-- What it looks like now, or before and after, for anything a person can see (site, app, Grafana, a PR
-     comment). Delete this section when nothing is visible. Upload with `python tools/review/pr_shots.py`. -->
+<!-- Only what this PR changes, as a player sees it (signed in if that is where it shows), cropped to the change;
+     before and after with `compare`. No standard set of pages. Nothing visible: write "Nothing visible." on one
+     line instead. Upload with `python tools/review/pr_shots.py`. -->
 
 ## Owner steps
 
