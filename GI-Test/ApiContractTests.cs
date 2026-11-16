@@ -24,6 +24,17 @@ namespace GI_Test
         // One build per schema: every schema registers its $id, and a second build of the same id is not needed.
         private static readonly ConcurrentDictionary<string, JsonSchema> Schemas = new();
 
+        // The public source mirror carries no contracts/ (it also holds private files), so there these checks skip. Here,
+        // not in Root() or ContractsDir(): TheCheckBites and ABadTimestampAloneFails would catch it as the wrong exception.
+        [TestInitialize]
+        public void TheContractsAreInThisCheckout()
+        {
+            string root = RenderTestKit.RepoRoot();
+            if (root == null) Assert.Inconclusive("GI-Subtitles.sln not found above the test binaries");
+            if (!Directory.Exists(Path.Combine(root, "contracts", "api")))
+                Assert.Inconclusive("contracts/api is not in this checkout (the public source mirror).");
+        }
+
         private static string Root() =>
             RenderTestKit.RepoRoot() ?? throw new AssertInconclusiveException("GI-Subtitles.sln not found above the test binaries");
 
