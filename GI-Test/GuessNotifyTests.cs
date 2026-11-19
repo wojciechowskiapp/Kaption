@@ -1124,6 +1124,25 @@ namespace GI_Test
         }
 
         [TestMethod]
+        public void Spotlight_EndfieldRow_ShowsOnlyWhileThePackIsListed_AndNeverToAPlayerWhoHasTheGame()
+        {
+            static SpotlightInputs Listed(bool coming = false, bool selected = false, bool seen = false, bool onboarding = false, int shows = 0) =>
+                new() { SetupCompleted = true, EndfieldPolishListed = true, EndfieldGameVersion = "1.6", EndfieldComing = coming,
+                        EndfieldSelected = selected, SeenEndfield = seen, OnboardingRanThisLaunch = onboarding, ShowsEndfield = shows };
+            var rows = SpotlightRules.Rows(Listed());
+            Assert.IsTrue(rows.Endfield);
+            Assert.AreEqual("1.6", rows.EndfieldVersion);
+            Assert.IsFalse(rows.WuWa, "the WuWa row has its own listing");
+            Assert.IsFalse(SpotlightRules.Rows(new SpotlightInputs { SetupCompleted = true }).Endfield, "not listed");
+            Assert.IsFalse(SpotlightRules.Rows(Listed(coming: true)).Endfield, "the server still says on the way");
+            Assert.IsFalse(SpotlightRules.Rows(Listed(selected: true)).Endfield, "already picked");
+            Assert.IsFalse(SpotlightRules.Rows(Listed(seen: true)).Endfield, "closed or used");
+            Assert.IsFalse(SpotlightRules.Rows(Listed(onboarding: true)).Any, "not on the setup launch");
+            Assert.IsTrue(SpotlightRules.Rows(Listed(shows: 2)).Endfield);
+            Assert.IsFalse(SpotlightRules.Rows(Listed(shows: 3)).Endfield, "retires after three launches");
+        }
+
+        [TestMethod]
         public void Spotlight_WuWaAction_SwitchesUnlessWuWaIsSelected()
         {
             Assert.AreEqual(SpotlightWuWaAction.Switch, SpotlightRules.Rows(Ready()).WuWaAction);
@@ -1164,6 +1183,11 @@ namespace GI_Test
             Assert.IsFalse(SpotlightRules.HasWuWaPolish(null, out _));
             Assert.IsFalse(SpotlightRules.HasWuWaPolish(new[] { new LatestPack { Game = "wuwa", Language = "en", PackVersion = "1" } }, out _));
             Assert.AreEqual("3.7.1", SpotlightRules.ShortVersion("3.7.1"));
+            var withEndfield = packs.Append(new LatestPack { Game = "endfield", Language = "pl", PackVersion = "1.6.0-r1", GameVersion = "1.6.0" });
+            Assert.IsTrue(SpotlightRules.HasEndfieldPolish(withEndfield, out string e));
+            Assert.AreEqual("1.6", e);
+            Assert.IsFalse(SpotlightRules.HasEndfieldPolish(packs, out _), "WuWa's pack is not Endfield's");
+            Assert.IsFalse(SpotlightRules.HasEndfieldPolish(new[] { new LatestPack { Game = "endfield", Language = "en", PackVersion = "1" } }, out _));
         }
 
         [TestMethod]
@@ -1182,10 +1206,32 @@ namespace GI_Test
         }
 
         [TestMethod]
+        public void Spotlight_EndfieldRow_CountsAndRetiresInConfig()
+        {
+            GI_Subtitles.Core.Config.Config.Remove(SpotlightRules.ShowsEndfieldKey);
+            GI_Subtitles.Core.Config.Config.Remove(SpotlightRules.SeenEndfieldKey);
+            var live = new SpotlightInputs { SetupCompleted = true, EndfieldPolishListed = true };
+            for (int n = 0; n < SpotlightRules.MaxShows; n++)
+            {
+                var rows = SpotlightRules.Rows(SpotlightRules.FromConfig(live));
+                Assert.IsTrue(rows.Endfield, $"launch {n + 1} shows it");
+                SpotlightRules.CountShown(rows);
+            }
+            Assert.IsFalse(SpotlightRules.Rows(SpotlightRules.FromConfig(live)).Endfield, "the fourth launch does not");
+            GI_Subtitles.Core.Config.Config.Remove(SpotlightRules.ShowsEndfieldKey);
+            Assert.IsTrue(SpotlightRules.Rows(SpotlightRules.FromConfig(live)).Endfield);
+            SpotlightRules.MarkSeen(wuwa: false, guess: false, endfield: true);
+            Assert.IsFalse(SpotlightRules.Rows(SpotlightRules.FromConfig(live)).Endfield, "closing it is for good");
+            GI_Subtitles.Core.Config.Config.Remove(SpotlightRules.ShowsEndfieldKey);
+            GI_Subtitles.Core.Config.Config.Remove(SpotlightRules.SeenEndfieldKey);
+        }
+
+        [TestMethod]
         public void Onboarding_PreMarksTheWuWaRow_NotTheGuessRow()
         {
             string setup = File.ReadAllText(Path.Combine(RenderTestKit.RepoRoot(), "GI-Subtitles", "Views", "OnboardingWindow.xaml.cs"));
             Assert.AreEqual(2, CountOf(setup, "Config.Set(Shell.SpotlightRules.SeenWuWaKey, true)"), "both completion paths");
+            Assert.AreEqual(2, CountOf(setup, "Config.Set(Shell.SpotlightRules.SeenEndfieldKey, true)"), "and the Endfield row");
             Assert.IsFalse(setup.Contains("SeenGuessKey"));
         }
 

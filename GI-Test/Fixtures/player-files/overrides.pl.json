@@ -1,0 +1,20 @@
+{
+  "schema": 1,
+  "game": "genshin",
+  "lang": "pl",
+  "overrides": [
+    {
+      "en": "Ehe?",
+      "text": "Ehe?",
+      "savedAt": "2026-11-16T08:00:00.0000000+00:00"
+    },
+    {
+      "en": "Let's go, Paimon!",
+      "text": "Chodźmy, Paimon!",
+      "was": "Idziemy, Paimon!",
+      "speaker": "Traveler",
+      "note": "brzmi naturalniej <i>&</i> krócej",
+      "savedAt": "2026-11-15T19:04:05.0000000+00:00"
+    }
+  ]
+}

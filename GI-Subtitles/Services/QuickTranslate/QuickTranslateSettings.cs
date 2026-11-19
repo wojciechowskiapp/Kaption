@@ -1,5 +1,5 @@
 using System;
-using GI_Subtitles.Core.Config;
+using GI_Subtitles.Core.Settings;
 
 namespace GI_Subtitles.Services.QuickTranslate
 {
@@ -51,14 +51,16 @@ namespace GI_Subtitles.Services.QuickTranslate
                 Math.Clamp(fontSize, MinFontSize, MaxFontSize));
         }
 
-        public static QuickTranslateSettings Load()
+        public static QuickTranslateSettings Load() => Load(ConfigSettingsStore.Instance);
+
+        public static QuickTranslateSettings Load(ISettingsStore store)
         {
             try
             {
                 return FromValues(
-                    Config.Get(CloseModeKey, nameof(QuickTranslateCloseMode.Auto)),
-                    Config.Get(SecondsKey, DefaultSeconds),
-                    Config.Get(FontSizeKey, DefaultFontSize));
+                    store.Get(CloseModeKey, nameof(QuickTranslateCloseMode.Auto)),
+                    store.Get(SecondsKey, DefaultSeconds),
+                    store.Get(FontSizeKey, DefaultFontSize));
             }
             catch
             {

@@ -28,7 +28,7 @@ namespace GI_Subtitles.Services.Rendering
         /// Default max height as fraction of screen height.
         /// Used when user hasn't configured a specific MaxHeight.
         /// </summary>
-        private const double DefaultMaxHeightScreenFraction = 0.25;
+        public const double DefaultMaxHeightScreenFraction = 0.25;
 
         public SubtitleLayoutResult CalculateLayout(SubtitleLayoutParams p)
         {

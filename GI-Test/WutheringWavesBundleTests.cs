@@ -24,8 +24,7 @@ using GI_Subtitles.Services.Data;
 using GI_Subtitles.Services.Security;
 using GI_Subtitles.Services.Translation;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
+using System.Text.Json.Nodes;
 
 namespace GI_Test
 {
@@ -44,7 +43,7 @@ namespace GI_Test
         private string _gameDir;
         private string _bundlePath;
         private FileProtectionHelper _protector;
-        private JObject _bundle;
+        private JsonObject _bundle;
 
         [TestInitialize]
         public void Setup()
@@ -52,7 +51,7 @@ namespace GI_Test
             var fixture = Path.Combine(RepoRoot(), "tools", "fixtures", "wuwa", "expected-bundle.json");
             if (!File.Exists(fixture))
                 Assert.Inconclusive("tools/fixtures/wuwa is not in this checkout (public source mirror).");
-            _bundle = JObject.Parse(File.ReadAllText(fixture));
+            _bundle = JsonNode.Parse(File.ReadAllText(fixture)).AsObject();
             _game = "WuWaBundleTest_" + Guid.NewGuid().ToString("N").Substring(0, 8);
             _gameDir = GameDataPaths.GameDir(_game);
             Directory.CreateDirectory(_gameDir);
@@ -78,18 +77,18 @@ namespace GI_Test
         /// <summary>Node ids of every dialog_graph entry whose English (through textmap_en) is <paramref name="text"/>.</summary>
         private List<long> NodesOf(string text)
         {
-            var tm = (JObject)_bundle["textmap_en"];
-            return ((JObject)_bundle["dialog_graph"]).Properties()
-                .Where(p => (string)tm[(string)p.Value["h"]] == text)
-                .Select(p => long.Parse(p.Name))
+            var tm = _bundle["textmap_en"].AsObject();
+            return _bundle["dialog_graph"].AsObject()
+                .Where(p => (string)tm[p.Value["h"].ToJsonString().Trim('"')] == text)
+                .Select(p => long.Parse(p.Key))
                 .ToList();
         }
 
         private NormalizedDialogueContext InstallAndLoad()
         {
-            var copy = (JObject)_bundle.DeepClone();
+            var copy = _bundle.DeepClone().AsObject();
             copy["extension"]["game"] = _game;
-            File.WriteAllText(_bundlePath, JsonConvert.SerializeObject(copy, Formatting.None));
+            File.WriteAllText(_bundlePath, copy.ToJsonString());
 
             var install = GamedataSyncService.InstallBundleFromFile(_bundlePath, _game, _protector);
             Assert.IsTrue(install.Success, $"install failed: {install.Message}");

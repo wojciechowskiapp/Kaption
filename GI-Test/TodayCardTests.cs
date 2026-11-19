@@ -336,8 +336,10 @@ namespace GI_Test
             Assert.IsTrue(TodayCardBuilder.Build(Inputs("wuwa", reading: new StaminaReading(100, Now.AddMinutes(-10), 180))).WorthShowing);
             Assert.IsTrue(TodayCardBuilder.Build(Inputs("starrail", periods: new[] { Period("x", "2026-11-12T00:00:00Z") })).WorthShowing);
 
-            // Every listed game can have a card; the trigger watches a game only while today's has not shown.
-            foreach (GameManifest g in GameRegistry.Current.Listed) Assert.IsTrue(TodayCardSettings.HasCard(g), g.Id);
+            // Every live game can have a card (a beta game with no stamina or reset data, Endfield, has none yet); the
+            // trigger watches a game only while today's has not shown.
+            foreach (GameManifest g in GameRegistry.Current.Listed)
+                Assert.AreEqual(g.Status == GameManifest.StatusLive || g.Resets != null || g.Stamina != null, TodayCardSettings.HasCard(g), g.Id);
             Assert.IsFalse(TodayCardSettings.HasCard(null));
             Assert.IsTrue(FarmCardTrigger.ShouldWatch(true, true, "2026-11-10", "2026-11-11"));
             Assert.IsFalse(FarmCardTrigger.ShouldWatch(true, false, null, "2026-11-11"), "a game without a card is never probed");

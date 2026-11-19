@@ -187,6 +187,8 @@ namespace GI_Subtitles.Views
             "calendar" => "WnCalendar",
             "power" => "WnPower",
             "record" => "WnRecord",
+            "frame" => "WnFrame",
+            "keys" => "WnKeys",
             _ => "WnSpark",
         }) as Geometry;
 

@@ -9,7 +9,8 @@ using GI_Subtitles.Common;
 using GI_Subtitles.Services;
 using GI_Subtitles.Services.Translation;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
-using Newtonsoft.Json;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 
 namespace GI_Test
@@ -115,7 +116,7 @@ namespace GI_Test
             };
 
             // Output JSON format result
-            string jsonResult = JsonConvert.SerializeObject(performanceResult, Formatting.Indented);
+            string jsonResult = JsonSerializer.Serialize(performanceResult, Indented);
             Logger.Log.Debug($"Performance test result (JSON):\n{jsonResult}");
 
             // Output to the console (visible in the test output)
@@ -219,7 +220,7 @@ namespace GI_Test
             };
 
             // Output JSON format result
-            string jsonResult = JsonConvert.SerializeObject(performanceResult, Formatting.Indented);
+            string jsonResult = JsonSerializer.Serialize(performanceResult, Indented);
             Logger.Log.Debug($"Performance test result (JSON):\n{jsonResult}");
 
             // Output to the console (visible in the test output)
@@ -324,7 +325,7 @@ namespace GI_Test
             };
 
             // Output JSON format result
-            string jsonResult = JsonConvert.SerializeObject(performanceResult, Formatting.Indented);
+            string jsonResult = JsonSerializer.Serialize(performanceResult, Indented);
             Logger.Log.Debug($"Performance test result (JSON):\n{jsonResult}");
 
             // Output to the console (visible in the test output)
@@ -347,38 +348,40 @@ namespace GI_Test
             Assert.IsTrue(testResults.Count == testSentences.Length, "All test sentences should be processed");
         }
 
+        private static readonly JsonSerializerOptions Indented = new() { WriteIndented = true };
+
         // Test result class
         private class TestResult
         {
-            [JsonProperty("input")]
+            [JsonPropertyName("input")]
             public string Input { get; set; }
 
-            [JsonProperty("matchedKey")]
+            [JsonPropertyName("matchedKey")]
             public string MatchedKey { get; set; }
 
-            [JsonProperty("matchedResult")]
+            [JsonPropertyName("matchedResult")]
             public string MatchedResult { get; set; }
 
-            [JsonProperty("elapsedMilliseconds")]
+            [JsonPropertyName("elapsedMilliseconds")]
             public double ElapsedMilliseconds { get; set; }
         }
 
         // Performance test result class
         private class PerformanceTestResult
         {
-            [JsonProperty("dictionarySize")]
+            [JsonPropertyName("dictionarySize")]
             public int DictionarySize { get; set; }
 
-            [JsonProperty("testCount")]
+            [JsonPropertyName("testCount")]
             public int TestCount { get; set; }
 
-            [JsonProperty("totalElapsedMilliseconds")]
+            [JsonPropertyName("totalElapsedMilliseconds")]
             public double TotalElapsedMilliseconds { get; set; }
 
-            [JsonProperty("averageElapsedMilliseconds")]
+            [JsonPropertyName("averageElapsedMilliseconds")]
             public double AverageElapsedMilliseconds { get; set; }
 
-            [JsonProperty("testResults")]
+            [JsonPropertyName("testResults")]
             public List<TestResult> TestResults { get; set; }
         }
     }

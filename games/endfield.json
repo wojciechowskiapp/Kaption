@@ -1,0 +1,71 @@
+{
+  "$schema": "./game.schema.json",
+  "schema": 1,
+  "id": "endfield",
+  "gameId": "Endfield",
+  "name": "Arknights: Endfield",
+  "shortName": "Endfield",
+  "publisher": "GRYPHLINE",
+  "status": "beta",
+  "order": 5,
+  "aliases": ["ArknightsEndfield", "Arknights Endfield", "Arknights: Endfield", "Arknights-Endfield", "AKE"],
+  "steamAppId": 4732690,
+  "detect": { "processNames": ["Endfield"], "windowTitles": ["Arknights: Endfield", "Endfield"] },
+  "desktop": {
+    "dialogue": { "x": 0.15, "y": 0.70, "w": 0.70, "h": 0.265, "text": { "x": 0.193, "y": 0.723, "w": 0.614, "h": 0.229 } },
+    "answer":   { "x": 0.645, "y": 0.33, "w": 0.26, "h": 0.42 },
+    "pacing": { "ocrIntervalMs": 100, "stabilityWindowFrames": 5, "stableFramesChain": 2, "stableFramesDefault": 2, "forceOcrAfterSeconds": 0.15 },
+    "vision": {
+      "classifier": "geometry",
+      "stripsSpeakerNameDecoration": true
+    },
+    "dialogueContext": "passthrough",
+    "upstreamTextMap": "none",
+    "displayModeTip": false,
+    "playerNameTokens": ["Player Name"],
+    "notes": [
+      "dialogue measured 2026-11-18 on gameplay footage at 16:9 (1920x1080, Endfield 1.6 and the prologue) and 21:9 (2560x1072, PC): it holds the radio speaker row (top 0.723), three dialogue rows (bottom 0.952) and the nameless cinematic line. 16:10, 4:3 and lines of four or more rows are not measured (.plan/research/s68/ENDFIELD-DESIGN.md section 5).",
+      "text is that measurement in letters: radio name top 0.723, three rows ending 0.952, widest row 0.193-0.807.",
+      "answer is Wuthering Waves' rectangle as a placeholder: no choice menu was captured.",
+      "Pacing is Wuthering Waves' measured row, provisional until Endfield's own replay sweep. The geometry classifier is provisional too: the speaker name is plain white and smaller than the body, and the replay decides between it and a speaker-row gap rule.",
+      "detect is from guides, not seen on a machine: Endfield.exe is specific to the game, so requireTitle stays off until a live test shows a generic process in front.",
+      "playerNameTokens is a token the game's English never contains: the game prints Endministrator, never the player's chosen name, and the builder writes {player} as Player Name."
+    ]
+  },
+  "look": { "accent": "#F5E100", "accentDark": "#6B6300", "glow": "#F5E100", "ambience": "endfield", "elementHues": { "Cryo": "#21C6D0", "Electric": "#FFC000" } },
+  "site": {
+    "hub": "arknights-endfield",
+    "guideKey": "endfield",
+    "guide": { "pl": "/pl/arknights-endfield-tlumaczenie/", "en": "/arknights-endfield-translator/" },
+    "ogBackground": "src/assets/og/ai/endfield.jpg",
+    "motif": "rails",
+    "currency": "Oroberyl",
+    "library": {
+      "paper": "#ECECE6",
+      "ink": "#151515",
+      "night": "#101010",
+      "nightInk": "#E6E6DE",
+      "ornament": "plain",
+      "binding": "board"
+    }
+  },
+  "source": { "kind": "datamine", "host": "github", "repo": "rmxlinux/EndfieldData", "branch": "main", "keySpace": "minted" },
+  "translation": { "targets": ["pl"], "sources": ["auto", "community"] },
+  "news": {
+    "hoyolabGid": null,
+    "officialFeeds": [
+      { "kind": "youtube", "channelId": "UCowPaVRBzg8CE6K4CB6LJfw" },
+      {
+        "kind": "gryphline",
+        "url": "https://web-news.gryphline.com/api/bulletin?lang=en-us&code=arknights_endfield_official",
+        "page": "https://endfield.gryphline.com/en-us/news/"
+      }
+    ],
+    "codes": {
+      "kind": "ingame",
+      "redeemUrl": null,
+      "redeemHow": { "path": ["Protocol Synchronizer", "Settings", "Platform & Account", "Exchange Code"] },
+      "officialDiscord": "950244160684834837"
+    }
+  }
+}

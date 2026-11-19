@@ -23,7 +23,7 @@ using Border = System.Windows.Controls.Border;
 namespace GI_Test
 {
     /// <summary>
-    /// The screenshots kaption.one shows on its home page ("Tak wygląda Kaption 2.5") and ships in the media kit's app
+    /// The screenshots kaption.one shows on its home page ("Tak wygląda Kaption") and ships in the media kit's app
     /// folder: Start while translating and while waiting for the game, Wygląd napisów, Postacie, the first setup step
     /// and the Ctrl+Q popup, Polish interface, both palettes, drawn at 200 % (a 1280×800 window is 2560×1600 px).
     /// Publishing renders, not checks (one guard on the UID row aside): they run only with KAPTION_RENDER_SHOWCASE=1 and
@@ -217,29 +217,11 @@ namespace GI_Test
             });
         }
 
-        /// <summary>
-        /// The packs as the live feed had them on the afternoon of 2 November 2026 (Genshin 7.2, whose character data
-        /// the Postacie shot shows, and its 551,847-line pack): Genshin up to date, a newer Star Rail pack offered, ZZZ
-        /// not installed yet. ShellRenderTests' fixture keeps its older numbers, which the guide screenshots match.
-        /// </summary>
+        /// <summary>The packs card and the subtitles chip as the other shell renders have them (RenderFixtures: one row per live game).</summary>
         private static void CurrentPacks(Border host, Window window)
         {
             string L(string key, string fallback) => host.TryFindResource(key) as string ?? fallback;
-            var culture = new CultureInfo(Lang);
-            Brush B(string key) => host.TryFindResource(key) as Brush;
-            SettingsWindow.PackCardRow Row(string name, string accent, string installed, string latest, bool active)
-            {
-                var (text, brush, isDownload, sub) = SettingsWindow.PackRowStatus(PackStatus.Compare(installed, latest), false, active,
-                    installed, latest, L, culture);
-                return new SettingsWindow.PackCardRow { Name = name, Version = sub, Status = text, StatusBrush = B(brush), Accent = B(accent),
-                    IsDownload = isDownload, Tooltip = isDownload ? L("shell_Packs_Download_Tip", "") : null };
-            }
-            ((ItemsControl)window.FindName("PacksCardList")).ItemsSource = new[]
-            {
-                Row("Genshin Impact", "GameGenshinBrush", "7.2.0-r5", "7.2.0-r5", active: true),
-                Row("Honkai: Star Rail", "GameStarRailBrush", "4.6.0-r8", "4.6.0-r10", active: false),
-                Row("Zenless Zone Zero", "GameZzzBrush", null, "3.3.0-r7", active: false),
-            };
+            ((ItemsControl)window.FindName("PacksCardList")).ItemsSource = RenderFixtures.PackRows(host, new CultureInfo(Lang));
             ((TextBlock)window.FindName("DashDictStatus")).Text = EngineLabels.SubtitlesChip(loaded: true, packMissing: false, packComing: false, L);
         }
 

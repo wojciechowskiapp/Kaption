@@ -205,6 +205,9 @@
          dictionary-trained per-value compression of the matcher's
          Polish value pool. -->
     <PackageReference Include="ZstdSharp.Port" Version="0.8.8" />
+    <!-- CommunityToolkit.Mvvm (MIT, .NET Foundation): source-generated INotifyPropertyChanged and commands for the
+         Settings view models (.plan/in-progress/MVVM-PILOT.md). No runtime reflection, no DI container. -->
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
     <!-- OnnxRuntime.DirectML 1.24 transitively pulls Microsoft.AI.DirectML
          1.15.4 — but we still explicit-reference below to pin the version
          and to let the .targets file copy the newer DirectML.dll. -->

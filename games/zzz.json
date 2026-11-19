@@ -15,19 +15,21 @@
     "windowTitles": ["Zenless Zone Zero", "ZenlessZoneZero"]
   },
   "desktop": {
-    "dialogue": { "x": 0.13, "y": 0.70, "w": 0.74, "h": 0.27 },
+    "dialogue": { "x": 0.13, "y": 0.70, "w": 0.74, "h": 0.27, "text": { "x": 0.145, "y": 0.722, "w": 0.70, "h": 0.206 } },
     "answer": { "x": 0.55, "y": 0.38, "w": 0.38, "h": 0.30 },
     "pacing": { "ocrIntervalMs": 60, "stabilityWindowFrames": 2, "stableFramesChain": 2, "stableFramesDefault": 2, "forceOcrAfterSeconds": 0.15 },
     "vision": {
       "classifier": "geometry",
       "stripsSpeakerNameDecoration": true,
-      "subtitlePadVertical": -180,
-      "regionMinWidthFraction": 0.55,
-      "strictRegionJunkFilter": true
+      "subtitlePadVertical": -180
     },
     "dialogueContext": "passthrough",
     "upstreamTextMap": "none",
-    "displayModeTip": false
+    "displayModeTip": false,
+    "notes": [
+      "dialogue measured on two 1919x1079 screenshots of both layouts (letters: x 0.145-0.845, y 0.724-0.928; .plan/in-progress/ZZZ-SUPPORT.md) and the recorded scene zzz-breakfast-amber-hall (reader's boxes, names from 0.722). text joins the two. 16:10, 4:3 and 21:9 are not measured.",
+      "answer is Star Rail's rectangle: no ZZZ choice screen was measured."
+    ]
   },
   "look": { "accent": "#C9CEDC", "accentDark": "#5B6272", "glow": "#FF8A2B", "signal": "#FF8A2B", "ambience": "zzz", "elementHues": { "Physical": "#E6B83A" } },
   "site": {

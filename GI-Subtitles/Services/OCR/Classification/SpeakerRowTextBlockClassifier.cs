@@ -32,6 +32,8 @@ namespace GI_Subtitles.Services.OCR.Classification
         /// <summary>
         /// A row whose left edge lies right of this fraction of the frame width is not dialogue. WuWa's choice panels
         /// start at 0.75 of the default region; 0.62 leaves room for a region drawn off-centre by about 0.07 of the band.
+        /// Star Rail's accent path uses it too: there prompts start at 0.89 of the area, choice options and the phone
+        /// panel at 0.68, and centred dialogue rows left of 0.5.
         /// </summary>
         internal const float SideRowStartFraction = 0.62f;
 

@@ -380,23 +380,17 @@ namespace GI_Test
                 var p = GameRegionProfile.Get(game);
                 Assert.IsFalse(p.UsesGeometryClassifier, game ?? "(null)");
                 Assert.AreEqual(-140, p.SubtitlePadVertical, game ?? "(null)");
-                Assert.AreEqual(0.55, p.RegionSplitXFraction, 1e-9, game ?? "(null)");
-                Assert.AreEqual(0.70, p.RegionMinWidthFraction, 1e-9, game ?? "(null)");
-                Assert.IsFalse(p.StrictRegionJunkFilter, game ?? "(null)");
             }
         }
 
         [TestMethod]
-        public void VisionProfile_Zenless_LiftsOverlayAndNarrowsRegionFloor()
+        public void VisionProfile_Zenless_LiftsOverlay()
         {
             var p = GameRegionProfile.Get("zzz");
 
             Assert.IsTrue(p.UsesGeometryClassifier);
             Assert.IsTrue(p.SubtitlePadVertical < -140,
                 "Zenless captions wrap taller, so the overlay needs more clearance above the region.");
-            Assert.IsTrue(p.RegionMinWidthFraction < 0.70,
-                "A 0.70 floor over-widens the narrow comic panel and pulls in HUD/watermarks.");
-            Assert.IsTrue(p.StrictRegionJunkFilter);
         }
 
         // ══════════════════════════════════════════════════════════════

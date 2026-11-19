@@ -1,0 +1,38 @@
+{
+  "about": "What the text engine returned for Kaption's own subtitle panel when the panel was in the frame, against the line the panel showed, and what it returned for the game-like picture alone. Measured by `Kaption.Benchmark overlay-over-text --ocr` on 2026-11-18 (PP-OCRv6 Small on the GPU); raw run: .plan/research/s68/overlay-over-text/results/spike/fullscreen-2.json.",
+  "englishRead": "Paimon Hey, wait up! Paimon wants to see what is behind that gate too.",
+  "ownLines": [
+    {
+      "shown": "Ej, poczekaj! Paimon też chce zobaczyć, co jest za tą bramą.",
+      "read": "Paimon Ej, poczekaj! Paimon też chce zobaczyć, co jest za tą bramą."
+    },
+    {
+      "shown": "Ej, poczekaj!",
+      "read": "Paimon Ej, poczekaj!"
+    },
+    {
+      "shown": "Nie wiem, czy to dobry pomysł. Tam może być niebezpiecznie, a my nie mamy nawet jedzenia na drogę.",
+      "read": "Paimon Nie wiem, czy to dobry pomyst. Tam może być niebezpiecznie, a my nie mamy nawet jedzenia na drogę."
+    },
+    {
+      "shown": "Witaj w Gildii Poszukiwaczy Przygód.",
+      "read": "Katheryne Witaj w Gildii Poszukiwaczy Przygód."
+    },
+    {
+      "shown": "No dobrze, chodźmy już. Tylko obiecaj, że potem coś zjemy!",
+      "read": "Paimon No dobrze, chodźmy już. Tylko obiecaj, że potem coś zjemy!"
+    },
+    {
+      "shown": "Każda umowa ma swoją cenę, a tę zapłaciliśmy dawno temu.",
+      "read": "Zhongli Każda umowa ma swoją cenę, a tę zapłaciliśmy dawno temu."
+    },
+    {
+      "shown": "Hmm, Paimon ma złe przeczucia co do tego miejsca.",
+      "read": "Paimon Hmm, Paimon ma zte przeczucia co do tego miejsca."
+    },
+    {
+      "shown": "Musimy znaleźć inne wejście, zanim zapadnie zmrok.",
+      "read": "Lumine Musimy znaleźć inne wejście, zanim zapadnie zmrok."
+    }
+  ]
+}

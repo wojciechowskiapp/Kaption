@@ -33,21 +33,43 @@ namespace GI_Subtitles.Services.OCR.Classification
     {
         /// <summary>Shared stateless instance — safe to reuse across threads.</summary>
         public static readonly AccentColorTextBlockClassifier Instance =
-            new AccentColorTextBlockClassifier(filterJunk: false);
+            new AccentColorTextBlockClassifier(filterJunk: false, dropSideRows: false);
 
         /// <summary>
         /// The same split after dropping <see cref="OcrTextJunkFilter"/> blocks (HUD readouts, watermarks, single
         /// glyphs), for a profile with <c>FiltersOcrJunk</c>. A frame of nothing but junk has no dialogue.
         /// </summary>
         public static readonly AccentColorTextBlockClassifier WithJunkFilter =
-            new AccentColorTextBlockClassifier(filterJunk: true);
+            new AccentColorTextBlockClassifier(filterJunk: true, dropSideRows: false);
+
+        /// <summary>
+        /// The junk-filtering split that also drops side rows (profile <c>DropsSideRows</c>, Star Rail): a row whose
+        /// left edge lies right of <see cref="SpeakerRowTextBlockClassifier.SideRowStartFraction"/> of the frame is a
+        /// HUD prompt, a choice option or the phone panel, never the centred dialogue.
+        /// </summary>
+        public static readonly AccentColorTextBlockClassifier WithJunkAndSideRowFilter =
+            new AccentColorTextBlockClassifier(filterJunk: true, dropSideRows: true);
+
+        private static readonly AccentColorTextBlockClassifier WithSideRowFilter =
+            new AccentColorTextBlockClassifier(filterJunk: false, dropSideRows: true);
 
         private readonly bool _filterJunk;
+        private readonly bool _dropSideRows;
 
-        private AccentColorTextBlockClassifier(bool filterJunk)
+        private AccentColorTextBlockClassifier(bool filterJunk, bool dropSideRows)
         {
             _filterJunk = filterJunk;
+            _dropSideRows = dropSideRows;
         }
+
+        /// <summary>The shared instance for a profile's <c>FiltersOcrJunk</c> and <c>DropsSideRows</c>.</summary>
+        public static AccentColorTextBlockClassifier For(bool filterJunk, bool dropSideRows) => (filterJunk, dropSideRows) switch
+        {
+            (false, false) => Instance,
+            (true, false) => WithJunkFilter,
+            (true, true) => WithJunkAndSideRowFilter,
+            (false, true) => WithSideRowFilter,
+        };
 
         /// <inheritdoc/>
         public DetectedTextResult Classify(Mat colorFrame, List<TextBlock> textBlocks)
@@ -72,16 +94,27 @@ namespace GI_Subtitles.Services.OCR.Classification
             using var hsvFrame = new Mat();
             Cv2.CvtColor(colorFrame, hsvFrame, ColorConversionCodes.BGR2HSV);
 
-            var candidates = new List<(TextBlockInfo Info, bool IsNpcColor)>();
+            var usable = new List<TextBlockInfo>(textBlocks.Count);
             foreach (var block in textBlocks)
             {
                 if (block.BoxPoints == null || block.BoxPoints.Length < 4 || string.IsNullOrWhiteSpace(block.Text))
                     continue;
                 if (_filterJunk && OcrTextJunkFilter.IsJunk(block.Text))
                     continue;
+                usable.Add(OcrBlockGeometry.ToTextBlockInfo(block, isNpc: false));
+            }
 
-                bool isNpcColor = IsColoredTextBlock(hsvFrame, block.BoxPoints);
-                candidates.Add((OcrBlockGeometry.ToTextBlockInfo(block, isNpcColor), isNpcColor));
+            // After the junk filter, so a stray glyph cannot pull a prompt's row left; before the colour gate, so the
+            // name band and the role-text rule never see a side row.
+            if (_dropSideRows)
+                usable = WithoutSideRows(usable, colorFrame.Width);
+
+            var candidates = new List<(TextBlockInfo Info, bool IsNpcColor)>(usable.Count);
+            foreach (var info in usable)
+            {
+                bool isNpcColor = IsColoredTextBlock(hsvFrame, info.BoxPoints);
+                info.IsNpcText = isNpcColor;
+                candidates.Add((info, isNpcColor));
             }
 
             // NPC names occupy the first accent-coloured line above the body.
@@ -150,6 +183,54 @@ namespace GI_Subtitles.Services.OCR.Classification
             }
 
             return result;
+        }
+
+        /// <summary>
+        /// Blocks of one row band further apart than this many block heights are separate pieces of the screen. Star
+        /// Rail, measured: pieces of one dialogue row sit at most 0.8 of a height apart (word spaces); a choice option
+        /// that shares the speaker's band sits 7.7 heights right of the name.
+        /// </summary>
+        internal const float SideRowGapHeights = 2f;
+
+        /// <summary>
+        /// Drops every piece of a row (blocks at one height, joined across word gaps) whose left edge lies right of the
+        /// side-row line. Pieces, not blocks: the reader can split a long dialogue row, and its right part starts past
+        /// the line. Pieces, not whole bands: a choice option can share the speaker's band. OCR order is kept.
+        /// </summary>
+        private static List<TextBlockInfo> WithoutSideRows(List<TextBlockInfo> usable, int frameWidth)
+        {
+            float sideStart = SpeakerRowTextBlockClassifier.SideRowStartFraction * frameWidth;
+            HashSet<TextBlockInfo> side = null;
+            foreach (var band in GeometryTextBlockClassifier.GroupIntoRowBands(usable))
+            {
+                // A band of several blocks comes back sorted by left edge.
+                int start = 0;
+                float right = band[0].BoundingRect.Right;
+                for (int i = 1; i <= band.Count; i++)
+                {
+                    if (i < band.Count)
+                    {
+                        RectangleF prev = band[i - 1].BoundingRect, next = band[i].BoundingRect;
+                        float gap = next.Left - right;
+                        if (gap <= SideRowGapHeights * Math.Max(1f, Math.Min(prev.Height, next.Height)))
+                        {
+                            right = Math.Max(right, next.Right);
+                            continue;
+                        }
+                    }
+                    if (band[start].BoundingRect.Left >= sideStart)
+                    {
+                        side ??= new HashSet<TextBlockInfo>();
+                        for (int j = start; j < i; j++) side.Add(band[j]);
+                    }
+                    if (i < band.Count)
+                    {
+                        start = i;
+                        right = band[i].BoundingRect.Right;
+                    }
+                }
+            }
+            return side == null ? usable : usable.Where(info => !side.Contains(info)).ToList();
         }
 
         /// <summary>

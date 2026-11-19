@@ -16,10 +16,10 @@
     "windowTitles": ["Honkai: Star Rail"]
   },
   "desktop": {
-    "dialogue": { "x": 0.15, "y": 0.75, "w": 0.70, "h": 0.20 },
+    "dialogue": { "x": 0.10, "y": 0.725, "w": 0.80, "h": 0.235, "text": { "x": 0.122, "y": 0.727, "w": 0.757, "h": 0.194 } },
     "answer": { "x": 0.55, "y": 0.38, "w": 0.38, "h": 0.30 },
     "pacing": { "ocrIntervalMs": 60, "stabilityWindowFrames": 2, "stableFramesChain": 2, "stableFramesDefault": 2, "forceOcrAfterSeconds": 0.15 },
-    "vision": {},
+    "vision": { "ocrJunkFilter": true, "sideRowFilter": true },
     "dialogueContext": "passthrough",
     "upstreamTextMap": "dimbreath-starrail",
     "displayModeTip": false,
@@ -40,7 +40,13 @@
       "readers": {
         "stamina": { "kind": "fraction", "locate": "search", "spec": "staminaScreen", "cap": "stamina.max" }
       }
-    }
+    },
+    "notes": [
+      "dialogue measured 2026-11-18 on full 1920x1080 frames of four clips (versions 1.0, 3.7, 4.5: talk, narration on black, character cards, choices, free roam). text is the reader's boxes: widest row 0.122-0.879, lowest row 0.921 (four-row narration). Until then the block was 0.15-0.85 by 0.75-0.95 and cut long rows on both sides (.plan/in-progress/AUTO-AREA-PR1.md).",
+      "Not held: free-roam speaker names sit higher (boxes from 0.705); their rows are read. The top is pinned: the last choice option ends near 0.74 beside the name (from x 0.70), so a higher top takes in more of it. At the right edge, free roam's energy counter and Teleport prompt (from x 0.83) come in; the replay painted Teleport for 1 s.",
+      "ocrJunkFilter and sideRowFilter keep them out: the counter's digits are junk, and rows that start right of 0.62 of the area (prompts from 0.89, choice options and the phone panel from 0.68; centred dialogue rows start left of 0.5) are dropped. Measured by recording and replaying four scenes (.plan/in-progress/AUTO-AREA-1C.md).",
+      "16:10, 4:3 and 21:9 are not measured."
+    ]
   },
   "look": { "accent": "#6FD6E8", "accentDark": "#0B7C90", "glow": "#4F8DFF", "ambience": "starrail" },
   "site": {

@@ -51,16 +51,23 @@ namespace GI_Test
             FeatureOn = featureOn ?? (f => f == WhatsNewFeatures.DayNotice),
         };
 
+        /// <summary>
+        /// The 2.6.1 card these scenarios were written for (stamina, the day notice, start with Windows, recordings):
+        /// a later release's entries come first in the shipped file and would change which rows the card shows.
+        /// </summary>
+        private static readonly WhatsNewCatalog Release261 =
+            new(WhatsNewCatalog.Default.Entries.Where(e => e.Since == new Version(2, 6, 1)));
+
         private static IReadOnlyList<WhatsNewRow> LeadRows(GameManifest game, string lang, Func<string, string, string> l, Func<string, bool> featureOn = null)
         {
             WhatsNewInputs inputs = Updated(game, featureOn);
-            WhatsNewPlan plan = WhatsNewPlanner.Lead(WhatsNewCatalog.Default, inputs);
+            WhatsNewPlan plan = WhatsNewPlanner.Lead(Release261, inputs);
             Assert.AreEqual(WhatsNewPlanState.Show, plan.State, game.Id);
             return WhatsNewRows.Build(plan.Rows, lang == "pl-PL", SettingsWindow.WhatsNewValues(game, l, new CultureInfo(lang)), inputs.FeatureOn);
         }
 
         private static IReadOnlyList<WhatsNewRow> ListRows(GameManifest game, string lang, Func<string, string, string> l, Func<string, bool> featureOn) =>
-            WhatsNewRows.Build(WhatsNewPlanner.List(WhatsNewCatalog.Default, Updated(game, featureOn)), lang == "pl-PL",
+            WhatsNewRows.Build(WhatsNewPlanner.List(Release261, Updated(game, featureOn)), lang == "pl-PL",
                 SettingsWindow.WhatsNewValues(game, l, new CultureInfo(lang)), featureOn);
 
         [TestMethod]
@@ -98,6 +105,41 @@ namespace GI_Test
             foreach (string p in written) Console.WriteLine(p);
         }
 
+        /// <summary>
+        /// The card of the newest release in the shipped file, for a player on 2.6.2 who just updated, with the hint
+        /// card on (its default): what the release note looks like per game, and that it stays within the card's rows.
+        /// </summary>
+        [TestMethod]
+        public void RendersTheNewestReleasesCard_ForTwoGames()
+        {
+            var written = new List<string>();
+            WhatsNewCatalog shipped = WhatsNewCatalog.Default;
+            var newest = new WhatsNewCatalog(shipped.Entries.Where(e => e.Since == shipped.Level));
+            RunSta(() =>
+            {
+                foreach (string game in new[] { "genshin", "starrail" })
+                foreach (string lang in Langs)
+                foreach (string palette in WindowRenderTests.Palettes)
+                {
+                    var card = new WhatsNewLead();
+                    Border host = Host(card, palette, lang);
+                    string L(string key, string fallback) => host.TryFindResource(key) as string ?? fallback;
+                    WhatsNewInputs inputs = Updated(Game(game), f => f == WhatsNewFeatures.InGameHints);
+                    WhatsNewPlan plan = WhatsNewPlanner.Lead(newest, inputs);
+                    Assert.AreEqual(WhatsNewPlanState.Show, plan.State, game);
+                    Assert.IsTrue(plan.Rows.Count is >= 2 and <= WhatsNewPlanner.MaxRows, $"{game}: {plan.Rows.Count} rows");
+                    var rows = WhatsNewRows.Build(plan.Rows, lang == "pl-PL", SettingsWindow.WhatsNewValues(Game(game), L, new CultureInfo(lang)), inputs.FeatureOn);
+                    Assert.AreEqual(plan.Rows.Count, rows.Count, $"{game}: every row has its words");
+
+                    card.Apply(rows, list: false, L);
+                    Layout(host, 912 + 48);
+                    AssertFits(card, $"release-{game}-{lang}-{palette}");
+                    written.Add(Save(Snapshot(host), $"whatsnew-release-{game}-{lang.Substring(0, 2)}-{palette.ToLowerInvariant()}.png"));
+                }
+            });
+            foreach (string p in written) Console.WriteLine(p);
+        }
+
         [TestMethod]
         public void RendersARowTurnedOn_AndTheListFromHelp()
         {
@@ -126,7 +168,7 @@ namespace GI_Test
                     string LL(string key, string fallback) => listHost.TryFindResource(key) as string ?? fallback;
                     Func<string, bool> on = f => f is WhatsNewFeatures.DayNotice or WhatsNewFeatures.StaminaNotice;
                     var all = ListRows(Game("genshin"), lang, LL, on);
-                    Assert.AreEqual(WhatsNewCatalog.Default.Entries.Count(e => e.Games.Count == 0 || e.Games.Contains("genshin")), all.Count,
+                    Assert.AreEqual(Release261.Entries.Count(e => e.Games.Count == 0 || e.Games.Contains("genshin")), all.Count,
                         "Genshin has every entry that is not another game's");
                     list.Apply(all, list: true, LL);
                     Layout(listHost, 912 + 48);

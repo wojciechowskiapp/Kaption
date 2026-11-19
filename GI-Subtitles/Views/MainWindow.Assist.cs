@@ -66,13 +66,14 @@ namespace GI_Subtitles.Views
         bool IAssistHost.TryGetGameClient(out Rectangle client) => GameWindowDetector.TryGetClientArea(GetForegroundWindow(), out client);
 
         /// <summary>
-        /// The subtitle panel and the Ctrl+Q popup where a frame can show them, now and at the previous read (a frame
-        /// can be one composition older than the layout). Empty when Windows keeps them out of the capture.
+        /// The subtitle panel, the Ctrl+Q popup and the hint card where a frame can show them, now and at the previous
+        /// read (a frame can be one composition older than the layout). Empty when Windows keeps them out of the capture.
         /// </summary>
         IReadOnlyList<Rectangle> IAssistHost.OwnWindowAreas()
         {
-            if (!OverlayCanBeInFrame) return Array.Empty<Rectangle>();
-            IReadOnlyList<Rectangle> now = OverlayScreenAreas();
+            if (!OwnWindowsCanBeInFrame) return Array.Empty<Rectangle>();
+            // The watch copies from the frame the tick's own capture just took, through the same reader.
+            IReadOnlyList<Rectangle> now = OwnAreasInFrame();
             IReadOnlyList<Rectangle> before = _overlayAreaHistory.Observe(now, Environment.TickCount64);
             if (before == null || before.Count == 0) return now;
             var all = new List<Rectangle>(now.Count + before.Count);

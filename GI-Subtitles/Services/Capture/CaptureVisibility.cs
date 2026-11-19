@@ -30,6 +30,15 @@ namespace GI_Subtitles.Services.Capture
         HiddenWindowsRefused,
     }
 
+    /// <summary>Where the subtitle panel goes.</summary>
+    public enum SubtitlePlacement
+    {
+        /// <summary>Above or below the game's dialogue, never on it.</summary>
+        Beside,
+        /// <summary>On the game's own text, which the app keeps reading underneath.</summary>
+        OverText,
+    }
+
     /// <summary>
     /// "Show subtitles in recordings and streams": whether the subtitle overlay asks Windows to keep it out of screen
     /// capture, and when the app has to black the overlay out of the frames it reads itself so it never reads its own
@@ -38,6 +47,28 @@ namespace GI_Subtitles.Services.Capture
     public static class CaptureVisibility
     {
         public const string ShowInRecordingsKey = "ShowInRecordings";
+
+        /// <summary>"Overlay.Placement": absent or anything else is <see cref="SubtitlePlacement.Beside"/>.</summary>
+        public const string PlacementKey = "Overlay.Placement";
+        public const string OverTextValue = "OverText";
+
+        /// <summary>The saved placement; no migration writes the key and reading it saves nothing.</summary>
+        public static SubtitlePlacement Placement =>
+            ResolvePlacement(Config.Has(PlacementKey) ? Config.Get<string>(PlacementKey, null) : null);
+
+        public static SubtitlePlacement ResolvePlacement(string saved) =>
+            string.Equals(saved?.Trim(), OverTextValue, System.StringComparison.OrdinalIgnoreCase)
+                ? SubtitlePlacement.OverText
+                : SubtitlePlacement.Beside;
+
+        /// <summary>
+        /// Whether the overlay is left out of Desktop Duplication (<see cref="CaptureExclusion"/>): only for subtitles
+        /// over the text, and never while recordings must show them, because a recorder that reads through Desktop
+        /// Duplication (OBS display capture by default) would then lose the subtitles without a word.
+        /// </summary>
+        public static bool LeavesOutOfDuplication(SubtitlePlacement placement, bool showInRecordings) =>
+            placement == SubtitlePlacement.OverText && !showInRecordings;
+
 
         /// <summary>
         /// What an install without the key gets. Off keeps what each PC does today; whether it ships on is the owner's

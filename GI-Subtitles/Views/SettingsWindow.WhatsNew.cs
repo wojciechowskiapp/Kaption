@@ -73,6 +73,8 @@ namespace GI_Subtitles.Views
             ConfigWhatsNewMemory.EnabledChanged += OnNoticeSettingsChanged;
             DayNoticeSettings.Changed += OnNoticeSettingsChanged;
             StaminaSettings.Changed += OnNoticeSettingsChanged;
+            // "Don't show again" on the hint card switches it off while the list may be open.
+            Services.Hints.HintSettings.Changed += OnNoticeSettingsChanged;
             UiLanguage.Changed += OnWhatsNewLanguageChanged;
             NavTabs.SelectionChanged += OnWhatsNewTabChanged;
             IsVisibleChanged += (_, __) => MarkWhatsNewPresented();
@@ -83,6 +85,7 @@ namespace GI_Subtitles.Views
                 ConfigWhatsNewMemory.EnabledChanged -= OnNoticeSettingsChanged;
                 DayNoticeSettings.Changed -= OnNoticeSettingsChanged;
                 StaminaSettings.Changed -= OnNoticeSettingsChanged;
+                Services.Hints.HintSettings.Changed -= OnNoticeSettingsChanged;
                 UiLanguage.Changed -= OnWhatsNewLanguageChanged;
             };
             PlanWhatsNewLead();
@@ -244,6 +247,7 @@ namespace GI_Subtitles.Views
             WhatsNewFeatures.StartWithWindows => Config.Get(WindowsStartup.SettingKey, false),
             WhatsNewFeatures.ShowInRecordings => CaptureVisibility.ShowInRecordings,
             WhatsNewFeatures.DayNotice => DayNoticeSettings.Enabled,
+            WhatsNewFeatures.InGameHints => Services.Hints.HintSettings.Enabled,
             _ => false,
         };
 
@@ -272,6 +276,9 @@ namespace GI_Subtitles.Views
                     break;
                 case WhatsNewFeatures.DayNotice:
                     DayNoticeSettings.Enabled = on;
+                    break;
+                case WhatsNewFeatures.InGameHints:
+                    Services.Hints.HintSettings.Enabled = on; // the switch on the Shortcuts tab follows (HintSettings.Changed)
                     break;
                 default:
                     return;

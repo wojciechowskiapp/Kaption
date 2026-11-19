@@ -26,6 +26,7 @@ namespace GI_Subtitles.Services.Games
                 DialogueYPct = d.Dialogue.Y,
                 DialogueWPct = d.Dialogue.W,
                 DialogueHPct = d.Dialogue.H,
+                DialogueText = d.Dialogue.Text is GameRect t ? new RegionFraction(t.X, t.Y, t.W, t.H) : null,
                 AnswerXPct = d.Answer.X,
                 AnswerYPct = d.Answer.Y,
                 AnswerWPct = d.Answer.W,
@@ -54,10 +55,8 @@ namespace GI_Subtitles.Services.Games
             }
             if (v.StripsSpeakerNameDecoration is bool strip) p.StripsSpeakerNameDecoration = strip;
             if (v.SubtitlePadVertical is int pad) p.SubtitlePadVertical = pad;
-            if (v.RegionSplitXFraction is double split) p.RegionSplitXFraction = split;
-            if (v.RegionMinWidthFraction is double minWidth) p.RegionMinWidthFraction = minWidth;
-            if (v.StrictRegionJunkFilter is bool strict) p.StrictRegionJunkFilter = strict;
             if (v.OcrJunkFilter is bool junk) p.FiltersOcrJunk = junk;
+            if (v.SideRowFilter is bool side) p.DropsSideRows = side;
             if (v.DialogueEvidence is bool evidence) p.RequiresDialogueEvidence = evidence;
             if (v.FadedReadFilter is bool faded) p.RejectsFadedReads = faded;
             return p;

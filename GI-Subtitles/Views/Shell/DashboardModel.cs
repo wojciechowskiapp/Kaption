@@ -1,6 +1,7 @@
 using System;
 using System.Globalization;
 using GI_Subtitles.Services.Automation;
+using GI_Subtitles.Services.Detection;
 
 namespace GI_Subtitles.Views.Shell
 {
@@ -72,11 +73,34 @@ namespace GI_Subtitles.Views.Shell
         public string LoadedGameName { get; init; }
         /// <summary>This session's automatic dialogue area: still the saved one (Set), or it could not be found (Failed).</summary>
         public RegionAutoFillNote RegionAutoFill { get; init; }
+        /// <summary>Kaption keeps the frame itself: advice to go and fix it would send the player the wrong way.</summary>
+        public bool AreaAutomatic { get; init; }
+        /// <summary>Why reads are held right now: the game's window cannot carry the frame.</summary>
+        public AreaHold AreaHold { get; init; }
         /// <summary>Why no line shows while translating (SessionCheckModel); None when lines show or nothing is known.</summary>
         public SessionCheckKind SessionCheck { get; init; }
         /// <summary>This run of translation showed the install's first line ever.</summary>
         public bool FirstLineShown { get; init; }
     }
+
+    /// <summary>What the Start card says about the dialogue area Kaption keeps by itself.</summary>
+    public enum RegionAutoFillNote
+    {
+        None,
+        /// <summary>The area is Kaption's own (automatic mode).</summary>
+        Set,
+        /// <summary>No game window to place it on was ever seen this session: the card offers the picker.</summary>
+        Failed,
+        /// <summary>A drawing that cut the game's text was widened by Kaption.</summary>
+        Adjusted,
+        /// <summary>A drawing that holds the text but covers far more than the dialogue.</summary>
+        TooBig,
+        /// <summary>A drawing wholly outside the game's window.</summary>
+        Outside,
+    }
+
+    /// <summary>What a button under the frame note does (the note's two buttons).</summary>
+    public enum RegionNoteAction { KeepWidened, KeepExact, UseGameFrame, KeepMine }
 
     public sealed class StartCardState
     {
@@ -91,6 +115,14 @@ namespace GI_Subtitles.Views.Shell
         public StartGate Gate { get; init; }
         /// <summary>Kaption saved the dialogue area by itself this session: the card says so, so a wrong frame gets fixed.</summary>
         public bool ShowRegionAutoSetNote { get; init; }
+        /// <summary>With <see cref="ShowRegionAutoSetNote"/>: the note is that Kaption widened the player's drawing.</summary>
+        public bool RegionAdjusted { get; init; }
+        /// <summary>With <see cref="ShowRegionAutoSetNote"/>: which note it is (set by Kaption, widened, too big, outside the game).</summary>
+        public RegionAutoFillNote RegionNote { get; init; }
+        /// <summary>Reads are held on a window that cannot carry the frame; the card says why under "Translating".</summary>
+        public AreaHold AreaHold { get; init; }
+        /// <summary>Kaption keeps the frame itself: no state sends the player to fix it.</summary>
+        public bool AreaAutomatic { get; init; }
         /// <summary>With the Region gate: the automatic try did not work, the card says so and offers the picker.</summary>
         public bool RegionAutoFailed { get; init; }
     }
@@ -104,7 +136,16 @@ namespace GI_Subtitles.Views.Shell
         /// A black picture and unmatched lines both also fit a dialogue area in the wrong place, so those two states
         /// offer the area under their first fix (where "Change game" sits otherwise).
         /// </summary>
-        public static bool OffersAreaAsSecondFix(StartCardKind kind) => kind is StartCardKind.SessionFullScreen or StartCardKind.SessionNoMatch;
+        public static bool OffersAreaAsSecondFix(StartCardKind kind, bool areaAutomatic = false) =>
+            !areaAutomatic && kind is StartCardKind.SessionFullScreen or StartCardKind.SessionNoMatch;
+
+        /// <summary>The note's two buttons, first and second; none for the note Kaption's own frame gets.</summary>
+        public static (RegionNoteAction First, RegionNoteAction Second)? NoteActions(RegionAutoFillNote note) => note switch
+        {
+            RegionAutoFillNote.Adjusted => (RegionNoteAction.KeepWidened, RegionNoteAction.KeepExact),
+            RegionAutoFillNote.TooBig or RegionAutoFillNote.Outside => (RegionNoteAction.UseGameFrame, RegionNoteAction.KeepMine),
+            _ => null,
+        };
 
         /// <summary>The problems that have a card state of their own below the Translating branch.</summary>
         private static bool HasKnownProblem(StartCardInputs i) =>
@@ -131,7 +172,10 @@ namespace GI_Subtitles.Views.Shell
         {
             bool cpuNote = i.ReaderOnCpu && i.Reader == ReaderState.Ready;
             bool offlineNote = i.Offline && i.PackOnDisk;
-            bool areaNote = i.RegionAutoFill == RegionAutoFillNote.Set;
+            bool areaNote = i.RegionAutoFill is RegionAutoFillNote.Set or RegionAutoFillNote.Adjusted
+                or RegionAutoFillNote.TooBig or RegionAutoFillNote.Outside;
+            bool adjusted = i.RegionAutoFill == RegionAutoFillNote.Adjusted;
+            RegionAutoFillNote note = areaNote ? i.RegionAutoFill : RegionAutoFillNote.None;
             if (i.DeviceLimit)
                 return new StartCardState { Kind = StartCardKind.DeviceLimit, Action = StartCardAction.OpenAccount };
             if (i.Translating)
@@ -147,9 +191,11 @@ namespace GI_Subtitles.Views.Shell
                     SessionCheckKind.NoDialogue => (StartCardKind.SessionNoDialogue, StartCardAction.CheckArea),
                     _ => (i.FirstLineShown ? StartCardKind.FirstLineWorks : StartCardKind.Translating, StartCardAction.Stop),
                 };
+                // In automatic mode Kaption keeps the frame: the check offers no walk to the frame, only Stop.
+                if (kind == StartCardKind.SessionNoDialogue && i.AreaAutomatic) action = StartCardAction.Stop;
                 // The area note would sit under a sentence that already talks about the area.
                 bool check = sessionCheck != SessionCheckKind.None;
-                return new StartCardState { Kind = kind, Action = action, ShowOfflineNote = offlineNote, ShowCpuNote = cpuNote, ShowRegionAutoSetNote = areaNote && !check };
+                return new StartCardState { Kind = kind, Action = action, ShowOfflineNote = offlineNote, ShowCpuNote = cpuNote, ShowRegionAutoSetNote = areaNote && !check && i.AreaHold == AreaHold.None, RegionAdjusted = adjusted, RegionNote = note, AreaHold = i.AreaHold, AreaAutomatic = i.AreaAutomatic };
             }
             // Before downloads and gates: whatever they say is about data this process will not use.
             if (i.GameSwitchPending)
@@ -180,12 +226,12 @@ namespace GI_Subtitles.Views.Shell
                 return new StartCardState
                 {
                     Kind = StartCardKind.AutoStartBlocked, Action = StartCardAction.ResolveGate, Gate = i.AutoStartBlockedBy,
-                    ShowOfflineNote = offlineNote, ShowCpuNote = cpuNote, ShowRegionAutoSetNote = areaNote,
+                    ShowOfflineNote = offlineNote, ShowCpuNote = cpuNote, ShowRegionAutoSetNote = areaNote, RegionAdjusted = adjusted, RegionNote = note,
                     RegionAutoFailed = i.AutoStartBlockedBy == StartGate.Region && i.RegionAutoFill == RegionAutoFillNote.Failed,
                 };
             if (i.WaitingForGame)
-                return new StartCardState { Kind = StartCardKind.WaitingForGame, Action = StartCardAction.StartAnyway, ShowOfflineNote = offlineNote, ShowCpuNote = cpuNote, ShowRegionAutoSetNote = areaNote };
-            return new StartCardState { Kind = StartCardKind.Stopped, Action = StartCardAction.Start, ShowOfflineNote = offlineNote, ShowCpuNote = cpuNote, ShowRegionAutoSetNote = areaNote };
+                return new StartCardState { Kind = StartCardKind.WaitingForGame, Action = StartCardAction.StartAnyway, ShowOfflineNote = offlineNote, ShowCpuNote = cpuNote, ShowRegionAutoSetNote = areaNote, RegionAdjusted = adjusted, RegionNote = note };
+            return new StartCardState { Kind = StartCardKind.Stopped, Action = StartCardAction.Start, ShowOfflineNote = offlineNote, ShowCpuNote = cpuNote, ShowRegionAutoSetNote = areaNote, RegionAdjusted = adjusted, RegionNote = note };
         }
     }
 

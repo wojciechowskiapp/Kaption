@@ -249,10 +249,10 @@ namespace GI_Test
 
             try
             {
-                var en = Newtonsoft.Json.JsonConvert
-                    .DeserializeObject<Dictionary<string, string>>(File.ReadAllText(textMapEnPath));
-                var pl = Newtonsoft.Json.JsonConvert
-                    .DeserializeObject<Dictionary<string, string>>(File.ReadAllText(textMapPlPath));
+                var en = System.Text.Json.JsonSerializer
+                    .Deserialize<Dictionary<string, string>>(File.ReadAllText(textMapEnPath));
+                var pl = System.Text.Json.JsonSerializer
+                    .Deserialize<Dictionary<string, string>>(File.ReadAllText(textMapPlPath));
 
                 if (en == null || pl == null) return result;
 

@@ -64,6 +64,12 @@ namespace GI_Subtitles.Services.Detection
         /// <summary>Dialogue region height as fraction of reference height.</summary>
         public double DialogueHPct { get; set; }
 
+        /// <summary>
+        /// Where the game's dialogue text was measured inside the dialogue block, in the same fractions: the detector's
+        /// boxes round the speaker name and every body row. Null when nobody measured it (the generic fallback).
+        /// </summary>
+        public RegionFraction? DialogueText { get; set; }
+
         // ── Fallback answer region ratios ──
 
         /// <summary>Answer region X offset as fraction of reference width.</summary>
@@ -156,26 +162,6 @@ namespace GI_Subtitles.Services.Detection
         public int SubtitlePadVertical { get; set; } = -140;
 
         /// <summary>
-        /// Fraction of frame width separating "centre" blocks (dialogue) from
-        /// "right" blocks (answer choices) during auto region detection.
-        /// </summary>
-        public double RegionSplitXFraction { get; set; } = 0.55;
-
-        /// <summary>
-        /// Minimum dialogue-region width as a fraction of frame width. Auto
-        /// detection widens a narrow detected cluster up to this so the region
-        /// still fits longer lines that appear later in the conversation.
-        /// </summary>
-        public double RegionMinWidthFraction { get; set; } = 0.70;
-
-        /// <summary>
-        /// Whether auto region detection should apply <c>OcrTextJunkFilter</c> on
-        /// top of its own HUD heuristic. Off for the shipping games so their
-        /// detection stays unchanged.
-        /// </summary>
-        public bool StrictRegionJunkFilter { get; set; } = false;
-
-        /// <summary>
         /// Speaker/body split by row: the name is the top row of a centred dialogue column, accent-coloured or in a
         /// larger font (<c>SpeakerRowTextBlockClassifier</c>). Wuthering Waves' free-roam lines have no backing panel,
         /// so sunlit scenery passes body text through the accent gate. Ignored when
@@ -186,9 +172,16 @@ namespace GI_Subtitles.Services.Detection
         /// <summary>
         /// Whether every OCR frame drops <c>OcrTextJunkFilter</c> blocks (HP and level readouts, watermarks, stray
         /// glyphs) before the speaker/body split, on the accent and speaker-row paths. The geometry classifier always
-        /// does. Off for Genshin and Star Rail, which have never filtered.
+        /// does. Off for Genshin, which has never filtered; on for Star Rail since its area takes in the energy counter.
         /// </summary>
         public bool FiltersOcrJunk { get; set; } = false;
+
+        /// <summary>
+        /// Whether the accent path drops rows that start right of <c>SpeakerRowTextBlockClassifier.SideRowStartFraction</c> of the read area: HUD
+        /// prompts, choice options and the phone panel beside a centred dialogue column. Star Rail (its area takes in
+        /// the free-roam prompts at the right edge). The speaker-row classifier always does.
+        /// </summary>
+        public bool DropsSideRows { get; set; } = false;
 
         /// <summary>
         /// A matcher hit is painted only when the dialogue data vouches for it (a graph line, or a known speaker saying

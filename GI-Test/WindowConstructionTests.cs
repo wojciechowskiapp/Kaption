@@ -4,6 +4,7 @@ using System.Linq;
 using System.Reflection;
 using System.Text.Json.Nodes;
 using System.Windows.Controls;
+using GI_Subtitles.Services.QuickTranslate;
 using GI_Subtitles.Views;
 using GI_Subtitles.Views.Shell;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
@@ -146,6 +147,64 @@ namespace GI_Test
                 finally
                 {
                     w.Close();
+                }
+            });
+        }
+
+        /// <summary>
+        /// The Ctrl+Q card is bound to its view model (QuickTranslateCardViewModel): a binding path typo fails silently,
+        /// so this reads the real window's controls and the saved file.
+        /// </summary>
+        [TestMethod]
+        public void Settings_QuickTranslateCard_ShowsTheSavedValues_AndThePlayersChangesWrite()
+        {
+            RunSta(() =>
+            {
+                string[] keys = { QuickTranslateSettings.CloseModeKey, QuickTranslateSettings.SecondsKey, QuickTranslateSettings.FontSizeKey };
+                AppConfig.Set(QuickTranslateSettings.CloseModeKey, "Timed");
+                AppConfig.Set(QuickTranslateSettings.SecondsKey, 30);
+                AppConfig.Set(QuickTranslateSettings.FontSizeKey, 20);
+                var before = Saved();
+                using var license = TestProtection.UseFakeLicense();
+                var w = new SettingsWindow("2.5.0", null, 1.0);
+                try
+                {
+                    DoEvents();
+                    // Only the card's own keys: a first build in a fresh profile writes a few others (What's new and so on).
+                    var after = Saved();
+                    foreach (string k in keys) Assert.AreEqual(before[k], after[k], $"building the window rewrote {k}");
+                    var timed = Find<RadioButton>(w, "QuickTranslateModeTimed");
+                    var manual = Find<RadioButton>(w, "QuickTranslateModeManual");
+                    var secondsRow = Find<System.Windows.FrameworkElement>(w, "QuickTranslateSecondsRow");
+                    var countdown = Find<System.Windows.FrameworkElement>(w, "QuickTranslatePreviewTimer");
+                    var seconds = Find<Slider>(w, "QuickTranslateSecondsSlider");
+                    var font = Find<Slider>(w, "QuickTranslateFontSlider");
+                    Assert.AreEqual(true, timed.IsChecked);
+                    Assert.AreEqual(false, Find<RadioButton>(w, "QuickTranslateModeAuto").IsChecked);
+                    Assert.AreEqual(System.Windows.Visibility.Visible, secondsRow.Visibility);
+                    Assert.AreEqual(System.Windows.Visibility.Visible, countdown.Visibility);
+                    Assert.AreEqual(30, seconds.Value);
+                    Assert.AreEqual(20, font.Value);
+
+                    manual.IsChecked = true;
+                    DoEvents();
+                    Assert.AreEqual(false, timed.IsChecked);
+                    Assert.AreEqual("\"Manual\"", Saved()[QuickTranslateSettings.CloseModeKey], "the mode is saved by its name");
+                    Assert.AreEqual(System.Windows.Visibility.Collapsed, secondsRow.Visibility);
+                    Assert.AreEqual(System.Windows.Visibility.Collapsed, countdown.Visibility);
+
+                    font.Value = 24;
+                    seconds.Value = 45;
+                    DoEvents();
+                    Assert.AreEqual("24", Saved()[QuickTranslateSettings.FontSizeKey], "a whole number, as before");
+                    Assert.AreEqual("45", Saved()[QuickTranslateSettings.SecondsKey]);
+                    var next = QuickTranslateSettings.Load();
+                    Assert.AreEqual((QuickTranslateCloseMode.Manual, 45, 24), (next.CloseMode, next.Seconds, next.FontSize));
+                }
+                finally
+                {
+                    w.Close();
+                    foreach (string k in keys) AppConfig.Remove(k);
                 }
             });
         }

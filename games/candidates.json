@@ -3,15 +3,6 @@
   "schema": 1,
   "candidates": [
     {
-      "key": "endfield",
-      "name": "Arknights: Endfield",
-      "steamAppId": 4732690,
-      "pitch": {
-        "pl": "Fabularne RPG sci-fi ze świata Arknights. Polskiej wersji nie ma.",
-        "en": "Story-driven sci-fi RPG set in the Arknights world. There's no Polish option."
-      }
-    },
-    {
       "key": "wherewindsmeet",
       "name": "Where Winds Meet",
       "steamAppId": 3564740,

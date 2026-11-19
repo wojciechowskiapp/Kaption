@@ -123,7 +123,7 @@ namespace GI_Test
             });
         }
 
-        // ── ux-01: the dialogue area filled when the game shows up ───────────
+        // The dialogue area the watcher places is guarded by DialogueAreaTests (the rules, not this file's text).
 
         private static string Wiring() =>
             System.IO.File.ReadAllText(System.IO.Path.Combine(RepoRoot(), "GI-Subtitles", "Views", "MainWindow.AutoStart.cs"));
@@ -134,52 +134,6 @@ namespace GI_Test
             Assert.IsTrue(start > 0, signature);
             int end = code.IndexOf("\n        }", start, System.StringComparison.Ordinal);
             return code.Substring(start, end - start);
-        }
-
-        [TestMethod]
-        public void TheWatcher_FillsAMissingArea_FromTheProbesOwnForeground_OnlyAtTheRegionGate()
-        {
-            string code = Wiring();
-            string watch = Body(code, "private async void WatchGame()");
-            StringAssert.Contains(watch, "TryAutoFillRegionAsync(profile, probe.Foreground)",
-                "the real foreground: with 'running counts' a covered window would still be filled from");
-
-            string fill = Body(code, "private async Task TryAutoFillRegionAsync(");
-            StringAssert.Contains(fill, "_autoStart.State == AutoStartState.Blocked && _autoStart.BlockingGate == StartGate.Region");
-            StringAssert.Contains(fill, "RegionAutoFill.ShouldTry(HasConfiguredRegion(),");
-            StringAssert.Contains(fill, "ChooseRegion || OCRTimer.IsEnabled || _quickTranslateBusy", "never while a picker, translation or Ctrl+Q runs");
-            StringAssert.Contains(fill, "await Task.Run(", "the window lookup lists processes: off the UI thread");
-            StringAssert.Contains(fill, "_autoStart?.OnGatesChanged()", "the gate re-opens at once after the save");
-        }
-
-        [TestMethod]
-        public void TheFill_NeverReplacesASavedArea_AndSavesItWhereTheGateLooks()
-        {
-            string fill = Body(Wiring(), "private async Task TryAutoFillRegionAsync(");
-            int recheck = fill.IndexOf("bool savedNow = HasConfiguredRegion()", System.StringComparison.Ordinal);
-            int config = fill.IndexOf("Config.Get<string>(\"Region\", \"\")", recheck, System.StringComparison.Ordinal);
-            int save = fill.IndexOf("Config.Set(\"Region\", region)", System.StringComparison.Ordinal);
-            int notify = fill.IndexOf("notify.Region = region.Split(',')", System.StringComparison.Ordinal);
-            Assert.IsTrue(recheck > 0 && config > recheck && save > config, "both the gate's copy and Config are checked again after the lookup, before saving");
-            Assert.IsTrue(notify > save, "HasConfiguredRegion reads notify.Region: the gate opens without a restart");
-            StringAssert.Contains(fill, "RegionAutoFill.MaySave(savedNow, region)");
-            StringAssert.Contains(fill, "_regionAutoFill.MarkFailed()", "a failed try reaches the card");
-
-            int mark = fill.IndexOf("_regionAutoFill.MarkSet(region)", System.StringComparison.Ordinal);
-            int keep = fill.IndexOf("Config.Set(RegionAutoFill.FilledRegionKey, region)", System.StringComparison.Ordinal);
-            Assert.IsTrue(mark > save && keep > mark, "the filled area is remembered, so it never reads as hand-drawn after a restart");
-            StringAssert.Contains(Wiring(), "_regionAutoFill.Restore(Config.Get<string>(RegionAutoFill.FilledRegionKey, null))",
-                "the next launch keeps the note while the area is unchanged");
-        }
-
-        [TestMethod]
-        public void TheFill_StaysQuiet_OverTheGame()
-        {
-            string fill = Body(Wiring(), "private async Task TryAutoFillRegionAsync(");
-            Assert.IsFalse(fill.Contains("AnswerRegion"), "the answer area has no reader (FeatureAnswerTranslationEnabled is off)");
-            Assert.IsFalse(fill.Contains("OnCaptureRegionUserChange") || fill.Contains("ShowOverlapWarnIfNeeded"), "no overlap dialog over the game");
-            Assert.IsFalse(fill.Contains("AutoRegionService.Detect"), "no OCR on a splash or login screen; the measured ratios instead");
-            Assert.IsFalse(fill.Contains("Logger.Log.Error"), "a best-effort step is not a GlitchTip event");
         }
 
         // ── "Later" on the game-switch restart prompt ────────────────────────

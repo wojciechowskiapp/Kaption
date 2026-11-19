@@ -77,7 +77,7 @@ namespace GI_Test
         {
             Assert.IsFalse(OnboardingFlow.ShouldAutoDetectRegion(savedRegionValid: true, userAsked: false),
                 "the setup guide opened with the game running must not replace a saved area");
-            Assert.IsTrue(OnboardingFlow.ShouldAutoDetectRegion(savedRegionValid: true, userAsked: true), "Wykryj automatycznie replaces it");
+            Assert.IsTrue(OnboardingFlow.ShouldAutoDetectRegion(savedRegionValid: true, userAsked: true), "Ustaw automatycznie replaces it");
             Assert.IsTrue(OnboardingFlow.ShouldAutoDetectRegion(savedRegionValid: false, userAsked: false), "no area yet: detect one");
 
             string code = System.IO.File.ReadAllText(System.IO.Path.Combine(RepoRoot(), "GI-Subtitles", "Views", "OnboardingWindow.xaml.cs"));

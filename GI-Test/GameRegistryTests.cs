@@ -294,8 +294,6 @@ namespace GI_Test
             var p = GameProfileBuilder.Build(m);
             var defaults = new GameRegionProfile();
             Assert.AreEqual(defaults.SubtitlePadVertical, p.SubtitlePadVertical);
-            Assert.AreEqual(defaults.RegionMinWidthFraction, p.RegionMinWidthFraction);
-            Assert.AreEqual(defaults.RegionSplitXFraction, p.RegionSplitXFraction);
             Assert.IsFalse(p.UsesGeometryClassifier);
             Assert.IsNull(p.OcrIntervalMs, "no pacing in the manifest = the global default");
             Assert.IsNull(p.ForceOcrAfterSeconds);

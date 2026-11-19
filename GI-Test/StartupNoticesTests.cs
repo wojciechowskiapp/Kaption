@@ -288,7 +288,7 @@ namespace GI_Test
                     Assert.IsFalse(r.Title.Contains('{') || r.Body.Contains('{') || (r.Done ?? "").Contains('{'), r.Entry.Id);
                     Assert.AreEqual(r.Entry.Feature == WhatsNewFeatures.DayNotice, r.FeatureOn, r.Entry.Id);
                 }
-                Assert.IsTrue(rows[0].Title.Contains("Original Resin"));
+                Assert.IsTrue(rows.First(r => r.Entry.Feature == WhatsNewFeatures.StaminaNotice).Title.Contains("Original Resin"));
             }
             // A game without a pool: the stamina row cannot be worded, so it is not there.
             var bare = WhatsNewRows.Build(entries, false, new Dictionary<string, string> { ["game"] = "Zenless Zone Zero" }, _ => false);
@@ -304,9 +304,11 @@ namespace GI_Test
             Assert.IsTrue(GI_Subtitles.Views.SettingsWindow.WhatsNewMeets(WhatsNewRequirements.StaminaScreen, genshin));
             Assert.IsTrue(GI_Subtitles.Views.SettingsWindow.WhatsNewMeets(WhatsNewRequirements.StaminaScreen, hsr));
             Assert.IsFalse(GI_Subtitles.Views.SettingsWindow.WhatsNewMeets(WhatsNewRequirements.StaminaScreen, zzz), "its screen is not measured");
-            // Every listed game has a card of the day since the Today card.
+            // Every live game has a card of the day since the Today card; a beta game with no stamina or reset data yet
+            // (Endfield) has nothing to put on one, so it is not offered.
             foreach (GameManifest game in GameRegistry.Current.Listed)
-                Assert.IsTrue(GI_Subtitles.Views.SettingsWindow.WhatsNewMeets(WhatsNewRequirements.TodayCard, game), game.Id);
+                Assert.AreEqual(game.Status == GameManifest.StatusLive || game.Resets != null || game.Stamina != null,
+                    GI_Subtitles.Views.SettingsWindow.WhatsNewMeets(WhatsNewRequirements.TodayCard, game), game.Id);
             Assert.IsFalse(GI_Subtitles.Views.SettingsWindow.WhatsNewMeets(WhatsNewRequirements.TodayCard, null));
             Assert.IsFalse(GI_Subtitles.Views.SettingsWindow.WhatsNewMeets("full-moon", genshin));
 

@@ -2,6 +2,67 @@
   "schema": 1,
   "entries": [
     {
+      "id": "dialogue-frame-2.6.3",
+      "since": "2.6.3",
+      "order": 5,
+      "kind": "info",
+      "icon": "frame",
+      "en": {
+        "title": "The dialogue frame sets itself",
+        "body": "Kaption places it on the game's window and moves it along with the window. A frame you drew stays yours. If it cuts long lines Kaption widens it, and you choose: “Keep it” or “Keep exactly my frame”. “Set automatically” on Game and subtitles hands the frame back to Kaption."
+      },
+      "pl": {
+        "title": "Ramka dialogu ustawia się sama",
+        "body": "Kaption ustawia ją na oknie gry i przesuwa razem z nim. Ramka, którą zaznaczysz ręcznie, zostaje Twoja. Jeśli ucina długie kwestie, Kaption ją poszerzy, a Ty wybierasz: „Zostaw tak” albo „Chcę dokładnie moją ramkę”. „Ustaw automatycznie” w zakładce Gra i napisy oddaje ramkę z powrotem Kaptionowi."
+      }
+    },
+    {
+      "id": "in-game-hints-2.6.3",
+      "since": "2.6.3",
+      "order": 10,
+      "kind": "info",
+      "feature": "in-game-hints",
+      "icon": "keys",
+      "en": {
+        "title": "Shortcuts at hand, in the game",
+        "body": "A small card over the game lists the four shortcuts you need most. Press one by accident and it says in a sentence what just happened; when no subtitle shows, it says why, right in the game. It never takes a click from the game. Ctrl+Shift+D (the default shortcut) brings it back, and the “In-game hints” switch on the Shortcuts tab turns it off."
+      },
+      "pl": {
+        "title": "Skróty pod ręką, w grze",
+        "body": "Mała karta nad grą pokazuje cztery najważniejsze skróty. Gdy wciśniesz któryś przez przypadek, powie jednym zdaniem, co się stało, a gdy napisy się nie pojawiają, podpowie od razu w grze dlaczego. Nie zabiera grze żadnego kliknięcia. Wróci po Ctrl+Shift+D (domyślny skrót), a wyłączysz ją w zakładce Skróty, przełącznikiem „Podpowiedzi w grze”."
+      }
+    },
+    {
+      "id": "starrail-frame-2.6.3",
+      "since": "2.6.3",
+      "order": 15,
+      "kind": "info",
+      "games": ["starrail"],
+      "icon": "frame",
+      "en": {
+        "title": "Star Rail: long lines read whole",
+        "body": "The frame in Honkai: Star Rail is wider and taller now, so long lines are read whole, the speaker's name included. Kaption also skips buttons on the map, like “Teleport”, so they don't show up as subtitles."
+      },
+      "pl": {
+        "title": "Star Rail: długie kwestie w całości",
+        "body": "Ramka w Honkai: Star Rail jest teraz szersza i wyższa, więc długie kwestie czytają się w całości, razem z imieniem postaci. Kaption pomija też przyciski z mapy, jak „Teleport”, więc nie trafiają do napisów."
+      }
+    },
+    {
+      "id": "small-fixes-2.6.3",
+      "since": "2.6.3",
+      "order": 90,
+      "kind": "info",
+      "en": {
+        "title": "Two small fixes",
+        "body": "After you change the dialogue frame, reading on the graphics card is back to full speed within a second, no restart needed. And the translation pack now saves on PCs where Windows reported an encryption error."
+      },
+      "pl": {
+        "title": "Dwie drobne poprawki",
+        "body": "Po zmianie ramki dialogu czytanie na karcie graficznej wraca do pełnej szybkości w około sekundę, bez restartu. A paczka z tłumaczeniem zapisuje się teraz także na komputerach, na których Windows zgłaszał błąd szyfrowania."
+      }
+    },
+    {
       "id": "stamina-notice-2.6.1",
       "since": "2.6.1",
       "order": 10,

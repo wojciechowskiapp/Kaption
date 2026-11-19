@@ -48,6 +48,7 @@ namespace GI_Subtitles.Services.Security
         // Function returns the activation row at the moment it's called.
         // Indirection lets callers swap the source (production, tests).
         private readonly Func<ActivationData> _loadActivation;
+        private readonly Pbkdf2Sha256 _kdf;
 
         private readonly object _keyLock = new object();
         private byte[] _encryptionKey;
@@ -66,8 +67,15 @@ namespace GI_Subtitles.Services.Security
 
         /// <summary>Test-friendly constructor. <paramref name="activationLoader"/> may return null.</summary>
         public ServerKeyFileProtectionService(Func<ActivationData> activationLoader)
+            : this(activationLoader, Pbkdf2Sha256.Shared)
+        {
+        }
+
+        /// <summary>Tests pass their own <paramref name="kdf"/> to stand in for a broken OS key derivation.</summary>
+        internal ServerKeyFileProtectionService(Func<ActivationData> activationLoader, Pbkdf2Sha256 kdf)
         {
             _loadActivation = activationLoader ?? throw new ArgumentNullException(nameof(activationLoader));
+            _kdf = kdf ?? throw new ArgumentNullException(nameof(kdf));
         }
 
         // ─────────────────────────────────────────────────────────────────
@@ -534,16 +542,19 @@ namespace GI_Subtitles.Services.Security
             // PBKDF2-SHA256 (server algorithm string says SHA-256). Legacy
             // SHA-1 v1 files are no longer readable; the startup sweep in
             // App.WipeLegacyProtectedCacheFiles deletes them so the next
-            // sync re-encrypts under SHA-256 / v2.
-            _encryptionKey = Rfc2898DeriveBytes.Pbkdf2(
-                combined, machineId, iterations, HashAlgorithmName.SHA256, KeySizeBytes);
+            // sync re-encrypts under SHA-256 / v2. Pbkdf2Sha256 falls back to
+            // managed code with the same bytes when Windows' derivation fails.
+            byte[] encryptionKey = _kdf.Derive(combined, machineId, iterations, KeySizeBytes);
 
             byte[] hmacSaltFull = new byte[machineId.Length + HmacSalt.Length];
             Buffer.BlockCopy(machineId, 0, hmacSaltFull, 0, machineId.Length);
             Buffer.BlockCopy(HmacSalt, 0, hmacSaltFull, machineId.Length, HmacSalt.Length);
 
-            _hmacKey = Rfc2898DeriveBytes.Pbkdf2(
-                combined, hmacSaltFull, iterations, HashAlgorithmName.SHA256, KeySizeBytes);
+            byte[] hmacKey = _kdf.Derive(combined, hmacSaltFull, iterations, KeySizeBytes);
+
+            // Published only once both exist, so a failed derivation leaves no half-set pair behind.
+            _encryptionKey = encryptionKey;
+            _hmacKey = hmacKey;
 
             // Defence against accidental disclosure: the combined buffer is
             // about to be GC'd; explicitly clear it so a heap dump after
@@ -552,7 +563,8 @@ namespace GI_Subtitles.Services.Security
             Array.Clear(combined, 0, combined.Length);
 
             Logger.Log.Info(
-                $"ServerKey: derived AES + HMAC keys (iterations={iterations}, deviceSecret=<redacted, len={deviceSecret.Length}>).");
+                $"ServerKey: derived AES + HMAC keys (iterations={iterations}, deviceSecret=<redacted, len={deviceSecret.Length}>"
+                + (_kdf.UsesManagedFallback ? ", managed PBKDF2" : "") + ").");
         }
 
         private static bool ConstantTimeEquals(byte[] a, byte[] b)

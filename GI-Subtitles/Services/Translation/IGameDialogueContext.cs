@@ -26,6 +26,12 @@ namespace GI_Subtitles.Services.Translation
         public string EnText;
     }
 
+    /// <summary>
+    /// A line of the dialogue graph that a player's choice on screen may be: its node, its text as the pack keys it
+    /// (<see cref="PackKeyText"/>), that text normalised for matching, and its Polish (null when the pack has none).
+    /// </summary>
+    public readonly record struct AnswerCandidate(long NodeId, string EnText, string Normalized, string Translation);
+
     /// <summary>Why the last <see cref="IGameDialogueContext.Load"/> left the engine unloaded.</summary>
     public enum DialoguePrepareFailure
     {
@@ -131,6 +137,16 @@ namespace GI_Subtitles.Services.Translation
         /// <summary>All immediate next-line predictions — used for player answer
         /// translation via <see cref="AnswerTranslationService"/>.</summary>
         List<PredictionResult> GetPredictedAnswers(Dictionary<string, string> translationDict);
+
+        /// <summary>The active line's successors whose role is one of <paramref name="optionRoles"/> (exact, never a
+        /// prefix): the options the graph expects on screen now. Empty before the graph has loaded; never loads it.</summary>
+        IReadOnlyList<AnswerCandidate> GetAnswerCandidates(IReadOnlyList<string> optionRoles,
+            Dictionary<string, string> translationDict) => Array.Empty<AnswerCandidate>();
+
+        /// <summary>Every graph line with one of <paramref name="optionRoles"/> whose normalised text equals
+        /// <paramref name="rowText"/>'s, wherever it is in the graph. Empty before the graph has loaded.</summary>
+        IReadOnlyList<AnswerCandidate> GetOptionLinesByText(string rowText, IReadOnlyList<string> optionRoles,
+            Dictionary<string, string> translationDict) => Array.Empty<AnswerCandidate>();
 
         /// <summary>All current NPC-cache + chain-cache entries. Fallback source
         /// for answer matching when graph predictions don't cover the options.</summary>

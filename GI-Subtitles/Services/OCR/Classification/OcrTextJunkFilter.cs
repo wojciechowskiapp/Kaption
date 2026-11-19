@@ -22,8 +22,8 @@ namespace GI_Subtitles.Services.OCR.Classification
     ///
     /// <para><b>On the accent path only when the profile asks</b>
     /// (<c>FiltersOcrJunk</c>, Wuthering Waves: its free-roam region holds the HP
-    /// and level readouts). Genshin and Star Rail never set it and stay
-    /// byte-identical; there an all-junk frame is simply an empty frame.</para>
+    /// and level readouts; Star Rail: the energy counter). Genshin never sets it
+    /// and stays byte-identical; there an all-junk frame is simply an empty frame.</para>
     /// </summary>
     public static class OcrTextJunkFilter
     {

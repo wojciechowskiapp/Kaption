@@ -28,7 +28,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Text;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
-using Newtonsoft.Json;
+using System.Text.Json;
 
 namespace GI_Test
 {
@@ -88,7 +88,7 @@ namespace GI_Test
         private string Write(string name, Dictionary<string, string> map)
         {
             string p = Path.Combine(_dir, name);
-            File.WriteAllText(p, JsonConvert.SerializeObject(map), new UTF8Encoding(false));
+            File.WriteAllText(p, JsonSerializer.Serialize(map), new UTF8Encoding(false));
             return p;
         }
 
@@ -108,7 +108,7 @@ namespace GI_Test
                 $"merge should succeed when both sides share a key space.\n{run.Output}");
             Assert.IsTrue(File.Exists(outPath), "merged pack must be written on success");
 
-            var merged = JsonConvert.DeserializeObject<Dictionary<string, string>>(File.ReadAllText(outPath));
+            var merged = JsonSerializer.Deserialize<Dictionary<string, string>>(File.ReadAllText(outPath));
             Assert.AreEqual(EntryCount, merged.Count);
             // The published pack is keyed by ENGLISH TEXT — that's the whole
             // point of merging at publish time. The ids only have to agree

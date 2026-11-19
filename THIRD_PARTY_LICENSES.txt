@@ -8,7 +8,7 @@ copyright notices are reproduced below.
 
 For the desktop app's own source license, see LICENSE in the repository root.
 
-Last reviewed: 2026-11-04
+Last reviewed: 2026-11-16
 
 Table of contents
 
@@ -17,16 +17,16 @@ Table of contents
     3.  OpenCV                            Apache-2.0
     4.  ONNX Runtime                      MIT
     5.  log4net                           Apache-2.0
-    6.  Newtonsoft.Json                   MIT
-    7.  Velopack                          MIT
-    8.  Sentry SDK for .NET               MIT
-    9.  Lucene.Net                        Apache-2.0
-   10.  ZstdSharp.Port                    MIT
-   11.  DirectML                          Microsoft system library (notice)
-   12.  qew21/Genshin-Subtitles           Apache-2.0  (upstream fork)
-   13.  PaddleOCR model weights            Apache-2.0
-   14.  .NET 11.0.0 runtime                MIT
-   15.  Source Sans 3, Inter Tight         OFL-1.1  (subtitle fonts)
+    6.  Velopack                          MIT
+    7.  Sentry SDK for .NET               MIT
+    8.  Lucene.Net                        Apache-2.0
+    9.  ZstdSharp.Port                    MIT
+   10.  DirectML                          Microsoft system library (notice)
+   11.  qew21/Genshin-Subtitles           Apache-2.0  (upstream fork)
+   12.  PaddleOCR model weights            Apache-2.0
+   13.  .NET 11.0.0 runtime                MIT
+   14.  Source Sans 3, Inter Tight         OFL-1.1  (subtitle fonts)
+   15.  CommunityToolkit.Mvvm             MIT
 
 ================================================================================
 1. PaddleOCRSharp
@@ -247,36 +247,7 @@ Copyright: Copyright 2004-2017 The Apache Software Foundation
 
 
 ================================================================================
-6. Newtonsoft.Json
-================================================================================
-
-Project:   https://www.newtonsoft.com/json
-License:   MIT License
-Copyright: Copyright (c) 2007 James Newton-King
-
- MIT License
-
- Permission is hereby granted, free of charge, to any person obtaining a copy
- of this software and associated documentation files (the "Software"), to deal
- in the Software without restriction, including without limitation the rights
- to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- copies of the Software, and to permit persons to whom the Software is
- furnished to do so, subject to the following conditions:
-
- The above copyright notice and this permission notice shall be included in
- all copies or substantial portions of the Software.
-
- THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
- THE SOFTWARE.
-
-
-================================================================================
-7. Velopack
+6. Velopack
 ================================================================================
 
 Project:   https://github.com/velopack/velopack
@@ -305,7 +276,7 @@ Copyright: Copyright (c) Caelan Sayler and Velopack contributors
 
 
 ================================================================================
-8. Sentry SDK for .NET
+7. Sentry SDK for .NET
 ================================================================================
 
 Project:   https://github.com/getsentry/sentry-dotnet
@@ -320,7 +291,7 @@ Copyright: Copyright (c) 2018 Sentry (https://sentry.io) and individual contribu
 
 
 ================================================================================
-9. Lucene.Net
+8. Lucene.Net
 ================================================================================
 
 Project:   https://lucenenet.apache.org/
@@ -340,7 +311,7 @@ Copyright: Copyright 2006-2024 The Apache Software Foundation
 
 
 ================================================================================
-10. ZstdSharp.Port
+9. ZstdSharp.Port
 ================================================================================
 
 Project:   https://github.com/oleg-st/ZstdSharp
@@ -354,7 +325,7 @@ Copyright: Copyright (c) 2021 Oleg Stepanischev and contributors
 
 
 ================================================================================
-11. DirectML
+10. DirectML
 ================================================================================
 
 Project:   Microsoft DirectML (https://learn.microsoft.com/windows/ai/directml/)
@@ -372,7 +343,7 @@ Notice:    DirectML.dll is a Microsoft-supplied system library that Kaption
 
 
 ================================================================================
-12. qew21/Genshin-Subtitles  (upstream fork — not a bundled component)
+11. qew21/Genshin-Subtitles  (upstream fork — not a bundled component)
 ================================================================================
 
 Project:   https://github.com/qew21/Genshin-Subtitles
@@ -421,7 +392,7 @@ Notice:    Kaption began as a fork of qew21/Genshin-Subtitles. The codebase
 
 
 ================================================================================
-13. PaddleOCR model weights
+12. PaddleOCR model weights
 ================================================================================
 
 Project:   https://github.com/PaddlePaddle/PaddleOCR
@@ -437,7 +408,7 @@ Notice:    Kaption bundles ONNX runtime copies of the official PP-OCRv6 Small,
 
 
 ================================================================================
-14. .NET 11.0.0 runtime
+13. .NET 11.0.0 runtime
 ================================================================================
 
 Project:   https://github.com/dotnet/runtime
@@ -475,7 +446,7 @@ Notice:    Kaption is published self-contained: the .NET 11.0.0 runtime
 
 
 ================================================================================
-15. Source Sans 3 and Inter Tight (subtitle overlay fonts)
+14. Source Sans 3 and Inter Tight (subtitle overlay fonts)
 ================================================================================
 
 Project:   https://github.com/adobe-fonts/source-sans (Source Sans 3 3.052)
@@ -491,6 +462,20 @@ Notice:    The subtitle overlay draws its text in Source Sans 3 (Semibold and
            Bold, unmodified files) with Inter Tight as the fallback face
            (static 600 and 700 instances, cut to Latin and Latin Extended).
            Both are embedded in Kaption.exe as resources.
+
+
+================================================================================
+15. CommunityToolkit.Mvvm
+================================================================================
+
+Project:   https://github.com/CommunityToolkit/dotnet
+License:   MIT License
+Copyright: (c) .NET Foundation and Contributors. All rights reserved.
+
+ MIT License (see Velopack section above for full text).
+
+ Source-generated property change notifications for the desktop app's
+ settings pages.
 
 
 ================================================================================

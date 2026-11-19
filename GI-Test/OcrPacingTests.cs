@@ -35,7 +35,7 @@ namespace GI_Test
     [TestClass]
     public class OcrPacingTests
     {
-        private static readonly string[] ShippingGames = { "Genshin", "StarRail", "ZZZ", "WuWa" };
+        private static readonly string[] ShippingGames = { "Genshin", "StarRail", "ZZZ", "WuWa", "Endfield" };
 
         // ── Precedence ────────────────────────────────────────────────────
 
@@ -157,6 +157,7 @@ namespace GI_Test
         [DataRow("StarRail", 60, 2, 2, 2, 0.15, "mostly whole lines, so eager reads cost nothing; 50 vs 60 ms measured identical")]
         [DataRow("ZZZ", 60, 2, 2, 2, 0.15, "paint churn is flat to 0.15 then jumps at 0.1; 50 vs 60 ms measured identical")]
         [DataRow("WuWa", 100, 5, 2, 2, 0.15, "Genshin-like typewriter text; 0.15 beat 0.25 on p90 at 1x, 2x and 3x OCR cost with equal coverage (WUWA-STAGE-B.md)")]
+        [DataRow("Endfield", 100, 5, 2, 2, 0.15, "provisional: WuWa's row until Endfield's replay sweep (ENDFIELD-DESIGN.md sections 5.5 and 6); a short left-to-right sweep like WuWa's")]
         public void ShippingProfiles_CarryTheMeasuredPacing(
             string game, int interval, int window, int chain, int dflt, double force, string why)
         {

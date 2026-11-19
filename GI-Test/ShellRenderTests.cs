@@ -33,7 +33,7 @@ namespace GI_Test
 
         public enum Scene
         {
-            Stopped, Translating, WaitingForGame, Downloading, Updated25, OnHold, AreaAutoSet, AreaAutoFailed, GameSwitch,
+            Stopped, Translating, WaitingForGame, Downloading, Updated25, OnHold, AreaAutoSet, AreaAutoFailed, AreaAdjusted, AreaTooBig, AreaHeld, GameSwitch,
             // The first-session check: why no line shows, and the first line a new install shows.
             CheckFullScreen, CheckNoMatch, CheckNoDialogue, FirstLine,
         }
@@ -88,6 +88,21 @@ namespace GI_Test
                     {
                         case Scene.AreaAutoSet:
                             Assert.IsFalse(string.IsNullOrEmpty(detail), $"{lang}: the card says the area was set by itself");
+                            break;
+                        case Scene.AreaAdjusted:
+                            Assert.IsFalse(string.IsNullOrEmpty(detail), $"{lang}: the card says Kaption widened the frame");
+                            Assert.AreEqual(Visibility.Visible, ((FrameworkElement)window.FindName("StateCardNoteActions")).Visibility,
+                                $"{lang}: with two answers");
+                            Assert.AreEqual(host.TryFindResource("shell_Region_KeepWidened") as string, ((Button)window.FindName("StateCardNoteFirst")).Content as string);
+                            Assert.AreEqual(host.TryFindResource("shell_Region_KeepExact") as string, ((Button)window.FindName("StateCardNoteSecond")).Content as string,
+                                $"{lang}: the way back to the frame as drawn");
+                            break;
+                        case Scene.AreaTooBig:
+                            Assert.AreEqual(host.TryFindResource("shell_Region_UseGameFrame") as string, ((Button)window.FindName("StateCardNoteFirst")).Content as string);
+                            Assert.AreEqual(host.TryFindResource("shell_Region_KeepMine") as string, ((Button)window.FindName("StateCardNoteSecond")).Content as string);
+                            break;
+                        case Scene.AreaHeld:
+                            Assert.AreEqual(host.TryFindResource("shell_Card_AreaHeldSmall") as string, detail, $"{lang}: the card says why nothing is read");
                             break;
                         case Scene.AreaAutoFailed:
                             Assert.IsFalse(string.IsNullOrEmpty(detail), $"{lang}: a failed try is said, never a silent closed gate");
@@ -397,6 +412,49 @@ namespace GI_Test
             foreach (string p in written) Console.WriteLine(p);
         }
 
+        /// <summary>The frame card on Game and subtitles for every way the frame is kept: who keeps it is said in a sentence.</summary>
+        [TestMethod]
+        public void RendersTheFrameCard_ForEveryWayTheFrameIsKept()
+        {
+            var written = new List<string>();
+            RunSta(() =>
+            {
+                foreach (string palette in WindowRenderTests.Palettes)
+                foreach (string lang in new[] { "pl-PL", "en-US" })
+                {
+                    var host = LoadLooseWindow("Views/SettingsWindow.xaml", lang, out var window, palette);
+                    Fill(host, window, Scene.Stopped, lang);
+                    Select(window, SettingsNavigation.Game);
+                    string L(string key, string fallback) => host.TryFindResource(key) as string ?? fallback;
+                    var card = (FrameworkElement)window.FindName("RegionCard");
+                    var modeLine = (System.Windows.Controls.TextBlock)window.FindName("RegionModeText");
+                    var hint = (System.Windows.Controls.TextBlock)window.FindName("RegionExactHint");
+                    foreach (var (name, mode, widened) in new[]
+                    {
+                        ("automatic", GI_Subtitles.Services.Detection.DialogueAreaMode.Auto, false),
+                        ("hint", GI_Subtitles.Services.Detection.DialogueAreaMode.Hand, false),
+                        ("widened", GI_Subtitles.Services.Detection.DialogueAreaMode.Hand, true),
+                        ("exact", GI_Subtitles.Services.Detection.DialogueAreaMode.Exact, false),
+                    })
+                    {
+                        SettingsWindow.ApplyFrameModeTo(window.FindName, mode, saved: true, widened, L);
+                        Layout(host, GuideWidth, 1900);
+                        Assert.IsFalse(string.IsNullOrEmpty(modeLine.Text), $"{lang} {name}: the card says who keeps the frame");
+                        Assert.AreEqual(mode != GI_Subtitles.Services.Detection.DialogueAreaMode.Auto,
+                            ((FrameworkElement)window.FindName("RegionExactPanel")).Visibility == Visibility.Visible, $"{lang} {name}: the choice is for a frame the player drew");
+                        if (widened)
+                            Assert.AreEqual(L("shell_Region_KeepExact_Hint_Widened", ""), hint.Text, $"{lang}: the checkbox says it brings the smaller drawing back");
+                        var at = card.TranslatePoint(new Point(0, 0), host);
+                        var shot = Snapshot(host);
+                        var crop = new CroppedBitmap(shot, new Int32Rect((int)at.X, (int)at.Y,
+                            (int)Math.Min(card.ActualWidth, shot.PixelWidth - at.X), (int)Math.Min(card.ActualHeight, shot.PixelHeight - at.Y)));
+                        written.Add(SaveReview(crop, $"start/frame-card-{name}-{lang.Substring(0, 2)}-{palette.ToLowerInvariant()}.png"));
+                    }
+                }
+            });
+            foreach (string p in written) Console.WriteLine(p);
+        }
+
         /// <summary>The page as the app fills it, plus the sliders (code-behind keeps them in step in the app).</summary>
         private static void ApplyLook(Window window, OverlayStyle look, string game, LookScene scene, Func<string, string, string> L)
         {
@@ -585,6 +643,9 @@ namespace GI_Test
             Scene.OnHold => "wstrzymany",
             Scene.AreaAutoSet => "obszar-sam",
             Scene.AreaAutoFailed => "obszar-nie-wyszlo",
+            Scene.AreaAdjusted => "obszar-poszerzony",
+            Scene.AreaTooBig => "obszar-za-duzy",
+            Scene.AreaHeld => "okno-za-male",
             Scene.GameSwitch => "zmiana-gry",
             Scene.CheckFullScreen => "pelny-ekran",
             Scene.CheckNoMatch => "brak-kwestii",
@@ -607,8 +668,9 @@ namespace GI_Test
             object Find(string n) => window.FindName(n);
             string repo = RepoRoot();
 
-            ((TitleBar)Find("WindowTitleBar")).Subtitle = "v2.5.1";
-            ((Button)Find("VersionChip")).Content = "v2.5.1";
+            string version = RenderFixtures.PreviewVersion;
+            ((TitleBar)Find("WindowTitleBar")).Subtitle = version;
+            ((Button)Find("VersionChip")).Content = version;
 
             // State card: Genshin, its hub art, the scene's state.
             var art = Path.Combine(repo, "GI-Subtitles", "Assets", "Ambience", "genshin.jpg");
@@ -630,6 +692,14 @@ namespace GI_Test
                     RegionAutoFill = RegionAutoFillNote.Set },
                 Scene.AreaAutoFailed => new StartCardInputs { Reader = ReaderState.Ready, PackOnDisk = true, GameName = "Genshin Impact",
                     AutoStartBlockedBy = GI_Subtitles.Services.Automation.StartGate.Region, RegionAutoFill = RegionAutoFillNote.Failed },
+                // A drawing that cut the dialogue, widened by Kaption: the note and the way back to the drawing.
+                Scene.AreaAdjusted => new StartCardInputs { Translating = true, LinesThisSession = 3, Reader = ReaderState.Ready, PackOnDisk = true,
+                    RegionAutoFill = RegionAutoFillNote.Adjusted },
+                // A drawing far bigger than the dialogue: the warning and its two answers.
+                Scene.AreaTooBig => new StartCardInputs { Reader = ReaderState.Ready, PackOnDisk = true, RegionAutoFill = RegionAutoFillNote.TooBig },
+                // Translating in a game window too small for its dialogue: reads wait, and the card says so.
+                Scene.AreaHeld => new StartCardInputs { Translating = true, Reader = ReaderState.Ready, PackOnDisk = true, AreaAutomatic = true,
+                    AreaHold = GI_Subtitles.Services.Detection.AreaHold.TooSmall },
                 // Star Rail picked, "Later" chosen: Genshin's data stays loaded until the restart.
                 Scene.GameSwitch => new StartCardInputs { Reader = ReaderState.Ready, PackOnDisk = true, GameName = "Honkai: Star Rail", GameSwitchPending = true,
                     LoadedGameName = "Genshin Impact" },
@@ -647,21 +717,12 @@ namespace GI_Test
             // The subtitles chip says ready or loading; the line count lives in the Advanced-mode tooltip only.
             ((TextBlock)Find("DashDictStatus")).Text = EngineLabels.SubtitlesChip(loaded: scene != Scene.Downloading, packMissing: false, packComing: false, L);
 
-            // Packs, reader, shortcuts: values from a real install (2026-11-02).
+            // The Ctrl+Q card on Subtitle style, through its view model as the app binds it: a fresh install's values.
+            ((FrameworkElement)Find("QuickTranslateCard")).DataContext = new QuickTranslateCardViewModel(new MemorySettingsStore());
+
+            // Packs, reader, shortcuts: one row per live game (RenderFixtures), the reader and keys from a real install.
             Brush B(string key) => host.TryFindResource(key) as Brush;
-            SettingsWindow.PackCardRow Row(string name, string accent, string installed, string latest, bool active, bool downloading = false)
-            {
-                var (text, brush, isDownload, sub) = SettingsWindow.PackRowStatus(PackStatus.Compare(installed, latest), downloading, active,
-                    installed, latest, L, culture);
-                return new SettingsWindow.PackCardRow { Name = name, Version = sub, Status = text, StatusBrush = B(brush), Accent = B(accent),
-                    IsDownload = isDownload, Tooltip = isDownload ? L("shell_Packs_Download_Tip", "") : null };
-            }
-            ((ItemsControl)Find("PacksCardList")).ItemsSource = new[]
-            {
-                Row("Genshin Impact", "GameGenshinBrush", "7.1.0-r8", "7.1.0-r8", active: true),
-                Row("Honkai: Star Rail", "GameStarRailBrush", "4.6.0-r3", "4.6.0-r5", active: false),
-                Row("Zenless Zone Zero", "GameZzzBrush", scene == Scene.Downloading ? "3.3.0-r2" : null, "3.3.0-r3", active: false, downloading: scene == Scene.Downloading),
-            };
+            ((ItemsControl)Find("PacksCardList")).ItemsSource = RenderFixtures.PackRows(host, culture, downloadingLast: scene == Scene.Downloading);
             ((UIElement)Find("PacksCardList")).Visibility = Visibility.Visible;
             ((UIElement)Find("PacksCardSkeleton")).Visibility = Visibility.Collapsed;
             // The reader is a status-bar chip: "GPU", the card's product name in its tooltip, the model in Zaawansowane.
@@ -692,25 +753,12 @@ namespace GI_Test
             genshinPill.Style = host.TryFindResource("ModernButton") as Style ?? genshinPill.Style;
             ((Button)Find("InputPillEN")).Style = host.TryFindResource("ModernButton") as Style ?? ((Button)Find("InputPillEN")).Style;
             TranslationPackInfo.Lookup = key => host.TryFindResource(key);
-            var packs = new List<TranslationPackInfo>
-            {
-                new TranslationPackInfo { Game = "genshin", Language = "pl", GameDisplayName = "Genshin Impact", LanguageDisplayName = "Polski",
-                    Source = TranslationPackSource.PaidCached, LocalPath = @"C:\Users\Gracz\AppData\Roaming\Kaption\Genshin\TextMapPL.gisub",
-                    LocalSize = 92_901_376, LocalModifiedAt = DateTime.Now.AddHours(-3), LocalVersion = "7.1.0-r8", RemoteVersion = "7.1.0-r8",
-                    DirectionLabel = "English → Polski", IsActiveTarget = true },
-                new TranslationPackInfo { Game = "starrail", Language = "pl", GameDisplayName = "Honkai: Star Rail", LanguageDisplayName = "Polski",
-                    Source = TranslationPackSource.RemoteAvailable, RemoteSize = 64_487_424, RemoteUnlocked = true, RemoteVersion = "4.6.0-r5",
-                    DirectionLabel = "English → Polski" },
-            };
+            var packs = RenderFixtures.PackList();
             var view = new ListCollectionView(packs);
             view.GroupDescriptions.Add(new PropertyGroupDescription(nameof(TranslationPackInfo.GameDisplayName)));
             ((ListView)Find("TranslationsList")).ItemsSource = view;
             ((UIElement)Find("TranslationsLoading")).Visibility = Visibility.Collapsed;
-            string frame = new[]
-            {
-                Path.Combine(repo, "GI-Test", "bin", "Debug", "Images", "en-pl-npc-dialog.jpg"),
-                @"F:\Pobrane\Nowy folder (3)\kaption-promo-landing\GI-Test\bin\Debug\Images\en-pl-npc-dialog.jpg",
-            }.FirstOrDefault(File.Exists);
+            string frame = RenderFixtures.DialogueScene();
             if (frame != null)
             {
                 var shot = new BitmapImage(new Uri(frame));
@@ -754,11 +802,11 @@ namespace GI_Test
             };
         }
 
-        /// <summary>The newest note on api.kaption.one when the screenshots were made (2026-11-02, 07:07 UTC).</summary>
+        /// <summary>The newest note on api.kaption.one/api/app/release-notes when the screenshots were made (2026-11-19): Star Rail 4.7.0-r3.</summary>
         internal static readonly ReleaseNote LatestNote = new()
         {
-            ReleaseId = "rel_01a19a16540bed71e5b577", Slug = "zzz-3-3-r4", Game = "zzz", GameVersion = "3.3", Kind = "revision", NewLines = 10,
-            PublishedAt = DateTimeOffset.FromUnixTimeSeconds(1793601112),
+            ReleaseId = "rel_01a1caea00ca31ae31bdae", Slug = "starrail-4-7-r3", Game = "starrail", GameVersion = "4.7", Kind = "revision", NewLines = 3,
+            PublishedAt = DateTimeOffset.FromUnixTimeSeconds(1794466858),
         };
 
         private static string SaveTo(string dir, BitmapSource bitmap, string name)

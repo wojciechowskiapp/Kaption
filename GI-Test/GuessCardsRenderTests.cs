@@ -58,6 +58,25 @@ namespace GI_Test
                     Layout(host, 1280, 1000);
                     written.Add(Save(Snapshot(host), $"guess-start-one-row-{tag}.png"));
 
+                    // What most players meet once Endfield's pack is public: its row over the guess row, and all three rows.
+                    var endfield = SpotlightRules.Rows(new SpotlightInputs { SetupCompleted = true, EndfieldPolishListed = true, EndfieldGameVersion = "1.6" });
+                    Assert.IsTrue(SettingsWindow.ApplySpotlightTo(Find, endfield, "Gendle", Art("wuwa"), Art("genshin"), L, B("GameWuWaBrush"),
+                        B("GameGenshinBrush"), Art("endfield"), B("GameEndfieldBrush")));
+                    Assert.AreEqual(Visibility.Collapsed, ((UIElement)Find("SpotlightWuWaRow")).Visibility);
+                    StringAssert.Contains(((TextBlock)Find("SpotlightEndfieldBody")).Text, "1.6");
+                    Layout(host, 1280, 1000);
+                    written.Add(Save(Snapshot(host), $"guess-start-endfield-{tag}.png"));
+
+                    var all = SpotlightRules.Rows(new SpotlightInputs { SetupCompleted = true, WuWaPolishListed = true, WuWaGameVersion = "3.7",
+                        EndfieldPolishListed = true, EndfieldGameVersion = "1.6" });
+                    SettingsWindow.ApplySpotlightTo(Find, all, "Gendle", Art("wuwa"), Art("genshin"), L, B("GameWuWaBrush"),
+                        B("GameGenshinBrush"), Art("endfield"), B("GameEndfieldBrush"));
+                    Assert.AreEqual(0, ((FrameworkElement)Find("SpotlightWuWaRow")).Margin.Top);
+                    Assert.AreEqual(14, ((FrameworkElement)Find("SpotlightEndfieldRow")).Margin.Top);
+                    Assert.AreEqual(14, ((FrameworkElement)Find("SpotlightGuessRow")).Margin.Top);
+                    Layout(host, 1280, 1280);
+                    written.Add(Save(Snapshot(host), $"guess-start-three-rows-{tag}.png"));
+
                     ((TextBlock)Find("GuessCommunityBody")).Text = SettingsWindow.GuessCommunityText(L);
                     StringAssert.Contains(((TextBlock)Find("GuessCommunityBody")).Text, lang == "pl-PL" ? "Zendle i Wuwdle" : "Zendle and Wuwdle");
                     Select(window, SettingsNavigation.Help);

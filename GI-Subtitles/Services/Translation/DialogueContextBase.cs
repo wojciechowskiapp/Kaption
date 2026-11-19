@@ -1490,6 +1490,69 @@ namespace GI_Subtitles.Services.Translation
             return results;
         }
 
+        /// <inheritdoc/>
+        public IReadOnlyList<AnswerCandidate> GetAnswerCandidates(IReadOnlyList<string> optionRoles,
+            Dictionary<string, string> translationDict)
+        {
+            // Never loads the graph: an answers read must not pay for it. OnTextMatched already has.
+            if (!_isFullyLoaded || _dialogGraph == null || optionRoles == null || optionRoles.Count == 0)
+                return Array.Empty<AnswerCandidate>();
+
+            List<AnswerCandidate> results = null;
+            lock (_lock)
+            {
+                foreach (long nextId in _immediateNextIds)
+                {
+                    if (_dialogGraph.TryGetValue(nextId, out var node) && HasRole(node, optionRoles))
+                        (results ??= new List<AnswerCandidate>(_immediateNextIds.Length)).Add(ToCandidate(nextId, node, translationDict));
+                }
+            }
+            return results ?? (IReadOnlyList<AnswerCandidate>)Array.Empty<AnswerCandidate>();
+        }
+
+        /// <inheritdoc/>
+        public IReadOnlyList<AnswerCandidate> GetOptionLinesByText(string rowText, IReadOnlyList<string> optionRoles,
+            Dictionary<string, string> translationDict)
+        {
+            if (!_isFullyLoaded || _dialogGraph == null || _textToDialogIds == null || optionRoles == null || optionRoles.Count == 0)
+                return Array.Empty<AnswerCandidate>();
+            string normalized = OptimizedMatcher.NormalizeInput(rowText, true);
+            if (normalized.Length == 0) return Array.Empty<AnswerCandidate>();
+
+            List<AnswerCandidate> results = null;
+            lock (_lock)
+            {
+                if (!_textToDialogIds.TryGetValue(normalized, out var ids)) return Array.Empty<AnswerCandidate>();
+                foreach (long id in ids)
+                {
+                    if (_dialogGraph.TryGetValue(id, out var node) && HasRole(node, optionRoles))
+                        (results ??= new List<AnswerCandidate>(ids.Count)).Add(ToCandidate(id, node, translationDict));
+                }
+            }
+            return results ?? (IReadOnlyList<AnswerCandidate>)Array.Empty<AnswerCandidate>();
+        }
+
+        // Exact equality: WuWa's WUWA_OPTION_MENU and SYSTEM_OPTION items share the prefix and are not choices.
+        private static bool HasRole(in DialogNode node, IReadOnlyList<string> roles)
+        {
+            if (string.IsNullOrEmpty(node.EnText) || node.RoleType == null) return false;
+            for (int i = 0; i < roles.Count; i++)
+                if (string.Equals(node.RoleType, roles[i], StringComparison.Ordinal)) return true;
+            return false;
+        }
+
+        // The pack keys lines by their cleaned text (male branch, no markup); the screen shows that text too.
+        private static AnswerCandidate ToCandidate(long id, in DialogNode node, Dictionary<string, string> translationDict)
+        {
+            string raw = node.EnText;
+            string text = PackKeyText.MayDiffer(raw) ? PackKeyText.Clean(raw) : raw.Trim();
+            string translation = null;
+            if (translationDict != null && !translationDict.TryGetValue(text, out translation))
+                translationDict.TryGetValue(raw, out translation);
+            return new AnswerCandidate(id, text, OptimizedMatcher.NormalizeInput(text, true),
+                string.IsNullOrEmpty(translation) ? null : translation);
+        }
+
         /// <summary>
         /// Get all NPC cache entries as prediction candidates for fuzzy answer matching.
         /// Used when graph NextDialogIds don't cover answer choices (shop NPCs, idle talk).

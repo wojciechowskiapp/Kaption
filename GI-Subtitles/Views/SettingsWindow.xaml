@@ -268,6 +268,14 @@
                                                    AutomationProperties.LiveSetting="Polite"/>
                                         <TextBlock x:Name="StateCardDetail" Style="{StaticResource BandSub}" Foreground="{StaticResource BandDetailBrush}"
                                                    Margin="0,6,0,0" MaxWidth="560" HorizontalAlignment="Left" Visibility="Collapsed"/>
+                                        <!-- Under a note about the player's frame: two answers (Services/Detection/DialogueAreaStore.cs;
+                                             the note decides what each does: StartCardModel.NoteActions). -->
+                                        <WrapPanel x:Name="StateCardNoteActions" Margin="-8,4,0,0" HorizontalAlignment="Left" Visibility="Collapsed">
+                                            <Button x:Name="StateCardNoteFirst" Style="{StaticResource BandGhostButton}" MinHeight="28" Padding="8,0"
+                                                    Click="StateCardNote_Click"/>
+                                            <Button x:Name="StateCardNoteSecond" Style="{StaticResource BandGhostButton}" MinHeight="28" Padding="8,0"
+                                                    Margin="4,0,0,0" Click="StateCardNote_Click"/>
+                                        </WrapPanel>
                                         <WrapPanel Margin="0,12,0,0">
                                             <TextBlock x:Name="DashActiveTranslationText" Style="{StaticResource BandSub}" Margin="0,0,14,0"
                                                        Text="English → Polski"/>
@@ -379,8 +387,8 @@
                             </Grid>
                         </Border>
 
-                        <!-- New in Kaption (SettingsWindow.GuessNotify.cs, SpotlightRules): Wuthering Waves in Polish while the
-                             live listing backs it, and the guess game. Each row closes on its own and retires after 3 launches. -->
+                        <!-- New in Kaption (SettingsWindow.GuessNotify.cs, SpotlightRules): Wuthering Waves and Arknights: Endfield in
+                             Polish while the live listing backs each, and the guess game. Each row closes on its own and retires after 3 launches. -->
                         <Border x:Name="SpotlightCard" Visibility="Collapsed" Style="{StaticResource Card}" Margin="0,16,0,0" Padding="0">
                             <Grid>
                                 <Grid.ColumnDefinitions>
@@ -406,6 +414,28 @@
                                                     Content="{DynamicResource shell_Spotlight_WuWa_Switch}" Click="SpotlightWuWa_Click"/>
                                         </StackPanel>
                                         <Button Grid.Column="2" Style="{StaticResource IconButton}" Click="SpotlightWuWaClose_Click" VerticalAlignment="Top"
+                                                ToolTip="{DynamicResource shell_Action_Dismiss}" AutomationProperties.Name="{DynamicResource shell_Action_Dismiss}">
+                                            <Path Data="{StaticResource IconClose}" Width="16" Height="16" Stretch="None" StrokeThickness="1.6"
+                                                  Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                                  StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
+                                        </Button>
+                                    </Grid>
+                                    <Grid x:Name="SpotlightEndfieldRow" Visibility="Collapsed">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Border x:Name="SpotlightEndfieldThumb" Width="64" Height="64" CornerRadius="8" VerticalAlignment="Top"
+                                                Background="{DynamicResource SurfaceSunkenBrush}" BorderThickness="0,0,0,2"
+                                                AutomationProperties.Name="{DynamicResource shell_Spotlight_Endfield_Title}"/>
+                                        <StackPanel Grid.Column="1" Margin="14,0,12,0" VerticalAlignment="Center">
+                                            <TextBlock Text="{DynamicResource shell_Spotlight_Endfield_Title}" Style="{StaticResource CardTitle}" Margin="0,0,0,2"/>
+                                            <TextBlock x:Name="SpotlightEndfieldBody" Text="{DynamicResource shell_Spotlight_Endfield_Body}" Style="{StaticResource HintText}"/>
+                                            <Button Style="{StaticResource LinkButton}" HorizontalAlignment="Left" Margin="0,6,0,0"
+                                                    Content="{DynamicResource shell_Spotlight_Endfield_Switch}" Click="SpotlightEndfield_Click"/>
+                                        </StackPanel>
+                                        <Button Grid.Column="2" Style="{StaticResource IconButton}" Click="SpotlightEndfieldClose_Click" VerticalAlignment="Top"
                                                 ToolTip="{DynamicResource shell_Action_Dismiss}" AutomationProperties.Name="{DynamicResource shell_Action_Dismiss}">
                                             <Path Data="{StaticResource IconClose}" Width="16" Height="16" Stretch="None" StrokeThickness="1.6"
                                                   Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
@@ -987,7 +1017,9 @@
                                 <StackPanel Grid.Column="2">
                                     <TextBlock Style="{StaticResource CardTitle}" Text="{DynamicResource shell_Region_Title}"/>
                                     <TextBlock x:Name="RegionMonitorText" Style="{StaticResource HintText}" Margin="0,0,0,4"/>
-                                    <TextBlock x:Name="DashRegionInfo" Style="{StaticResource BodyText}"
+                                    <!-- Who keeps the frame: Kaption (automatic), or the player (by hand), said in a sentence. -->
+                                    <TextBlock x:Name="RegionModeText" Style="{StaticResource BodyText}" TextWrapping="Wrap" Margin="0,0,0,2"/>
+                                    <TextBlock x:Name="DashRegionInfo" Style="{StaticResource HintText}"
                                                Text="{DynamicResource Dash_Region_NotSet}" Margin="0,0,0,14"/>
                                     <WrapPanel>
                                         <Button x:Name="DashAutoDetectButton" Style="{StaticResource ModernButton}"
@@ -1002,6 +1034,13 @@
                                                 Content="{DynamicResource Regions_Answer_Button}" Click="DashSelectAnswerRegion_Click"
                                                 Margin="0,0,8,8" Visibility="Collapsed" ToolTip="{DynamicResource Regions_Answer_Tooltip}"/>
                                     </WrapPanel>
+                                    <!-- A frame the player drew: kept exactly, never widened. Hidden while Kaption keeps the frame itself. -->
+                                    <StackPanel x:Name="RegionExactPanel" Margin="0,4,0,6" Visibility="Collapsed">
+                                        <CheckBox x:Name="RegionExactCheck" Style="{StaticResource ModernCheckBox}"
+                                                  Content="{DynamicResource shell_Region_KeepExact}"
+                                                  Checked="RegionExactCheck_Changed" Unchecked="RegionExactCheck_Changed"/>
+                                        <TextBlock x:Name="RegionExactHint" Text="{DynamicResource shell_Region_KeepExact_Hint}" Style="{StaticResource HintText}" Margin="28,2,0,0"/>
+                                    </StackPanel>
                                     <TextBlock x:Name="DashAutoDetectStatus" Style="{StaticResource HintText}" Margin="0,2,0,0"/>
                                     <Button Style="{StaticResource LinkButton}" Content="{DynamicResource shell_Region_Guide}"
                                             Click="GuideRegion_Click" Margin="0,4,0,0"/>
@@ -1260,8 +1299,9 @@
                             </StackPanel>
                         </Border>
 
-                        <!-- The Ctrl+Q window (code in SettingsWindow.QuickTranslate.cs), with a small picture of it. -->
-                        <Border Style="{StaticResource Card}">
+                        <!-- The Ctrl+Q window, with a small picture of it. Bound to QuickTranslateCardViewModel, set as this
+                             card's DataContext in SettingsWindow.QuickTranslate.cs. -->
+                        <Border x:Name="QuickTranslateCard" Style="{StaticResource Card}">
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
@@ -1270,11 +1310,12 @@
                                 <StackPanel Margin="0,0,20,0">
                                     <TextBlock Style="{StaticResource CardTitle}" Text="{DynamicResource Settings_QuickTranslate_Card_Label}"/>
                                     <TextBlock Style="{StaticResource HintText}" Text="{DynamicResource Settings_QuickTranslate_Card_Body}" Margin="0,0,0,12"/>
-                                    <RadioButton x:Name="QuickTranslateModeAuto" GroupName="QuickTranslateMode" Tag="Auto"
-                                                 Content="{DynamicResource Settings_QuickTranslate_Mode_Auto}" Checked="QuickTranslateMode_Checked"/>
-                                    <RadioButton x:Name="QuickTranslateModeTimed" GroupName="QuickTranslateMode" Tag="Timed"
-                                                 Content="{DynamicResource Settings_QuickTranslate_Mode_Timed}" Checked="QuickTranslateMode_Checked"/>
-                                    <Grid x:Name="QuickTranslateSecondsRow" Margin="28,0,0,4" Visibility="Collapsed">
+                                    <RadioButton x:Name="QuickTranslateModeAuto" GroupName="QuickTranslateMode"
+                                                 Content="{DynamicResource Settings_QuickTranslate_Mode_Auto}" IsChecked="{Binding IsAuto, Mode=TwoWay}"/>
+                                    <RadioButton x:Name="QuickTranslateModeTimed" GroupName="QuickTranslateMode"
+                                                 Content="{DynamicResource Settings_QuickTranslate_Mode_Timed}" IsChecked="{Binding IsTimed, Mode=TwoWay}"/>
+                                    <Grid x:Name="QuickTranslateSecondsRow" Margin="28,0,0,4"
+                                          Visibility="{Binding IsSecondsRowVisible, Converter={StaticResource BoolToVisibilityConverter}, FallbackValue=Collapsed}">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="122"/>
                                             <ColumnDefinition Width="*"/>
@@ -1284,12 +1325,11 @@
                                         <Slider x:Name="QuickTranslateSecondsSlider" Grid.Column="1" Style="{StaticResource ValueSlider}" Minimum="2" Maximum="120"
                                                 TickFrequency="1" IsSnapToTickEnabled="True" shell:SliderValue.Format="{}{0:0} s"
                                                 AutomationProperties.Name="{DynamicResource Settings_QuickTranslate_Seconds_Label}"
-                                                ValueChanged="QuickTranslateSecondsSlider_ValueChanged"/>
+                                                Value="{Binding Seconds, Mode=TwoWay}"/>
                                     </Grid>
-                                    <TextBlock x:Name="QuickTranslateSecondsValue" Visibility="Collapsed"/>
-                                    <RadioButton x:Name="QuickTranslateModeManual" GroupName="QuickTranslateMode" Tag="Manual"
+                                    <RadioButton x:Name="QuickTranslateModeManual" GroupName="QuickTranslateMode"
                                                  Content="{DynamicResource Settings_QuickTranslate_Mode_Manual}" Margin="0,0,0,8"
-                                                 Checked="QuickTranslateMode_Checked"/>
+                                                 IsChecked="{Binding IsManual, Mode=TwoWay}"/>
                                     <Grid>
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="150"/>
@@ -1300,9 +1340,8 @@
                                         <Slider x:Name="QuickTranslateFontSlider" Grid.Column="1" Style="{StaticResource ValueSlider}" Minimum="12" Maximum="28"
                                                 TickFrequency="1" IsSnapToTickEnabled="True"
                                                 AutomationProperties.Name="{DynamicResource Settings_QuickTranslate_FontSize_Label}"
-                                                ValueChanged="QuickTranslateFontSlider_ValueChanged"/>
+                                                Value="{Binding FontSize, Mode=TwoWay}"/>
                                     </Grid>
-                                    <TextBlock x:Name="QuickTranslateFontValue" Visibility="Collapsed"/>
                                     <TextBlock Text="{DynamicResource Settings_QuickTranslate_Hint}" Style="{StaticResource HintText}" Margin="0,4,0,0"/>
                                 </StackPanel>
                                 <!-- A small picture of the popup: always dark like the real one, its text at the chosen size. -->
@@ -1324,7 +1363,8 @@
                                         <TextBlock Text="{DynamicResource look_Qt_Preview_Line}" TextWrapping="Wrap" Foreground="{StaticResource BandTextBrush}"
                                                    FontSize="{Binding Value, ElementName=QuickTranslateFontSlider}"/>
                                         <Border x:Name="QuickTranslatePreviewTimer" Height="3" CornerRadius="1.5" Margin="0,10,0,0" HorizontalAlignment="Left"
-                                                Width="148" Background="{StaticResource BandAccentBrush}" Opacity="0.7"/>
+                                                Width="148" Background="{StaticResource BandAccentBrush}" Opacity="0.7"
+                                                Visibility="{Binding IsPreviewTimerVisible, Converter={StaticResource BoolToVisibilityConverter}, FallbackValue=Visible}"/>
                                     </StackPanel>
                                 </Border>
                             </Grid>
@@ -1492,6 +1532,28 @@
                     <StackPanel Style="{StaticResource PageContent}">
                         <TextBlock Style="{StaticResource PageHeading}" Text="{DynamicResource shell_Page_Hotkeys_Title}"/>
                         <TextBlock Style="{StaticResource PageLead}" Text="{DynamicResource Settings_Hotkeys_Hint}"/>
+
+                        <!-- In-game hints: the small card of shortcuts over the game (Services/Hints, MainWindow.Hints.cs). -->
+                        <Border Style="{StaticResource Card}">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <CheckBox x:Name="HintsToggle" Style="{StaticResource ToggleSwitch}" Loaded="HintsToggle_Loaded"
+                                          Checked="HintsToggle_Changed" Unchecked="HintsToggle_Changed"
+                                          AutomationProperties.Name="{DynamicResource Hints_Setting_Title}"
+                                          AutomationProperties.HelpText="{DynamicResource Hints_Setting_Hint}">
+                                    <StackPanel>
+                                        <TextBlock Text="{DynamicResource Hints_Setting_Title}" FontWeight="SemiBold" Foreground="{DynamicResource TextBrush}"
+                                                   TextWrapping="Wrap"/>
+                                        <TextBlock Text="{DynamicResource Hints_Setting_Hint}" Style="{StaticResource HintText}" Margin="0,2,0,0"/>
+                                    </StackPanel>
+                                </CheckBox>
+                                <Button x:Name="HintsShowNowButton" Grid.Column="1" Style="{StaticResource SecondaryButton}" VerticalAlignment="Center"
+                                        Margin="16,0,0,0" Content="{DynamicResource Hints_Setting_ShowNow}" Click="HintsShowNow_Click"/>
+                            </Grid>
+                        </Border>
 
                         <Border x:Name="HotkeyConflictNotice" Visibility="Collapsed" Style="{StaticResource Callout}"
                                 Background="{DynamicResource WarnLightBrush}" Margin="0,0,0,12">

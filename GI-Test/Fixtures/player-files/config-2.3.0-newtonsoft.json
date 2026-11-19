@@ -1,0 +1,31 @@
+{
+  "Game": "Genshin",
+  "UILang": "zh-CN",
+  "Region": "560,860,800,140",
+  "Pad": [
+    10,
+    20
+  ],
+  "Size": 28,
+  "OcrInterval": 200,
+  "UiRefreshInterval": 200,
+  "ForceOcrAfterSeconds": 1.0,
+  "UseSymSpell": true,
+  "AutoShrinkText": false,
+  "UpdateSkippedAtUnix": 1755600000,
+  "OcrGpuQuarantineUtc": "2026-08-01T10:15:30.1234567Z",
+  "WhatsNew.Answers": [
+    "today=yes",
+    "fix=later"
+  ],
+  "OutputSample": "Zażółć gęślą jaźń — „cytat” <b>&</b>",
+  "FutureFeature": {
+    "on": true,
+    "levels": [
+      1,
+      2.5
+    ],
+    "note": null
+  },
+  "Cleared": null
+}

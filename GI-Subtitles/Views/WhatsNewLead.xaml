@@ -13,6 +13,8 @@
         <Geometry x:Key="WnCalendar">M3,4.5 H13 V13 H3 Z M3,7.2 H13 M5.8,2.8 V5.6 M10.2,2.8 V5.6</Geometry>
         <Geometry x:Key="WnPower">M8,2.5 V8 M4.8,4.7 A4.6,4.6 0 1 0 11.2,4.7</Geometry>
         <Geometry x:Key="WnRecord">M13.5,8 A5.5,5.5 0 1 1 2.5,8 A5.5,5.5 0 1 1 13.5,8 Z M10,8 A2,2 0 1 1 6,8 A2,2 0 1 1 10,8 Z</Geometry>
+        <Geometry x:Key="WnFrame">M2.5,3.5 H13.5 V12.5 H2.5 Z M5,7 H11 M5,9.5 H9</Geometry>
+        <Geometry x:Key="WnKeys">M2,4.5 H14 V11.5 H2 Z M4.5,7 H5.5 M7.5,7 H8.5 M10.5,7 H11.5 M5,9.5 H11</Geometry>
         <Geometry x:Key="WnSpark">M8,2.5 V5.5 M8,10.5 V13.5 M2.5,8 H5.5 M10.5,8 H13.5 M4.3,4.3 L5.9,5.9 M10.1,10.1 L11.7,11.7 M11.7,4.3 L10.1,5.9 M5.9,10.1 L4.3,11.7</Geometry>
         <Geometry x:Key="WnCheck">M3.5,8.5 L6.5,11.5 L12.5,4.5</Geometry>
     </UserControl.Resources>

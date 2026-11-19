@@ -155,7 +155,7 @@ namespace GI_Test
             Assert.AreEqual(0, result.NpcBlocks.Count + result.DialogueBlocks.Count);
         }
 
-        /// <summary>Genshin and Star Rail keep the unfiltered accent instance: their HUD text still reaches the body.</summary>
+        /// <summary>Genshin keeps the unfiltered accent instance: its HUD text still reaches the body.</summary>
         [TestMethod]
         public void JunkFilter_IsOptIn_OnTheAccentPath()
         {
@@ -182,16 +182,14 @@ namespace GI_Test
             Assert.AreSame(SpeakerRowTextBlockClassifier.WithJunkFilter, TextBlockClassifierFactory.Create("WuWa"));
             Assert.AreSame(SpeakerRowTextBlockClassifier.WithJunkFilter, TextBlockClassifierFactory.Create("Wuthering Waves"));
             Assert.AreSame(AccentColorTextBlockClassifier.Instance, TextBlockClassifierFactory.Create("Genshin"));
-            Assert.AreSame(AccentColorTextBlockClassifier.Instance, TextBlockClassifierFactory.Create("StarRail"));
+            Assert.AreSame(AccentColorTextBlockClassifier.WithJunkAndSideRowFilter, TextBlockClassifierFactory.Create("StarRail"));
             Assert.AreSame(AccentColorTextBlockClassifier.Instance, TextBlockClassifierFactory.Create("NotAGame"));
             Assert.AreSame(GeometryTextBlockClassifier.Instance, TextBlockClassifierFactory.Create("ZZZ"));
 
             foreach (string live in new[] { "Genshin", "StarRail", "ZZZ" })
-            {
-                var p = GameRegionProfile.Get(live);
-                Assert.IsFalse(p.UsesSpeakerRowClassifier, live);
-                Assert.IsFalse(p.FiltersOcrJunk, live);
-            }
+                Assert.IsFalse(GameRegionProfile.Get(live).UsesSpeakerRowClassifier, live);
+            foreach (string live in new[] { "Genshin", "ZZZ" })
+                Assert.IsFalse(GameRegionProfile.Get(live).FiltersOcrJunk, live);
         }
 
         private static TextBlock Paint(Mat frame, string text, int x, int y, int w, int h, Scalar colour)

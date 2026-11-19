@@ -110,6 +110,9 @@ namespace GI_Subtitles.Services.Detection
             }
         }
 
+        /// <summary>Lines found since translation started: the in-game hint card reads this alone once a second.</summary>
+        public int MatchedReads => Volatile.Read(ref _matchedReads);
+
         public SessionEvidenceSnapshot Snapshot() => new(
             Volatile.Read(ref _dialogueReads), Volatile.Read(ref _matchedReads), Volatile.Read(ref _blackFrames),
             Volatile.Read(ref _packHits), Volatile.Read(ref _unmatchedRun),

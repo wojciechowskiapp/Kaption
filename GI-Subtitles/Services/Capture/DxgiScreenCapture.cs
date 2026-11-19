@@ -69,6 +69,20 @@ namespace GI_Subtitles.Services.Capture
         /// </summary>
         public static long FrameSerial => System.Threading.Interlocked.Read(ref _frameSerial);
 
+        /// <summary>
+        /// How many new pictures of the desktop this reader has taken into the frame it holds. Unlike
+        /// <see cref="FrameSerial"/> it is this reader's own, and it does not move for a frame that brought nothing but
+        /// a pointer move (Windows hands those out with the picture it had before). The overlay read check counts
+        /// these: it has to know that what it looks at was drawn after it changed something. Read on the capture thread.
+        /// </summary>
+        public long PictureSerial { get; private set; }
+
+        /// <summary>
+        /// How often this reader lost its duplication and set it up again (a mode change, the secure desktop). What was
+        /// proven about its frames before does not carry over.
+        /// </summary>
+        public long Restarts { get; private set; }
+
         public bool IsAvailable => _initialized;
 
         public bool HoldsFrame => true;
@@ -198,6 +212,7 @@ namespace GI_Subtitles.Services.Capture
                         Cleanup();
                         try { Initialize(_adapterIndex, _outputIndex); _initialized = true; }
                         catch { _initialized = false; }
+                        Restarts++;
                     }
                     else
                     {
@@ -217,6 +232,8 @@ namespace GI_Subtitles.Services.Capture
                     ID3D11DeviceContext_CopyResource(_context, _stagingTexture, desktopTexture);
                     copied = true;
                     _hasValidFrame = true;
+                    // Zero means the desktop picture was not updated since the last frame: a pointer move alone.
+                    if (frameInfo.LastPresentTime != 0) PictureSerial++;
                     Marshal.Release(desktopTexture);
                 }
                 else

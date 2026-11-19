@@ -25,9 +25,11 @@ namespace GI_Subtitles.Services.Notices.WhatsNew
         public const string StartWithWindows = "start-with-windows";
         public const string ShowInRecordings = "show-in-recordings";
         public const string DayNotice = "day-notice";
+        /// <summary>The small card of shortcuts over the game (Services/Hints).</summary>
+        public const string InGameHints = "in-game-hints";
 
         public static readonly IReadOnlyCollection<string> Known =
-            new HashSet<string>(StringComparer.Ordinal) { StaminaNotice, StartWithWindows, ShowInRecordings, DayNotice };
+            new HashSet<string>(StringComparer.Ordinal) { StaminaNotice, StartWithWindows, ShowInRecordings, DayNotice, InGameHints };
     }
 
     /// <summary>The conditions an entry may name in <c>requires</c>, about the selected game.</summary>

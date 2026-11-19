@@ -423,8 +423,10 @@ namespace GI_Subtitles.Core.UI
                             "GDI capture path for every read.");
                     }
 
-                    Config.Config.Set("Region", $"{x},{y},{w},{h}");
-                    Region = Config.Config.Get<string>("Region").ToString().Split(',');
+                    // A drawing is the player's: the store keeps it by hand (or exactly, when the player chose that), and the
+                    // running app checks a hint against the game's text (widened only when it cuts it, MainWindow.DialogueArea.cs).
+                    Region = new[] { x.ToString(), y.ToString(), w.ToString(), h.ToString() };
+                    GI_Subtitles.Services.Detection.DialogueAreaStore.CommitDrawing(new System.Drawing.Rectangle(x, y, w, h));
                 }
             }
             catch (Exception ex)
@@ -725,6 +727,9 @@ namespace GI_Subtitles.Core.UI
         private System.Windows.Window _activeRegionOverlayWindow;
         private System.Windows.Threading.DispatcherTimer _activeRegionOverlayTimer;
 
+        /// <summary>The dialogue frame is on screen, over the area Kaption reads (the capture tick skips its reads meanwhile).</summary>
+        public bool IsRegionOverlayOpen => _activeRegionOverlayWindow != null;
+
         public void ShowRegionOverlay()
         {
             ShowRegionOverlay(TimeSpan.FromSeconds(10));
@@ -803,6 +808,9 @@ namespace GI_Subtitles.Core.UI
                 Background = System.Windows.Media.Brushes.Transparent,
                 Topmost = true,
                 ShowInTaskbar = false,
+                // A ten-second look, not a window to work in: the game keeps the keyboard, and stays the window in
+                // front, so the sheet of shortcuts the same key asks for lands on the game's screen.
+                ShowActivated = false,
                 Width = SystemParameters.VirtualScreenWidth,
                 Height = SystemParameters.VirtualScreenHeight,
                 Left = virtualLeftDip,
@@ -928,6 +936,10 @@ namespace GI_Subtitles.Core.UI
             }
 
             overlay.Content = canvas;
+            // Nothing on the frame takes a click, so every click goes to the window underneath: a click on the tinted
+            // dialogue area advances the dialogue instead of taking the keyboard from the game.
+            overlay.SourceInitialized += (_, __) =>
+                GI_Subtitles.Views.HintWindowHost.ApplyStyles(new WindowInteropHelper(overlay).Handle, clickThrough: true);
             overlay.Show();
 
             // Exclude from screen capture to avoid OCR interference

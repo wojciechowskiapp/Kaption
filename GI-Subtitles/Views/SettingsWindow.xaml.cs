@@ -1199,7 +1199,10 @@ namespace GI_Subtitles.Views
                 }
                 catch (Exception ex)
                 {
-                    Logger.Log.Error($"Failed to load dictionary: {ex.Message}", ex);
+                    // The first HMAC failure self-heals below, so it is a Warn; Error (and Sentry) only when that retry fails too.
+                    bool willSelfHeal = IsCryptographicFailure(ex) && !isCryptoRetry;
+                    if (willSelfHeal) Logger.Log.Warn($"Failed to load dictionary: {ex.Message}", ex);
+                    else Logger.Log.Error($"Failed to load dictionary: {ex.Message}", ex);
 
                     // A CryptographicException here is HMAC verification failing in
                     // ServerKeyFileProtectionService: a cached .gisub was encrypted
@@ -1211,7 +1214,7 @@ namespace GI_Subtitles.Views
                     // First time we hit it, self-heal by wiping the machine-bound
                     // caches and re-downloading. isCryptoRetry guards against looping
                     // if the rebuilt data still won't decrypt.
-                    if (IsCryptographicFailure(ex) && !isCryptoRetry)
+                    if (willSelfHeal)
                     {
                         await RecoverFromStaleEncryptedCacheAsync(
                             renew, outputFilePath1, effectiveOutputPath, jsonFilePath, indexPath);
@@ -2193,6 +2196,28 @@ namespace GI_Subtitles.Views
             }
         }
 
+        /// <summary>
+        /// Most a detector rebuild may take; reads wait for it, so it stays well under the 15 s live-read watchdog.
+        /// One normally takes about a second.
+        /// </summary>
+        private static readonly TimeSpan DetectorRebuildBudget = TimeSpan.FromSeconds(10);
+
+        /// <summary>
+        /// Gives the current engine's detector the fast path for the dialogue area <paramref name="currentArea"/>
+        /// returns, when DirectML has it on the slow one (audit B1). Serialised with <see cref="LoadEngine(bool?, string, bool)"/>
+        /// so an engine swap never disposes a detector mid-build; the area is read again inside the lock. Blocks the
+        /// calling thread; call it off the UI thread.
+        /// </summary>
+        public void FitDetectorToArea(Func<OpenCvSharp.Size?> currentArea)
+        {
+            lock (_engineLoadLock)
+            {
+                PaddleOCREngine current = engine;
+                if (current == null || currentArea() is not { } area) return;
+                current.PrepareDetectorFor(area, DetectorRebuildBudget);
+            }
+        }
+
         // OcrGpuFitness.WarmUpBudget (3 s) was re-derived when warm-up dropped from 9 shape
         // compiles to 2: ~1.1 s per compile plus first-call DirectML device init.
 
@@ -2748,6 +2773,7 @@ namespace GI_Subtitles.Views
                 if (!registered) taken.Add(hotkey.DisplayText);
             }
             SetHotkeyConflicts(taken);
+            OnHotkeysRegistered?.Invoke();
         }
 
         // Add this helper method to your class
@@ -3114,86 +3140,88 @@ namespace GI_Subtitles.Views
         }
 #pragma warning restore CS0162
 
-        /// <summary>
-        /// Runs <see cref="AutoRegionService.Detect"/> on a background thread,
-        /// then applies the detected dialogue and answer regions to config.
-        /// </summary>
+        /// <summary>"Set automatically": the game's frame goes back to Kaption, placed on the game's window now.</summary>
         private async void DashAutoDetect_Click(object sender, RoutedEventArgs e)
         {
             DashAutoDetectButton.IsEnabled = false;
-            DashAutoDetectStatus.Text = "Scanning...";
-            DashAutoDetectStatus.Foreground = new SolidColorBrush(
-                System.Windows.Media.Color.FromRgb(0x1E, 0x40, 0xAF));
-
+            DashAutoDetectStatus.Text = "";
+            DashAutoDetectStatus.SetResourceReference(System.Windows.Controls.TextBlock.ForegroundProperty, "TextSecondaryBrush");
             try
             {
-                // The worker asks for the overlay's places at the moment it captures; they are read on this thread.
-                var result = await Task.Run(() => AutoRegionService.Detect(Game, engine,
-                    () => Dispatcher.Invoke(() => OverlayScreenAreas?.Invoke())));
-
-                if (result.Success)
-                {
-                    Config.Set("Region", result.DialogueRegion);
-                    notifyIcon.Region = result.DialogueRegion.Split(',');
-
-                    #pragma warning disable CS0162 // feature flag is a const today
-                    // Only persist the answer region while the feature that reads it exists.
-                    // FeatureAnswerTranslationEnabled is false, so nothing consumes this value —
-                    // but writing it anyway had two visible effects: INotifyIcon.ShowRegionOverlay
-                    // drew a stray "Answer Region" rectangle unrelated to anything on screen, and
-                    // OverlayRegionValidator.Check probes it, so TryGateOverlayNotInRegion could
-                    // block starting OCR over a region no code reads. The ratio fallback emits a
-                    // region on every run, including when the game is not on a dialogue screen,
-                    // so this fired routinely rather than rarely.
-                    if (MainWindow.FeatureAnswerTranslationEnabled && !string.IsNullOrEmpty(result.AnswerRegion))
-                    {
-                        Config.Set("AnswerRegion", result.AnswerRegion);
-                        notifyIcon.AnswerRegion = result.AnswerRegion.Split(',');
-                    }
-                    #pragma warning restore CS0162
-
-                    DashAutoDetectStatus.Text = $"\u2713 {result.Resolution} ({result.Method})";
-                    DashAutoDetectStatus.Foreground = new SolidColorBrush(
-                        System.Windows.Media.Color.FromRgb(0x05, 0x96, 0x69));
-
-                    // Show detected regions on screen for 5 seconds
-                    notifyIcon.ShowRegionOverlay(TimeSpan.FromSeconds(5));
-
-                    UpdateDashboardRegionInfo();
-
-                    // Update region text boxes in Settings tab
-                    var parts = result.DialogueRegion.Split(',');
-                    if (parts.Length == 4)
-                    {
-                        RegionX.Text = parts[0];
-                        RegionY.Text = parts[1];
-                        RegionWidth.Text = parts[2];
-                        RegionHeight.Text = parts[3];
-                    }
-
-                    // Post-change validation: fires on the UI thread after
-                    // the Region has been persisted so MainWindow can compare
-                    // its overlay bounds against the new capture rectangle.
-                    OnCaptureRegionUserChanged?.Invoke();
-                }
-                else
-                {
-                    DashAutoDetectStatus.Text = $"\u2717 {result.Error}";
-                    DashAutoDetectStatus.Foreground = new SolidColorBrush(
-                        System.Windows.Media.Color.FromRgb(0xDC, 0x26, 0x26));
-                }
+                (bool ok, string text) = await PlaceGameFrameAsync();
+                if (text == null) return;
+                DashAutoDetectStatus.Text = text;
+                DashAutoDetectStatus.SetResourceReference(System.Windows.Controls.TextBlock.ForegroundProperty, ok ? "SuccessBrush" : "ErrorBrush");
             }
             catch (Exception ex)
             {
-                DashAutoDetectStatus.Text = $"\u2717 {ex.Message}";
-                DashAutoDetectStatus.Foreground = new SolidColorBrush(
-                    System.Windows.Media.Color.FromRgb(0xDC, 0x26, 0x26));
-                Logger.Log.Error($"Dashboard auto-detect failed: {ex}");
+                DashAutoDetectStatus.Text = L("shell_Region_DetectFailed", "\u2717 Couldn't set the frame. Try again in a moment.");
+                DashAutoDetectStatus.SetResourceReference(System.Windows.Controls.TextBlock.ForegroundProperty, "ErrorBrush");
+                Logger.Log.Warn($"Setting the frame automatically failed: {ex}");
             }
             finally
             {
                 DashAutoDetectButton.IsEnabled = true;
             }
+        }
+
+        /// <summary>
+        /// Places the game's measured dialogue block on its window (<see cref="AutoRegionService.Detect"/>, off the UI
+        /// thread), then applies it as automatic. Text is what to tell the player (null: say nothing, a newer change
+        /// of the frame or the game overtook the lookup).
+        /// </summary>
+        private async Task<(bool Placed, string Text)> PlaceGameFrameAsync()
+        {
+            // A drawing, typed pixels or another game picked while the lookup runs are newer than its answer: keep them.
+            AreaSnapshot before = AreaSnapshot.Take();
+            var result = await Task.Run(() => AutoRegionService.Detect(before.Game));
+            if (!before.IsCurrent) return (false, null);
+
+            if (!result.Success)
+                return (false, result.GameMinimised ? L("shell_Region_DetectMinimised", "\u2717 The game is minimised. Bring it back and try again.")
+                    : result.WindowTooSmall ? L("shell_Region_DetectTooSmall", "\u2717 The game's window is too small. Make it bigger and try again.")
+                    : result.OffScreen ? L("shell_Region_DetectOffScreen", "\u2717 The game's window is partly off the screen. Move it back and try again.")
+                    : result.NoGameWindow ? L("shell_Region_DetectNoGame", "\u2717 Start the game and try again.")
+                    : L("shell_Region_DetectFailed", "\u2717 Couldn't set the frame. Try again in a moment."));
+
+            // Automatic from here on: the frame follows the game's window (DialogueAreaStore).
+            DialogueAreaStore.Commit(result.DialogueRegion, DialogueAreaMode.Auto, AreaOrigin.Placed, quiet: false, result.Client);
+
+            #pragma warning disable CS0162 // feature flag is a const today
+            // Only persist the answer region while the feature that reads it exists.
+            // FeatureAnswerTranslationEnabled is false, so nothing consumes this value —
+            // but writing it anyway had two visible effects: INotifyIcon.ShowRegionOverlay
+            // drew a stray "Answer Region" rectangle unrelated to anything on screen, and
+            // OverlayRegionValidator.Check probes it, so TryGateOverlayNotInRegion could
+            // block starting OCR over a region no code reads. The ratio fallback emits a
+            // region on every run, including when the game is not on a dialogue screen,
+            // so this fired routinely rather than rarely.
+            if (MainWindow.FeatureAnswerTranslationEnabled && !string.IsNullOrEmpty(result.AnswerRegion))
+            {
+                Config.Set("AnswerRegion", result.AnswerRegion);
+                notifyIcon.AnswerRegion = result.AnswerRegion.Split(',');
+            }
+            #pragma warning restore CS0162
+
+            // Show the frame on screen for 5 seconds
+            notifyIcon.ShowRegionOverlay(TimeSpan.FromSeconds(5));
+            UpdateDashboardRegionInfo();
+
+            // Update region text boxes in Settings tab
+            var parts = result.DialogueRegion.Split(',');
+            if (parts.Length == 4)
+            {
+                RegionX.Text = parts[0];
+                RegionY.Text = parts[1];
+                RegionWidth.Text = parts[2];
+                RegionHeight.Text = parts[3];
+            }
+
+            // Post-change validation: fires on the UI thread after the Region has been persisted so MainWindow can
+            // compare its overlay bounds against the new capture rectangle.
+            OnCaptureRegionUserChanged?.Invoke();
+            return (true, string.Format(System.Globalization.CultureInfo.CurrentUICulture,
+                L("shell_Region_DetectPlaced", "\u2713 Frame set to the game's dialogue ({0})"), result.Resolution));
         }
 
         private void DashSetupGuide_Click(object sender, RoutedEventArgs e)
@@ -3245,7 +3273,7 @@ namespace GI_Subtitles.Views
                 OnRetryEngineLoad?.Invoke(true);
                 return;
             }
-            if (_cardState != null && Shell.StartCardModel.OffersAreaAsSecondFix(_cardState.Kind))
+            if (_cardState != null && Shell.StartCardModel.OffersAreaAsSecondFix(_cardState.Kind, _cardState.AreaAutomatic))
             {
                 OpenDialogueAreaFromCheck();
                 return;
@@ -3404,7 +3432,10 @@ namespace GI_Subtitles.Views
                 string regionStr = Config.Get<string>("Region", "");
                 if (!CaptureRegionValidator.TryParse(regionStr, out int x, out int y, out int width, out int height))
                 {
-                    DashRegionInfo.Text = TryFindResource("Dash_Region_NotSet") as string ?? "Not set";
+                    // Automatic mode with nothing saved: Kaption places the frame when the game shows up.
+                    DashRegionInfo.Text = DialogueAreaStore.Mode == DialogueAreaMode.Auto
+                        ? L("Dash_Region_AutoPending", "Kaption sets the frame by itself once the game is running.")
+                        : TryFindResource("Dash_Region_NotSet") as string ?? "Not set";
                 }
                 else
                 {
@@ -3429,6 +3460,7 @@ namespace GI_Subtitles.Views
                     RegionWidth.Text = notifyIcon.Region[2];
                     RegionHeight.Text = notifyIcon.Region[3];
                 }
+                SyncExactFrameCheck();
             }
             catch (Exception ex)
             {
@@ -3634,16 +3666,112 @@ namespace GI_Subtitles.Views
 
         private void RegionField_LostFocus(object sender, RoutedEventArgs e)
         {
-            if (int.TryParse(RegionX.Text, out _) &&
-                int.TryParse(RegionY.Text, out _) &&
-                int.TryParse(RegionWidth.Text, out _) &&
-                int.TryParse(RegionHeight.Text, out _))
+            string region = $"{RegionX.Text.Trim()},{RegionY.Text.Trim()},{RegionWidth.Text.Trim()},{RegionHeight.Text.Trim()}";
+            if (!CaptureRegionValidator.TryParse(region, out _, out _, out _, out _)) return;
+            // Boxes that lose focus unchanged are not a choice: only a real edit makes the area "exactly as typed".
+            if (region == Config.Get<string>("Region", "")) return;
+            DialogueAreaStore.Commit(region, DialogueAreaMode.Exact, AreaOrigin.Typed, quiet: false);
+            OnCaptureRegionUserChanged?.Invoke();
+        }
+
+        private bool _syncingExactFrame;
+
+        /// <summary>One of the two buttons under a note about the player's frame; the button's tag says which answer it is.</summary>
+        private async void StateCardNote_Click(object sender, RoutedEventArgs e)
+        {
+            if ((sender as FrameworkElement)?.Tag is not Shell.RegionNoteAction action) return;
+            try
             {
-                string region = $"{RegionX.Text},{RegionY.Text},{RegionWidth.Text},{RegionHeight.Text}";
-                Config.Set("Region", region);
-                if (notifyIcon != null) notifyIcon.Region = region.Split(',');
-                OnCaptureRegionUserChanged?.Invoke();
+                switch (action)
+                {
+                    case Shell.RegionNoteAction.KeepWidened:
+                        DialogueAreaStore.KeepWidened();
+                        break;
+                    case Shell.RegionNoteAction.KeepExact:
+                        ApplyKeepExact(true);
+                        return;
+                    case Shell.RegionNoteAction.KeepMine:
+                        DialogueAreaStore.KeepMine();
+                        break;
+                    case Shell.RegionNoteAction.UseGameFrame:
+                        (bool placed, string text) = await PlaceGameFrameAsync();
+                        if (!placed && text != null)
+                            GI_Subtitles.Views.ModernDialog.Warn(this, L("shell_Region_Title", "Dialogue frame"), text.TrimStart('\u2717', ' '));
+                        break;
+                }
             }
+            catch (Exception ex)
+            {
+                Logger.Log.Warn($"Frame note answer {action} failed: {ex.Message}");
+            }
+            UpdateDashboardRegionInfo();
+            UpdateDashboardStatus();
+        }
+
+        private void RegionExactCheck_Changed(object sender, RoutedEventArgs e)
+        {
+            if (_syncingExactFrame) return;
+            ApplyKeepExact(RegionExactCheck.IsChecked == true);
+        }
+
+        // The frame may change (the drawing a widen replaced), also mid-translation: the same follow-up as typed pixels.
+        private void ApplyKeepExact(bool on)
+        {
+            try
+            {
+                if (DialogueAreaStore.KeepExact(on)) OnCaptureRegionUserChanged?.Invoke();
+            }
+            catch (Exception ex)
+            {
+                Logger.Log.Warn($"Keep exactly my frame ({on}) failed: {ex.Message}");
+            }
+            UpdateDashboardRegionInfo();
+            UpdateDashboardStatus();
+        }
+
+        /// <summary>
+        /// The frame card says who keeps the frame (Kaption, or the player: a drawing Kaption may widen, or one it leaves
+        /// alone), the checkbox shows the store's mode, and only a frame the player drew or typed offers it. Beside a
+        /// widened frame the checkbox says it brings the smaller drawing back.
+        /// </summary>
+        private void SyncExactFrameCheck()
+        {
+            if (RegionExactCheck == null || RegionExactPanel == null) return;
+            _syncingExactFrame = true;
+            try
+            {
+                ApplyFrameModeTo(FindName, DialogueAreaStore.Mode, DialogueArea.Parse(DialogueAreaStore.Region) != null,
+                    DialogueAreaStore.IsWidened, L);
+            }
+            finally
+            {
+                _syncingExactFrame = false;
+            }
+        }
+
+        /// <summary>
+        /// Fills the frame card's named elements for how the frame is kept. Static so the render tests run the same code on
+        /// the window's XAML that the app runs. The caller holds <see cref="_syncingExactFrame"/> while it sets the checkbox.
+        /// </summary>
+        internal static void ApplyFrameModeTo(Func<string, object> find, DialogueAreaMode mode, bool saved, bool widened, Func<string, string, string> L)
+        {
+            if (find("RegionExactCheck") is System.Windows.Controls.CheckBox check) check.IsChecked = mode == DialogueAreaMode.Exact;
+            if (find("RegionExactPanel") is UIElement panel)
+                panel.Visibility = mode != DialogueAreaMode.Auto && saved ? Visibility.Visible : Visibility.Collapsed;
+            if (find("RegionExactHint") is System.Windows.Controls.TextBlock hint)
+                hint.Text = widened
+                    ? L("shell_Region_KeepExact_Hint_Widened", "Brings back the smaller frame you drew before Kaption widened it. Kaption won't widen it again, even if longer lines don't fit in it.")
+                    : L("shell_Region_KeepExact_Hint", "Kaption won't widen your frame, even if longer lines don't fit in it.");
+            if (find("RegionModeText") is System.Windows.Controls.TextBlock line)
+                line.Text = mode switch
+                {
+                    DialogueAreaMode.Exact => L("shell_Region_Mode_Exact", "By hand. This is your frame; Kaption leaves it alone."),
+                    DialogueAreaMode.Hand => L("shell_Region_Mode_Hand", "By hand. This is your frame, but Kaption widens it if it cuts off longer lines."),
+                    _ => L("shell_Region_Mode_Auto", "Automatic. Kaption keeps the frame on the game's window."),
+                };
+            // Back to automatic is the main button only while the frame is the player's.
+            if (find("DashAutoDetectButton") is FrameworkElement button)
+                button.SetResourceReference(FrameworkElement.StyleProperty, mode == DialogueAreaMode.Auto && saved ? "SecondaryButton" : "ModernButton");
         }
 
         private void OcrIntervalTextBox_LostFocus(object sender, RoutedEventArgs e)

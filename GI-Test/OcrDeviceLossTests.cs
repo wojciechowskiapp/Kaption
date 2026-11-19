@@ -26,7 +26,7 @@ namespace GI_Test
             Assert.IsTrue(OcrDeviceLoss.IsDeviceLost(new Exception(SentryMessage)));
         }
 
-        [DataTestMethod]
+        [TestMethod]
         [DataRow("887A0005")] // DXGI_ERROR_DEVICE_REMOVED
         [DataRow("887a0006")] // DXGI_ERROR_DEVICE_HUNG
         [DataRow("0x887A0007")] // DXGI_ERROR_DEVICE_RESET
@@ -60,7 +60,7 @@ namespace GI_Test
             Assert.IsFalse(OcrDeviceLoss.IsDeviceLost(new COMException("invalid call", unchecked((int)0x887A0001))));
         }
 
-        [DataTestMethod]
+        [TestMethod]
         [DataRow("[ErrorCode:Fail] Exception(277) tid(278c) 887A0001 invalid call")] // DXGI_ERROR_INVALID_CALL: our bug, not a lost device
         [DataRow("[ErrorCode:Fail] Non-zero status code returned while running Conv node.")]
         [DataRow("buffer at 0x1887A00050 overflowed")] // the code inside a longer hex number

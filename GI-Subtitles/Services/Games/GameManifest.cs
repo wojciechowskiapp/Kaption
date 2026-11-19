@@ -50,12 +50,21 @@ namespace GI_Subtitles.Services.Games
     }
 
     /// <summary>A region as fractions of the 16:9 reference area inside the game window.</summary>
-    public sealed class GameRect
+    public class GameRect
     {
         public double X { get; set; }
         public double Y { get; set; }
         public double W { get; set; }
         public double H { get; set; }
+    }
+
+    /// <summary>
+    /// desktop.dialogue: the block Kaption reads, and inside it the measured text extent (the detector's boxes round
+    /// the speaker name and every body row, over every layout measured). Same fractions as the block.
+    /// </summary>
+    public sealed class GameDialogueRect : GameRect
+    {
+        public GameRect Text { get; set; }
     }
 
     /// <summary>Per-game OCR pacing; null keeps the global default (GameOcrTuning).</summary>
@@ -76,10 +85,8 @@ namespace GI_Subtitles.Services.Games
         public string Classifier { get; set; }
         public bool? StripsSpeakerNameDecoration { get; set; }
         public int? SubtitlePadVertical { get; set; }
-        public double? RegionSplitXFraction { get; set; }
-        public double? RegionMinWidthFraction { get; set; }
-        public bool? StrictRegionJunkFilter { get; set; }
         public bool? OcrJunkFilter { get; set; }
+        public bool? SideRowFilter { get; set; }
         public bool? DialogueEvidence { get; set; }
         public bool? FadedReadFilter { get; set; }
     }
@@ -97,7 +104,7 @@ namespace GI_Subtitles.Services.Games
         public const string Passthrough = "passthrough";
         public const string MirrorGenshin = "dimbreath-genshin", MirrorStarRail = "dimbreath-starrail", MirrorNone = "none";
 
-        public GameRect Dialogue { get; set; }
+        public GameDialogueRect Dialogue { get; set; }
         public GameRect Answer { get; set; }
         public GamePacing Pacing { get; set; }
         public GameVision Vision { get; set; }
@@ -111,6 +118,8 @@ namespace GI_Subtitles.Services.Games
         public GameStaminaScreen StaminaScreen { get; set; }
         /// <summary>What else the app may read off this game's screen, as data (Services/Assist); null: nothing.</summary>
         public GameAssist Assist { get; set; }
+        /// <summary>Where the game draws the player's dialogue choices (Services/Answers); null until measured, and then no answers.</summary>
+        public GameAnswers Answers { get; set; }
 
         /// <summary>What every game replaced before manifests had the field: Genshin's "Traveler".</summary>
         public static readonly string[] DefaultPlayerNameTokens = { "Traveler", "traveler" };
@@ -334,6 +343,31 @@ namespace GI_Subtitles.Services.Games
         public string Cap { get; set; }
         /// <summary>The list a name must be in.</summary>
         public string Vocabulary { get; set; }
+    }
+
+    /// <summary>
+    /// desktop.answers: the player's dialogue choices, found with no setup. <see cref="Box"/> is in pixels of
+    /// <see cref="Canvas"/>, from a window edge, and counts only in a window whose shape is in <see cref="Checked"/>.
+    /// </summary>
+    public sealed class GameAnswers
+    {
+        public GameAssistCanvas Canvas { get; set; }
+        public GameAssistBox Box { get; set; }
+        /// <summary>Dialogue-graph roles that mark an option, compared exactly; null when the game's data marks none.</summary>
+        public string[] OptionRoles { get; set; }
+        public GameAnswersInk Ink { get; set; }
+        /// <summary>Canvas pixels from the top of an option's text box up to the top of its panel.</summary>
+        public int PillPad { get; set; }
+        public GameAssistChecked Checked { get; set; }
+    }
+
+    /// <summary>How option text is told from the scenery behind it.</summary>
+    public sealed class GameAnswersInk
+    {
+        /// <summary>Brightness (0-255) a letter's stroke is above; the option panel stays below it.</summary>
+        public int Level { get; set; }
+        /// <summary>One line of option text, tallest letter to descender, in canvas pixels (not the line pitch).</summary>
+        public int LineHeight { get; set; }
     }
 
     /// <summary>The number's place to the right of the icon.</summary>

@@ -219,11 +219,13 @@ namespace GI_Test
         [TestMethod]
         public void ABalloon_WaitsWhileThePlayerIsOnAnotherPage()
         {
-            Assert.AreEqual(GI_Subtitles.Views.SettingsWindow.CheckBalloon.Send, GI_Subtitles.Views.SettingsWindow.BalloonDecision(windowActive: false, startPageInView: false));
-            Assert.AreEqual(GI_Subtitles.Views.SettingsWindow.CheckBalloon.Send, GI_Subtitles.Views.SettingsWindow.BalloonDecision(windowActive: false, startPageInView: true),
+            // The in-game hint card cannot say it here (HintPlannerTests has the rows where it can): the balloon as it always was.
+            const GI_Subtitles.Services.Hints.HintCheckAnswer noCard = GI_Subtitles.Services.Hints.HintCheckAnswer.Cannot;
+            Assert.AreEqual(GI_Subtitles.Views.SettingsWindow.CheckBalloon.Send, GI_Subtitles.Views.SettingsWindow.BalloonDecision(windowActive: false, startPageInView: false, noCard));
+            Assert.AreEqual(GI_Subtitles.Views.SettingsWindow.CheckBalloon.Send, GI_Subtitles.Views.SettingsWindow.BalloonDecision(windowActive: false, startPageInView: true, noCard),
                 "Start is open behind the game: the player is not looking at it");
-            Assert.AreEqual(GI_Subtitles.Views.SettingsWindow.CheckBalloon.SeenOnCard, GI_Subtitles.Views.SettingsWindow.BalloonDecision(windowActive: true, startPageInView: true));
-            Assert.AreEqual(GI_Subtitles.Views.SettingsWindow.CheckBalloon.Wait, GI_Subtitles.Views.SettingsWindow.BalloonDecision(windowActive: true, startPageInView: false),
+            Assert.AreEqual(GI_Subtitles.Views.SettingsWindow.CheckBalloon.SeenOnCard, GI_Subtitles.Views.SettingsWindow.BalloonDecision(windowActive: true, startPageInView: true, noCard));
+            Assert.AreEqual(GI_Subtitles.Views.SettingsWindow.CheckBalloon.Wait, GI_Subtitles.Views.SettingsWindow.BalloonDecision(windowActive: true, startPageInView: false, noCard),
                 "on another page the card is not in view: the balloon is neither sent over the window nor used up");
         }
 

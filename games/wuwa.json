@@ -11,14 +11,12 @@
   "steamAppId": 3513350,
   "detect": { "processNames": ["Client-Win64-Shipping"], "windowTitles": ["Wuthering Waves"], "requireTitle": true },
   "desktop": {
-    "dialogue": { "x": 0.165, "y": 0.63, "w": 0.67, "h": 0.365 },
+    "dialogue": { "x": 0.165, "y": 0.63, "w": 0.67, "h": 0.365, "text": { "x": 0.255, "y": 0.65, "w": 0.489, "h": 0.314 } },
     "answer":   { "x": 0.645, "y": 0.33, "w": 0.26, "h": 0.42 },
     "pacing": { "ocrIntervalMs": 100, "stabilityWindowFrames": 5, "stableFramesChain": 2, "stableFramesDefault": 2, "forceOcrAfterSeconds": 0.15 },
     "vision": {
       "classifier": "speaker-row",
-      "ocrJunkFilter": true,
-      "regionMinWidthFraction": 0.55,
-      "strictRegionJunkFilter": true
+      "ocrJunkFilter": true
     },
     "dialogueContext": "passthrough",
     "upstreamTextMap": "none",
@@ -41,12 +39,21 @@
         "stamina": { "kind": "fraction", "locate": "search", "spec": "staminaScreen", "cap": "stamina.max" }
       }
     },
+    "answers": {
+      "canvas": { "width": 1920, "height": 1080, "scale": "min" },
+      "box": { "edge": "bottomRight", "x": -682, "y": -724, "w": 500, "h": 454 },
+      "optionRoles": ["WUWA_OPTION"],
+      "ink": { "level": 200, "lineHeight": 26 },
+      "pillPad": 12,
+      "checked": { "version": "3.7", "aspects": ["16:9", "16:10", "21:9"], "source": "Option menus on footage at 1920x1080 (NPC and letterbox), 2304x1440 (3.7) and 3440x1440 (3.4, one two-option menu); one and two options only. .plan/in-progress/ANSWERS-PR1.md" }
+    },
     "playerNameTokens": ["Rover"],
     "notes": [
       "Regions measured 2026-11-04 on footage from six creators (WuWa 3.4-3.7) at 16:9, 16:10 (one creator, 2304x1440) and 21:9 (3440x1440). 4:3, 5:4 and Steam Deck are not measured; at 4:3 NPC text falls below any band rectangle.",
-      "answer holds one- and two-option menus at 16:9 and 16:10; menus with three or more options are estimated, and 21:9 options sit outside the band.",
+      "answer (the old band rectangle, read by nothing) holds one- and two-option menus at 16:9 and 16:10; 21:9 options sit outside the band. answers is the same area pinned to the bottom-right corner, so it follows the menu at 21:9 too; menus of three or more options are estimated (top near y 0.39 at 16:9).",
       "Pacing and the speaker-row classifier with ocrJunkFilter are measured by replaying 12 recorded scenes with the 3.7.0 Polish map at 1x, 2x and 3x the recorded GPU OCR cost (.plan/in-progress/WUWA-STAGE-B.md).",
-      "regionMinWidthFraction and strictRegionJunkFilter (Detect automatically) are reasoned from the measured positions, not tested on the detector. subtitlePadVertical is the default."
+      "subtitlePadVertical is the default.",
+      "text is the 16:9 extent of the letters (p05-p95) over the NPC, free-roam, letterbox and caption layouts: free-roam names from 0.650, CG captions down to 0.964, NPC rows 0.255-0.744. The two widest CG captions (0.126-0.871) are wider than the block and are not in it."
     ]
   },
   "look": { "accent": "#F2E6A6", "accentDark": "#806A10", "glow": "#2FC7B4", "ambience": "wuwa" },

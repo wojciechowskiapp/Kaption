@@ -373,14 +373,11 @@ namespace GI_Test
                 Assert.IsFalse(p.UsesGeometryClassifier, label);
                 Assert.IsFalse(p.StripsSpeakerNameDecoration, label);
                 Assert.AreEqual(-140, p.SubtitlePadVertical, label);
-                Assert.AreEqual(0.55, p.RegionSplitXFraction, 1e-9, label);
-                Assert.AreEqual(0.70, p.RegionMinWidthFraction, 1e-9, label);
-                Assert.IsFalse(p.StrictRegionJunkFilter, label);
             }
         }
 
         [TestMethod]
-        public void Registry_Zzz_LiftsOverlayAndNarrowsRegionFloor()
+        public void Registry_Zzz_LiftsOverlay()
         {
             var p = GameRegionProfile.Get("ZZZ");
 
@@ -388,13 +385,6 @@ namespace GI_Test
             Assert.IsTrue(p.StripsSpeakerNameDecoration);
             Assert.IsTrue(p.SubtitlePadVertical < -140,
                 "ZZZ captions wrap taller, so the overlay needs more clearance above the region.");
-            Assert.IsTrue(p.RegionMinWidthFraction < 0.70,
-                "A 0.70 floor over-widens the narrow comic panel and pulls in HUD/watermarks.");
-            Assert.IsTrue(p.StrictRegionJunkFilter);
-
-            // Deliberately left at the default — no ZZZ answer-choice frame has
-            // been measured, and a third guessed geometry constant doesn't ship.
-            Assert.AreEqual(0.55, p.RegionSplitXFraction, 1e-9);
         }
 
         [TestMethod]

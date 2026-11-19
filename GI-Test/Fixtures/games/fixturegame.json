@@ -15,7 +15,7 @@
     "windowTitles": ["Fixture Game"]
   },
   "desktop": {
-    "dialogue": { "x": 0.12, "y": 0.66, "w": 0.76, "h": 0.29 },
+    "dialogue": { "x": 0.12, "y": 0.66, "w": 0.76, "h": 0.29, "text": { "x": 0.2, "y": 0.72, "w": 0.6, "h": 0.2 } },
     "answer": { "x": 0.58, "y": 0.38, "w": 0.35, "h": 0.38 },
     "pacing": { "ocrIntervalMs": 100, "forceOcrAfterSeconds": 0.25 },
     "vision": { "classifier": "accent" },

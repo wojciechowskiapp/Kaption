@@ -16,7 +16,7 @@ using Logger = GI_Subtitles.Common.Logger;
 namespace GI_Subtitles.Views
 {
     /// <summary>
-    /// The guess game in Settings: the Start page's "Nowość w Kaption" card (Wuthering Waves in Polish, the guess game),
+    /// The guess game in Settings: the Start page's "Nowość w Kaption" card (Wuthering Waves and Endfield in Polish, the guess game),
     /// the strip that shows a ranking notice's text, and the Help page's row with the notice switch. Nothing here polls;
     /// MainWindow.GuessNotify.cs owns the standing reads and hands the notice over.
     /// </summary>
@@ -127,8 +127,14 @@ namespace GI_Subtitles.Views
             {
                 var packs = await DashboardFeeds.LatestPacksAsync().ConfigureAwait(true);
                 bool listed = SpotlightRules.HasWuWaPolish(packs, out string version);
+                bool endfieldListed = SpotlightRules.HasEndfieldPolish(packs, out string endfieldVersion);
                 string game = Config.Get("Game", "Genshin") ?? "Genshin";
                 string wuwaId = GameRegistry.Current.FindByWireId("wuwa")?.GameId ?? "WuWa";
+                string endfieldId = GameRegistry.Current.FindByWireId("endfield")?.GameId ?? "Endfield";
+                bool endfieldSelected = string.Equals(GameRegionProfile.Get(game).GameId, endfieldId, StringComparison.Ordinal);
+                // A player who has the game selected while its pack is public has met it: the row never comes back,
+                // not even after they switch to another game.
+                if (endfieldListed && endfieldSelected) SpotlightRules.MarkSeen(wuwa: false, guess: false, endfield: true);
                 var rows = SpotlightRules.Rows(SpotlightRules.FromConfig(new SpotlightInputs
                 {
                     SetupCompleted = Config.Get("SetupCompleted", false),
@@ -139,17 +145,22 @@ namespace GI_Subtitles.Views
                     WuWaComing = PackAvailability.IsComing(wuwaId, "pl"),
                     WuWaGameVersion = version,
                     WuWaSelected = string.Equals(GameRegionProfile.Get(game).GameId, wuwaId, StringComparison.Ordinal),
+                    EndfieldPolishListed = endfieldListed,
+                    EndfieldComing = PackAvailability.IsComing(endfieldId, "pl"),
+                    EndfieldGameVersion = endfieldVersion,
+                    EndfieldSelected = endfieldSelected,
                 }));
                 ImageSource wuwaArt = rows.WuWa ? await AmbienceArt.LoadAsync(AmbienceArt.ForGame(wuwaId)).ConfigureAwait(true) : null;
+                ImageSource endfieldArt = rows.Endfield ? await AmbienceArt.LoadAsync(AmbienceArt.ForGame(endfieldId)).ConfigureAwait(true) : null;
                 ImageSource guessArt = rows.Guess ? await AmbienceArt.LoadAsync(AmbienceArt.ForGame(game)).ConfigureAwait(true) : null;
                 string guessName = GuessNoticeText.GuessNameOf(GameRegistry.Current.Find(game)?.Id) ?? "Gendle";
-                ApplySpotlightTo(FindName, rows, guessName, wuwaArt, guessArt, L, AccentOf(wuwaId), AccentOf(game));
+                ApplySpotlightTo(FindName, rows, guessName, wuwaArt, guessArt, L, AccentOf(wuwaId), AccentOf(game), endfieldArt, AccentOf(endfieldId));
                 _spotlightRows = rows;
                 if (rows.Any && !_spotlightCounted)
                 {
                     _spotlightCounted = true; // once per launch, whatever reruns this
                     SpotlightRules.CountShown(rows);
-                    Logger.Log.Info($"Start spotlight shown (WuWa {rows.WuWa}, guess {rows.Guess}).");
+                    Logger.Log.Info($"Start spotlight shown (WuWa {rows.WuWa}, Endfield {rows.Endfield}, guess {rows.Guess}).");
                 }
             }
             catch (Exception ex)
@@ -166,7 +177,8 @@ namespace GI_Subtitles.Views
         /// run the app's own code (the art comes in decoded: the window loads it from the app's resources).
         /// </summary>
         internal static bool ApplySpotlightTo(Func<string, object> find, SpotlightRows rows, string guessName, ImageSource wuwaArt,
-                                              ImageSource guessArt, Func<string, string, string> L, Brush wuwaAccent, Brush guessAccent)
+                                              ImageSource guessArt, Func<string, string, string> L, Brush wuwaAccent, Brush guessAccent,
+                                              ImageSource endfieldArt = null, Brush endfieldAccent = null)
         {
             rows ??= SpotlightRows.None;
             if (!(find("SpotlightCard") is UIElement card)) return false;
@@ -184,10 +196,22 @@ namespace GI_Subtitles.Views
                         : L("shell_Spotlight_WuWa_Switch", "Switch to Wuthering Waves");
                 Thumb(find("SpotlightWuWaThumb") as Border, wuwaArt, wuwaAccent);
             }
+            var gaps = SpotlightRules.RowGaps(rows.WuWa, rows.Endfield, rows.Guess);
+            if (find("SpotlightEndfieldRow") is FrameworkElement endfieldRow)
+            {
+                endfieldRow.Visibility = rows.Endfield ? Visibility.Visible : Visibility.Collapsed;
+                endfieldRow.Margin = new Thickness(0, gaps.Endfield, 0, 0);
+                if (find("SpotlightEndfieldBody") is TextBlock endfieldBody)
+                    endfieldBody.Text = string.IsNullOrWhiteSpace(rows.EndfieldVersion)
+                        ? L("shell_Spotlight_Endfield_Body", "Polish subtitles for the dialogue, in beta for now. Pick the game and they download on their own.")
+                        : SafeFormat(L("shell_Spotlight_Endfield_Body_Format", "Polish subtitles for the dialogue from version {0}, in beta for now. Pick the game and the subtitles download on their own."),
+                            "Polish subtitles for the dialogue from version {0}, in beta for now. Pick the game and the subtitles download on their own.", rows.EndfieldVersion);
+                Thumb(find("SpotlightEndfieldThumb") as Border, endfieldArt, endfieldAccent);
+            }
             if (find("SpotlightGuessRow") is FrameworkElement guessRow)
             {
                 guessRow.Visibility = rows.Guess ? Visibility.Visible : Visibility.Collapsed;
-                guessRow.Margin = new Thickness(0, rows.WuWa && rows.Guess ? 14 : 0, 0, 0);
+                guessRow.Margin = new Thickness(0, gaps.Guess, 0, 0);
                 string title = SafeFormat(L("shell_Spotlight_Guess_Title_Format", "{0}: guess today's character"),
                     "{0}: guess today's character", guessName);
                 if (find("SpotlightGuessTitle") is TextBlock t) t.Text = title;
@@ -214,20 +238,22 @@ namespace GI_Subtitles.Views
             catch (FormatException) { return string.Format(CultureInfo.InvariantCulture, fallback, arg); }
         }
 
-        private void RetireSpotlightRow(bool wuwa, bool guess)
+        private void RetireSpotlightRow(bool wuwa, bool guess, bool endfield = false)
         {
-            SpotlightRules.MarkSeen(wuwa, guess);
+            SpotlightRules.MarkSeen(wuwa, guess, endfield);
             _spotlightRows = _spotlightRows with
             {
                 WuWa = _spotlightRows.WuWa && !wuwa,
                 Guess = _spotlightRows.Guess && !guess,
+                Endfield = _spotlightRows.Endfield && !endfield,
             };
             if (SpotlightWuWaRow != null && wuwa) SpotlightWuWaRow.Visibility = Visibility.Collapsed;
-            if (SpotlightGuessRow != null)
-            {
-                if (guess) SpotlightGuessRow.Visibility = Visibility.Collapsed;
-                SpotlightGuessRow.Margin = new Thickness(0);
-            }
+            if (SpotlightEndfieldRow != null && endfield) SpotlightEndfieldRow.Visibility = Visibility.Collapsed;
+            if (SpotlightGuessRow != null && guess) SpotlightGuessRow.Visibility = Visibility.Collapsed;
+            // The rows that stay close up: the first one visible has no gap above it.
+            var gaps = SpotlightRules.RowGaps(_spotlightRows.WuWa, _spotlightRows.Endfield, _spotlightRows.Guess);
+            if (SpotlightEndfieldRow != null) SpotlightEndfieldRow.Margin = new Thickness(0, gaps.Endfield, 0, 0);
+            if (SpotlightGuessRow != null) SpotlightGuessRow.Margin = new Thickness(0, gaps.Guess, 0, 0);
             if (SpotlightCard != null && !_spotlightRows.Any) SpotlightCard.Visibility = Visibility.Collapsed;
         }
 
@@ -240,6 +266,14 @@ namespace GI_Subtitles.Views
         }
 
         private void SpotlightWuWaClose_Click(object sender, RoutedEventArgs e) => RetireSpotlightRow(wuwa: true, guess: false);
+
+        private void SpotlightEndfield_Click(object sender, RoutedEventArgs e)
+        {
+            RetireSpotlightRow(wuwa: false, guess: false, endfield: true);
+            SwitchGame(GameRegistry.Current.FindByWireId("endfield")?.GameId ?? "Endfield");
+        }
+
+        private void SpotlightEndfieldClose_Click(object sender, RoutedEventArgs e) => RetireSpotlightRow(wuwa: false, guess: false, endfield: true);
 
         private void SpotlightGuess_Click(object sender, RoutedEventArgs e)
         {

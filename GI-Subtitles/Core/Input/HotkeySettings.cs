@@ -136,7 +136,7 @@ namespace GI_Subtitles.Core.Input
                     new HotkeyData
                     {
                         Id = 9003, IsCtrl = true, IsShift = true, SelectedKey = 'D',
-                        Description = GetLocalizedString("Hotkey_9003_Description", "展示识别区域")
+                        Description = GetLocalizedString("Hotkey_9003_Description", "Show the dialogue frame and the shortcuts")
                     },
                     new HotkeyData
                     {

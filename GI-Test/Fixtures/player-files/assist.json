@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "salt": "c2FsdC1mb3ItdGVzdHM=",
+  "accounts": {
+    "local": {
+      "genshin.resin": {
+        "value": "160/200",
+        "screen": "Żywica",
+        "seenUtc": "2026-11-16T08:00:00+00:00"
+      }
+    },
+    "a1b2c3": {
+      "genshin.resin": {
+        "value": "42/200",
+        "screen": "resin",
+        "seenUtc": "2026-11-15T21:30:00+00:00"
+      }
+    }
+  },
+  "health": {
+    "genshin.resin": {
+      "lastSeenUtc": "2026-11-16T08:00:00+00:00",
+      "sessionsSinceSeen": 0
+    },
+    "genshin.stamina": {
+      "lastSeenUtc": null,
+      "sessionsSinceSeen": 3
+    }
+  }
+}

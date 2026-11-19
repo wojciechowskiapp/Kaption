@@ -24,7 +24,13 @@ namespace PaddleOCRSharp
     /// </summary>
     public class PaddleOCREngine : IDisposable
     {
-        private readonly InferenceSession _detSession;
+        // Replaced only under _gate, by RebuildDetector, when the dialogue area's detector shape changes.
+        private InferenceSession _detSession;
+        private readonly string _detModelPath;
+        // The detector input shape _detSession's DirectML fast path is bound to, packed by PackShape; 0 until its
+        // first Run. _detectorShapeFailed is the last shape a rebuild failed for, so it is not retried every tick.
+        private long _detectorShape;
+        private long _detectorShapeFailed;
         private readonly InferenceSession _recSession;
 
         // One recognition session per input width.
@@ -317,6 +323,8 @@ namespace PaddleOCRSharp
                 throw new FileNotFoundException($"Character dictionary file not found: {inferenceYmlPath} or {config.keys}");
             }
 
+            _detModelPath = config.det_infer;
+
             // Create ONNX Runtime sessions with optional DirectML GPU acceleration
             if (parameter.use_gpu)
             {
@@ -601,15 +609,16 @@ namespace PaddleOCRSharp
                     }
 
                     totalTimer.Stop();
-                    string timing =
+                    // Built only when written: this runs on every read, and the root level is INFO.
+                    string Timing() =>
                         $"OCR inference: provider={ExecutionProvider}, source={src.Width}x{src.Height}, " +
                         $"detection={detectionMs}ms, regions={rects.Length}, " +
                         $"recognition={recognitionMs}ms, accepted={textBlocks.Count}, " +
                         $"total={totalTimer.ElapsedMilliseconds}ms";
                     if (totalTimer.ElapsedMilliseconds >= 2000)
-                        Logger.Log.Warn(timing);
-                    else
-                        Logger.Log.Debug(timing);
+                        Logger.Log.Warn(Timing());
+                    else if (Logger.Log.IsDebugEnabled)
+                        Logger.Log.Debug(Timing());
 
                     return new OCRResult
                     {
@@ -678,6 +687,11 @@ namespace PaddleOCRSharp
         /// </summary>
         private RotatedRect[] DetectTextRegions(
             Mat src, RunOptions runOptions, CancellationToken cancellationToken)
+            => DetectTextRegions(src, runOptions, cancellationToken, _detSession);
+
+        /// <param name="session">The engine's detector, or a new one <see cref="RebuildDetector"/> is compiling.</param>
+        private RotatedRect[] DetectTextRegions(
+            Mat src, RunOptions runOptions, CancellationToken cancellationToken, InferenceSession session)
         {
             if (src == null || src.IsDisposed || src.Empty())
                 throw new ArgumentException("Invalid Mat object", nameof(src));
@@ -700,11 +714,14 @@ namespace PaddleOCRSharp
             // Run detection model
             var inputs = new List<NamedOnnxValue>
             {
-                NamedOnnxValue.CreateFromTensor(_detSession.InputNames[0], inputTensor)
+                NamedOnnxValue.CreateFromTensor(session.InputNames[0], inputTensor)
             };
 
             cancellationToken.ThrowIfCancellationRequested();
-            using var outputs = _detSession.Run(inputs, _detSession.OutputNames, runOptions);
+            using var outputs = session.Run(inputs, session.OutputNames, runOptions);
+            // DirectML binds the session's fast path to the first shape it runs: remember which one that was.
+            if (ReferenceEquals(session, _detSession) && Volatile.Read(ref _detectorShape) == 0)
+                Volatile.Write(ref _detectorShape, PackShape(padded32.Size()));
             var output = outputs.First().AsTensor<float>();
 
             // Convert to Mat
@@ -990,6 +1007,125 @@ namespace PaddleOCRSharp
         }
 
         /// <summary>
+        /// The detector input a frame of <paramref name="frame"/> becomes: <see cref="ResizeImage"/> to
+        /// <paramref name="maxSide"/>, then <see cref="PadTo32"/>. OpenCV rounds the scaled size to nearest-even, as
+        /// <see cref="Math.Round(double)"/> does.
+        /// </summary>
+        internal static CvSize DetectorInputShape(CvSize frame, int maxSide)
+        {
+            double scale = 1.0 * maxSide / Math.Max(frame.Width, frame.Height);
+            int width = scale < 1.0 ? (int)Math.Round(frame.Width * scale) : frame.Width;
+            int height = scale < 1.0 ? (int)Math.Round(frame.Height * scale) : frame.Height;
+            return new CvSize(32 * (int)Math.Ceiling(width / 32.0), 32 * (int)Math.Ceiling(height / 32.0));
+        }
+
+        private static long PackShape(CvSize shape) => ((long)shape.Width << 32) | (uint)shape.Height;
+
+        private static CvSize UnpackShape(long packed) => new CvSize((int)(packed >> 32), (int)(packed & 0xFFFFFFFF));
+
+        /// <summary>The detector input shape the detector session is compiled for; null before its first pass.</summary>
+        public CvSize? DetectorShape
+        {
+            get
+            {
+                long packed = Volatile.Read(ref _detectorShape);
+                return packed == 0 ? null : UnpackShape(packed);
+            }
+        }
+
+        /// <summary>
+        /// Whether reads of <paramref name="frame"/>-sized areas would run on the detector's slow path: only on
+        /// DirectML, once the detector has run, for a shape that differs and has not already failed a rebuild. Cheap
+        /// enough for the OCR tick.
+        /// </summary>
+        public bool NeedsDetectorFor(CvSize frame)
+        {
+            if (_disposed || !IsUsingGpu || frame.Width <= 0 || frame.Height <= 0) return false;
+            long current = Volatile.Read(ref _detectorShape);
+            if (current == 0) return false; // the first read compiles whatever shape it brings
+            long wanted = PackShape(DetectorInputShape(frame, DetMaxSize));
+            return wanted != current && wanted != Volatile.Read(ref _detectorShapeFailed);
+        }
+
+        /// <summary>
+        /// Rebuilds the detector for <paramref name="frame"/> when <see cref="NeedsDetectorFor"/> says reads of that
+        /// size are on the slow path. Blocks the calling thread (never the UI thread) for about a second.
+        /// </summary>
+        /// <returns>True when the detector now has the new shape's fast path.</returns>
+        public bool PrepareDetectorFor(CvSize frame, TimeSpan budget) =>
+            NeedsDetectorFor(frame) && RebuildDetector(frame, budget);
+
+        /// <summary>
+        /// Builds a new detector session, runs one blank <paramref name="frame"/>-sized pass on it so DirectML compiles
+        /// that shape's fast path, then swaps it in and disposes the old one. Built and compiled under the gate: a read
+        /// waits for it instead of running beside it on the same device. On any failure the old detector stays.
+        /// Any provider, so tests can drive it on the processor.
+        /// </summary>
+        internal bool RebuildDetector(CvSize frame, TimeSpan budget)
+        {
+            if (frame.Width <= 0 || frame.Height <= 0)
+                throw new ArgumentOutOfRangeException(nameof(frame));
+            if (_disposed) return false;
+
+            CvSize shape = DetectorInputShape(frame, DetMaxSize);
+            CvSize? previous = DetectorShape;
+            using var cts = new CancellationTokenSource(budget);
+            InferenceSession built = null;
+            bool entered = false;
+            var timer = Stopwatch.StartNew();
+            try
+            {
+                _gate.Wait(cts.Token);
+                entered = true;
+                if (_disposed) return false;
+
+                using (SessionOptions options = CreateSessionOptions(_parameter, IsUsingGpu))
+                    built = new InferenceSession(_detModelPath, options);
+                long buildMs = timer.ElapsedMilliseconds;
+
+                using var runOptions = new RunOptions();
+                using var cancellationRegistration = cts.Token.Register(() =>
+                {
+                    try { runOptions.Terminate = true; }
+                    catch (ObjectDisposedException) { }
+                });
+                using (var blank = new Mat(frame.Height, frame.Width, MatType.CV_8UC3, Scalar.All(0)))
+                    _ = DetectTextRegions(blank, runOptions, cts.Token, built);
+
+                // Dispose may have timed out waiting for the gate and marked the engine dead meanwhile.
+                if (_disposed) return false;
+                InferenceSession old = _detSession;
+                _detSession = built;
+                built = null;
+                Volatile.Write(ref _detectorShape, PackShape(shape));
+                old?.Dispose();
+                Logger.Log.Info(
+                    $"OCR detector rebuilt for a {frame.Width}x{frame.Height} area in {timer.ElapsedMilliseconds}ms " +
+                    $"(session {buildMs}ms, compile {timer.ElapsedMilliseconds - buildMs}ms, " +
+                    $"provider={ExecutionProvider}, det={shape.Width}x{shape.Height}, " +
+                    $"was {(previous is { } was ? $"{was.Width}x{was.Height}" : "none")}).");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                // Warn: the old detector keeps reading, only slower. A lost device surfaces on the next read.
+                Volatile.Write(ref _detectorShapeFailed, PackShape(shape));
+                Logger.Log.Warn(
+                    $"OCR detector rebuild for a {frame.Width}x{frame.Height} area failed after " +
+                    $"{timer.ElapsedMilliseconds}ms ({ex.GetType().Name}: {ex.Message}); keeping the current detector.");
+                return false;
+            }
+            finally
+            {
+                built?.Dispose();
+                if (entered)
+                {
+                    try { _gate.Release(); } catch (ObjectDisposedException) { }
+                }
+            }
+        }
+
+        /// <summary>
         /// Times one detector + recogniser pass over the shapes <see cref="WarmUp(TimeSpan, CvSize?)"/>
         /// compiled. Warm-up time is mostly DirectML kernel compilation; this is what a frame costs.
         /// </summary>
@@ -1030,7 +1166,7 @@ namespace PaddleOCRSharp
 
                 Logger.Log.Info(
                     $"OCR steady-state probe: {timer.ElapsedMilliseconds}ms " +
-                    $"(provider={ExecutionProvider}, det={detWidth}x{detHeight}, rec={WarmUpRecognitionWidth}).");
+                    $"[provider={ExecutionProvider}, det={detWidth}x{detHeight}, rec={WarmUpRecognitionWidth}).");
                 return timer.Elapsed;
             }
             catch (Exception ex) when (cts.IsCancellationRequested)
@@ -1158,7 +1294,7 @@ namespace PaddleOCRSharp
         /// <summary>
         /// Resize image
         /// </summary>
-        private Mat ResizeImage(Mat src, int maxSize)
+        internal static Mat ResizeImage(Mat src, int maxSize)
         {
             if (src == null || src.IsDisposed || src.Empty())
                 throw new ArgumentException("Invalid Mat object", nameof(src));
@@ -1172,7 +1308,7 @@ namespace PaddleOCRSharp
         /// <summary>
         /// Pad to 32's multiple
         /// </summary>
-        private Mat PadTo32(Mat src)
+        internal static Mat PadTo32(Mat src)
         {
             var size = src.Size();
             var newSize = new OpenCvSharp.Size(

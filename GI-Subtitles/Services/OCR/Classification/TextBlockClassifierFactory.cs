@@ -21,7 +21,8 @@
         /// (Zenless Zone Zero) wins, then <c>UsesSpeakerRowClassifier</c> (Wuthering
         /// Waves), else the accent classifier that Genshin and Star Rail have always
         /// used, which is also what null, empty and unknown games get.
-        /// <c>FiltersOcrJunk</c> picks the junk-filtering instance of the latter two.</para>
+        /// <c>FiltersOcrJunk</c> picks the junk-filtering instance of the latter two, and <c>DropsSideRows</c> (Star
+        /// Rail) the accent instance that also drops rows beside the dialogue.</para>
         ///
         /// <para>Returns shared stateless instances, so this is safe to call once
         /// per OCR tick — no allocation, no lock.</para>
@@ -36,9 +37,7 @@
                     ? SpeakerRowTextBlockClassifier.WithJunkFilter
                     : SpeakerRowTextBlockClassifier.Instance;
             }
-            return profile.FiltersOcrJunk
-                ? AccentColorTextBlockClassifier.WithJunkFilter
-                : AccentColorTextBlockClassifier.Instance;
+            return AccentColorTextBlockClassifier.For(profile.FiltersOcrJunk, profile.DropsSideRows);
         }
     }
 }

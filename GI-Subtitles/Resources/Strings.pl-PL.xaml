@@ -191,13 +191,28 @@
     <sys:String x:Key="shell_Game_Detected_Format" xmlns:sys="clr-namespace:System;assembly=mscorlib">Na ekranie jest teraz {0}.</sys:String>
     <sys:String x:Key="shell_Game_Detected_Switch" xmlns:sys="clr-namespace:System;assembly=mscorlib">Przełącz na {0}</sys:String>
     <sys:String x:Key="shell_Game_Reading" xmlns:sys="clr-namespace:System;assembly=mscorlib">Język gry</sys:String>
-    <sys:String x:Key="shell_Region_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">Obszar dialogu</sys:String>
+    <sys:String x:Key="shell_Region_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">Ramka dialogu</sys:String>
     <sys:String x:Key="shell_Region_Preview_None" xmlns:sys="clr-namespace:System;assembly=mscorlib">Podgląd pojawi się, gdy ustawisz obszar.</sys:String>
     <sys:String x:Key="shell_Region_Monitor_Format" xmlns:sys="clr-namespace:System;assembly=mscorlib">Monitor {0} · {1}×{2}</sys:String>
-    <sys:String x:Key="shell_Region_Detect" xmlns:sys="clr-namespace:System;assembly=mscorlib">Wykryj automatycznie</sys:String>
+    <sys:String x:Key="shell_Region_Detect" xmlns:sys="clr-namespace:System;assembly=mscorlib">Ustaw automatycznie</sys:String>
+    <sys:String x:Key="shell_Region_DetectPlaced" xmlns:sys="clr-namespace:System;assembly=mscorlib">✓ Ramka ustawiona na dialog w grze ({0})</sys:String>
+    <sys:String x:Key="shell_Region_DetectNoGame" xmlns:sys="clr-namespace:System;assembly=mscorlib">✗ Włącz grę i spróbuj jeszcze raz.</sys:String>
+    <sys:String x:Key="shell_Region_DetectMinimised" xmlns:sys="clr-namespace:System;assembly=mscorlib">✗ Gra jest zminimalizowana. Przywróć ją i spróbuj jeszcze raz.</sys:String>
+    <sys:String x:Key="shell_Region_DetectFailed" xmlns:sys="clr-namespace:System;assembly=mscorlib">✗ Nie udało się ustawić ramki. Spróbuj za chwilę.</sys:String>
+    <sys:String x:Key="shell_Region_DetectTooSmall" xmlns:sys="clr-namespace:System;assembly=mscorlib">✗ Okno gry jest za małe. Powiększ je i spróbuj jeszcze raz.</sys:String>
+    <sys:String x:Key="shell_Region_DetectOffScreen" xmlns:sys="clr-namespace:System;assembly=mscorlib">✗ Okno gry wystaje poza ekran. Przesuń je z powrotem i spróbuj jeszcze raz.</sys:String>
     <sys:String x:Key="shell_Region_Fix" xmlns:sys="clr-namespace:System;assembly=mscorlib">Popraw ramkę</sys:String>
     <sys:String x:Key="shell_Region_Show" xmlns:sys="clr-namespace:System;assembly=mscorlib">Pokaż ramkę</sys:String>
-    <sys:String x:Key="shell_Region_Guide" xmlns:sys="clr-namespace:System;assembly=mscorlib">Jak ustawić obszar</sys:String>
+    <sys:String x:Key="shell_Region_KeepExact" xmlns:sys="clr-namespace:System;assembly=mscorlib">Chcę dokładnie moją ramkę</sys:String>
+    <sys:String x:Key="shell_Region_KeepWidened" xmlns:sys="clr-namespace:System;assembly=mscorlib">Zostaw tak</sys:String>
+    <sys:String x:Key="shell_Region_UseGameFrame" xmlns:sys="clr-namespace:System;assembly=mscorlib">Użyj ramki gry</sys:String>
+    <sys:String x:Key="shell_Region_KeepMine" xmlns:sys="clr-namespace:System;assembly=mscorlib">Zostaw moją</sys:String>
+    <sys:String x:Key="shell_Region_Mode_Auto" xmlns:sys="clr-namespace:System;assembly=mscorlib">Automatycznie. Kaption trzyma ramkę na oknie gry.</sys:String>
+    <sys:String x:Key="shell_Region_Mode_Hand" xmlns:sys="clr-namespace:System;assembly=mscorlib">Ręcznie. To Twoja ramka, ale Kaption poszerzy ją, gdy ucina dłuższe kwestie.</sys:String>
+    <sys:String x:Key="shell_Region_Mode_Exact" xmlns:sys="clr-namespace:System;assembly=mscorlib">Ręcznie. To Twoja ramka, Kaption jej nie rusza.</sys:String>
+    <sys:String x:Key="shell_Region_KeepExact_Hint" xmlns:sys="clr-namespace:System;assembly=mscorlib">Kaption nie poszerzy Twojej ramki, nawet jeśli dłuższe kwestie się w niej nie zmieszczą.</sys:String>
+    <sys:String x:Key="shell_Region_KeepExact_Hint_Widened" xmlns:sys="clr-namespace:System;assembly=mscorlib">Wróci Twoja mniejsza ramka sprzed poszerzenia. Kaption nie poszerzy jej ponownie, nawet jeśli dłuższe kwestie się w niej nie zmieszczą.</sys:String>
+    <sys:String x:Key="shell_Region_Guide" xmlns:sys="clr-namespace:System;assembly=mscorlib">Kiedy ustawiać ramkę ręcznie</sys:String>
     <sys:String x:Key="shell_Region_Coords" xmlns:sys="clr-namespace:System;assembly=mscorlib">Dokładna pozycja w pikselach</sys:String>
     <sys:String x:Key="shell_Region_Set_Format" xmlns:sys="clr-namespace:System;assembly=mscorlib">{0} × {1} px, punkt {2}, {3}</sys:String>
     <sys:String x:Key="shell_Startup_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">Uruchamianie</sys:String>
@@ -296,12 +311,13 @@
     <sys:String x:Key="onb_Region_None" xmlns:sys="clr-namespace:System;assembly=mscorlib">Jeszcze nie ustawiony</sys:String>
     <sys:String x:Key="onb_Region_Fix" xmlns:sys="clr-namespace:System;assembly=mscorlib">Popraw ręcznie</sys:String>
     <sys:String x:Key="onb_Region_Hint" xmlns:sys="clr-namespace:System;assembly=mscorlib">Ramka powinna objąć imię postaci i całą kwestię dialogu.</sys:String>
+    <sys:String x:Key="onb_Region_AutoHint" xmlns:sys="clr-namespace:System;assembly=mscorlib">Kaption czyta dialogi w tym miejscu. Nic nie musisz zaznaczać.</sys:String>
     <sys:String x:Key="onb_DisplayMode" xmlns:sys="clr-namespace:System;assembly=mscorlib">Ustaw w grze tryb Bez ramki albo Okno. W pełnym ekranie napisy migają. Alt+Enter przełącza tryb w locie.</sys:String>
     <sys:String x:Key="onb_DisplayMode_Link" xmlns:sys="clr-namespace:System;assembly=mscorlib">Jak to zrobić</sys:String>
     <sys:String x:Key="onb_DisplayMode_Ok" xmlns:sys="clr-namespace:System;assembly=mscorlib">Rozumiem</sys:String>
     <sys:String x:Key="onb_Manual_Header" xmlns:sys="clr-namespace:System;assembly=mscorlib">Ustawię sam</sys:String>
     <sys:String x:Key="onb_Manual_SkipAutoStart" xmlns:sys="clr-namespace:System;assembly=mscorlib">Nie uruchamiaj tłumaczenia samodzielnie</sys:String>
-    <sys:String x:Key="onb_Manual_Hint" xmlns:sys="clr-namespace:System;assembly=mscorlib">Grę wybierzesz wyżej, a ramkę narysujesz przyciskiem Popraw ręcznie. Tłumaczenie uruchomisz wtedy na Starcie albo skrótem Ctrl+Shift+S.</sys:String>
+    <sys:String x:Key="onb_Manual_Hint" xmlns:sys="clr-namespace:System;assembly=mscorlib">Ramkę dialogu zaznaczysz przyciskiem Popraw ręcznie. Tłumaczenie uruchomisz potem na Starcie albo skrótem Ctrl+Shift+S.</sys:String>
     <sys:String x:Key="onb_SignIn_Heading" xmlns:sys="clr-namespace:System;assembly=mscorlib">Zaloguj się</sys:String>
     <sys:String x:Key="onb_SignIn_Lead" xmlns:sys="clr-namespace:System;assembly=mscorlib">Żeby pobrać polskie napisy i zapamiętać ustawienia.</sys:String>
     <sys:String x:Key="onb_SignIn_Button" xmlns:sys="clr-namespace:System;assembly=mscorlib">Zaloguj się przez przeglądarkę</sys:String>
@@ -331,6 +347,7 @@
     <sys:String x:Key="onb_Done_Game_Format" xmlns:sys="clr-namespace:System;assembly=mscorlib">Gra: {0}</sys:String>
     <sys:String x:Key="onb_Done_Region_Set" xmlns:sys="clr-namespace:System;assembly=mscorlib">Obszar dialogu: ustawiony</sys:String>
     <sys:String x:Key="onb_Done_Region_None" xmlns:sys="clr-namespace:System;assembly=mscorlib">Obszar dialogu: nie ustawiono. Ustawisz go w Gra i napisy.</sys:String>
+    <sys:String x:Key="onb_Done_Region_Auto" xmlns:sys="clr-namespace:System;assembly=mscorlib">Obszar dialogu: Kaption ustawi go sam, gdy włączysz grę</sys:String>
     <sys:String x:Key="onb_Done_Pack" xmlns:sys="clr-namespace:System;assembly=mscorlib">Napisy: polskie</sys:String>
     <sys:String x:Key="onb_Done_PackMissing" xmlns:sys="clr-namespace:System;assembly=mscorlib">Napisy: jeszcze niepobrane</sys:String>
     <sys:String x:Key="onb_Done_Hotkeys" xmlns:sys="clr-namespace:System;assembly=mscorlib">Skróty na start</sys:String>
@@ -369,6 +386,10 @@
     <sys:String x:Key="shell_Spotlight_WuWa_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">Napisy są gotowe. Wybierz grę, a pobiorą się same.</sys:String>
     <sys:String x:Key="shell_Spotlight_WuWa_Switch" xmlns:sys="clr-namespace:System;assembly=mscorlib">Przełącz na Wuthering Waves</sys:String>
     <sys:String x:Key="shell_Spotlight_WuWa_Open" xmlns:sys="clr-namespace:System;assembly=mscorlib">Otwórz zakładkę Gra i napisy</sys:String>
+    <sys:String x:Key="shell_Spotlight_Endfield_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">Arknights: Endfield po polsku</sys:String>
+    <sys:String x:Key="shell_Spotlight_Endfield_Body_Format" xmlns:sys="clr-namespace:System;assembly=mscorlib">Polskie napisy do dialogów z wersji {0}, na razie w becie. Wybierz grę, a napisy pobiorą się same.</sys:String>
+    <sys:String x:Key="shell_Spotlight_Endfield_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">Polskie napisy do dialogów, na razie w becie. Wybierz grę, a pobiorą się same.</sys:String>
+    <sys:String x:Key="shell_Spotlight_Endfield_Switch" xmlns:sys="clr-namespace:System;assembly=mscorlib">Przełącz na Arknights: Endfield</sys:String>
     <sys:String x:Key="shell_Spotlight_Guess_Title_Format" xmlns:sys="clr-namespace:System;assembly=mscorlib">{0}: zgadnij postać dnia</sys:String>
     <sys:String x:Key="shell_Spotlight_Guess_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">Codziennie nowa zagadka z każdej gry, którą obsługuje Kaption. W trybie rankingowym liczy się czas, a wyniki trafiają do rankingu miesiąca.</sys:String>
     <sys:String x:Key="shell_Spotlight_Guess_Play" xmlns:sys="clr-namespace:System;assembly=mscorlib">Zagraj dziś</sys:String>
@@ -387,14 +408,14 @@
     <sys:String x:Key="GuessNotify_Open" xmlns:sys="clr-namespace:System;assembly=mscorlib">Zobacz swoje miejsce</sys:String>
     <sys:String x:Key="GuessNotify_TurnOff" xmlns:sys="clr-namespace:System;assembly=mscorlib">Wyłącz</sys:String>
     <sys:String x:Key="onb_Region_Saved" xmlns:sys="clr-namespace:System;assembly=mscorlib">Zapisany ręcznie</sys:String>
-    <sys:String x:Key="onb_Game_DetectedKept_Format" xmlns:sys="clr-namespace:System;assembly=mscorlib">Na ekranie jest {0}. Zapisany obszar dialogu zostaje, „Wykryj automatycznie” go zastąpi.</sys:String>
+    <sys:String x:Key="onb_Game_DetectedKept_Format" xmlns:sys="clr-namespace:System;assembly=mscorlib">Na ekranie jest {0}. Zapisana ramka dialogu zostaje, a „Ustaw automatycznie” ją zastąpi.</sys:String>
     <sys:String x:Key="shell_Card_AutoStartBlocked" xmlns:sys="clr-namespace:System;assembly=mscorlib">Auto-start wstrzymany</sys:String>
     <sys:String x:Key="shell_Status_AutoStartBlocked" xmlns:sys="clr-namespace:System;assembly=mscorlib">Auto-start wstrzymany</sys:String>
     <sys:String x:Key="shell_Card_GameSwitchPending_Detail_Format" xmlns:sys="clr-namespace:System;assembly=mscorlib">Wciąż masz wczytane napisy do {0}, więc auto-start czeka na restart.</sys:String>
     <sys:String x:Key="shell_Chip_Subtitles_AdvancedTip_Format" xmlns:sys="clr-namespace:System;assembly=mscorlib">{0:N0} kwestii · {1:N0} wpisów w indeksie</sys:String>
     <sys:String x:Key="shell_Blocked_Session" xmlns:sys="clr-namespace:System;assembly=mscorlib">Twoje logowanie wygasło.</sys:String>
     <sys:String x:Key="shell_Blocked_Action_Session" xmlns:sys="clr-namespace:System;assembly=mscorlib">_Zaloguj się</sys:String>
-    <sys:String x:Key="shell_Blocked_Action_Region" xmlns:sys="clr-namespace:System;assembly=mscorlib">_Wybierz obszar dialogu</sys:String>
+    <sys:String x:Key="shell_Blocked_Action_Region" xmlns:sys="clr-namespace:System;assembly=mscorlib">_Zaznacz ramkę dialogu</sys:String>
     <sys:String x:Key="shell_Blocked_Action_DisplayMode" xmlns:sys="clr-namespace:System;assembly=mscorlib">_Pokaż wskazówkę</sys:String>
     <sys:String x:Key="shell_Blocked_Action_Overlay" xmlns:sys="clr-namespace:System;assembly=mscorlib">_Popraw obszar</sys:String>
     <sys:String x:Key="shell_Blocked_Action_Details" xmlns:sys="clr-namespace:System;assembly=mscorlib">Pokaż _szczegóły</sys:String>
@@ -418,7 +439,7 @@
     <sys:String x:Key="Game_StarRail" xmlns:sys="clr-namespace:System;assembly=mscorlib">Honkai: Star Rail</sys:String>
     <sys:String x:Key="Game_ZZZ" xmlns:sys="clr-namespace:System;assembly=mscorlib">Zenless Zone Zero</sys:String>
     <sys:String x:Key="Game_Wuthering" xmlns:sys="clr-namespace:System;assembly=mscorlib">Wuthering Waves</sys:String>
-    <sys:String x:Key="Game_Endfield" xmlns:sys="clr-namespace:System;assembly=mscorlib">Endfield</sys:String>
+    <sys:String x:Key="Game_Endfield" xmlns:sys="clr-namespace:System;assembly=mscorlib">Arknights: Endfield</sys:String>
     <sys:String x:Key="Game_BH3" xmlns:sys="clr-namespace:System;assembly=mscorlib">BH3</sys:String>
 
     <sys:String x:Key="Lang_ZH_Simplified" xmlns:sys="clr-namespace:System;assembly=mscorlib">Chiński (uproszczony)</sys:String>
@@ -502,7 +523,7 @@
     <sys:String x:Key="Hotkey_9000_Description" xmlns:sys="clr-namespace:System;assembly=mscorlib">Włącz / wyłącz tłumaczenie</sys:String>
     <sys:String x:Key="Hotkey_9001_Description" xmlns:sys="clr-namespace:System;assembly=mscorlib">Wybierz obszar dialogu</sys:String>
     <sys:String x:Key="Hotkey_9002_Description" xmlns:sys="clr-namespace:System;assembly=mscorlib">Ukryj napisy</sys:String>
-    <sys:String x:Key="Hotkey_9003_Description" xmlns:sys="clr-namespace:System;assembly=mscorlib">Pokaż obszar rozpoznawania</sys:String>
+    <sys:String x:Key="Hotkey_9003_Description" xmlns:sys="clr-namespace:System;assembly=mscorlib">Pokaż ramkę dialogu i skróty</sys:String>
     <sys:String x:Key="Hotkey_9004_Description" xmlns:sys="clr-namespace:System;assembly=mscorlib">Wymuś ponowne tłumaczenie</sys:String>
     <sys:String x:Key="Hotkey_9005_Description" xmlns:sys="clr-namespace:System;assembly=mscorlib">Szybkie tłumaczenie zaznaczonego obszaru</sys:String>
 
@@ -512,7 +533,7 @@
     <sys:String x:Key="Hotkey_9000_Info" xmlns:sys="clr-namespace:System;assembly=mscorlib">Główny włącznik. Naciśnij raz, a Kaption zacznie śledzić obszar dialogu i tłumaczyć to, co się w nim pojawia. Naciśnij drugi raz, żeby zatrzymać, gdy cutscenka albo zadanie się skończy. Działa jak duży przycisk na stronie Start. Skrót przydaje się, kiedy nie chcesz wychodzić z gry.</sys:String>
     <sys:String x:Key="Hotkey_9001_Info" xmlns:sys="clr-namespace:System;assembly=mscorlib">Przerysuj prostokąt, w którym Kaption szuka dialogów. Przydaje się po zmianie monitora, rozdzielczości, przełączeniu okno ↔ pełny ekran albo gdy napisy przestają się pojawiać mimo dialogów w grze.</sys:String>
     <sys:String x:Key="Hotkey_9002_Info" xmlns:sys="clr-namespace:System;assembly=mscorlib">Natychmiast chowa napisy na ekranie, ale nie zatrzymuje tłumaczenia. Pomocne przy screenach, filmowych scenach albo gdy interfejs gry zachodzi na pole napisów. Naciśnij drugi raz, a napisy wrócą. Tłumaczenie i tak działa w tle.</sys:String>
-    <sys:String x:Key="Hotkey_9003_Info" xmlns:sys="clr-namespace:System;assembly=mscorlib">Mrugnie kolorową ramką w miejscu, w którym Kaption pilnuje dialogów. Szybka kontrola, czy obszar jest ustawiony tam, gdzie trzeba, zwłaszcza po zmianie rozdzielczości albo interfejsu gry.</sys:String>
+    <sys:String x:Key="Hotkey_9003_Info" xmlns:sys="clr-namespace:System;assembly=mscorlib">Na dziesięć sekund pokazuje ramkę tam, gdzie Kaption pilnuje dialogów, a razem z nią krótką ściągę ze skrótami. Przydaje się po zmianie rozdzielczości albo interfejsu gry. Niczego nie przełącza, tylko pokazuje.</sys:String>
     <sys:String x:Key="Hotkey_9004_Info" xmlns:sys="clr-namespace:System;assembly=mscorlib">Wymusza natychmiastowe tłumaczenie bieżącej klatki, nawet jeśli tekst się nie zmienił. Przydatne, gdy Kaption utknął na starej linii (np. animacja pisania poszła dalej, a dopasowanie nie nadążyło) albo po zmianie ustawień. Nie trzeba zatrzymywać tłumaczenia.</sys:String>
     <sys:String x:Key="Hotkey_9005_Info" xmlns:sys="clr-namespace:System;assembly=mscorlib">Zaznaczasz ramką dowolny fragment ekranu, np. opis przedmiotu, tytuł zadania albo pozycję w menu, a Kaption pokazuje obok tłumaczenie. Działa niezależnie od obszaru dialogu, więc obsługuje też teksty spoza dymków.</sys:String>
 
@@ -588,7 +609,8 @@
     <sys:String x:Key="Dialog_EngineFailed_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">Otwórz Start i kliknij „Spróbuj ponownie”. Jeśli karta graficzna dalej się sypie, kliknij tam „Uruchom na procesorze”.</sys:String>
     <!-- TIGHT -->
     <sys:String x:Key="Dash_Status_NotLoaded" xmlns:sys="clr-namespace:System;assembly=mscorlib">Nie wczytano</sys:String>
-    <sys:String x:Key="Dash_Region_NotSet" xmlns:sys="clr-namespace:System;assembly=mscorlib">Jeszcze nie ustawiony. Gdy gra jest na ekranie, kliknij Wykryj automatycznie.</sys:String>
+    <sys:String x:Key="Dash_Region_NotSet" xmlns:sys="clr-namespace:System;assembly=mscorlib">Jeszcze nie ustawiona. Gdy gra jest na ekranie, kliknij „Ustaw automatycznie”.</sys:String>
+    <sys:String x:Key="Dash_Region_AutoPending" xmlns:sys="clr-namespace:System;assembly=mscorlib">Kaption sam ustawi ramkę, gdy włączysz grę.</sys:String>
     <sys:String x:Key="Dash_QuickStart" xmlns:sys="clr-namespace:System;assembly=mscorlib">Szybki start: 1) Uruchom grę  2) Kliknij „Wybierz obszar"  3) Kliknij „Uruchom"</sys:String>
     <sys:String x:Key="Dialog_GameNotFound_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">Gra nie jest uruchomiona</sys:String>
     <sys:String x:Key="Dialog_GameNotFound_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">Kaption nie widzi okna gry. Odpal grę, zaczekaj na menu główne i kliknij „Uruchom tłumaczenie”.</sys:String>
@@ -605,10 +627,13 @@
          bramka przy Start, ostrzeżenie po zmianie regionu, czerwony alert
          runtime. Krótkie warianty dla Ctrl+Shift+D i hintów w okienku niżej. -->
     <sys:String x:Key="Dialog_OverlayInRegion_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">⚠ Napisy zasłaniają dialog gry</sys:String>
-    <sys:String x:Key="Dialog_OverlayInRegion_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">Okienko napisów zasłania dialog gry, więc Kaption zacząłby czytać własne tłumaczenie w nieskończonej pętli. Przeciągnij okienko w bok, zmień jego pozycję w Wyglądzie napisów albo wciśnij Ctrl+Shift+R, żeby zaznaczyć obszar dialogu od nowa. Tłumaczenie wróci, jak tylko okienko zejdzie z dialogu.</sys:String>
+    <sys:String x:Key="Dialog_OverlayInRegion_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">Okienko napisów zasłania dialog gry, więc Kaption zacząłby czytać własne tłumaczenie w nieskończonej pętli. Przeciągnij okienko w bok, zmień jego pozycję w Wyglądzie napisów albo wciśnij Ctrl+Shift+R, żeby zaznaczyć ramkę dialogu od nowa. Tłumaczenie wróci, jak tylko okienko zejdzie z dialogu.</sys:String>
     <sys:String x:Key="Dialog_OverlayInRegion_Details" xmlns:sys="clr-namespace:System;assembly=mscorlib">Dalej się nachodzi? Na stronie Wygląd napisów przesuń napisy wyżej suwakiem „W pionie” albo zmniejsz „Maks. wysokość” w sekcji Zaawansowane. Poradnik z rysunkami: kaption.one/pl/how-to/region#overlap</sys:String>
     <sys:String x:Key="Dialog_OverlayInRegion_Primary" xmlns:sys="clr-namespace:System;assembly=mscorlib">Mimo to kontynuuj</sys:String>
-    <sys:String x:Key="Dialog_OverlayInRegion_Secondary" xmlns:sys="clr-namespace:System;assembly=mscorlib">Zaznacz obszar od nowa</sys:String>
+    <sys:String x:Key="Dialog_OverlayInRegion_Secondary" xmlns:sys="clr-namespace:System;assembly=mscorlib">Zaznacz ramkę od nowa</sys:String>
+    <sys:String x:Key="Dialog_OverlayInRegion_Body_Auto" xmlns:sys="clr-namespace:System;assembly=mscorlib">Napisy leżą na dialogu gry, więc Kaption czytałby własne tłumaczenie. Przeciągnij je wyżej albo niżej, a tłumaczenie wróci samo.</sys:String>
+    <sys:String x:Key="Dialog_OverlayInRegion_Details_Auto" xmlns:sys="clr-namespace:System;assembly=mscorlib">Dalej się nachodzi? W zakładce Wygląd napisów przesuń napisy suwakiem „W pionie”.</sys:String>
+    <sys:String x:Key="Dialog_OverlayInRegion_SecondaryAuto" xmlns:sys="clr-namespace:System;assembly=mscorlib">Przesunę napisy</sys:String>
     <!-- Krótka etykieta dla Ctrl+Shift+D gdy nakładka zachodzi na obszar. -->
     <sys:String x:Key="Overlap_Badge_Warning" xmlns:sys="clr-namespace:System;assembly=mscorlib">⚠ Napisy zasłaniają dialog. Tłumaczenie tu nie zadziała.</sys:String>
     <!-- Teksty pokazywane WEWNĄTRZ okienka napisów w dwóch stanach "złap mnie". -->
@@ -751,9 +776,19 @@
     <sys:String x:Key="Dialog_RestartTranslation_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">Kaption musi uruchomić się ponownie, żeby wczytać wybrany język gry i indeks tłumaczeń. Do tego czasu tłumacz działa na poprzednim wyborze.</sys:String>
     <sys:String x:Key="Dialog_SignInOpenFailed_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">Nie udało się otworzyć logowania</sys:String>
     <sys:String x:Key="Dialog_SignInOpenFailed_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">Kaption nie otworzył okna logowania. Zamknij aplikację i uruchom ją ponownie.</sys:String>
-    <sys:String x:Key="Dialog_RegionMissing_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">Nie ma jeszcze obszaru dialogu</sys:String>
+    <sys:String x:Key="Dialog_RegionMissing_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">Nie ma jeszcze ramki dialogu</sys:String>
     <sys:String x:Key="Dialog_RegionMissing_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">Zanim włączysz tłumaczenie, zaznacz, gdzie na ekranie pojawiają się dialogi z gry.</sys:String>
-    <sys:String x:Key="Dialog_RegionMissing_Details" xmlns:sys="clr-namespace:System;assembly=mscorlib">Otwórz Gra i napisy i kliknij „Wykryj automatycznie” albo „Popraw ramkę”, żeby narysować ją samemu. Potem spróbuj ponownie.</sys:String>
+    <sys:String x:Key="Dialog_RegionMissing_Details" xmlns:sys="clr-namespace:System;assembly=mscorlib">Otwórz Gra i napisy i wybierz „Ustaw automatycznie” albo „Popraw ramkę”, żeby zaznaczyć ją ręcznie. Potem spróbuj ponownie.</sys:String>
+    <sys:String x:Key="Dialog_AreaStartGame_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">Włącz grę, a Kaption sam ustawi ramkę dialogu.</sys:String>
+    <sys:String x:Key="Dialog_AreaMinimised_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">Przywróć ją na ekran, a Kaption sam ustawi ramkę dialogu.</sys:String>
+    <sys:String x:Key="Dialog_AreaStartGame_Mark" xmlns:sys="clr-namespace:System;assembly=mscorlib">Zaznaczę ręcznie</sys:String>
+    <sys:String x:Key="Dialog_AreaStartGame_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">Najpierw włącz grę</sys:String>
+    <sys:String x:Key="Dialog_AreaStartGame_Cloud" xmlns:sys="clr-namespace:System;assembly=mscorlib">Grasz w chmurze, np. w GeForce Now? Gra nie działa na tym komputerze, więc zaznacz ramkę ręcznie.</sys:String>
+    <sys:String x:Key="Dialog_AreaMinimised_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">Gra jest zminimalizowana</sys:String>
+    <sys:String x:Key="Dialog_AreaTooSmall_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">Okno gry jest za małe</sys:String>
+    <sys:String x:Key="Dialog_AreaTooSmall_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">Powiększ je, a Kaption sam ustawi ramkę dialogu.</sys:String>
+    <sys:String x:Key="Dialog_AreaOffScreen_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">Okno gry wystaje poza ekran</sys:String>
+    <sys:String x:Key="Dialog_AreaOffScreen_Body" xmlns:sys="clr-namespace:System;assembly=mscorlib">Przesuń je z powrotem na ekran, a Kaption sam ustawi ramkę dialogu.</sys:String>
     <sys:String x:Key="Dialog_PackMissing_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">Brak paczki tłumaczeń</sys:String>
     <sys:String x:Key="Dialog_PackMissing_Details" xmlns:sys="clr-namespace:System;assembly=mscorlib">Napisy będą po angielsku, dopóki paczka nie wyjdzie. Język docelowy zmienisz w Gra i napisy.</sys:String>
     <sys:String x:Key="Dialog_GameDataUpdated_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">Dane tłumaczeń zaktualizowane</sys:String>
@@ -1022,9 +1057,9 @@
     <sys:String x:Key="Tip_Update_WhatsNew" xmlns:sys="clr-namespace:System;assembly=mscorlib">Sprawdź, co się zmieniło w nowej wersji.</sys:String>
     <sys:String x:Key="Tip_Update_Remind" xmlns:sys="clr-namespace:System;assembly=mscorlib">Zamknij to powiadomienie. Przypomnimy przy następnym uruchomieniu.</sys:String>
 
-    <sys:String x:Key="Tip_Region_AutoDetect" xmlns:sys="clr-namespace:System;assembly=mscorlib">Automatycznie znajdź obszar dialogów w grze. Najlepiej działa z uruchomioną grą.</sys:String>
-    <sys:String x:Key="Tip_Region_Select" xmlns:sys="clr-namespace:System;assembly=mscorlib">Zaznacz obszar myszą.</sys:String>
-    <sys:String x:Key="Tip_Region_Show" xmlns:sys="clr-namespace:System;assembly=mscorlib">Pokaż ramkę aktualnie przechwytywanego obszaru, żeby sprawdzić, czy jest tam, gdzie trzeba.</sys:String>
+    <sys:String x:Key="Tip_Region_AutoDetect" xmlns:sys="clr-namespace:System;assembly=mscorlib">Ramka dialogu z samej gry. Kaption przesuwa ją razem z oknem gry.</sys:String>
+    <sys:String x:Key="Tip_Region_Select" xmlns:sys="clr-namespace:System;assembly=mscorlib">Zaznacz ramkę dialogu myszką.</sys:String>
+    <sys:String x:Key="Tip_Region_Show" xmlns:sys="clr-namespace:System;assembly=mscorlib">Pokaż na chwilę, gdzie Kaption czyta dialogi, żeby sprawdzić ramkę.</sys:String>
     <sys:String x:Key="Tip_Region_Preview" xmlns:sys="clr-namespace:System;assembly=mscorlib">Podgląd tego, co Kaption teraz przechwytuje.</sys:String>
 
     <sys:String x:Key="Tip_Appearance_Font" xmlns:sys="clr-namespace:System;assembly=mscorlib">Czcionka napisów wyświetlanych na ekranie.</sys:String>
@@ -1085,7 +1120,6 @@
     <sys:String x:Key="Settings_QuickTranslate_Mode_Timed" xmlns:sys="clr-namespace:System;assembly=mscorlib">Po ustalonym czasie</sys:String>
     <sys:String x:Key="Settings_QuickTranslate_Mode_Manual" xmlns:sys="clr-namespace:System;assembly=mscorlib">Dopiero gdy je zamknę</sys:String>
     <sys:String x:Key="Settings_QuickTranslate_Seconds_Label" xmlns:sys="clr-namespace:System;assembly=mscorlib">Czas</sys:String>
-    <sys:String x:Key="Settings_QuickTranslate_Seconds_Unit" xmlns:sys="clr-namespace:System;assembly=mscorlib">s</sys:String>
     <sys:String x:Key="Settings_QuickTranslate_FontSize_Label" xmlns:sys="clr-namespace:System;assembly=mscorlib">Rozmiar tekstu</sys:String>
     <sys:String x:Key="Settings_QuickTranslate_Hint" xmlns:sys="clr-namespace:System;assembly=mscorlib">Wskazówka: skrót „Przetłumacz ponownie ostatni obszar” czyta to samo miejsce bez rysowania ramki. Zmienisz go w zakładce Skróty.</sys:String>
     <sys:String x:Key="Tab_Characters" xmlns:sys="clr-namespace:System;assembly=mscorlib">Postacie</sys:String>
@@ -1330,21 +1364,29 @@
     <sys:String x:Key="Sync_Status_Offline" xmlns:sys="clr-namespace:System;assembly=mscorlib">Nie możemy połączyć się z Kaption. Pobrane napisy dalej działają.</sys:String>
     <sys:String x:Key="Sync_Status_NothingListed" xmlns:sys="clr-namespace:System;assembly=mscorlib">Napisów do tej gry w tym języku jeszcze nie ma. Kaption pobierze je, gdy tylko wyjdą.</sys:String>
     <sys:String x:Key="Sync_Status_Failed" xmlns:sys="clr-namespace:System;assembly=mscorlib">Nie udało się zaktualizować napisów. Spróbuj ponownie za chwilę.</sys:String>
-    <sys:String x:Key="shell_Card_RegionAutoSet" xmlns:sys="clr-namespace:System;assembly=mscorlib">Kaption sam ustawił obszar dialogu. Jeśli napisy omijają tekst, popraw ramkę w zakładce Gra i napisy.</sys:String>
-    <sys:String x:Key="shell_Card_RegionAutoFailed" xmlns:sys="clr-namespace:System;assembly=mscorlib">Kaption nie znalazł sam obszaru dialogu. Zaznacz go raz i tłumaczenie ruszy.</sys:String>
-    <sys:String x:Key="shell_Card_RegionAutoFailed_Action" xmlns:sys="clr-namespace:System;assembly=mscorlib">_Zaznacz obszar dialogu</sys:String>
+    <sys:String x:Key="shell_Card_RegionAutoSet" xmlns:sys="clr-namespace:System;assembly=mscorlib">Kaption sam ustawił ramkę dialogu. Nic nie musisz zaznaczać.</sys:String>
+    <sys:String x:Key="shell_Card_RegionTooBig" xmlns:sys="clr-namespace:System;assembly=mscorlib">Ta ramka obejmuje dużo więcej niż dialog. Kaption będzie czytał wolniej i może łapać napisy z menu.</sys:String>
+    <sys:String x:Key="shell_Card_RegionOutside" xmlns:sys="clr-namespace:System;assembly=mscorlib">Ta ramka leży poza oknem gry.</sys:String>
+    <sys:String x:Key="shell_Card_AreaHeldSmall" xmlns:sys="clr-namespace:System;assembly=mscorlib">Okno gry jest za małe, więc Kaption nie czyta dialogu. Powiększ je, a napisy wrócą.</sys:String>
+    <sys:String x:Key="shell_Card_AreaHeldOff" xmlns:sys="clr-namespace:System;assembly=mscorlib">Okno gry wystaje poza ekran, więc Kaption nie czyta dialogu. Przesuń je z powrotem.</sys:String>
+    <sys:String x:Key="shell_Card_RegionAdjusted" xmlns:sys="clr-namespace:System;assembly=mscorlib">Kaption poprawił ramkę dialogu, żeby mieściły się też długie kwestie.</sys:String>
+    <sys:String x:Key="shell_Card_RegionAutoFailed" xmlns:sys="clr-namespace:System;assembly=mscorlib">Kaption nie znalazł sam ramki dialogu. Zaznacz ją raz i tłumaczenie ruszy.</sys:String>
+    <sys:String x:Key="shell_Card_RegionAutoFailed_Action" xmlns:sys="clr-namespace:System;assembly=mscorlib">_Zaznacz ramkę dialogu</sys:String>
     <!-- The first-session check: why no line shows while Kaption translates, and the one-time "it works". -->
     <sys:String x:Key="shell_Card_FullScreen" xmlns:sys="clr-namespace:System;assembly=mscorlib">Kaption nie widzi gry</sys:String>
-    <sys:String x:Key="shell_Card_FullScreen_Detail" xmlns:sys="clr-namespace:System;assembly=mscorlib">Obraz z obszaru dialogu jest czarny. Zwykle znaczy to, że gra działa w pełnym ekranie: przełącz ją na Bez ramki albo Okno. Jeśli już tak jest, sprawdź, gdzie leży obszar dialogu.</sys:String>
+    <sys:String x:Key="shell_Card_FullScreen_Detail" xmlns:sys="clr-namespace:System;assembly=mscorlib">Obraz z ramki dialogu jest czarny. Zwykle znaczy to, że gra działa w pełnym ekranie: przełącz ją na Bez ramki albo Okno. Jeśli już tak jest, sprawdź, gdzie leży ramka dialogu.</sys:String>
+    <sys:String x:Key="shell_Card_FullScreen_Detail_Auto" xmlns:sys="clr-namespace:System;assembly=mscorlib">Obraz z gry jest czarny. Zwykle znaczy to, że gra działa w pełnym ekranie: przełącz ją na Bez ramki albo Okno.</sys:String>
     <sys:String x:Key="shell_Card_NoMatch" xmlns:sys="clr-namespace:System;assembly=mscorlib">Kaption widzi tekst, ale nie znajduje tej kwestii</sys:String>
-    <sys:String x:Key="shell_Card_NoMatch_Detail" xmlns:sys="clr-namespace:System;assembly=mscorlib">Czy tekst w grze jest ustawiony na angielski? Kaption tłumaczy z angielskiego. Jeśli tak, sprawdź, czy obszar dialogu obejmuje całe okno dialogowe.</sys:String>
+    <sys:String x:Key="shell_Card_NoMatch_Detail" xmlns:sys="clr-namespace:System;assembly=mscorlib">Czy tekst w grze jest ustawiony na angielski? Kaption tłumaczy z angielskiego. Jeśli tak, sprawdź, czy ramka dialogu obejmuje całe okno dialogowe.</sys:String>
+    <sys:String x:Key="shell_Card_NoMatch_Detail_Auto" xmlns:sys="clr-namespace:System;assembly=mscorlib">Czy tekst w grze jest ustawiony na angielski? Kaption tłumaczy z angielskiego.</sys:String>
     <sys:String x:Key="shell_Card_NoDialogue" xmlns:sys="clr-namespace:System;assembly=mscorlib">Nie widzę jeszcze żadnego dialogu</sys:String>
-    <sys:String x:Key="shell_Card_NoDialogue_Detail" xmlns:sys="clr-namespace:System;assembly=mscorlib">Zagadaj do kogoś w grze, a polska kwestia pojawi się sama. Jeśli dialog jest teraz na ekranie i nic się nie pokazuje, sprawdź, gdzie leży obszar dialogu.</sys:String>
+    <sys:String x:Key="shell_Card_NoDialogue_Detail" xmlns:sys="clr-namespace:System;assembly=mscorlib">Zagadaj do kogoś w grze, a polska kwestia pojawi się sama. Jeśli dialog jest teraz na ekranie i nic się nie pokazuje, sprawdź, gdzie leży ramka dialogu.</sys:String>
+    <sys:String x:Key="shell_Card_NoDialogue_Detail_Auto" xmlns:sys="clr-namespace:System;assembly=mscorlib">Zagadaj do kogoś w grze, a polska kwestia pojawi się sama.</sys:String>
     <sys:String x:Key="shell_Card_FirstLine" xmlns:sys="clr-namespace:System;assembly=mscorlib">Działa: napisy są na ekranie</sys:String>
     <sys:String x:Key="shell_Card_FirstLine_Detail" xmlns:sys="clr-namespace:System;assembly=mscorlib">To była Twoja pierwsza przetłumaczona kwestia. Od teraz Kaption pokazuje napisy zawsze, gdy ktoś w grze się odezwie.</sys:String>
     <sys:String x:Key="shell_Action_ShowHow" xmlns:sys="clr-namespace:System;assembly=mscorlib">Jak włączyć tryb _Bez ramki</sys:String>
     <sys:String x:Key="shell_Action_LanguageGuide" xmlns:sys="clr-namespace:System;assembly=mscorlib">Jak ustawić _język gry</sys:String>
-    <sys:String x:Key="shell_Action_CheckArea" xmlns:sys="clr-namespace:System;assembly=mscorlib">Sprawdź _obszar dialogu</sys:String>
+    <sys:String x:Key="shell_Action_CheckArea" xmlns:sys="clr-namespace:System;assembly=mscorlib">Sprawdź _ramkę dialogu</sys:String>
     <sys:String x:Key="shell_Chip_Subtitles" xmlns:sys="clr-namespace:System;assembly=mscorlib">Napisy gotowe</sys:String>
     <sys:String x:Key="shell_Chip_SubtitlesLoading" xmlns:sys="clr-namespace:System;assembly=mscorlib">Wczytuję napisy</sys:String>
     <sys:String x:Key="Dialog_AppCrash_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">Kaption musi się zamknąć</sys:String>
@@ -1482,4 +1524,31 @@
     <sys:String x:Key="DayNotice_Stamina_FillsToday" xmlns:sys="clr-namespace:System;assembly=mscorlib">{0}: około {1}/{2}, limit {3}.</sys:String>
     <sys:String x:Key="DayNotice_Stamina_FullLongAgo" xmlns:sys="clr-namespace:System;assembly=mscorlib">{0}: limit osiągnięty już od dłuższego czasu.</sys:String>
     <sys:String x:Key="DayNotice_Ends_Today" xmlns:sys="clr-namespace:System;assembly=mscorlib">Ostatni dzień: {0}.</sys:String>
+    <!-- The in-game hint card (Services/Hints/HintCatalog.cs): the shortcut sheet, the answers to a key, the tips, the strip. {0} is the player's own shortcut. -->
+    <sys:String x:Key="Hint_Sheet_Header" xmlns:sys="clr-namespace:System;assembly=mscorlib">Kaption · skróty</sys:String>
+    <sys:String x:Key="Hint_Key_9005" xmlns:sys="clr-namespace:System;assembly=mscorlib">Przetłumacz dowolny tekst na ekranie</sys:String>
+    <sys:String x:Key="Hint_Key_9002" xmlns:sys="clr-namespace:System;assembly=mscorlib">Ukryj albo pokaż napisy</sys:String>
+    <sys:String x:Key="Hint_Key_9007" xmlns:sys="clr-namespace:System;assembly=mscorlib">Popraw ten napis</sys:String>
+    <sys:String x:Key="Hint_Key_9000" xmlns:sys="clr-namespace:System;assembly=mscorlib">Zatrzymaj albo wznów tłumaczenie</sys:String>
+    <sys:String x:Key="Hint_Sheet_Footer" xmlns:sys="clr-namespace:System;assembly=mscorlib">{0} pokaże tę ściągę jeszcze raz</sys:String>
+    <sys:String x:Key="Hint_Sheet_Footer_NoKey" xmlns:sys="clr-namespace:System;assembly=mscorlib">Tę ściągę znajdziesz też w Kaption, w zakładce Skróty.</sys:String>
+    <sys:String x:Key="Hint_Echo_SubsHidden" xmlns:sys="clr-namespace:System;assembly=mscorlib">Napisy ukryte. {0} pokaże je z powrotem.</sys:String>
+    <sys:String x:Key="Hint_Echo_SubsBack" xmlns:sys="clr-namespace:System;assembly=mscorlib">Napisy znów widoczne.</sys:String>
+    <sys:String x:Key="Hint_Echo_Stopped" xmlns:sys="clr-namespace:System;assembly=mscorlib">Tłumaczenie zatrzymane. {0} włączy je znowu.</sys:String>
+    <sys:String x:Key="Hint_Echo_HintsOff" xmlns:sys="clr-namespace:System;assembly=mscorlib">Podpowiedzi wyłączone. Włączysz je w Kaption, w zakładce Skróty.</sys:String>
+    <sys:String x:Key="Hint_Tip_SubsHidden" xmlns:sys="clr-namespace:System;assembly=mscorlib">Ktoś mówi, a napisy są ukryte. {0} je pokaże.</sys:String>
+    <sys:String x:Key="Hint_Tip_NoDialogue" xmlns:sys="clr-namespace:System;assembly=mscorlib">Zagadaj do kogoś w grze, a polska kwestia pojawi się sama.</sys:String>
+    <sys:String x:Key="Hint_Tip_NoMatch" xmlns:sys="clr-namespace:System;assembly=mscorlib">Sprawdź, czy tekst w grze jest po angielsku.</sys:String>
+    <sys:String x:Key="Hint_Tip_AreaSmall" xmlns:sys="clr-namespace:System;assembly=mscorlib">Okno gry jest za małe, więc Kaption nie czyta dialogu. Powiększ je.</sys:String>
+    <sys:String x:Key="Hint_Tip_AreaOff" xmlns:sys="clr-namespace:System;assembly=mscorlib">Okno gry wystaje poza ekran, więc Kaption nie czyta dialogu. Przesuń je z powrotem.</sys:String>
+    <sys:String x:Key="Hint_Tip_QuickTranslate" xmlns:sys="clr-namespace:System;assembly=mscorlib">Zadanie, przedmiot albo menu po angielsku? {0} i zaznacz tekst.</sys:String>
+    <sys:String x:Key="Hint_Tip_FixLine" xmlns:sys="clr-namespace:System;assembly=mscorlib">Napis brzmi dziwnie? {0} i wpisz lepszą wersję. Zadziała od razu.</sys:String>
+    <sys:String x:Key="Hint_Strip_Pin" xmlns:sys="clr-namespace:System;assembly=mscorlib">Zostaw na ekranie</sys:String>
+    <sys:String x:Key="Hint_Strip_Unpin" xmlns:sys="clr-namespace:System;assembly=mscorlib">Odepnij</sys:String>
+    <sys:String x:Key="Hint_Strip_Move" xmlns:sys="clr-namespace:System;assembly=mscorlib">Przenieś w inne miejsce</sys:String>
+    <sys:String x:Key="Hint_Strip_Hide" xmlns:sys="clr-namespace:System;assembly=mscorlib">Schowaj</sys:String>
+    <sys:String x:Key="Hint_Strip_Never" xmlns:sys="clr-namespace:System;assembly=mscorlib">Nie pokazuj więcej</sys:String>
+    <sys:String x:Key="Hints_Setting_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">Podpowiedzi w grze</sys:String>
+    <sys:String x:Key="Hints_Setting_Hint" xmlns:sys="clr-namespace:System;assembly=mscorlib">Krótka ściąga ze skrótami i jedno zdanie, gdy coś nie działa. Pojawia się tylko nad grą.</sys:String>
+    <sys:String x:Key="Hints_Setting_ShowNow" xmlns:sys="clr-namespace:System;assembly=mscorlib">Pokaż teraz</sys:String>
 </ResourceDictionary>

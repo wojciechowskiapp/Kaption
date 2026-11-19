@@ -131,31 +131,42 @@ namespace GI_Subtitles.Core.Config
             // threads never fight over the file (in place, the second one threw "being used by another process").
             lock (_saveLock)
             {
-                JsonObject jo;
+                string text;
                 lock (_settingsLock)
                 {
-                    jo = new JsonObject();
-                    foreach (var kv in _settings)
-                    {
-                        jo[kv.Key] = kv.Value?.DeepClone();
-                    }
+                    text = ToText(_settings);
                 }
                 // Never in place: a save cut by a crash, the updater's forced stop or a power loss leaves the old file or
                 // the new one, whole (a temp file flushed to disk, then swapped in).
-                AtomicFile.WriteAllText(SettingsFile, jo.ToJsonString(JsonDefaults.Indented));
+                AtomicFile.WriteAllText(SettingsFile, text);
             }
+        }
+
+        /// <summary>The text <see cref="Save"/> writes for these settings (the player-file tests pin it).</summary>
+        internal static string ToText(IEnumerable<KeyValuePair<string, JsonNode>> settings)
+        {
+            var jo = new JsonObject();
+            foreach (var kv in settings)
+            {
+                jo[kv.Key] = kv.Value?.DeepClone();
+            }
+            return jo.ToJsonString(JsonDefaults.Indented);
         }
 
         public static T Get<T>(string key, T defaultValue = default)
         {
             lock (_settingsLock)
             {
-                if (_settings.TryGetValue(key, out var token) && token != null)
-                {
-                    try { return token.Deserialize<T>(ReadOptions); }
-                    catch (Exception ex) { Logger.Log.Error($"Config.Get<{typeof(T).Name}>(\"{key}\") failed: {ex.Message}"); }
-                }
+                return _settings.TryGetValue(key, out var token) ? ValueOf(token, key, defaultValue) : defaultValue;
             }
+        }
+
+        /// <summary>One stored value as <see cref="Get{T}"/> reads it (the player-file tests read samples through it).</summary>
+        internal static T ValueOf<T>(JsonNode token, string key, T defaultValue)
+        {
+            if (token == null) return defaultValue;
+            try { return token.Deserialize<T>(ReadOptions); }
+            catch (Exception ex) { Logger.Log.Error($"Config.Get<{typeof(T).Name}>(\"{key}\") failed: {ex.Message}"); }
             return defaultValue;
         }
 

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Logger = GI_Subtitles.Common.Logger;
 
 namespace GI_Subtitles.Services.Games
@@ -15,13 +16,6 @@ namespace GI_Subtitles.Services.Games
     {
         /// <summary>LogicalName prefix of the embedded manifests.</summary>
         public const string ResourcePrefix = "Kaption.Games.";
-
-        private static readonly JsonSerializerOptions Options = new JsonSerializerOptions
-        {
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-            ReadCommentHandling = JsonCommentHandling.Skip,
-            AllowTrailingCommas = true,
-        };
 
         public static IReadOnlyList<GameManifest> LoadEmbedded()
         {
@@ -61,7 +55,7 @@ namespace GI_Subtitles.Services.Games
         }
 
         public static GameManifest Parse(string json) =>
-            JsonSerializer.Deserialize<GameManifest>(json, Options) ?? throw new JsonException("empty manifest");
+            JsonSerializer.Deserialize(json, GameManifestJsonContext.Default.GameManifest) ?? throw new JsonException("empty manifest");
 
         /// <summary>What the desktop can't do without; the full contract is tools/games/validate.cjs.</summary>
         public static List<string> Problems(GameManifest m)
@@ -83,5 +77,18 @@ namespace GI_Subtitles.Services.Games
             }
             return problems;
         }
+    }
+
+    /// <summary>
+    /// The manifests are read at every start, before the first window: source-generated, so no reflection runs for
+    /// them (the options are the ones the reflection reader used).
+    /// </summary>
+    [JsonSourceGenerationOptions(
+        PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
+        ReadCommentHandling = JsonCommentHandling.Skip,
+        AllowTrailingCommas = true)]
+    [JsonSerializable(typeof(GameManifest))]
+    internal sealed partial class GameManifestJsonContext : JsonSerializerContext
+    {
     }
 }

@@ -70,6 +70,27 @@ icon in the top band (`desktop.staminaScreen`), so it is not bound to `checked.a
 found nothing is read. A `desktop.staminaScreen` without that reader fails validation, because the screen watch
 runs only what `desktop.assist.readers` lists.
 
+`desktop.answers` (optional) is where the game draws the player's dialogue choices, so the desktop can translate
+them with no setup (`GI-Subtitles/Services/Answers`). A game without the block gets no answers, and so does a window
+whose shape is not in `checked.aspects`: the same refusal rule as `desktop.assist`, whose `canvas`, box and `checked`
+shapes it reuses.
+
+- `box` is the area every measured option stack lies in, plus margin, from a window `edge` in `canvas` pixels. Games
+  pin the menu to a corner, so on a 21:9 window it sits outside the centred 16:9 band (Wuthering Waves: bottom-right,
+  option text about 640 to 245 canvas px left of the right edge). It must lie inside its canvas; the validator
+  checks that.
+- `optionRoles` are the dialogue graph's roles (`rt` in the bundle) that mark a player's option, compared exactly
+  (`WUWA_OPTION`, not `OPTION_MENU`). Leave it out when the game's data marks no options; rows then match only exact
+  pack lines.
+- `ink.level` is the brightness a letter's stroke is above while the option panel stays below it; `ink.lineHeight`
+  is one line of option text from the tallest letter to a descender (not the distance between lines), in canvas px.
+- `pillPad` is the distance from the top of an option's detected text box up to the top of its panel.
+- `checked` is the record: version, window shapes and where the measurement is. Add a shape only after its menu was
+  seen inside the box on real frames.
+
+The old `desktop.answer` rectangle (fractions of the 16:9 band) is still required and read by nothing; it goes once
+the answers card ships.
+
 When the executable name is generic (Unreal's `Client-Win64-Shipping` is shared by many games), set
 `"detect": { …, "requireTitle": true }`: the app then counts a process as the game only while one of its windows
 has a title from `windowTitles`. Two manifests may share an executable only if both set it.

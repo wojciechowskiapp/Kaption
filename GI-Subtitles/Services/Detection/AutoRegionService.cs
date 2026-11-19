@@ -1,222 +1,113 @@
 using System;
-using System.Collections.Generic;
 using System.Drawing;
-using GI_Subtitles.Services.Capture;
-using OpenCvSharp.Extensions;
-using PaddleOCRSharp;
 using Logger = GI_Subtitles.Common.Logger;
 
 namespace GI_Subtitles.Services.Detection
 {
     /// <summary>
-    /// High-level orchestrator for automatic capture-region detection.
-    /// Combines game window detection, full-screen OCR scan, and ratio-based
-    /// fallback into a single <see cref="Detect"/> call.
-    ///
-    /// Fallback chain: OCR AI detection -> ratio-based -> manual selection.
-    /// Must be called from a background thread (OCR is CPU-intensive).
+    /// "Set automatically" and setup's game step: the game's measured dialogue block (games/&lt;id&gt;.json), placed
+    /// on the game's window. Nothing is read off the screen. A scan used to box whatever text one moment showed, so a
+    /// one-line talk saved an area too small for the next long line, and Kaption's own window could be in the picture.
     /// </summary>
     public static class AutoRegionService
     {
-        /// <summary>
-        /// Result of an auto-detection attempt. Contains the detected regions as
-        /// comma-separated "x,y,w,h" strings ready to be saved to Config, plus
-        /// metadata about how the regions were determined.
-        /// </summary>
+        /// <summary>The dialogue and answer areas as "x,y,w,h" screen pixels, ready for Config.</summary>
         public class Result
         {
-            /// <summary>Whether detection succeeded and regions are available.</summary>
             public bool Success { get; set; }
 
-            /// <summary>
-            /// Dialogue region in screen-absolute "x,y,w,h" format, or null on failure.
-            /// </summary>
+            /// <summary>Dialogue area in screen pixels, or null on failure.</summary>
             public string DialogueRegion { get; set; }
 
-            /// <summary>
-            /// Answer region in screen-absolute "x,y,w,h" format, or null if
-            /// answers were not detected or detection failed.
-            /// </summary>
+            /// <summary>Answer area from the manifest's ratios, or null on failure.</summary>
             public string AnswerRegion { get; set; }
 
-            /// <summary>Detected game resolution, e.g. "2560x1440".</summary>
+            /// <summary>The game window's client size, e.g. "2560x1440".</summary>
             public string Resolution { get; set; }
 
-            /// <summary>
-            /// Human-readable description of which detection method produced the result
-            /// (e.g. "OCR scan (12 text blocks)" or "Ratio-based (no dialogue visible)").
-            /// </summary>
+            /// <summary>How the area was made, for the log.</summary>
             public string Method { get; set; }
 
-            /// <summary>Error message when Success is false.</summary>
             public string Error { get; set; }
 
-            /// <summary>Create a failed result with an error message.</summary>
-            public static Result Failed(string error)
-            {
-                return new Result { Success = false, Error = error };
-            }
+            /// <summary>No window of the game was found: the player has to start it first.</summary>
+            public bool NoGameWindow { get; set; }
 
-            /// <summary>Create a successful result with region data.</summary>
-            public static Result Succeeded(string dialogue, string answer, string resolution, string method)
+            /// <summary>The game runs but is minimised: bring it back, then try again.</summary>
+            public bool GameMinimised { get; set; }
+
+            /// <summary>The game's window is smaller than a game window (a launcher, a splash).</summary>
+            public bool WindowTooSmall { get; set; }
+
+            /// <summary>The desktop would cut the game's text: the window hangs off the screen.</summary>
+            public bool OffScreen { get; set; }
+
+            /// <summary>The game's client area the block was placed on (screen pixels).</summary>
+            public Rectangle Client { get; set; }
+
+            public static Result Failed(string error) => new Result { Success = false, Error = error };
+
+            public static Result Succeeded(string dialogue, string answer, string resolution, string method) => new Result
             {
-                return new Result
-                {
-                    Success = true,
-                    DialogueRegion = dialogue,
-                    AnswerRegion = answer,
-                    Resolution = resolution,
-                    Method = method,
-                };
-            }
+                Success = true,
+                DialogueRegion = dialogue,
+                AnswerRegion = answer,
+                Resolution = resolution,
+                Method = method,
+            };
         }
 
         /// <summary>
-        /// Auto-detect dialogue and answer regions by scanning the game screen.
-        /// Uses OCR-based AI detection with ratio-based fallback.
-        ///
-        /// <para><b>Thread safety:</b> Must be called from a background thread.
-        /// The OCR scan is CPU/GPU-intensive and will block for several hundred
-        /// milliseconds on a full-resolution frame.</para>
+        /// The game's block on its window, clipped to the desktop. Looks only at the game's own process (never a
+        /// window that just names the game) and tells a minimised game, a window too small to be the game's and one
+        /// hanging off the screen apart from a closed game. Looks up windows, so call it off the UI thread.
         /// </summary>
-        /// <param name="gameId">
-        /// Game identifier (e.g. "Genshin", "StarRail") used to look up the
-        /// <see cref="GameRegionProfile"/> for window detection and fallback ratios.
-        /// </param>
-        /// <param name="engine">
-        /// Initialized PaddleOCR engine, or null to skip OCR and use ratio fallback.
-        /// </param>
-        /// <returns>
-        /// A <see cref="Result"/> with dialogue/answer regions in screen-absolute
-        /// coordinates, ready to be saved to Config.
-        /// </returns>
-        /// <param name="ownOverlay">Asks where Kaption's own panels are on screen right now (screen pixels); called just
-        /// before and just after the capture, from this thread, and both answers are blacked out of the frame so a
-        /// subtitle showing over the game is never taken for the game's dialogue.</param>
-        public static Result Detect(string gameId, PaddleOCREngine engine, Func<IReadOnlyList<Rectangle>> ownOverlay = null)
-            => DetectCore(gameId, engine, ownOverlay);
-
-        /// <summary>The overlay's places, or none when nobody can say (never fails the search).</summary>
-        private static IReadOnlyList<Rectangle> OwnOverlay(Func<IReadOnlyList<Rectangle>> ask)
+        public static Result Detect(string gameId)
         {
-            try { return ask?.Invoke(); }
-            catch (Exception ex)
-            {
-                Logger.Log.Info($"Auto-detect: overlay bounds unavailable: {ex.Message}");
-                return null;
-            }
-        }
-
-        private static Result DetectCore(string gameId, PaddleOCREngine engine, Func<IReadOnlyList<Rectangle>> ownOverlay)
-        {
-            // 1. Get game profile
             var profile = GameRegionProfile.Get(gameId);
-            Logger.Log.Info($"Auto-detect started for game \"{profile.GameId}\"");
 
-            // 2. Find game window
+            GameWindowState state;
             GameWindowDetector.WindowInfo? windowInfo;
             try
             {
-                windowInfo = GameWindowDetector.FindGameWindow(profile);
+                (state, windowInfo) = GameWindowDetector.FindGameClient(profile);
             }
             catch (Exception ex)
             {
-                Logger.Log.Error($"Window detection failed: {ex.Message}");
+                // The player pressed a button: the status line says it, so this is not a Sentry event.
+                Logger.Log.Warn($"Dialogue area: window lookup failed for {profile.GameId}: {ex.Message}");
                 return Result.Failed($"Window detection error: {ex.Message}");
             }
-
+            if (state == GameWindowState.Minimised)
+                return new Result { Success = false, Error = "The game is minimised.", GameMinimised = true };
             if (windowInfo == null)
-                return Result.Failed("Game window not found. Make sure the game is running.");
+                return new Result { Success = false, Error = "Game window not found. Make sure the game is running.", NoGameWindow = true };
 
             var wi = windowInfo.Value;
-            string resolution = $"{wi.GameW}x{wi.GameH}";
+            var client = new Rectangle(wi.GameX, wi.GameY, wi.GameW, wi.GameH);
+            PlacementResult placed = DialogueAreaPlacement.Place(profile, client,
+                System.Windows.Forms.SystemInformation.VirtualScreen, DialogueAreaPlacement.MonitorBounds());
+            if (placed.Status == PlacementStatus.Unusable)
+                return new Result { Success = false, Error = "The game's window is too small.", WindowTooSmall = true };
+            if (placed.Status == PlacementStatus.OffScreen)
+                return new Result { Success = false, Error = "The game's window is mostly off the screen.", OffScreen = true };
 
-            // 3. Capture full game window using GDI (always available, one-shot)
-            // GDI is used for calibration because DXGI may not be initialized yet and
-            // requires a persistent duplication session. For a single calibration frame
-            // GDI is simpler and equally reliable. One-shot: keep a plain allocation so
-            // full-screen buckets don't pollute the BitmapPool for the OCR hot path.
-            Bitmap bitmap;
-            try
-            {
-                bitmap = new Bitmap(wi.GameW, wi.GameH, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
-                var overlayBefore = OwnOverlay(ownOverlay);
-                using (var gdi = new GdiScreenCapture())
-                {
-                    gdi.CaptureRegionInto(wi.GameX, wi.GameY, wi.GameW, wi.GameH, bitmap);
-                }
-                // Asked on both sides of the capture: a subtitle that changed meanwhile is covered where it was and is.
-                OverlayMask.Apply(bitmap, new Rectangle(wi.GameX, wi.GameY, wi.GameW, wi.GameH), OwnOverlay(ownOverlay), overlayBefore);
-            }
-            catch (Exception ex)
-            {
-                Logger.Log.Error($"Screen capture failed during auto-detect: {ex.Message}");
-                return Result.Failed($"Failed to capture game screen: {ex.Message}");
-            }
+            string dialogue = DialogueArea.Format(placed.Area);
+            var (_, answer) = GameWindowDetector.CalculateFromRatios(profile, wi.GameX, wi.GameY, wi.GameW, wi.GameH);
+            Logger.Log.Info($"Dialogue area for {profile.GameId}: {dialogue} on a {wi.GameW}x{wi.GameH} window (measured block).");
+            var result = Result.Succeeded(dialogue, answer, $"{wi.GameW}×{wi.GameH}", "measured block");
+            result.Client = client;
+            return result;
+        }
 
-            if (bitmap == null)
-                return Result.Failed("Failed to capture game screen (bitmap was null).");
-
-            // 4. Try OCR-based detection
-            using (bitmap)
-            {
-                if (engine == null)
-                {
-                    Logger.Log.Info("OCR engine not ready, using ratio-based fallback");
-                    var (d, a) = GameWindowDetector.CalculateFromRatios(
-                        profile, wi.GameX, wi.GameY, wi.GameW, wi.GameH);
-                    return Result.Succeeded(d, a, resolution, "Ratio-based (OCR engine not ready)");
-                }
-
-                OpenCvSharp.Mat frameMat = null;
-                try
-                {
-                    frameMat = BitmapConverter.ToMat(bitmap);
-
-                    var detected = OcrRegionDetector.DetectRegions(engine, frameMat, wi.GameW, wi.GameH);
-
-                    if (detected.DialogueFound)
-                    {
-                        // Convert from game-window-relative to screen-absolute coordinates
-                        string dialogueRegion = $"{wi.GameX + detected.DialogueX}," +
-                                                $"{wi.GameY + detected.DialogueY}," +
-                                                $"{detected.DialogueW},{detected.DialogueH}";
-
-                        string answerRegion = detected.AnswerFound
-                            ? $"{wi.GameX + detected.AnswerX}," +
-                              $"{wi.GameY + detected.AnswerY}," +
-                              $"{detected.AnswerW},{detected.AnswerH}"
-                            : null;
-
-                        Logger.Log.Info($"Auto-detect succeeded via OCR: dialogue={dialogueRegion}, " +
-                                        $"answer={answerRegion ?? "none"}, blocks={detected.TextBlocksFound}");
-
-                        return Result.Succeeded(dialogueRegion, answerRegion, resolution,
-                            $"OCR scan ({detected.TextBlocksFound} text blocks)");
-                    }
-
-                    // 5. OCR found no dialogue — fall back to ratios
-                    Logger.Log.Info("OCR scan found no dialogue region, using ratio-based fallback");
-                    var (dr, ar) = GameWindowDetector.CalculateFromRatios(
-                        profile, wi.GameX, wi.GameY, wi.GameW, wi.GameH);
-                    return Result.Succeeded(dr, ar, resolution,
-                        "Ratio-based (no dialogue visible on screen)");
-                }
-                catch (Exception ex)
-                {
-                    Logger.Log.Error($"OCR detection failed, using ratio fallback: {ex.Message}");
-
-                    // OCR crashed — still provide ratio-based regions rather than failing entirely
-                    var (dr, ar) = GameWindowDetector.CalculateFromRatios(
-                        profile, wi.GameX, wi.GameY, wi.GameW, wi.GameH);
-                    return Result.Succeeded(dr, ar, resolution,
-                        $"Ratio-based (OCR error: {ex.Message})");
-                }
-                finally
-                {
-                    frameMat?.Dispose();
-                }
-            }
+        /// <summary>
+        /// The profile's dialogue block on a window whose client area is <paramref name="client"/> (screen pixels),
+        /// clipped to <paramref name="desktop"/>; null when it cannot be placed (<see cref="DialogueAreaPlacement.Place"/>).
+        /// </summary>
+        public static string PlaceBlock(GameRegionProfile profile, Rectangle client, Rectangle desktop)
+        {
+            PlacementResult placed = DialogueAreaPlacement.Place(profile, client, desktop);
+            return placed.Status == PlacementStatus.Placed ? DialogueArea.Format(placed.Area) : null;
         }
     }
 }

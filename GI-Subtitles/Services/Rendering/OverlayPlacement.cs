@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Drawing;
 
 namespace GI_Subtitles.Services.Rendering
 {
@@ -32,5 +34,48 @@ namespace GI_Subtitles.Services.Rendering
             if (GrowsUpward(regionTop, regionHeight, upward, referenceWindowHeight)) return (int)Math.Round(upward);
             return (int)Math.Round(windowTop - regionTop);
         }
+
+        /// <summary>
+        /// The monitor the panel goes on: the one holding the game window's centre while Kaption keeps the frame on
+        /// that window (a windowed game straddling two monitors is over the one its middle is on), else the one holding
+        /// the frame's top-left corner. -1 when no monitor holds either.
+        /// </summary>
+        public static int MonitorFor(IReadOnlyList<Rectangle> monitors, Point frameTopLeft, Rectangle? gameClient)
+        {
+            if (monitors == null) return -1;
+            if (gameClient is Rectangle c)
+            {
+                int onGame = IndexHolding(monitors, new Point(c.X + c.Width / 2, c.Y + c.Height / 2));
+                if (onGame >= 0) return onGame;
+            }
+            return IndexHolding(monitors, frameTopLeft);
+        }
+
+        private static int IndexHolding(IReadOnlyList<Rectangle> monitors, Point p)
+        {
+            for (int i = 0; i < monitors.Count; i++)
+                if (monitors[i].Contains(p)) return i;
+            return -1;
+        }
+
+        /// <summary>
+        /// The x the panel is centred on, in DIPs: the game window's centre when it is on this monitor, else the
+        /// monitor's own centre. Saving a drag and applying the saved offset must both use this one value.
+        /// </summary>
+        public static double CentreDip(Rectangle monitor, double scale, Rectangle? gameClient)
+        {
+            if (gameClient is Rectangle c)
+            {
+                int centre = c.X + c.Width / 2;
+                if (centre >= monitor.Left && centre < monitor.Right) return centre / scale;
+            }
+            return monitor.Left / scale + monitor.Width / scale / 2;
+        }
+
+        /// <summary>The window's left edge for a panel of <paramref name="width"/> centred on <paramref name="centre"/> and moved by the saved offset.</summary>
+        public static double WindowLeft(double centre, double width, int padHorizontal) => centre - width / 2 + padHorizontal;
+
+        /// <summary>The saved horizontal offset that puts a window of <paramref name="width"/> at <paramref name="left"/> (after a drag).</summary>
+        public static int HorizontalPadFor(double left, double centre, double width) => (int)Math.Round(left - (centre - width / 2));
     }
 }

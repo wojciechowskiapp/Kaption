@@ -121,8 +121,9 @@ Kaption's guess game lives on kaption.one (Gendle, Stardle, Zendle, Wuwdle). The
 | `GuessNotify.GateRetrySeconds` | `60` | Seconds between checks while a notice waits for subtitles to stop, the game to leave the front or Windows to accept notices (10 to 900). |
 | `GuessNotify.StandingUrl` | none | Debug builds only: a test server's address used instead of the standing endpoint, called without your session. Local `http` or any `https` address. Release builds ignore it. Never point `ApiUrl` at a test server for this. |
 | `Ui.Seen.WuWaPolish` | `false` | The "Nowość w Kaption" ("New in Kaption") card's Wuthering Waves row was closed or used. The setup sets it for new installs. The row shows only while the server lists the Polish WuWa pack. |
+| `Ui.Seen.EndfieldPolish` | `false` | The same card's Arknights: Endfield row was closed or used, or you had the game selected while its pack was public. The setup sets it for new installs. The row shows only while the server lists the Polish Endfield pack, and never with Endfield selected. |
 | `Ui.Seen.GuessGame` | `false` | The same card's guess game row was closed or used. |
-| `Ui.Spotlight.Shows.WuWaPolish`, `Ui.Spotlight.Shows.GuessGame` | `0` | Written by Kaption: launches on which each row was on screen. A row retires after 3. |
+| `Ui.Spotlight.Shows.WuWaPolish`, `Ui.Spotlight.Shows.EndfieldPolish`, `Ui.Spotlight.Shows.GuessGame` | `0` | Written by Kaption: launches on which each row was on screen. A row retires after 3. |
 | `Ui.DismissedAnnouncements` | none | Ids of the announcements you closed on Start (newest last, at most 50), so a closed one never comes back. |
 
 ## New story notice (2.6.0)
@@ -168,6 +169,20 @@ Kaption can keep a timer for the selected game's stamina (Original Resin, Trailb
 | `Stamina.SampleLimit` | `200` | The most pictures kept per game; the oldest are deleted first (10 to 5000). |
 
 Where the icon is looked for and how the number is checked comes with the app per game (`games/<id>.json`, `desktop.staminaScreen`), not from this file. Every ten minutes of looking leaves one line in `app.log` starting `Stamina reader cost`.
+
+## In-game hints
+
+A small card over the game: the four shortcuts a player needs most, each with your own key combination, one sentence when a key did something you may not have meant (subtitles hidden, translation stopped), and one sentence when no subtitle shows and Kaption knows why (no dialogue seen yet; text is read but the line is not found, so check that the game's text is in English; someone is talking while subtitles are hidden). That last kind is said once per run of translation, in the game instead of the tray balloon: the balloon still goes out when the card cannot say it (hints are off, the card has no free place, or thirty seconds pass without a free moment), and always for a game in exclusive full screen, where nothing can be drawn over the game. Two shortcuts are also taught unasked, quick translate and "fix this line": each at most twice in the life of the install, one a day, and never once you have used that shortcut. The sheet shows by itself when translation starts with the game in front, on the first three days of a new install and once for an install that already had Kaption; after that only when you ask for it with the shortcut that shows the dialogue frame (Ctrl+Shift+D by default) or with "Pokaż teraz" ("Show it now") on the Skróty (Shortcuts) tab, where the switch is. The card never takes a click or the keyboard from the game: clicks go through it, and its three buttons (keep on screen, move, hide) appear only after a visible pointer has rested on it. It is placed at the left above the dialogue area or at the top, and never on the dialogue, a subtitle or anything Kaption reads. **On Windows 10 the card is visible in recordings and streams**, a pinned sheet included: the card asks Windows to keep it out of screen capture whatever "Show subtitles in recordings" says, and Windows 10 refuses that for this kind of window. Kaption then blacks the card out of its own reads, so translation is not disturbed; where Windows accepts the request, the card is in no recording. Unpin or hide the sheet before you record if you do not want it in the picture. Everything stays on this PC.
+
+| Key | Default | What it does |
+|---|---|---|
+| `Hints.Enabled` | `true` (absent) | The card shows on its own. "Podpowiedzi w grze" on the Skróty tab and "Nie pokazuj więcej" on the card write it. Off, nothing shows unasked, the answers to keys included; asking for the sheet still works. |
+| `Hints.Pinned` | `false` | The sheet stays up while translation runs and the game is in front (the pin on the card). Hiding a pinned sheet unpins it. |
+| `Hints.Place.<game>` | `left` | Where the card goes first for that game (`left` or `top`); the move button writes it. `<game>` is the wire id (`genshin`, `starrail`, `zzz`, `wuwa`, `endfield`). |
+| `Hints.State` | none | Written by Kaption: the days the welcome sheet showed, which shortcuts you have ever used, and how often each of the two tips that teach a shortcut showed. A day or a showing counts once the sheet or the tip has been up for three seconds, or you hid it yourself; one that a new line took down sooner is not counted and comes again. Removing it starts the card over as on an install that already had Kaption. |
+| `Hints.InE2E` | `false` | Testing: lets the card out in the end-to-end test mode, where it is otherwise silent. |
+
+When translation stops, `app.log` gets one line of counts: `Hints: sheet N (welcome N, asked N, pinned N), pinned yes|no; echoes N (hidden N, back N, stopped N, undone N); tips N (no-match N, quick-translate N, key used within 60 s: N); place left N, top N, none N; strip opened N, hidden N, never-again N.` The brackets after `tips` name each tip that appeared with how often it did (also one taken down before it counted), then how often a tip's shortcut was pressed within 60 seconds of it. `undone` is a second press of the hide shortcut within ten seconds of its answer, and `place none` a moment when the card had no free place and was not shown.
 
 ## New in Kaption
 
@@ -232,7 +247,13 @@ Wygląd napisów (Subtitle style) sets these with a true-scale preview. Its thre
 
 | Key | Default | What it does |
 |---|---|---|
-| `Region` | `"763,1797,2226,110"` | Dialogue area as `x,y,width,height` in screen pixels. Set it with the area picker on Gra i napisy, or let the setup window find it. |
+| `Region` | `""` | Dialogue area as `x,y,width,height` in screen pixels. Empty on a new install: Kaption places the game's measured frame on the game's window when it first sees it. |
+| `Region.Mode` | absent | How the area is kept. `"auto"`: the game's own frame (`games/<id>.json`, `desktop.dialogue`), placed again when the game's window moves or changes size (reading pauses until the window has been still for about half a second). `"hand"`: drawn with the picker; once a session, when the game's window is seen, Kaption checks it against the game's measured text and widens it only when it cuts the text, never shrinks or moves it. `"exact"`: typed under Zaawansowane, never changed. Absent (an older install): `"auto"` when nothing is saved or `Region` equals `RegionAutoFilled`, otherwise `"hand"`. "Ustaw automatycznie" on Gra i napisy switches back to `"auto"`. Nothing is placed under `DevSkipGameGate` or after "Continue anyway" for cloud gaming. |
+| `RegionAutoFilled` | absent | The last area Kaption saved by itself; an older install whose `Region` equals it reads as automatic. |
+| `Region.Previous` | absent | The drawing a widen replaced, for the way back. |
+| `Region.Widened` | absent | The area a widen saved; while `Region` is still that one the Start card says Kaption adjusted the frame and offers "Keep it" (clears this and `Region.Previous`) or "Keep exactly my frame" (brings `Region.Previous` back). |
+| `Region.Accepted` | absent | The frame the player kept after the too-big or outside-the-game warning ("Keep mine"); that frame is not warned about again. |
+| `Area.FirstRunPending` | absent | Set when setup finishes the first time; the first stop of translation after it writes the first-run report into `area.json` and clears it. |
 | `Region2` | `""` | Second area for two-box layouts. Empty means one area. |
 | `AnswerRegion` | `""` | Area of the answer choices, for translating them. Empty means off. |
 | `Size` | `22` | Subtitle size, 10 to 36. |
@@ -248,6 +269,8 @@ Wygląd napisów (Subtitle style) sets these with a true-scale preview. Its thre
 | `AutoShrinkText` | `true` | Make the text smaller when a line would need more than two rows. |
 | `Pad` | per game | `[vertical, horizontal]` offset from the dialogue area. Negative vertical puts the overlay above the game text: -140 for Genshin and Honkai: Star Rail, -180 for Zenless Zone Zero, whose lines often wrap to four or five rows. |
 | `PlayerName` | `""` | Your name, used where the dialogue addresses the Traveler. |
+
+Kaption keeps local numbers about the dialogue area per game in `%APPDATA%\Kaption\<Game>\area.json`: how each area came to be (placed, followed, widened, drawn, typed), the window shape at each placement (16:9, 16:10, 21:9, 4:3, other), why it was placed again (moved, resized), what the check of a drawing found, and once, for the first session after setup, a first-run report (how the area came to be, the shape, whether the picker was opened, matched lines, how soon the first line came, whether the Start card had to explain anything). Counts and buckets only: no text, no coordinates, no window title. Nothing is sent; the "Translation stopped" log line carries a summary.
 
 ## Overlay cards
 
@@ -290,6 +313,7 @@ Don't turn these on in builds for players. While `DevSkipGameGate` is `true`, ev
 | `SubtitleDebugMode` | `false` | Stop the video subtitle exporter after the first quick pass, to measure timings. |
 | `SubtitleDetectionFps` | `5` | Frames per second the video subtitle exporter samples. |
 | `SubtitleMinDurationMs` | `200` | Shortest subtitle the exporter writes, in milliseconds. |
+| `Overlay.Placement` | none | `"OverText"` switches on the groundwork for subtitles over the game's own text: Kaption keeps its overlay out of the screen read it reads the dialogue with, and checks by reading, at every start, that it no longer sees its own panel. The panel still sits beside the text and there is no setting for this yet. It does nothing while subtitles are shown in recordings. |
 
 For tests there is also the `KAPTION_CONFIG_DIR` environment variable: it moves `Config.json` to another folder (see [CONTRIBUTING](../.github/CONTRIBUTING.md)).
 

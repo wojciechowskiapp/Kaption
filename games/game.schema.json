@@ -140,6 +140,19 @@
         "h": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 }
       }
     },
+    "dialogue": {
+      "description": "The dialogue block: where the game draws its speaker name and every body row, with margin, as fractions of the 16:9 reference area inside the game window. \"Detect automatically\", setup and the start-up fill read exactly this. text is the measured text extent inside it: the union of the reader's text boxes (they sit a few pixels outside the letters) round the speaker name and every body row, over every dialogue layout measured. tools/games/validate.cjs keeps text inside the block with a margin.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["x", "y", "w", "h", "text"],
+      "properties": {
+        "x": { "$ref": "#/$defs/fraction" },
+        "y": { "$ref": "#/$defs/fraction" },
+        "w": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 },
+        "h": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 },
+        "text": { "$ref": "#/$defs/rect" }
+      }
+    },
     "colour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
     "detect": {
       "type": "object",
@@ -168,7 +181,7 @@
       "additionalProperties": false,
       "required": ["dialogue", "answer", "dialogueContext", "upstreamTextMap", "displayModeTip"],
       "properties": {
-        "dialogue": { "$ref": "#/$defs/rect" },
+        "dialogue": { "$ref": "#/$defs/dialogue" },
         "answer": { "$ref": "#/$defs/rect" },
         "pacing": {
           "description": "Per-game OCR pacing defaults. A key left out means the global default (GameOcrTuning). Bounds are the resolver's clamp.",
@@ -193,10 +206,8 @@
             },
             "stripsSpeakerNameDecoration": { "type": "boolean" },
             "subtitlePadVertical": { "type": "integer", "minimum": -1000, "maximum": 1000 },
-            "regionSplitXFraction": { "type": "number", "exclusiveMinimum": 0, "exclusiveMaximum": 1 },
-            "regionMinWidthFraction": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 },
-            "strictRegionJunkFilter": { "type": "boolean" },
             "ocrJunkFilter": { "description": "Drop HUD readouts, watermarks and stray glyphs (OcrTextJunkFilter) before the speaker/body split on every frame. The geometry classifier always does.", "type": "boolean" },
+            "sideRowFilter": { "description": "Accent classifier: drop rows that start right of 0.62 of the read area (HUD prompts, choice options, the phone panel), after the junk filter. Centred dialogue rows start left of the centre. The speaker-row classifier always does.", "type": "boolean" },
             "dialogueEvidence": { "description": "Paint a match only when the dialogue data vouches for it: a dialogue-graph line, or a known speaker saying something that reads as speech. Map labels, menus and item text are TextMap keys too.", "type": "boolean" },
             "fadedReadFilter": { "description": "Treat a read whose body boxes are barely lit (under 2% of pixels past the binary threshold) as empty: the line is fading out, and keeping it would hide the fade from the change gate.", "type": "boolean" }
           }
@@ -230,6 +241,7 @@
         },
         "staminaScreen": { "$ref": "#/$defs/staminaScreen" },
         "assist": { "$ref": "#/$defs/assist" },
+        "answers": { "$ref": "#/$defs/answers" },
         "notes": {
           "description": "For maintainers: which values are measured and which are provisional. No consumer reads it.",
           "type": "array",
@@ -294,41 +306,73 @@
             "h": { "type": "integer", "minimum": 1, "maximum": 1080 }
       }
     },
+    "assistCanvas": {
+      "description": "The size the game draws its interface for, and how it grows with the window. Measured per game, never assumed.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["width", "height", "scale"],
+      "properties": {
+        "width": { "type": "integer", "minimum": 640, "maximum": 7680 },
+        "height": { "type": "integer", "minimum": 360, "maximum": 4320 },
+        "scale": { "description": "min: by the smaller of width/canvas width and height/canvas height; height or width: by that ratio alone.", "enum": ["min", "height", "width"] }
+      }
+    },
+    "assistChecked": {
+      "description": "What the places were measured on. A game update can move the interface; this is the record to check against.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "aspects", "source"],
+      "properties": {
+        "version": { "description": "The game version of the frames.", "type": "string", "pattern": "^[0-9]+[.][0-9]+(?:[.][0-9]+)?$" },
+        "aspects": {
+          "description": "Window shapes measured. A window of another shape gets no fixed place. \"21:9\" covers 2560x1080 and 3440x1440.",
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 8,
+          "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^[1-9][0-9]?:[1-9][0-9]?$" }
+        },
+        "source": { "description": "Which frames, and where the record is.", "type": "string", "minLength": 8, "maxLength": 300 }
+      }
+    },
+    "answers": {
+      "description": "Where the game draws the player's dialogue choices, with no setup: a box in canvas pixels from a window edge, the option roles of the dialogue graph, and how option text looks (GI-Subtitles/Services/Answers). A game without the block, or a window whose shape is not in `checked.aspects`, gets no answers.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["canvas", "box", "ink", "pillPad", "checked"],
+      "properties": {
+        "canvas": { "$ref": "#/$defs/assistCanvas" },
+        "box": { "description": "The area every measured option stack lies in, plus margin; the rows found in each read give the stack's real extent.", "$ref": "#/$defs/assistBox" },
+        "optionRoles": {
+          "description": "Dialogue-graph roles (the bundle's `rt`) that mark a player's option, compared exactly. Left out: the game's data marks no options, so rows match only exact pack lines.",
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 4,
+          "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*$" }
+        },
+        "ink": {
+          "description": "How option text is told from the scenery behind it.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["level", "lineHeight"],
+          "properties": {
+            "level": { "description": "Brightness (0-255) a pixel of a letter's stroke is above; the option panel stays below it.", "type": "integer", "minimum": 100, "maximum": 254 },
+            "lineHeight": { "description": "Height of one line of option text, top of the tallest letter to the bottom of a descender, in canvas pixels. Not the distance between lines.", "type": "integer", "minimum": 8, "maximum": 120 }
+          }
+        },
+        "pillPad": { "description": "Canvas pixels from the top of an option's detected text box up to the top of its panel: the card above the stack sits clear of it.", "type": "integer", "minimum": 0, "maximum": 64 },
+        "checked": { "$ref": "#/$defs/assistChecked" }
+      }
+    },
     "assist": {
       "description": "What the desktop may read off this game's screen besides the dialogue, for a player who switched a reader on (the in-game helper; GI-Subtitles/Services/Assist). A game without the block gets nothing. `screens` are told apart by small templates at fixed places; `readers` say what is read and where. Fixed places are in pixels of `canvas`, count only in a window whose shape is in `checked.aspects`, and need `canvas`. A reader with `locate: search` finds its own anchor instead (the stamina number) and is not bound to those shapes.",
       "type": "object",
       "additionalProperties": false,
       "required": ["checked", "readers"],
       "properties": {
-        "canvas": {
-          "description": "The size the game draws its interface for, and how it grows with the window. Measured per game, never assumed.",
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["width", "height", "scale"],
-          "properties": {
-            "width": { "type": "integer", "minimum": 640, "maximum": 7680 },
-            "height": { "type": "integer", "minimum": 360, "maximum": 4320 },
-            "scale": { "description": "min: by the smaller of width/canvas width and height/canvas height; height or width: by that ratio alone.", "enum": ["min", "height", "width"] }
-          }
-        },
-        "checked": {
-          "description": "What the places were measured on. A game update can move the interface; this is the record to check against.",
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["version", "aspects", "source"],
-          "properties": {
-            "version": { "description": "The game version of the frames.", "type": "string", "pattern": "^[0-9]+[.][0-9]+(?:[.][0-9]+)?$" },
-            "aspects": {
-              "description": "Window shapes measured. A window of another shape gets no fixed place. \"21:9\" covers 2560x1080 and 3440x1440.",
-              "type": "array",
-              "minItems": 1,
-              "maxItems": 8,
-              "uniqueItems": true,
-              "items": { "type": "string", "pattern": "^[1-9][0-9]?:[1-9][0-9]?$" }
-            },
-            "source": { "description": "Which frames, and where the record is.", "type": "string", "minLength": 8, "maxLength": 300 }
-          }
-        },
+        "canvas": { "$ref": "#/$defs/assistCanvas" },
+        "checked": { "$ref": "#/$defs/assistChecked" },
         "screens": {
           "description": "Screen id to its anchors: one or two small pictures that are on that screen and nowhere else, each at a declared place. Choose pictures that do not change with the input device (no key or button glyphs).",
           "type": "object",
@@ -501,12 +545,23 @@
                   "kind": { "const": "kuro" },
                   "url": { "type": "string", "pattern": "^https://[^\\s]+$" }
                 }
+              },
+              {
+                "description": "GRYPHLINE's official notices (JSON). url: the bulletin list with its lang and code query (the reader adds page and pageSize); page: the official site's notice page the notice id is appended to. The notices print codes with their redemption time, an official codes source.",
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["kind", "url", "page"],
+                "properties": {
+                  "kind": { "const": "gryphline" },
+                  "url": { "type": "string", "pattern": "^https://[^\\s?]+\\?[^\\s]+$" },
+                  "page": { "type": "string", "pattern": "^https://[^\\s]+/$" }
+                }
               }
             ]
           }
         },
         "codes": {
-          "description": "null: the game has no redeem codes. hoyolab: the news worker reads the HoYoLAB codes panel and the site has a codes page with a redeem link. ingame: codes are redeemed only inside the game; the site's codes page shows Copy and the in-game steps (redeemHow) instead of a link, and the news worker reads the sources [news.games.<id>] names (the official Discord follow, the wiki, the checked list).",
+          "description": "null: the game has no redeem codes. hoyolab: the news worker reads the HoYoLAB codes panel and the site has a codes page with a redeem link. ingame: codes are redeemed only inside the game; the site's codes page shows Copy and the in-game steps (redeemHow) instead of a link, and the news worker reads the sources [news.games.<id>] names (the official Discord follow, the wiki, the checked list) and the codes a gryphline feed's notices print.",
           "oneOf": [
             { "type": "null" },
             {

@@ -35,6 +35,9 @@ namespace GI_Subtitles.Services.Detection
         [DllImport("user32.dll")]
         private static extern bool IsWindowVisible(IntPtr hWnd);
 
+        [DllImport("user32.dll")]
+        private static extern bool IsIconic(IntPtr hWnd);
+
         [StructLayout(LayoutKind.Sequential)]
         private struct RECT
         {
@@ -150,6 +153,78 @@ namespace GI_Subtitles.Services.Detection
 
             Logger.Log.Warn($"Game window not found for profile \"{profile.GameId}\"");
             return null;
+        }
+
+        /// <summary>
+        /// The game's own window for placing the dialogue area: a window of the game's process (with the game's title
+        /// for a generic executable), never a window that only names the game (a browser tab, a video). Tells a
+        /// minimised game apart from a closed one. A game without process names (not registered) falls back to its
+        /// titles, as the foreground check does. Lists processes: off the UI thread, or on a click.
+        /// </summary>
+        public static (GameWindowState State, WindowInfo? Window) FindGameClient(GameRegionProfile profile)
+        {
+            if (profile == null) throw new ArgumentNullException(nameof(profile));
+            if (profile.ProcessNames == null || profile.ProcessNames.Length == 0)
+            {
+                var byTitle = profile.WindowTitles is { Length: > 0 } ? FindWindowByTitles(profile.WindowTitles) : null;
+                return (byTitle != null ? GameWindowState.Found : GameWindowState.NotFound, byTitle);
+            }
+
+            var pids = new HashSet<uint>();
+            try
+            {
+                foreach (string name in profile.ProcessNames)
+                {
+                    if (string.IsNullOrWhiteSpace(name)) continue;
+                    foreach (var proc in Process.GetProcessesByName(name))
+                    {
+                        try { pids.Add((uint)proc.Id); }
+                        catch (InvalidOperationException) { /* exited while listing */ }
+                        finally { proc.Dispose(); }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log.Warn($"Process enumeration failed: {ex.Message}");
+            }
+            if (pids.Count == 0) return (GameWindowState.NotFound, null);
+
+            string[] requiredTitles = profile.RequiresWindowTitle ? profile.WindowTitles ?? Array.Empty<string>() : null;
+            WindowInfo? found = null, small = null;
+            bool minimised = false;
+            var title = requiredTitles != null ? new StringBuilder(256) : null;
+            EnumWindows((hWnd, _) =>
+            {
+                if (!IsWindowVisible(hWnd)) return true;
+                GetWindowThreadProcessId(hWnd, out uint pid);
+                if (!pids.Contains(pid)) return true;
+                if (title != null)
+                {
+                    title.Clear();
+                    GetWindowText(hWnd, title, title.Capacity);
+                    if (!GameProcessMatch.TitleMatches(requiredTitles, title.ToString())) return true;
+                }
+                if (IsIconic(hWnd))
+                {
+                    minimised = true;
+                    return true;
+                }
+                var info = GetWindowClientInfo(hWnd);
+                if (info == null || info.Value.GameW <= 100 || info.Value.GameH <= 100) return true;
+                if (DialogueAreaPlacement.IsUsable(new System.Drawing.Rectangle(info.Value.GameX, info.Value.GameY, info.Value.GameW, info.Value.GameH)))
+                {
+                    found = info;
+                    return false;
+                }
+                // A launcher or splash of the same process may come first: keep looking for the game's own window.
+                small ??= info;
+                return true;
+            }, IntPtr.Zero);
+
+            if (found != null) return (GameWindowState.Found, found);
+            if (minimised) return (GameWindowState.Minimised, null);
+            return small != null ? (GameWindowState.Found, small) : (GameWindowState.NotFound, null);
         }
 
         /// <summary>

@@ -16,7 +16,6 @@ using GI_Subtitles.Services.Detection;
 using GI_Subtitles.Services.Security;
 using GI_Subtitles.Services.Translation;
 using GI_Subtitles.Views.Shell;
-using PaddleOCREngine = PaddleOCRSharp.PaddleOCREngine;
 using Logger = GI_Subtitles.Common.Logger;
 
 namespace GI_Subtitles.Views
@@ -54,7 +53,7 @@ namespace GI_Subtitles.Views
         private readonly OnboardingFlow _flow;
         private readonly ObservableCollection<RailItem> _rail = new();
         private CancellationTokenSource _signInCts;
-        private bool _syncingRadios, _gameEntered, _preparing, _finishing, _quitConfirmed, _regionAuto, _regionSaved, _modal;
+        private bool _syncingRadios, _gameEntered, _preparing, _finishing, _quitConfirmed, _regionSaved, _modal;
 
         public Outcome Result { get; private set; }
         /// <summary>First run: what closing meant (0 start the app, 1 not signed in, 2 terms declined, 3 no file key).</summary>
@@ -71,8 +70,6 @@ namespace GI_Subtitles.Views
         public Func<bool> ChooseRegion;
         /// <summary>Rerun: tell the overlay and Start about a new region.</summary>
         public Action RegionChanged;
-        /// <summary>Rerun: the loaded reader, for a better automatic region.</summary>
-        public Func<PaddleOCREngine> GetEngine;
         /// <summary>Rerun: switch game the way the Settings page does (restart prompt).</summary>
         public Action<string> SwitchGame;
         /// <summary>Rerun: the auto-start setting changed in the game step (MainWindow tells the controller and the page).</summary>
@@ -306,8 +303,10 @@ namespace GI_Subtitles.Views
             }
             string id = GameRegionProfile.Get(running).GameId;
             SelectGame(id, persist: true);
-            // A saved area (drawn by hand, or from an earlier run) stays; "Wykryj automatycznie" replaces it on request.
-            bool kept = !OnboardingFlow.ShouldAutoDetectRegion(SavedRegionValid(), userAsked: false);
+            // A drawing kept from before stays (it is checked against the game's text once the app runs); "Wykryj
+            // automatycznie" replaces it on request. An automatic area is placed again on the window as it is now.
+            bool kept = DialogueAreaStore.Mode != DialogueAreaMode.Auto
+                        && !OnboardingFlow.ShouldAutoDetectRegion(SavedRegionValid(), userAsked: false);
             bool regionFound = !kept && await AutoDetectRegionAsync(id);
             if (kept) UpdateRegionUi();
             DetectMark.State = MarkState.Done;
@@ -377,13 +376,16 @@ namespace GI_Subtitles.Views
             DetectRegionButton.IsEnabled = false;
             try
             {
-                var engine = GetEngine?.Invoke();
-                // The worker asks for the overlay's places at the moment it captures; they are read on this thread.
-                var result = await Task.Run(() => AutoRegionService.Detect(gameId, engine,
-                    () => Dispatcher.Invoke(() => (System.Windows.Application.Current?.MainWindow as MainWindow)?.OverlayAreasForOneOffRead())));
+                // The player may draw, or pick another game, while the lookup runs: then this result is stale.
+                string regionBefore = Config.Get<string>("Region", "");
+                DialogueAreaMode modeBefore = DialogueAreaStore.Mode;
+                var result = await Task.Run(() => AutoRegionService.Detect(gameId));
                 if (result?.Success != true || string.IsNullOrEmpty(result.DialogueRegion)) return false;
-                Config.Set("Region", result.DialogueRegion);
-                _regionAuto = true;
+                if (Config.Get<string>("Region", "") != regionBefore || DialogueAreaStore.Mode != modeBefore
+                    || !string.Equals(_flow.Game, gameId, StringComparison.OrdinalIgnoreCase))
+                    return false;
+                // The game's measured frame, automatic: it follows the window once the app runs. No scan, no drawing.
+                DialogueAreaStore.Commit(result.DialogueRegion, DialogueAreaMode.Auto, AreaOrigin.Placed, quiet: false, result.Client);
                 _regionSaved = false;
                 RegionChanged?.Invoke();
                 Logger.Log.Info($"Setup: dialogue area detected for {gameId}: {result.DialogueRegion} ({result.Method}).");
@@ -420,9 +422,8 @@ namespace GI_Subtitles.Views
                 {
                     string picked = RegionPicker.Pick();
                     if (picked == null) return;
-                    Config.Set("Region", picked);
+                    DialogueAreaStore.CommitDrawing(picked);
                 }
-                _regionAuto = false;
                 _regionSaved = false;
                 RegionChanged?.Invoke();
             }
@@ -438,10 +439,16 @@ namespace GI_Subtitles.Views
         {
             string region = Config.Get<string>("Region", "");
             bool set = CaptureRegionValidator.TryParse(region, out _, out _, out _, out _);
-            RegionStatus.Text = !set ? L("onb_Region_None", "Not set yet")
-                : _regionAuto ? L("onb_Region_Auto", "Set automatically")
+            bool auto = DialogueAreaStore.Mode == DialogueAreaMode.Auto;
+            RegionStatus.Text = !set ? (auto ? L("Dash_Region_AutoPending", "Kaption sets the frame by itself once the game is running.") : L("onb_Region_None", "Not set yet"))
+                : auto ? L("onb_Region_Auto", "Set automatically")
                 : _regionSaved ? L("onb_Region_Saved", "Saved, set by hand")
                 : L("onb_Region_Manual", "Drawn by hand");
+            // Automatic: nothing to mark, said once the frame is on the preview. By hand: what a frame should hold, and
+            // the button that hands the area back to Kaption.
+            RegionHint.SetResourceReference(TextBlock.TextProperty, auto ? "onb_Region_AutoHint" : "onb_Region_Hint");
+            RegionHint.Visibility = Vis(set);
+            DetectRegionButton.Visibility = Vis(set && !auto);
             var monitor = RegionPreview.Monitor(region);
             RegionMonitor.Text = monitor == null ? string.Empty : string.Format(CultureInfo.CurrentUICulture,
                 L("shell_Region_Monitor_Format", "Monitor {0} · {1}×{2}"), monitor.MonitorNumber, monitor.MonitorWidth, monitor.MonitorHeight);
@@ -717,8 +724,12 @@ namespace GI_Subtitles.Views
             string game = _flow.Game ?? Config.Get("Game", "Genshin");
             DoneGameText.Text = string.Format(culture, L("onb_Done_Game_Format", "Game: {0}"), GameRegionProfile.DisplayNameOf(game));
             bool regionSet = CaptureRegionValidator.TryParse(Config.Get<string>("Region", ""), out _, out _, out _, out _);
-            DoneRegionMark.State = regionSet ? MarkState.Done : MarkState.Warning;
-            DoneRegionText.Text = L(regionSet ? "onb_Done_Region_Set" : "onb_Done_Region_None", regionSet ? "Dialogue area: set" : "Dialogue area: not set");
+            // Automatic with the game closed is not a missing step: Kaption places the frame when the game starts.
+            bool placedLater = !regionSet && DialogueAreaStore.Mode == DialogueAreaMode.Auto;
+            DoneRegionMark.State = regionSet || placedLater ? MarkState.Done : MarkState.Warning;
+            DoneRegionText.Text = regionSet ? L("onb_Done_Region_Set", "Dialogue area: set")
+                : placedLater ? L("onb_Done_Region_Auto", "Dialogue area: Kaption sets it when the game starts")
+                : L("onb_Done_Region_None", "Dialogue area: not set");
             bool pack = PackOnDisk();
             bool coming = !pack && PackComing();
             DonePackMark.State = pack ? MarkState.Done : coming ? MarkState.Pending : MarkState.Warning;
@@ -738,7 +749,9 @@ namespace GI_Subtitles.Views
                 Config.Set("SetupDismissed", false);
                 Config.Set(SettingsWindow.Intro25SeenKey, true); // the setup already said what 2.5 does
                 Config.Set(SettingsWindow.FirstLinePendingKey, true); // the Start card confirms this install's first line, once
+                Config.Set(DialogueAreaCounters.FirstRunPendingKey, true); // area.json's first-run report, once
                 Config.Set(Shell.SpotlightRules.SeenWuWaKey, true); // a new player just picked from a list that has WuWa
+                Config.Set(Shell.SpotlightRules.SeenEndfieldKey, true); // and from a list that has Endfield
             }
             FinishButton.Focus();
         }
@@ -820,7 +833,9 @@ namespace GI_Subtitles.Views
                 Config.Set("SetupDismissed", false);
                 Config.Set(SettingsWindow.Intro25SeenKey, true);
                 Config.Set(SettingsWindow.FirstLinePendingKey, true);
+                Config.Set(DialogueAreaCounters.FirstRunPendingKey, true);
                 Config.Set(Shell.SpotlightRules.SeenWuWaKey, true); // a new player just picked from a list that has WuWa
+                Config.Set(Shell.SpotlightRules.SeenEndfieldKey, true); // and from a list that has Endfield
             }
             _signInCts?.Cancel();
             base.OnClosing(e);

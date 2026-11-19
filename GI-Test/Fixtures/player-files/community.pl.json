@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "game": "genshin",
+  "lang": "pl",
+  "since": "2026-11-15 20:01:02",
+  "entries": [
+    {
+      "en": "Hold on.",
+      "target": "Zaczekaj.",
+      "acceptedAt": "2026-11-15 20:01:02"
+    },
+    {
+      "en": "Thank you.",
+      "target": "Dziękuję — naprawdę.",
+      "acceptedAt": "2026-11-14T10:00:00Z"
+    }
+  ]
+}

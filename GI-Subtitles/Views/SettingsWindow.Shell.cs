@@ -50,6 +50,8 @@ namespace GI_Subtitles.Views
         public Func<string> LoadedGame;
         /// <summary>What happened to this session's automatic dialogue area, for the card's note (MainWindow).</summary>
         public Func<RegionAutoFillNote> GetRegionAutoFillNote;
+        /// <summary>Why reads are held right now (MainWindow): the game's window cannot carry the frame.</summary>
+        public Func<Services.Detection.AreaHold> GetAreaHold;
         /// <summary>A setting behind a Start gate changed here (MainWindow re-checks auto-start).</summary>
         public Action GatesChanged;
         /// <summary>Open what resolves a gate: the Start button's own dialog or page for it (MainWindow).</summary>
@@ -417,6 +419,8 @@ namespace GI_Subtitles.Views
                 GameSwitchPending = switchPending,
                 LoadedGameName = switchPending && LoadedGame?.Invoke() is string loaded ? GameRegionProfile.DisplayNameOf(loaded) : null,
                 RegionAutoFill = GetRegionAutoFillNote?.Invoke() ?? RegionAutoFillNote.None,
+                AreaAutomatic = Services.Detection.DialogueAreaStore.Mode == Services.Detection.DialogueAreaMode.Auto,
+                AreaHold = GetAreaHold?.Invoke() ?? Services.Detection.AreaHold.None,
             };
         }
 
@@ -445,15 +449,21 @@ namespace GI_Subtitles.Views
                     break;
                 case StartCardKind.SessionFullScreen:
                     titleText = L("shell_Card_FullScreen", "Kaption can't see the game");
-                    detail = L("shell_Card_FullScreen_Detail", "The picture from the dialogue area is black. That usually means the game runs in full screen: switch it to Borderless or Windowed. If it already is, check where the dialogue area sits.");
+                    detail = i.AreaAutomatic
+                        ? L("shell_Card_FullScreen_Detail_Auto", "The picture from the game is black. That usually means exclusive full screen: switch the game to Borderless or Windowed.")
+                        : L("shell_Card_FullScreen_Detail", "The picture from the dialogue frame is black. That usually means the game runs in full screen: switch it to Borderless or Windowed. If it already is, check where the dialogue frame sits.");
                     break;
                 case StartCardKind.SessionNoMatch:
                     titleText = L("shell_Card_NoMatch", "Kaption sees text but can't find the line");
-                    detail = L("shell_Card_NoMatch_Detail", "Is the game's text set to English? Kaption translates from the English text. If it is, check that the dialogue area covers the whole dialogue box.");
+                    detail = i.AreaAutomatic
+                        ? L("shell_Card_NoMatch_Detail_Auto", "Is the game's text set to English? Kaption translates from English.")
+                        : L("shell_Card_NoMatch_Detail", "Is the game's text set to English? Kaption translates from the English text. If it is, check that the dialogue frame covers the whole dialogue box.");
                     break;
                 case StartCardKind.SessionNoDialogue:
                     titleText = L("shell_Card_NoDialogue", "No dialogue seen yet");
-                    detail = L("shell_Card_NoDialogue_Detail", "Talk to someone in the game and the Polish line shows up. If a dialogue is on screen right now and nothing appears, check where the dialogue area sits.");
+                    detail = i.AreaAutomatic
+                        ? L("shell_Card_NoDialogue_Detail_Auto", "Talk to someone in the game and the Polish line shows up by itself.")
+                        : L("shell_Card_NoDialogue_Detail", "Talk to someone in the game and the Polish line shows up. If a dialogue is on screen right now and nothing appears, check where the dialogue frame sits.");
                     break;
                 case StartCardKind.FirstLineWorks:
                     titleText = L("shell_Card_FirstLine", "It works: subtitles are showing");
@@ -510,7 +520,7 @@ namespace GI_Subtitles.Views
                 case StartCardKind.AutoStartBlocked:
                     titleText = L("shell_Card_AutoStartBlocked", "Auto-start on hold");
                     detail = s.RegionAutoFailed
-                        ? L("shell_Card_RegionAutoFailed", "Kaption couldn't find the dialogue area by itself. Mark it once and translation starts.")
+                        ? L("shell_Card_RegionAutoFailed", "Kaption couldn't find the dialogue frame by itself. Mark it once and translation starts.")
                         : GateReason(s.Gate, L);
                     break;
                 case StartCardKind.GameSwitchPending:
@@ -524,10 +534,28 @@ namespace GI_Subtitles.Views
                     titleText = L("shell_Card_Stopped", "Stopped · ready to start");
                     break;
             }
+            // Reads wait for a window that cannot carry the frame: say so in place of what would be a wrong hint.
+            if (s.AreaHold != Services.Detection.AreaHold.None && s.Kind is StartCardKind.Translating or StartCardKind.SessionNoDialogue)
+                detail = AreaHoldText(s.AreaHold, L);
             if (s.ShowRegionAutoSetNote)
             {
-                string note = L("shell_Card_RegionAutoSet", "Kaption set the dialogue area by itself. If subtitles miss the text, adjust the frame on Game and subtitles.");
+                string note = s.RegionNote switch
+                {
+                    RegionAutoFillNote.Adjusted => L("shell_Card_RegionAdjusted", "Kaption adjusted the dialogue frame so long lines fit too."),
+                    RegionAutoFillNote.TooBig => L("shell_Card_RegionTooBig", "This frame covers much more than the dialogue. Kaption will read slower and may pick up menu text."),
+                    RegionAutoFillNote.Outside => L("shell_Card_RegionOutside", "This frame is outside the game's window."),
+                    _ => L("shell_Card_RegionAutoSet", "Kaption set the dialogue frame by itself. There is nothing to mark."),
+                };
                 detail = string.IsNullOrEmpty(detail) ? note : detail + "\n" + note;
+            }
+            // The note's two answers: keep Kaption's widen or bring the drawing back; use the game's frame or keep mine.
+            var noteActions = s.ShowRegionAutoSetNote ? StartCardModel.NoteActions(s.RegionNote) : null;
+            if (find("StateCardNoteActions") is UIElement noteRow)
+                noteRow.Visibility = noteActions != null ? Visibility.Visible : Visibility.Collapsed;
+            if (noteActions is { } pair)
+            {
+                if (find("StateCardNoteFirst") is Button first) FillNoteButton(first, pair.First, L);
+                if (find("StateCardNoteSecond") is Button second) FillNoteButton(second, pair.Second, L);
             }
             // A new state (not a new line count) fades the hero's text in; the first fill and a repeat stay still.
             bool newState = title.Tag is StartCardKind shown && shown != s.Kind;
@@ -551,9 +579,9 @@ namespace GI_Subtitles.Views
                 StartCardAction.OpenPacks => L("shell_Action_OpenPacks", "Go to the _packs"),
                 StartCardAction.OpenBorderlessGuide => L("shell_Action_ShowHow", "How to switch to _Borderless"),
                 StartCardAction.OpenLanguageGuide => L("shell_Action_LanguageGuide", "How to set the game's _language"),
-                StartCardAction.CheckArea => L("shell_Action_CheckArea", "Check the dialogue _area"),
+                StartCardAction.CheckArea => L("shell_Action_CheckArea", "Check the dialogue _frame"),
                 StartCardAction.ResolveGate => s.RegionAutoFailed
-                    ? L("shell_Card_RegionAutoFailed_Action", "_Mark the dialogue area")
+                    ? L("shell_Card_RegionAutoFailed_Action", "_Mark the dialogue frame")
                     : GateAction(s.Gate, L),
                 _ => null,
             };
@@ -570,7 +598,7 @@ namespace GI_Subtitles.Views
             {
                 // "Zmień grę" sits under the action, except where a state has a second fix of its own.
                 secondary.Content = s.Kind == StartCardKind.ReaderFailed ? L("shell_Action_RunOnCpu", "Run on the _processor")
-                    : StartCardModel.OffersAreaAsSecondFix(s.Kind) ? L("shell_Action_CheckArea", "Check the dialogue _area")
+                    : StartCardModel.OffersAreaAsSecondFix(s.Kind, s.AreaAutomatic) ? L("shell_Action_CheckArea", "Check the dialogue _frame")
                     : L("shell_Action_ChangeGame", "Change _game");
             }
 
@@ -584,6 +612,26 @@ namespace GI_Subtitles.Views
                 bar.Value = s.Progress;
             }
         }
+
+        private static void FillNoteButton(Button button, RegionNoteAction action, Func<string, string, string> L)
+        {
+            button.Tag = action;
+            button.Content = action switch
+            {
+                RegionNoteAction.KeepWidened => L("shell_Region_KeepWidened", "Keep it"),
+                RegionNoteAction.KeepExact => L("shell_Region_KeepExact", "Keep exactly my frame"),
+                RegionNoteAction.UseGameFrame => L("shell_Region_UseGameFrame", "Use the game's frame"),
+                _ => L("shell_Region_KeepMine", "Keep mine"),
+            };
+        }
+
+        /// <summary>The Start card's sentence while reads wait for the game's window.</summary>
+        internal static string AreaHoldText(Services.Detection.AreaHold hold, Func<string, string, string> L) => hold switch
+        {
+            Services.Detection.AreaHold.TooSmall => L("shell_Card_AreaHeldSmall", "The game's window is too small, so Kaption can't read the dialogue. Make it bigger and subtitles come back."),
+            Services.Detection.AreaHold.OffScreen => L("shell_Card_AreaHeldOff", "The game's window is partly off the screen, so Kaption can't read the dialogue. Move it back."),
+            _ => string.Empty,
+        };
 
         /// <summary>Why auto-start waits, in the words of the Start button's own dialog for that gate.</summary>
         internal static string GateReason(Services.Automation.StartGate gate, Func<string, string, string> L) => gate switch

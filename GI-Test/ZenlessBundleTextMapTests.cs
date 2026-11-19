@@ -26,8 +26,8 @@ using GI_Subtitles.Services.Data;
 using GI_Subtitles.Services.Security;
 using GI_Subtitles.Services.Translation;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 
 namespace GI_Test
 {
@@ -75,41 +75,41 @@ namespace GI_Test
         /// only thing that can turn a hash back into English is the
         /// <c>textmap_en</c> section carried alongside them.
         /// </summary>
-        private static JObject BuildBundle(string game, bool withTextMapEn)
+        private static JsonObject BuildBundle(string game, bool withTextMapEn)
         {
-            var bundle = new JObject
+            var bundle = new JsonObject
             {
                 ["bundle_version"] = 2,
-                ["dialog_graph"] = new JObject
+                ["dialog_graph"] = new JsonObject
                 {
-                    [Node1.ToString()] = new JObject
+                    [Node1.ToString()] = new JsonObject
                     {
                         ["h"] = Hash1,
                         ["nh"] = 0,
-                        ["n"] = new JArray(Node2),
+                        ["n"] = new JsonArray(Node2),
                         ["rt"] = "TALK",
                     },
-                    [Node2.ToString()] = new JObject
+                    [Node2.ToString()] = new JsonObject
                     {
                         ["h"] = Hash2,
                         ["nh"] = 0,
-                        ["n"] = new JArray(),
+                        ["n"] = new JsonArray(),
                         ["rt"] = "TALK",
                     },
                 },
-                ["hash_to_dialogs"] = new JObject
+                ["hash_to_dialogs"] = new JsonObject
                 {
-                    [Hash1.ToString()] = new JArray(Node1),
-                    [Hash2.ToString()] = new JArray(Node2),
+                    [Hash1.ToString()] = new JsonArray(Node1),
+                    [Hash2.ToString()] = new JsonArray(Node2),
                 },
-                ["npc_names"] = new JObject(),
-                ["talk_index"] = new JObject(),
-                ["quest_info"] = new JObject(),
+                ["npc_names"] = new JsonObject(),
+                ["talk_index"] = new JsonObject(),
+                ["quest_info"] = new JsonObject(),
             };
 
             if (withTextMapEn)
             {
-                bundle["textmap_en"] = new JObject
+                bundle["textmap_en"] = new JsonObject
                 {
                     [Hash1.ToString()] = Line1,
                     [Hash2.ToString()] = Line2,
@@ -119,7 +119,7 @@ namespace GI_Test
             // extension is written LAST on purpose — it mirrors the builder's
             // key order, so a bundle that must be rejected on game identity is
             // rejected only after textmap_en has already streamed past.
-            bundle["extension"] = new JObject
+            bundle["extension"] = new JsonObject
             {
                 ["game"] = game,
                 ["game_version"] = "3.1",
@@ -127,9 +127,9 @@ namespace GI_Test
             return bundle;
         }
 
-        private void WriteBundle(JObject bundle)
+        private void WriteBundle(JsonObject bundle)
         {
-            File.WriteAllText(_bundlePath, JsonConvert.SerializeObject(bundle, Formatting.None));
+            File.WriteAllText(_bundlePath, bundle.ToJsonString());
         }
 
         private string TextMapEnPath => GameDataPaths.TextMapJson(_game, "EN");
@@ -247,7 +247,7 @@ namespace GI_Test
             Assert.IsTrue(install.Success);
             Assert.IsTrue(install.TextMapEnInstalled);
 
-            var written = JsonConvert.DeserializeObject<Dictionary<string, string>>(
+            var written = JsonSerializer.Deserialize<Dictionary<string, string>>(
                 File.ReadAllText(TextMapEnPath));
             Assert.AreEqual(2, written.Count);
             Assert.AreEqual(Line1, written[Hash1.ToString()]);
@@ -302,7 +302,7 @@ namespace GI_Test
 
         /// <summary>
         /// Dialogue text is arbitrary game copy and some of it looks like a
-        /// date. Newtonsoft's default DateParseHandling would rewrite
+        /// date. A reader that parses dates (Newtonsoft's default did) would rewrite
         /// "2024-01-02" into a normalised DateTime on the way through the
         /// reader, changing the very string the matcher keys on.
         /// </summary>
@@ -311,12 +311,12 @@ namespace GI_Test
         {
             const string dateLike = "1997-06-11T00:00:00";
             var bundle = BuildBundle(_game, withTextMapEn: true);
-            ((JObject)bundle["textmap_en"])["999"] = dateLike;
+            bundle["textmap_en"]["999"] = dateLike;
             WriteBundle(bundle);
 
             GamedataSyncService.InstallBundleFromFile(_bundlePath, _game, _protector);
 
-            var written = JsonConvert.DeserializeObject<Dictionary<string, string>>(
+            var written = JsonSerializer.Deserialize<Dictionary<string, string>>(
                 File.ReadAllText(TextMapEnPath));
             Assert.AreEqual(dateLike, written["999"],
                 "date-shaped dialogue must survive the split byte-for-byte");

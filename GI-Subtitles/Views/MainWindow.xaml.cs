@@ -18,6 +18,7 @@ using System.Windows.Media;
 using Path = System.IO.Path;
 using System.Media;
 using GI_Subtitles.Services.Capture;
+using GI_Subtitles.Services.Hints;
 using System.Reflection;
 using System.Threading.Tasks;
 using System.Net;
@@ -612,6 +613,7 @@ namespace GI_Subtitles.Views
                     ClearReadyPlaceholderIfActive();
                     SystemSounds.Exclamation.Play();
                 }
+                OnHintSubtitlesToggledInWindow();
                 data.UpdateDashboardStatus();
             };
             data.IsOcrRunning = () => OCRTimer.IsEnabled;
@@ -624,6 +626,8 @@ namespace GI_Subtitles.Views
             InitGuessNotify();
             InitStamina();
             InitAssist();
+            InitOverlayReadCheck();
+            InitHints();
 
             // Always open settings window on startup (non-modal so UI stays responsive)
             // The end-to-end suite drives it through UI Automation and must not take the focus from whoever uses the PC.
@@ -1184,6 +1188,7 @@ namespace GI_Subtitles.Views
             try
             {
                 IntPtr fg = GetForegroundWindow();
+                _foregroundWindow = fg;
                 if (fg == IntPtr.Zero)
                     return GI_Subtitles.Services.Detection.ForegroundTarget.Other;
 
@@ -1288,6 +1293,16 @@ namespace GI_Subtitles.Views
                     }));
                 }
             }
+            // The dialogue frame (Ctrl+Shift+D) is drawn over the area being read, and Windows 10 keeps it in the
+            // capture: nothing is read through it. While the frame still took the foreground, the check above
+            // paused these ten seconds the same way. Below that check, so a player who leaves the game while the
+            // frame is up still has the subtitle hidden behind them, and shown again when they are back.
+            if (notify.IsRegionOverlayOpen)
+            {
+                return;
+            }
+            // The game's window moved or changed size: no read until it is still and the area is placed on it again.
+            if (HoldReadForDialogueArea()) return;
             if (Interlocked.Exchange(ref OCR_TIMER, 1) == 0)
             {
                 if (!_engineReady) { Interlocked.Exchange(ref OCR_TIMER, 0); return; }
@@ -1316,6 +1331,9 @@ namespace GI_Subtitles.Views
                     catch (Exception ex) { Logger.Log.Warn($"Auto-stop after region loss failed: {ex.Message}"); }
                     return;
                 }
+                // Subtitles over the game's text: the read check runs here when one is due. It lets input through
+                // while it waits, so a tick that ran one reads nothing and the next tick starts from the guards above.
+                if (RunOverlayReadCheckIfDue()) { Interlocked.Exchange(ref OCR_TIMER, 0); return; }
                 // Scope the runtime into SustainedLowLatency for the duration of the tick so
                 // GC avoids blocking Gen2 / LOH compactions while capture + preprocess + OCR
                 // are running. Disposed via using => previous mode restored even if we throw.
@@ -1326,6 +1344,7 @@ namespace GI_Subtitles.Views
                 {
                     // One capture tick: its reads (dialogue, answers, the screen watch) share one entry of mask history.
                     _overlayAreaHistory.NextTick();
+                    FitDetectorToArea();
                     Bitmap target;
                     bool isRegion2Valid = notify.Region2 != null && notify.Region2.Length == 4 &&
                                          int.TryParse(notify.Region2[2], out int region2Width) && region2Width > 0 &&
@@ -1722,23 +1741,16 @@ namespace GI_Subtitles.Views
                 _referenceWindowHeight,
                 this.Height > 0 && !double.IsNaN(this.Height) ? this.Height : _referenceWindowHeight);
 
-            foreach (var screen in Screen.AllScreens)
+            if (PanelScreen() is var (_, scale, centre))
             {
-                if (screen.WorkingArea.Contains(
-                        new System.Drawing.Point(
-                            Convert.ToInt16(notify.Region[0]),
-                            Convert.ToInt16(notify.Region[1]))))
-                {
-                    double scale = GetScaleForScreen(screen);
-                    double left = screen.Bounds.Left / scale;
+                // Width based on OCR region width with extra padding
+                double width = Convert.ToInt16(notify.Region[2]) / scale + 200;
 
-                    // Width based on OCR region width with extra padding
-                    double width = Convert.ToInt16(notify.Region[2]) / scale + 200;
-
-                    this.Left = left + (screen.Bounds.Width / scale - width) / 2 + Config.GetPadHorizontal();
-                    this.Width = width;
-                    this.Top = baseTop;
-                }
+                // Automatic mode: centred on the game's window, so the panel stays over a windowed game. The offset a drag
+                // saves is measured from this same centre (PersistManualPadAfterDrag), so an area change never moves it.
+                this.Left = OverlayPlacement.WindowLeft(centre, width, Config.GetPadHorizontal());
+                this.Width = width;
+                this.Top = baseTop;
             }
             // Height is now content-driven; do not hard-code here
 
@@ -1779,20 +1791,8 @@ namespace GI_Subtitles.Views
             {
                 if (notify?.Region == null || notify.Region.Length < 4) return;
 
-                Screen targetScreen = null;
-                foreach (var screen in Screen.AllScreens)
-                {
-                    if (screen.WorkingArea.Contains(
-                            new System.Drawing.Point(
-                                Convert.ToInt16(notify.Region[0]),
-                                Convert.ToInt16(notify.Region[1]))))
-                    {
-                        targetScreen = screen;
-                        break;
-                    }
-                }
-                if (targetScreen == null)
-                    targetScreen = Screen.PrimaryScreen;
+                // The monitor the panel is on (UpdateWindowPosition): the game's, for a windowed game across two.
+                Screen targetScreen = PanelScreen()?.Screen ?? Screen.PrimaryScreen;
 
                 double screenScale = GetScaleForScreen(targetScreen);
                 int fontSize = Config.Get<int>("Size", SubtitleOverlayDefaults.FontSize);
@@ -2030,8 +2030,11 @@ namespace GI_Subtitles.Views
                     if (_readAwaitingOutcome)
                     {
                         _readAwaitingOutcome = false;
-                        _sessionEvidence.OnRead(
-                            Services.Detection.SessionEvidence.Classify(ocrText, _detectedNpcName, resolution, gameUi), ocrText);
+                        var outcome = Services.Detection.SessionEvidence.Classify(ocrText, _detectedNpcName, resolution, gameUi);
+                        _sessionEvidence.OnRead(outcome, ocrText);
+                        NoteAreaRead(outcome);
+                        // Subtitles over the game's text: was that the app's own line? Before the line on screen changes.
+                        WatchForOwnLine();
                     }
 
                     // Community fixes, then the player's own, over the pack (exact key, no allocation); with no text
@@ -2042,6 +2045,8 @@ namespace GI_Subtitles.Views
                     string header = shown.Header;
                     string content = shown.Content;
                     bool displayingPrediction = shown.IsPrediction;
+                    // For WatchForOwnLine: this read gave the line (before an empty one is replaced by the line kept on screen).
+                    bool readGaveTheLine = hasOcrText && !displayingPrediction && !string.IsNullOrEmpty(content);
 
                     // Clear prediction once OCR confirms (content is set from OCR match)
                     if (!string.IsNullOrEmpty(content) && _predictedContent != null && hasOcrText)
@@ -2077,6 +2082,7 @@ namespace GI_Subtitles.Views
                     // Check whether the content has changed (mainly check content, which is the main text)
                     bool contentChanged = content != lastContent;
                     bool headerChanged = header != lastHeader;
+                    _selfRead.LineDecided(ocrText, readGaveTheLine, contentChanged);
 
                     // Consolidate layout updates: each call queues a Dispatcher.BeginInvoke
                     // which runs Measure/layout and sets Height/Top. Calling it 2-4 times per
@@ -2123,7 +2129,10 @@ namespace GI_Subtitles.Views
 
                             // A new line on screen (not a restore or a refinement of the same line) counts for "Tłumaczę · 37 linii".
                             if (!string.IsNullOrEmpty(content) && !isRecentRestore && !isPredictionRefinement)
+                            {
                                 data?.CountTranslatedLine();
+                                NoteHintLineShown();
+                            }
 
                             if (!isRecentRestore && !isPredictionRefinement)
                             {
@@ -2288,7 +2297,9 @@ namespace GI_Subtitles.Views
         {
             try
             {
-                var now = OverlayScreenAreas();
+                // The frame came from the capture backend: OwnAreasInFrame leaves the subtitle panel out while the read
+                // check's proof holds, and nothing else.
+                var now = OwnAreasInFrame();
                 var before = _overlayAreaHistory.Observe(now, Environment.TickCount64);
                 OverlayMask.Apply(bitmap, new System.Drawing.Rectangle(captureX, captureY, captureW, captureH), now, before);
             }
@@ -2300,19 +2311,38 @@ namespace GI_Subtitles.Views
 
         /// <summary>
         /// Where Kaption draws over the game right now, in screen pixels: the subtitle panel while any of it shows (a fade
-        /// included) and the Ctrl+Q popup while it is open and for a moment after it closed. Every read of the screen blacks these out (the dialogue read,
+        /// included), the Ctrl+Q popup while it is open and for a moment after it closed, and the hint card while a read can
+        /// show it. Every read of the screen blacks these out (the dialogue read,
         /// Ctrl+Q, the dialogue-area search, the build card's UID read), so Kaption never reads its own text. Call on
         /// the UI thread. Of this window only the panel
         /// counts: the window is the dialogue area's width plus 200 DIP and see-through beside the panel, where the game,
         /// and its UID, show.
         /// </summary>
-        internal IReadOnlyList<System.Drawing.Rectangle> OverlayScreenAreas()
+        /// <param name="throughCaptureBackend">
+        /// The read goes through the capture backend: the subtitle panel is left out while the read check's proof holds
+        /// for that very reader (PanelProvenOutOfReads, MainWindow.ReadCheck.cs), asked here, at the read. Only the
+        /// panel: the Ctrl+Q popup and the hint card are other windows that nothing was proven about, and a one-off
+        /// screen copy still sees the panel.
+        /// </param>
+        internal IReadOnlyList<System.Drawing.Rectangle> OverlayScreenAreas(bool throughCaptureBackend = false)
+        {
+            List<System.Drawing.Rectangle> areas = SubtitleAndPopupAreas(withoutPanel: throughCaptureBackend && PanelProvenOutOfReads);
+            // The hint card and its strip, only while a read can show them (each window keeps Windows' own answer).
+            areas.AddRange(HintAreasInFrame());
+            return areas;
+        }
+
+        /// <summary>
+        /// The subtitle panel and the Ctrl+Q popup, as <see cref="OverlayScreenAreas"/> describes them. Without the
+        /// panel only for a read that is proven not to see it; the hint card's placement asks for the panel always.
+        /// </summary>
+        private List<System.Drawing.Rectangle> SubtitleAndPopupAreas(bool withoutPanel = false)
         {
             var areas = new List<System.Drawing.Rectangle>(2);
             try
             {
                 var panel = SubtitleBackground;
-                if (IsVisible && Opacity > 0 && panel != null && panel.IsVisible && panel.Opacity > 0
+                if (!withoutPanel && IsVisible && Opacity > 0 && panel != null && panel.IsVisible && panel.Opacity > 0
                     && PresentationSource.FromVisual(this) != null)
                 {
                     var area = PanelScreenArea(this, panel);
@@ -2381,7 +2411,7 @@ namespace GI_Subtitles.Views
                 int.TryParse(region[2], out int w) && int.TryParse(region[3], out int h))
             {
                 Bitmap bmp = CaptureRegionFromBackend(region);
-                if (bmp != null && OverlayCanBeInFrame)
+                if (bmp != null && OwnWindowsCanBeInFrame)
                     MaskOverlayAreas(bmp, x, y, w, h);
                 return bmp;
             }
@@ -2511,6 +2541,7 @@ namespace GI_Subtitles.Views
                 _captureBackend = candidate;
                 candidate = null;
                 previous?.Dispose();
+                OnOverlayReaderReplaced();
                 _consecutiveDxgiNullFrames = 0;
                 _dxgiRetryAfterUtc = DateTime.MinValue;
                 _captureFailureLog.ResetAll();
@@ -2537,6 +2568,7 @@ namespace GI_Subtitles.Views
             Logger.Log.Warn($"DXGI capture unavailable, falling back to GDI: {reason}");
             _captureBackend?.Dispose();
             _captureBackend = new GdiScreenCapture();
+            OnOverlayReaderReplaced();
             _consecutiveDxgiNullFrames = 0;
             _dxgiRetryAfterUtc = allowDxgiRetry
                 ? DateTime.UtcNow + DxgiReinitRetryInterval
@@ -2970,13 +3002,52 @@ namespace GI_Subtitles.Views
         private bool TryGateRegionConfigured()
         {
             if (HasConfiguredRegion()) return true;
+            // Automatic mode places the game's frame by itself; only a missing game window stops the start.
+            if (TryPlaceAreaOnStart(out var why)) return true;
+
+            if (_areaMode == GI_Subtitles.Services.Detection.DialogueAreaMode.Auto
+                && GI_Subtitles.Services.Detection.DialogueArea.MayPlace(AreaContext(busy: false)))
+            {
+                Logger.Log.Info($"OCR start blocked: no dialogue frame yet and none could be placed ({why}).");
+                // What stops it decides what is said: a game that is not there is started, one that is there but small,
+                // minimised or off the screen is not. A player in the cloud has no game window to place it on: the way
+                // on, marking it by hand, is named under the sentence.
+                (string title, string body) = why switch
+                {
+                    GI_Subtitles.Services.Detection.AreaPlaceFailure.Minimised => (
+                        LocalizedString("Dialog_AreaMinimised_Title", "The game is minimised"),
+                        LocalizedString("Dialog_AreaMinimised_Body", "Bring it back to the screen and Kaption will set the dialogue frame.")),
+                    GI_Subtitles.Services.Detection.AreaPlaceFailure.TooSmall => (
+                        LocalizedString("Dialog_AreaTooSmall_Title", "The game's window is too small"),
+                        LocalizedString("Dialog_AreaTooSmall_Body", "Make it bigger and Kaption will set the dialogue frame.")),
+                    GI_Subtitles.Services.Detection.AreaPlaceFailure.OffScreen => (
+                        LocalizedString("Dialog_AreaOffScreen_Title", "The game's window is partly off the screen"),
+                        LocalizedString("Dialog_AreaOffScreen_Body", "Move it back onto the screen and Kaption will set the dialogue frame.")),
+                    _ => (
+                        LocalizedString("Dialog_AreaStartGame_Title", "Start the game first"),
+                        LocalizedString("Dialog_AreaStartGame_Body", "Start the game and Kaption will set the dialogue frame.")),
+                };
+                bool markIt = GI_Subtitles.Views.ModernDialog.Confirm(
+                    owner: this,
+                    title: title,
+                    body: why == GI_Subtitles.Services.Detection.AreaPlaceFailure.NoWindow
+                        ? body + "\n\n" + LocalizedString("Dialog_AreaStartGame_Cloud", "Playing in the cloud, like GeForce Now? The game doesn't run on this PC, so mark the frame by hand.")
+                        : body,
+                    primaryText: LocalizedString("Dialog_AreaStartGame_Mark", "Mark it myself"),
+                    secondaryText: LocalizedString("Common_OK", "OK"),
+                    severity: GI_Subtitles.Views.DialogSeverity.Info,
+                    dangerousPrimary: true);
+                if (!markIt) return false;
+                data?.OnSelectRegion?.Invoke();
+                return HasConfiguredRegion();
+            }
 
             Logger.Log.Info("OCR start blocked: no capture region configured.");
             GI_Subtitles.Views.ModernDialog.Warn(
                 owner: this,
-                title: LocalizedString("Dialog_RegionMissing_Title", "No dialogue area yet"),
+                title: LocalizedString("Dialog_RegionMissing_Title", "No dialogue frame yet"),
                 body: LocalizedString("Dialog_RegionMissing_Body", "Before you start translating, mark where the game's dialogue shows up on screen."),
-                details: LocalizedString("Dialog_RegionMissing_Details", "Open Game and subtitles and click Detect automatically, or Adjust the frame to draw it yourself. Then try again."));
+                details: LocalizedString("Dialog_RegionMissing_Details", "Open Game and subtitles and choose \u201cSet automatically\u201d, or \u201cAdjust the frame\u201d to mark it by hand. Then try again."));
             return false;
         }
 
@@ -3181,10 +3252,14 @@ namespace GI_Subtitles.Views
             WarmDialogueContextIfNew();
             // A new run of translation: the session check starts from nothing.
             _sessionEvidence.Reset();
+            StartAreaRun();
             _readAwaitingOutcome = false;
             data?.ResetSessionCheck();
+            // Subtitles over the game's text: the first capture tick proves it by reading (a no-op without the key).
+            OnTranslationStarting();
             OCRTimer.Start();
             UITimer.Start();
+            OnHintRunStarted();
         }
 
         /// <summary>
@@ -3199,6 +3274,18 @@ namespace GI_Subtitles.Views
         {
             _ = data?.ContextEngine?.WarmUpAsync();
         }
+
+        /// <summary>
+        /// What the overlap dialogs and the red alert say. In automatic mode the frame is the game's own, so the advice is
+        /// to move the subtitles, never to draw the frame again.
+        /// </summary>
+        private string OverlapBody() => _areaMode == GI_Subtitles.Services.Detection.DialogueAreaMode.Auto
+            ? LocalizedString("Dialog_OverlayInRegion_Body_Auto", "The subtitles sit on the game's dialogue, so Kaption would read its own translation. Drag them higher or lower and translation picks up again.")
+            : LocalizedString("Dialog_OverlayInRegion_Body", "The subtitle box is sitting on top of the game's dialogue, so Kaption would start reading its own translation and loop forever. Drag the subtitle box out of the way, change its position in Subtitle style, or press Ctrl+Shift+R to mark the dialogue frame again. Translation resumes as soon as the box is clear.");
+
+        private string OverlapDetails() => _areaMode == GI_Subtitles.Services.Detection.DialogueAreaMode.Auto
+            ? LocalizedString("Dialog_OverlayInRegion_Details_Auto", "Still overlapping? On Subtitle style, move the subtitles with the Up and down slider.")
+            : LocalizedString("Dialog_OverlayInRegion_Details", "Still overlapping after moving it? On Subtitle style, move the subtitles higher with Up and down, or lower Max height under Advanced. Guide with pictures: kaption.one/how-to/region#overlap");
 
         private bool TryGateOverlayNotInRegion()
         {
@@ -3216,10 +3303,12 @@ namespace GI_Subtitles.Views
                 bool bypass = GI_Subtitles.Views.ModernDialog.Confirm(
                     owner: this,
                     title: LocalizedString("Dialog_OverlayInRegion_Title", "⚠ Subtitles cover the game's dialogue"),
-                    body: LocalizedString("Dialog_OverlayInRegion_Body", "The subtitle box is sitting on top of the game's dialogue, so Kaption would start reading its own translation and loop forever. Drag the subtitle box out of the way, change its position in Subtitle style, or press Ctrl+Shift+R to redraw the dialogue area. Translation resumes as soon as the box is clear."),
-                    details: LocalizedString("Dialog_OverlayInRegion_Details", "Still overlapping after moving it? On Subtitle style, move the subtitles higher with Up and down, or lower Max height under Advanced. Guide with pictures: kaption.one/how-to/region#overlap"),
+                    body: OverlapBody(),
+                    details: OverlapDetails(),
                     primaryText: LocalizedString("Dialog_OverlayInRegion_Primary", "Continue anyway"),
-                    secondaryText: LocalizedString("Dialog_OverlayInRegion_Secondary", "Pick the area again"),
+                    secondaryText: _areaMode == GI_Subtitles.Services.Detection.DialogueAreaMode.Auto
+                        ? LocalizedString("Dialog_OverlayInRegion_SecondaryAuto", "I'll move the subtitles")
+                        : LocalizedString("Dialog_OverlayInRegion_Secondary", "Mark the frame again"),
                     severity: GI_Subtitles.Views.DialogSeverity.Warn,
                     dangerousPrimary: true);
 
@@ -3230,7 +3319,10 @@ namespace GI_Subtitles.Views
                     return true;
                 }
 
-                // User chose "Pick the area again" — fire the region picker instead
+                // In automatic mode the frame is right and the subtitles are what moves: no picker.
+                if (_areaMode == GI_Subtitles.Services.Detection.DialogueAreaMode.Auto) return false;
+
+                // User chose "Mark the frame again" — fire the region picker instead
                 // of just saying no. Cheaper than making them dig through menus
                 // to find the button after the dialog already told them what
                 // to do.
@@ -3327,7 +3419,67 @@ namespace GI_Subtitles.Views
             // A new dialogue area is a new trial: what the old one read says nothing about it.
             _sessionEvidence.Reset();
             data?.ResetSessionCheck();
+            // Early start only: the OCR tick is what catches every way the area changes (auto-fill, onboarding).
+            if (_engineReady) FitDetectorToArea();
             ShowOverlapWarnIfNeeded(dialogOwner, clearOverride: true);
+        }
+
+        // The engine and area FitDetectorToArea last settled; UI thread only.
+        private PaddleOCREngine _detectorFitEngine;
+        private string[] _detectorFitArea;
+        private int _detectorFitInFlight;
+
+        /// <summary>
+        /// DirectML keeps one fast detector shape per session, the first it ran, so an area picked after the engine
+        /// loaded read about four times slower until a restart (audit B1). When the dialogue area's shape differs,
+        /// rebuild the detector in the background. Free on the tick while nothing changed: every area change
+        /// replaces <c>notify.Region</c>.
+        /// </summary>
+        private void FitDetectorToArea()
+        {
+            PaddleOCREngine engine = data?.engine;
+            string[] area = notify?.Region;
+            if (engine == null || area == null) return;
+            if (ReferenceEquals(engine, _detectorFitEngine) && ReferenceEquals(area, _detectorFitArea)) return;
+            if (!GI_Subtitles.Services.Detection.CaptureRegionValidator.TryParse(area, out _, out _, out int width, out int height))
+                return;
+            if (engine.NeedsDetectorFor(new OpenCvSharp.Size(width, height)))
+            {
+                // One rebuild at a time; a change during it is picked up on a later tick.
+                if (Interlocked.CompareExchange(ref _detectorFitInFlight, 1, 0) != 0) return;
+                SettingsWindow settings = data;
+                Task.Run(() =>
+                {
+                    try
+                    {
+                        settings.FitDetectorToArea(() =>
+                            GI_Subtitles.Services.Detection.CaptureRegionValidator.TryParse(
+                                notify?.Region, out _, out _, out int w, out int h)
+                                ? new OpenCvSharp.Size(w, h)
+                                : null);
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Log.Warn($"OCR detector fit to the dialogue area failed: {ex.Message}");
+                    }
+                    finally
+                    {
+                        Volatile.Write(ref _detectorFitInFlight, 0);
+                        // An area settled while this ran was judged against the old shape: judge it again.
+                        try
+                        {
+                            Dispatcher.BeginInvoke(new Action(() =>
+                            {
+                                _detectorFitEngine = null;
+                                _detectorFitArea = null;
+                            }));
+                        }
+                        catch (Exception ex) { Logger.Log.Warn($"OCR detector fit: could not reset its check: {ex.Message}"); }
+                    }
+                });
+            }
+            _detectorFitEngine = engine;
+            _detectorFitArea = area;
         }
 
         /// <summary>
@@ -3585,8 +3737,7 @@ namespace GI_Subtitles.Views
             // runtime alert). Short badge variant lives in Overlap_Badge_Warning.
             string title = LocalizedString("Dialog_OverlayInRegion_Title",
                 "⚠ Subtitles cover the game's dialogue");
-            string body = LocalizedString("Dialog_OverlayInRegion_Body",
-                "The subtitle box is sitting on top of the game's dialogue, so Kaption would start reading its own translation and loop forever. Drag the subtitle box out of the way, change its position in Subtitle style, or press Ctrl+Shift+R to redraw the dialogue area. Translation resumes as soon as the box is clear.");
+            string body = OverlapBody();
 
             _overlapAlertOverlay.Show(
                 regionScreenPx: check.RegionRect,
@@ -3742,8 +3893,8 @@ namespace GI_Subtitles.Views
                 GI_Subtitles.Views.ModernDialog.Warn(
                     owner: dialogOwner ?? this,
                     title: LocalizedString("Dialog_OverlayInRegion_Title", "⚠ Subtitles cover the game's dialogue"),
-                    body: LocalizedString("Dialog_OverlayInRegion_Body", "The subtitle box is sitting on top of the game's dialogue, so Kaption would start reading its own translation and loop forever. Drag the subtitle box out of the way, change its position in Subtitle style, or press Ctrl+Shift+R to redraw the dialogue area. Translation resumes as soon as the box is clear."),
-                    details: LocalizedString("Dialog_OverlayInRegion_Details", "Still overlapping after moving it? On Subtitle style, move the subtitles higher with Up and down, or lower Max height under Advanced. Guide with pictures: kaption.one/how-to/region#overlap"));
+                    body: OverlapBody(),
+                    details: OverlapDetails());
             }
             catch (Exception ex)
             {
@@ -3814,7 +3965,6 @@ namespace GI_Subtitles.Views
                     notify.ChooseRegion();
                     return !string.Equals(before, Config.Get<string>("Region", ""), StringComparison.Ordinal);
                 },
-                GetEngine = () => data?.engine,
                 SwitchGame = id => data?.SwitchGame(id),
                 ReadyState = () => (data?.IsMatcherReady == true, data?.Engine == SettingsWindow.EngineStatus.Ready, data?.engine?.IsUsingGpu == true),
                 AutoStartChanged = on =>
@@ -3825,7 +3975,7 @@ namespace GI_Subtitles.Views
             };
             w.RegionChanged = () =>
             {
-                notify.Region = Config.Get<string>("Region", "").Split(',');
+                // DialogueAreaStore.Changed already gave the reader the new area.
                 data?.UpdateDashboardRegionInfo();
                 OnCaptureRegionUserChange(dialogOwner: w);
             };
@@ -4708,7 +4858,7 @@ namespace GI_Subtitles.Views
             try
             {
                 if (notify?.Region == null || notify.Region.Length < 4) return;
-                if (!int.TryParse(notify.Region[0], out int regionX)) return;
+                if (!int.TryParse(notify.Region[0], out _)) return;
                 if (!int.TryParse(notify.Region[1], out int regionY)) return;
                 if (!int.TryParse(notify.Region[2], out int regionW)) return;
 
@@ -4721,22 +4871,12 @@ namespace GI_Subtitles.Views
                 int newPadV = OverlayPlacement.PadFor(this.Top, this.ActualHeight > 0 ? this.ActualHeight : this.Height,
                     regionY / scale, regionH / scale, _referenceWindowHeight);
 
-                // Horizontal pad: overlay is centred on screen + PadHorizontal.
-                // Derive from where the user dropped the box.
-                Screen targetScreen = null;
-                foreach (var screen in Screen.AllScreens)
-                {
-                    if (screen.Bounds.Contains(new System.Drawing.Point(regionX, regionY)))
-                    {
-                        targetScreen = screen;
-                        break;
-                    }
-                }
-                if (targetScreen == null) targetScreen = Screen.PrimaryScreen;
-                double screenScale = GetScaleForScreen(targetScreen);
-                double expectedLeft = targetScreen.Bounds.Left / screenScale
-                                      + (targetScreen.Bounds.Width / screenScale - (regionW / screenScale + 200)) / 2;
-                int newPadH = (int)Math.Round(this.Left - expectedLeft);
+                // Horizontal pad: the panel is centred where UpdateWindowPosition centres it (the game's window in
+                // automatic mode, the monitor otherwise) and moved by this offset. Measured from any other centre, the
+                // next area change put the panel somewhere else than where it was dropped.
+                int newPadH = Config.GetPadHorizontal(0);
+                if (PanelScreen() is var (_, screenScale, centre))
+                    newPadH = OverlayPlacement.HorizontalPadFor(this.Left, centre, regionW / screenScale + 200);
 
                 Config.Set("Pad", new int[] { newPadV, newPadH });
                 Logger.Log.Info($"Overlay drag: saved new Pad = [{newPadV},{newPadH}] (top={this.Top}, left={this.Left}).");
@@ -4785,6 +4925,7 @@ namespace GI_Subtitles.Views
             const int WM_HOTKEY = 0x0312;
             if (msg == WM_HOTKEY)
             {
+                NoteHintKey(wParam.ToInt32());
                 if (wParam.ToInt32() == HOTKEY_ID_1)
                 {
                     bool wasRunning = OCRTimer.IsEnabled;
@@ -4818,6 +4959,8 @@ namespace GI_Subtitles.Views
                     }
                     NotifyUserToggled(wasRunning);
                     data.UpdateDashboardStatus();
+                    // A stop by accident looks like a broken app: the card says what the key did.
+                    if (wasRunning && !OCRTimer.IsEnabled) RequestHint(HintRequest.TranslationStopped);
                     handled = true;
                 }
                 else if (wParam.ToInt32() == HOTKEY_ID_2)
@@ -4846,6 +4989,7 @@ namespace GI_Subtitles.Views
                         SystemSounds.Exclamation.Play();
                     }
                     data.UpdateDashboardStatus();
+                    OnHintSubtitlesToggledByKey(ShowText);
                 }
                 else if (wParam.ToInt32() == HOTKEY_ID_4)
                 {
@@ -4858,6 +5002,8 @@ namespace GI_Subtitles.Views
                     // subtitle box stays draggable by default.
                     notify.ShowRegionOverlay();
                     SystemSounds.Hand.Play();
+                    // The same ten-second look also shows the sheet of shortcuts. Nothing is switched.
+                    RequestHint(HintRequest.Sheet);
                     handled = true;
                 }
                 else if (wParam.ToInt32() == HOTKEY_ID_5)
@@ -5564,6 +5710,13 @@ namespace GI_Subtitles.Views
         /// </summary>
         internal void ApplyCaptureVisibility()
         {
+            ApplyWindowsHiding();
+            ApplyDuplicationExclusion();
+        }
+
+        /// <summary>The part of <see cref="ApplyCaptureVisibility"/> that asks Windows to hide the overlay from screen capture, or to show it.</summary>
+        private void ApplyWindowsHiding()
+        {
             bool show = CaptureVisibility.ShowInRecordings;
             var answer = WindowsHideAnswer.NotAsked;
             if (_mainWindowHandle != IntPtr.Zero)
@@ -5587,8 +5740,26 @@ namespace GI_Subtitles.Views
         /// recordings that show the overlay never do.
         /// </summary>
         private bool OverlayCanBeInFrame =>
-            CaptureVisibility.MasksOverlay(_showInRecordings, _windowsHideAnswer, _captureBackend is DxgiScreenCapture)
+            // Subtitles over the text: only the read check lets the panel out of the mask (OverlayScreenAreas), never
+            // Windows' answer alone.
+            _readProof.Wanted
+            || CaptureVisibility.MasksOverlay(_showInRecordings, _windowsHideAnswer, _captureBackend is DxgiScreenCapture)
             || Environment.TickCount64 < _maskWhileHidingSettlesUntil;
+
+        /// <summary>
+        /// Whether any of Kaption's windows can be in a frame the app reads: the subtitle overlay by its own answer
+        /// above, or the hint card by the answer Windows gave that window. With no card up this is the overlay's alone.
+        /// </summary>
+        private bool OwnWindowsCanBeInFrame => OverlayCanBeInFrame || HintWindowsCanBeInFrame();
+
+        /// <summary>
+        /// What a read through the capture backend blacks out (the tick's reads and the screen watch, which copies
+        /// from the tick's frame). A window Windows keeps out of the frame is left out, so the subtitle panel is not
+        /// blacked out on the hint card's account, nor the other way round; and the subtitle panel alone is left out
+        /// while the read check's proof holds for that reader.
+        /// </summary>
+        private IReadOnlyList<System.Drawing.Rectangle> OwnAreasInFrame() =>
+            OverlayCanBeInFrame ? OverlayScreenAreas(throughCaptureBackend: true) : HintAreasInFrame();
 
         /// <summary>What a screen recording shows right now, for the line under the setting.</summary>
         internal CaptureStatus CaptureStatus => CaptureVisibility.Status(_showInRecordings, _windowsHideAnswer);

@@ -85,6 +85,98 @@ namespace GI_Test
             foreach (string p in written) Console.WriteLine(p);
         }
 
+        /// <summary>Where the guide renders for the site go (KAPTION_GUIDES_DIR); landing/scripts/guide-shots.mjs turns them into public/app-*.webp.</summary>
+        public static string PublishDir =>
+            Environment.GetEnvironmentVariable("KAPTION_GUIDES_DIR") is { Length: > 0 } dir
+                ? dir
+                : Path.Combine(Path.GetTempPath(), "kaption-guides", "renders");
+
+        public static bool PublishRequested => Environment.GetEnvironmentVariable("KAPTION_RENDER_GUIDES") == "1";
+
+        /// <summary>
+        /// The setup and Settings pictures the site's guides use once the switch for the automatic dialogue frame is on
+        /// (landing/src/data/app-flow.ts), 1280×720, dark, Polish and English, drawn from the app's own windows with the
+        /// live games and the version the next build carries (RenderFixtures). A publishing render, not a check:
+        /// KAPTION_RENDER_GUIDES=1. The names carry the "-area" suffix the site's pictures for that switch have.
+        /// </summary>
+        [TestMethod]
+        public void RendersTheGuideShotsForTheAutomaticFrame()
+        {
+            if (!PublishRequested) Assert.Inconclusive("Set KAPTION_RENDER_GUIDES=1 for the guides' publishing renders.");
+            var written = new List<string>();
+            RunSta(() =>
+            {
+                foreach (string lang in new[] { "pl-PL", "en-US" })
+                {
+                    string tag = lang.Substring(0, 2);
+                    foreach (OnboardingStep step in OnboardingFlow.Steps)
+                    {
+                        var host = LoadLooseWindow("Views/OnboardingWindow.xaml", lang, out var window, "Dark");
+                        RenderFixtures.OfferLiveGamesOnly(window);
+                        OnboardingTests.Fill(host, window, step, lang);
+                        Layout(host, 1000, 720);
+                        written.Add(WriteTo(PublishDir, Frame(Snapshot(host), true), $"app-setup-{step.ToString().ToLowerInvariant()}-area-{tag}.png"));
+                    }
+
+                    var start = LoadLooseWindow("Views/SettingsWindow.xaml", lang, out var startWindow, "Dark");
+                    ShellRenderTests.Fill(start, startWindow, ShellRenderTests.Scene.WaitingForGame, lang);
+                    Select(startWindow, SettingsNavigation.Home);
+                    Layout(start, Width, Height);
+                    written.Add(WriteTo(PublishDir, Snapshot(start), $"app-start-waiting-area-{tag}.png"));
+
+                    // The Game and subtitles page scrolled to its dialogue area card.
+                    var game = LoadLooseWindow("Views/SettingsWindow.xaml", lang, out var gameWindow, "Dark");
+                    ShellRenderTests.Fill(game, gameWindow, ShellRenderTests.Scene.Translating, lang);
+                    Select(gameWindow, SettingsNavigation.Game);
+                    Layout(game, Width, Height);
+                    var gameScroller = (ScrollViewer)gameWindow.FindName("GamePageScroller");
+                    var regionCard = (FrameworkElement)gameWindow.FindName("RegionCard");
+                    gameScroller.ScrollToVerticalOffset(regionCard.TransformToAncestor(gameScroller).Transform(new Point(0, gameScroller.VerticalOffset)).Y - 24);
+                    Layout(game, Width, Height);
+                    written.Add(WriteTo(PublishDir, Snapshot(game), $"app-game-region-area-{tag}.png"));
+
+                    var look = LoadLooseWindow("Views/SettingsWindow.xaml", lang, out var lookWindow, "Light");
+                    ShellRenderTests.Fill(look, lookWindow, ShellRenderTests.Scene.Stopped, lang);
+                    Select(lookWindow, SettingsNavigation.Look);
+                    Layout(look, Width, Height);
+                    // Scrolled to the card that offers the themes: Match Windows, Dark and Light.
+                    var themeRadio = (RadioButton)lookWindow.FindName("ThemeAutoRadio");
+                    themeRadio.IsChecked = true; // a fresh install follows Windows
+                    ((ComboBox)lookWindow.FindName("UILangCombo")).SelectedIndex = lang == "pl-PL" ? 0 : 1;
+                    DependencyObject up = themeRadio;
+                    while (up != null && up is not ScrollViewer) up = VisualTreeHelper.GetParent(up);
+                    var lookScroller = (ScrollViewer)up ?? throw new AssertFailedException("the theme card sits in a scroller");
+                    lookScroller.ScrollToVerticalOffset(themeRadio.TransformToAncestor(lookScroller).Transform(new Point(0, lookScroller.VerticalOffset)).Y - 160);
+                    Layout(look, Width, Height);
+                    written.Add(WriteTo(PublishDir, Snapshot(look), $"app-theme-light-area-{tag}.png"));
+
+                    var help = LoadLooseWindow("Views/SettingsWindow.xaml", lang, out var helpWindow, "Dark");
+                    ShellRenderTests.Fill(help, helpWindow, ShellRenderTests.Scene.Stopped, lang);
+                    Select(helpWindow, SettingsNavigation.Help);
+                    ((CheckBox)helpWindow.FindName("AdvancedModeToggle")).IsChecked = true;
+                    ((ComboBox)helpWindow.FindName("OcrModelComboBox")).SelectedIndex = 0; // the recommended model, as a started app shows it
+                    ((CheckBox)helpWindow.FindName("UseGpuOcrCheckBox")).IsChecked = true;
+                    ((Expander)helpWindow.FindName("HelpAdvancedExpander")).IsExpanded = true;
+                    Layout(help, Width, Height);
+                    ((ScrollViewer)helpWindow.FindName("HelpPageScroller")).ScrollToEnd();
+                    Layout(help, Width, Height);
+                    written.Add(WriteTo(PublishDir, Snapshot(help), $"app-help-advanced-area-{tag}.png"));
+                }
+            });
+            foreach (string p in written) Console.WriteLine(p);
+        }
+
+        private static string WriteTo(string dir, BitmapSource bitmap, string name)
+        {
+            RenderTestKit.AssertNotBlank(bitmap, name);
+            Directory.CreateDirectory(dir);
+            string path = Path.Combine(dir, name);
+            var encoder = new PngBitmapEncoder();
+            encoder.Frames.Add(BitmapFrame.Create(bitmap));
+            using (var fs = File.Create(path)) encoder.Save(fs);
+            return path;
+        }
+
         private static void Select(Window window, string page)
         {
             var tabs = (TabControl)window.FindName("NavTabs");

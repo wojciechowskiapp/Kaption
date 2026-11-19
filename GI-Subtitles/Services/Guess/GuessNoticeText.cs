@@ -24,9 +24,12 @@ namespace GI_Subtitles.Services.Guess
                 : !string.IsNullOrWhiteSpace(m.ShortName) ? m.ShortName : m.Name;
         }
 
-        /// <summary>Every listed game's guess name in UI order, for the Help card ("Gendle, Stardle, Zendle and Wuwdle").</summary>
+        /// <summary>
+        /// The guess names of the listed games that have a daily puzzle, in UI order, for the Help card ("Gendle, Stardle,
+        /// Zendle and Wuwdle"). A game without one (site.guessName: Endfield in beta) is not named there.
+        /// </summary>
         public static IReadOnlyList<string> AllGuessNames() =>
-            GameRegistry.Current.Listed.Select(m => GuessNameOf(m.Id)).Where(n => !string.IsNullOrEmpty(n)).ToList();
+            GameRegistry.Current.Listed.Where(m => !string.IsNullOrWhiteSpace(m.Site?.GuessName)).Select(m => m.Site.GuessName).ToList();
 
         /// <summary>"A, B, C and D" with the language's "and".</summary>
         public static string JoinNames(IReadOnlyList<string> names, string and)

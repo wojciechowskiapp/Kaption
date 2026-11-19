@@ -1,0 +1,31 @@
+{
+  "schema": 1,
+  "items": [
+    {
+      "id": "0f8e5b8c2a7d4c1e9b3a6d5f4e2c1b0a",
+      "game": "genshin",
+      "lang": "pl",
+      "enText": "Hold on.",
+      "currentText": "Poczekaj.",
+      "suggestedText": "Zaczekaj.",
+      "speaker": "Paimon",
+      "contextPrev": "Where are we going?",
+      "note": "krócej",
+      "createdAt": "2026-11-15T19:00:00.0000000+00:00",
+      "attempts": 2,
+      "nextAttemptAt": "2026-11-15T19:04:00.0000000+00:00",
+      "lastError": "offline"
+    },
+    {
+      "id": "1a2b3c4d5e6f40718293a4b5c6d7e8f9",
+      "game": "starrail",
+      "lang": "pl",
+      "enText": "Trailblazer.",
+      "currentText": "Pionier.",
+      "suggestedText": "Pionierka.",
+      "createdAt": "2026-11-16T07:30:00.0000000+00:00",
+      "attempts": 0,
+      "nextAttemptAt": "2026-11-16T07:30:00.0000000+00:00"
+    }
+  ]
+}

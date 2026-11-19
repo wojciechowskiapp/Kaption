@@ -108,6 +108,36 @@ namespace GI_Test
             }
         }
 
+        // ── Subtitles over the game's text: out of the app's own reads ───────────
+
+        [TestMethod]
+        public void ThePlacement_IsBesideTheText_UnlessTheKeySaysOverText()
+        {
+            Assert.AreEqual(SubtitlePlacement.Beside, CaptureVisibility.ResolvePlacement(null), "no key: as it has always been");
+            Assert.AreEqual(SubtitlePlacement.Beside, CaptureVisibility.ResolvePlacement(""));
+            Assert.AreEqual(SubtitlePlacement.Beside, CaptureVisibility.ResolvePlacement("Beside"));
+            Assert.AreEqual(SubtitlePlacement.Beside, CaptureVisibility.ResolvePlacement("on top"), "a value nobody defined changes nothing");
+            Assert.AreEqual(SubtitlePlacement.OverText, CaptureVisibility.ResolvePlacement("OverText"));
+            Assert.AreEqual(SubtitlePlacement.OverText, CaptureVisibility.ResolvePlacement(" overtext "), "typed by hand");
+            WithKeysCleared(new[] { CaptureVisibility.PlacementKey }, () =>
+            {
+                Assert.AreEqual(SubtitlePlacement.Beside, CaptureVisibility.Placement);
+                Assert.IsFalse(AppConfig.Has(CaptureVisibility.PlacementKey), "reading the placement must not save it");
+            });
+        }
+
+        // The overlay leaves Desktop Duplication only for subtitles over the text, and never while recordings must show it:
+        // OBS's display capture reads through Desktop Duplication.
+        [TestMethod]
+        [DataRow(SubtitlePlacement.Beside, false, false)]
+        [DataRow(SubtitlePlacement.Beside, true, false)]
+        [DataRow(SubtitlePlacement.OverText, false, true)]
+        [DataRow(SubtitlePlacement.OverText, true, false)]
+        public void TheOverlayLeavesDesktopDuplication_OnlyOverTheText_AndNeverForRecordings(SubtitlePlacement placement, bool show, bool leftOut)
+        {
+            Assert.AreEqual(leftOut, CaptureVisibility.LeavesOutOfDuplication(placement, show));
+        }
+
         // ── The line under the setting ──────────────────────────────────────────
 
         [TestMethod]

@@ -90,7 +90,7 @@ namespace GI_Subtitles.Views.Shell
 
         /// <summary>
         /// Finding the game in step 2 detects the dialogue area only when none is saved; a saved one (drawn by hand, or
-        /// set on an earlier run) is replaced only when the user clicks "Wykryj automatycznie".
+        /// set on an earlier run) is replaced only when the user clicks "Ustaw automatycznie".
         /// </summary>
         public static bool ShouldAutoDetectRegion(bool savedRegionValid, bool userAsked) => userAsked || !savedRegionValid;
 

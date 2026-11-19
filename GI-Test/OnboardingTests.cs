@@ -229,11 +229,7 @@ namespace GI_Test
                     ((TextBlock)Find("RegionStatus")).Text = L("onb_Region_Auto");
                     ((TextBlock)Find("RegionMonitor")).Text = string.Format(culture, L("shell_Region_Monitor_Format", "{0}"), 1, 2560, 1440);
                     ((UIElement)Find("DisplayModeNotice")).Visibility = Visibility.Visible;
-                    string frame = new[]
-                    {
-                        Path.Combine(repo, "GI-Test", "bin", "Debug", "Images", "en-pl-npc-dialog.jpg"),
-                        @"F:\Pobrane\Nowy folder (3)\kaption-promo-landing\GI-Test\bin\Debug\Images\en-pl-npc-dialog.jpg",
-                    }.FirstOrDefault(File.Exists);
+                    string frame = RenderFixtures.DialogueScene();
                     if (frame != null)
                     {
                         var shot = new BitmapImage(new Uri(frame));

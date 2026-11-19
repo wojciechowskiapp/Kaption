@@ -15,7 +15,7 @@
     "windowTitles": ["Genshin Impact"]
   },
   "desktop": {
-    "dialogue": { "x": 0.10, "y": 0.66, "w": 0.80, "h": 0.29 },
+    "dialogue": { "x": 0.10, "y": 0.66, "w": 0.80, "h": 0.29, "text": { "x": 0.168, "y": 0.748, "w": 0.662, "h": 0.194 } },
     "answer": { "x": 0.58, "y": 0.38, "w": 0.35, "h": 0.38 },
     "pacing": { "ocrIntervalMs": 100, "stabilityWindowFrames": 5, "stableFramesChain": 2, "stableFramesDefault": 2, "forceOcrAfterSeconds": 0.25 },
     "vision": { "dialogueEvidence": true, "fadedReadFilter": true },
@@ -39,7 +39,11 @@
       "readers": {
         "stamina": { "kind": "fraction", "locate": "search", "spec": "staminaScreen", "cap": "stamina.max" }
       }
-    }
+    },
+    "notes": [
+      "dialogue predates any recorded measurement. Measured 2026-11-18 on full frames of six clips (five at 1920x1080, one at 2560x1440). text is the reader's boxes: names from 0.748 (a speaker with a title line), rows down to 0.942 (three rows), widest row 0.168-0.830 (.plan/in-progress/AUTO-AREA-PR1.md).",
+      "The bottom is tight: three rows end 9 px above it at 1080p, and a four-row body would end near 0.98. None was in these clips; one that is seen means a lower bottom edge. 16:10, 4:3 and 21:9 are not measured."
+    ]
   },
   "look": { "accent": "#F2B84B", "accentDark": "#A86A05", "glow": "#F2B84B", "ambience": "genshin" },
   "site": {

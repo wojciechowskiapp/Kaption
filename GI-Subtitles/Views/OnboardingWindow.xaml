@@ -224,13 +224,16 @@
                                         <TextBlock Text="{DynamicResource shell_Region_Title}" Style="{StaticResource CardTitle}"/>
                                         <TextBlock x:Name="RegionStatus" Style="{StaticResource BodyText}" Text="{DynamicResource onb_Region_None}"/>
                                         <TextBlock x:Name="RegionMonitor" Style="{StaticResource HintText}" Margin="0,2,0,12"/>
+                                        <!-- Nothing to mark: the game's own frame is placed (and follows its window). Detect shows only
+                                             over a drawing kept from before; "Popraw ręcznie" stays as a link. -->
+                                        <TextBlock x:Name="RegionHint" Text="{DynamicResource onb_Region_AutoHint}" Style="{StaticResource HintText}"
+                                                   TextWrapping="Wrap" Margin="0,0,0,6"/>
                                         <WrapPanel>
                                             <Button x:Name="DetectRegionButton" Style="{StaticResource SecondaryButton}" Margin="0,0,8,8"
-                                                    Content="{DynamicResource shell_Region_Detect}" Click="DetectRegion_Click"/>
-                                            <Button Style="{StaticResource SecondaryButton}" Margin="0,0,8,8"
+                                                    Content="{DynamicResource shell_Region_Detect}" Click="DetectRegion_Click" Visibility="Collapsed"/>
+                                            <Button Style="{StaticResource LinkButton}" Margin="0,0,8,8" VerticalAlignment="Center"
                                                     Content="{DynamicResource onb_Region_Fix}" Click="FixRegion_Click"/>
                                         </WrapPanel>
-                                        <TextBlock Text="{DynamicResource onb_Region_Hint}" Style="{StaticResource HintText}"/>
                                     </StackPanel>
                                 </Grid>
                             </Border>

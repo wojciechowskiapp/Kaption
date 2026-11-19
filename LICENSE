@@ -88,7 +88,7 @@ THIRD-PARTY COMPONENTS
 ================================================================================
 
 Kaption bundles and depends on third-party software (PaddleOCR, ONNX
-Runtime, Velopack, OpenCV, Newtonsoft.Json, and others). Those components
+Runtime, Velopack, OpenCV, and others). Those components
 are distributed under their own licences, listed in
 THIRD_PARTY_LICENSES.txt. Nothing in this Kaption licence overrides their
 terms — you must comply with them as well.

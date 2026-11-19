@@ -1371,21 +1371,7 @@ namespace GI_Subtitles.Services.Translation
             string norm = NormalizeInput(want, isEng);
             if (norm.Length == 0) return false;
 
-            // Every key normalizing to `norm` holds all of its n-grams, so the smallest bucket has them all.
-            IEnumerable<int> pool = _shortKeysIndices;
-            if (norm.Length >= _ngramSize)
-            {
-                int[] smallest = null;
-                var span = norm.AsSpan();
-                for (int i = 0; i <= norm.Length - _ngramSize; i++)
-                {
-                    if (!_ngramIndex.TryGetValue(GetNgramHash(span.Slice(i, _ngramSize)), out var ids)) return false;
-                    if (smallest == null || ids.Length < smallest.Length) smallest = ids;
-                }
-                pool = smallest ?? Array.Empty<int>();
-            }
-
-            foreach (int id in pool)
+            foreach (int id in ExactPool(norm))
             {
                 if (string.Equals(GetNormKey(id), norm, StringComparison.Ordinal) &&
                     string.Equals(GetOriginalKey(id)?.Trim(), want, StringComparison.Ordinal))
@@ -1395,6 +1381,85 @@ namespace GI_Subtitles.Services.Translation
                 }
             }
             return false;
+        }
+
+        /// <summary>
+        /// The one translation of every key that normalises like <paramref name="text"/> (case and punctuation
+        /// ignored). Keys that are the text itself (<see cref="SameSurfaceText"/>) win over the rest; keys that
+        /// disagree give nothing. Off the OCR tick (dialogue choices, one call per row).
+        /// </summary>
+        public bool TryGetNormalizedUnique(string text, out string key, out string value)
+        {
+            key = null;
+            value = null;
+            string want = text?.Trim();
+            if (string.IsNullOrEmpty(want)) return false;
+            string norm = NormalizeInput(want, isEng);
+            if (norm.Length == 0) return false;
+
+            int[] pool = ExactPool(norm);
+            int first = -1, surface = -1;
+            foreach (int id in pool)
+            {
+                if (!string.Equals(GetNormKey(id), norm, StringComparison.Ordinal)) continue;
+                if (first < 0) first = id;
+                if (surface < 0 && SameSurfaceText(GetOriginalKey(id), want)) surface = id;
+            }
+            if (first < 0) return false;
+
+            // Keys that are the text itself decide when there are any; they and the rest must agree among themselves.
+            bool bySurface = surface >= 0;
+            int pick = bySurface ? surface : first;
+            string picked = GetValue(pick);
+            if (string.IsNullOrEmpty(picked)) return false;
+            foreach (int id in pool)
+            {
+                if (id == pick || !string.Equals(GetNormKey(id), norm, StringComparison.Ordinal)) continue;
+                if (bySurface && !SameSurfaceText(GetOriginalKey(id), want)) continue;
+                if (!string.Equals(GetValue(id), picked, StringComparison.Ordinal)) return false;
+            }
+            key = GetOriginalKey(pick);
+            value = picked;
+            return true;
+        }
+
+        /// <summary>
+        /// Two texts read the same on screen: equal once whitespace is skipped and typographic quotes are folded
+        /// to plain ones; case and every other mark count ("Okay" is not "Okay?"). No allocation.
+        /// </summary>
+        internal static bool SameSurfaceText(ReadOnlySpan<char> a, ReadOnlySpan<char> b)
+        {
+            int i = 0, j = 0;
+            while (true)
+            {
+                while (i < a.Length && char.IsWhiteSpace(a[i])) i++;
+                while (j < b.Length && char.IsWhiteSpace(b[j])) j++;
+                if (i == a.Length || j == b.Length) return i == a.Length && j == b.Length;
+                if (FoldQuote(a[i]) != FoldQuote(b[j])) return false;
+                i++;
+                j++;
+            }
+        }
+
+        private static char FoldQuote(char c) => c switch
+        {
+            '‘' or '’' or 'ʼ' => '\'',
+            '“' or '”' => '"',
+            _ => c,
+        };
+
+        // Every key normalizing to `norm` holds all of its n-grams, so the smallest bucket has them all.
+        private int[] ExactPool(string norm)
+        {
+            if (norm.Length < _ngramSize) return _shortKeysIndices;
+            int[] smallest = null;
+            var span = norm.AsSpan();
+            for (int i = 0; i <= norm.Length - _ngramSize; i++)
+            {
+                if (!_ngramIndex.TryGetValue(GetNgramHash(span.Slice(i, _ngramSize)), out var ids)) return Array.Empty<int>();
+                if (smallest == null || ids.Length < smallest.Length) smallest = ids;
+            }
+            return smallest ?? Array.Empty<int>();
         }
 
         /// <summary>

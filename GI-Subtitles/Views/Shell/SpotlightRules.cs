@@ -24,20 +24,32 @@ namespace GI_Subtitles.Views.Shell
         /// <summary>Launches on which each row was already on screen.</summary>
         public int ShowsWuWa { get; init; }
         public int ShowsGuess { get; init; }
+        /// <summary>The live listing has an endfield/pl pack (the server lists only packs every player can get).</summary>
+        public bool EndfieldPolishListed { get; init; }
+        /// <summary>PackAvailability.IsComing("Endfield", "pl"): the server's own list still says "on the way".</summary>
+        public bool EndfieldComing { get; init; }
+        public string EndfieldGameVersion { get; init; }
+        /// <summary>The player has Endfield selected: they know the game, so the row never shows.</summary>
+        public bool EndfieldSelected { get; init; }
+        public bool SeenEndfield { get; init; }
+        public int ShowsEndfield { get; init; }
     }
 
     public enum SpotlightWuWaAction { None, Switch, OpenGamePage }
 
     public sealed record SpotlightRows(bool WuWa, SpotlightWuWaAction WuWaAction, string WuWaVersion, bool Guess)
     {
-        public bool Any => WuWa || Guess;
+        /// <summary>The Endfield row (always a "switch to the game" action); init-only so the older four-value form still reads.</summary>
+        public bool Endfield { get; init; }
+        public string EndfieldVersion { get; init; }
+        public bool Any => WuWa || Endfield || Guess;
         public static readonly SpotlightRows None = new(false, SpotlightWuWaAction.None, null, false);
     }
 
     /// <summary>
-    /// The "Nowość w Kaption" card on Start (R4 section 3.2): two rows, each retired on its own by its action, its close
-    /// button, or after <see cref="MaxShows"/> launches on screen. The WuWa row claims Polish subtitles only while the
-    /// live listing backs it.
+    /// The "Nowość w Kaption" card on Start (R4 section 3.2): up to three rows, each retired on its own by its action,
+    /// its close button, or after <see cref="MaxShows"/> launches on screen. The WuWa and Endfield rows claim Polish
+    /// subtitles only while the live listing backs it.
     /// </summary>
     public static class SpotlightRules
     {
@@ -47,6 +59,8 @@ namespace GI_Subtitles.Views.Shell
         public const string SeenGuessKey = "Ui.Seen.GuessGame";
         public const string ShowsWuWaKey = "Ui.Spotlight.Shows.WuWaPolish";
         public const string ShowsGuessKey = "Ui.Spotlight.Shows.GuessGame";
+        public const string SeenEndfieldKey = "Ui.Seen.EndfieldPolish";
+        public const string ShowsEndfieldKey = "Ui.Spotlight.Shows.EndfieldPolish";
 
         public static SpotlightRows Rows(SpotlightInputs i)
         {
@@ -54,17 +68,27 @@ namespace GI_Subtitles.Views.Shell
             bool wuwa = i.WuWaPolishListed && !i.WuWaComing && !i.SeenWuWa && i.ShowsWuWa < MaxShows;
             bool guess = !i.SeenGuess && i.ShowsGuess < MaxShows;
             var action = !wuwa ? SpotlightWuWaAction.None : i.WuWaSelected ? SpotlightWuWaAction.OpenGamePage : SpotlightWuWaAction.Switch;
-            return new SpotlightRows(wuwa, action, wuwa ? i.WuWaGameVersion : null, guess);
+            // Never to a player who has the game selected, and a launch that finds it selected retires the row for good.
+            bool endfield = i.EndfieldPolishListed && !i.EndfieldComing && !i.EndfieldSelected && !i.SeenEndfield && i.ShowsEndfield < MaxShows;
+            return new SpotlightRows(wuwa, action, wuwa ? i.WuWaGameVersion : null, guess)
+            {
+                Endfield = endfield,
+                EndfieldVersion = endfield ? i.EndfieldGameVersion : null,
+            };
         }
 
-        /// <summary>The listing has a Polish WuWa pack; its game version ("3.7"), or null.</summary>
-        public static bool HasWuWaPolish(IEnumerable<LatestPack> packs, out string gameVersion)
+        /// <summary>The listing has a Polish pack for this game (wire id); its game version ("3.7"), or null.</summary>
+        public static bool HasPolishPack(IEnumerable<LatestPack> packs, string wireId, out string gameVersion)
         {
-            var pack = packs?.FirstOrDefault(p => string.Equals(p.Game, "wuwa", StringComparison.OrdinalIgnoreCase)
+            var pack = packs?.FirstOrDefault(p => string.Equals(p.Game, wireId, StringComparison.OrdinalIgnoreCase)
                                                 && string.Equals(p.Language, "pl", StringComparison.OrdinalIgnoreCase));
             gameVersion = pack == null ? null : ShortVersion(pack.GameVersion);
             return pack != null;
         }
+
+        public static bool HasWuWaPolish(IEnumerable<LatestPack> packs, out string gameVersion) => HasPolishPack(packs, "wuwa", out gameVersion);
+
+        public static bool HasEndfieldPolish(IEnumerable<LatestPack> packs, out string gameVersion) => HasPolishPack(packs, "endfield", out gameVersion);
 
         /// <summary>"3.7.0" reads "3.7"; anything else as given.</summary>
         public static string ShortVersion(string v)
@@ -89,12 +113,19 @@ namespace GI_Subtitles.Views.Shell
             SeenGuess = Config.Get(SeenGuessKey, false),
             ShowsWuWa = Config.Get(ShowsWuWaKey, 0),
             ShowsGuess = Config.Get(ShowsGuessKey, 0),
+            EndfieldPolishListed = live.EndfieldPolishListed,
+            EndfieldComing = live.EndfieldComing,
+            EndfieldGameVersion = live.EndfieldGameVersion,
+            EndfieldSelected = live.EndfieldSelected,
+            SeenEndfield = Config.Get(SeenEndfieldKey, false),
+            ShowsEndfield = Config.Get(ShowsEndfieldKey, 0),
         };
 
-        public static void MarkSeen(bool wuwa, bool guess)
+        public static void MarkSeen(bool wuwa, bool guess, bool endfield = false)
         {
             if (wuwa) Config.Set(SeenWuWaKey, true);
             if (guess) Config.Set(SeenGuessKey, true);
+            if (endfield) Config.Set(SeenEndfieldKey, true);
         }
 
         /// <summary>One more launch on screen for each row shown (the caller counts once per process).</summary>
@@ -102,6 +133,11 @@ namespace GI_Subtitles.Views.Shell
         {
             if (rows.WuWa) Config.Set(ShowsWuWaKey, Config.Get(ShowsWuWaKey, 0) + 1);
             if (rows.Guess) Config.Set(ShowsGuessKey, Config.Get(ShowsGuessKey, 0) + 1);
+            if (rows.Endfield) Config.Set(ShowsEndfieldKey, Config.Get(ShowsEndfieldKey, 0) + 1);
         }
+
+        /// <summary>Top margin of each row: 14 under another visible row, 0 for the first one on the card.</summary>
+        public static (double Endfield, double Guess) RowGaps(bool wuwa, bool endfield, bool guess) =>
+            (wuwa && endfield ? 14 : 0, (wuwa || endfield) && guess ? 14 : 0);
     }
 }
