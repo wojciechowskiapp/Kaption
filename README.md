@@ -4,9 +4,11 @@
 [![CodeQL](https://github.com/wojciechowskiapp/Kaption/actions/workflows/codeql.yml/badge.svg)](https://github.com/wojciechowskiapp/Kaption/actions/workflows/codeql.yml)
 [![License: AGPL-3.0 OR Commercial](https://img.shields.io/badge/license-AGPL--3.0%20OR%20Commercial-blue.svg)](./LICENSE)
 
-Kaption shows Polish subtitles over the dialogue in Genshin Impact, Honkai: Star Rail, Zenless Zone Zero and Wuthering Waves. It reads the dialogue box from your screen and draws the translation on top, without touching the game's files or memory.
+Kaption shows Polish subtitles over the dialogue in Genshin Impact, Honkai: Star Rail, Zenless Zone Zero, Wuthering Waves and Arknights: Endfield. It reads the dialogue box from your screen and draws the translation on top, without touching the game's files or memory.
 
-**[Download for Windows](https://kaption.one/#download)** · [kaption.one](https://kaption.one)
+**[Download for Windows](https://files.kaption.one/releases/stable/Kaption-stable-Setup.exe)** · [kaption.one](https://kaption.one/?src=github)
+
+Kaption is free. You sign in once in the app with a free account (Google or Discord), and then it downloads the Polish subtitles for your game.
 
 ![A Polish subtitle from Kaption over a Genshin Impact dialogue](./docs/screenshots/hero-dialog.jpg)
 
@@ -16,6 +18,7 @@ Kaption shows Polish subtitles over the dialogue in Genshin Impact, Honkai: Star
 - Honkai: Star Rail
 - Zenless Zone Zero
 - Wuthering Waves
+- Arknights: Endfield
 
 ## How it works
 
@@ -38,9 +41,9 @@ Kaption shows Polish subtitles over the dialogue in Genshin Impact, Honkai: Star
 
 The installer brings the .NET runtime with it, and Kaption updates itself.
 
-## Features in 2.5
+## What's in the app
 
-![Kaption 2.5 on its Home page while translating](./docs/screenshots/app-home.png)
+![Kaption's Home page while translating Genshin Impact, pictured in version 2.5](./docs/screenshots/app-home.png)
 
 - Auto-start: Kaption starts translating when the game is on screen and stops when you close it.
 - New subtitles: a clearer typeface that stays readable over bright scenes, and Wygląd napisów (Subtitle style) with a true-scale preview and three styles.
@@ -48,7 +51,7 @@ The installer brings the .NET runtime with it, and Kaption updates itself.
 - Postacie (Characters): skills, builds and materials for every character in Genshin Impact, Honkai: Star Rail and Zenless Zone Zero, with game terms in English and the Polish next to them.
 - Ctrl+Q quick translate: select any panel in the game, read it in Polish, and open the card of the character Kaption recognised.
 - Build cards on [kaption.one/my-build](https://kaption.one/my-build/): a shareable PNG of any character from your UID, in a dozen layouts, in Polish or English.
-- Polish subtitle packs for all four games, refreshed after each game patch.
+- Polish subtitle packs for all five games, refreshed after each game patch.
 
 ## Privacy
 
@@ -71,6 +74,6 @@ Kaption is dual-licensed under [AGPL-3.0](./LICENSE-AGPL) or a [commercial licen
 
 ## Credits
 
-Kaption began as a fork of [qew21/Genshin-Subtitles](https://github.com/qew21/Genshin-Subtitles) (Apache-2.0), where the idea of reading the dialogue and looking it up in the game's text came from. Every line is matched against game data maintained by [Dimbreath](https://www.patreon.com/c/dimbreath/posts): [AnimeGameData2](https://gitlab.com/Dimbreath/animegamedata2), [turnbasedgamedata](https://gitlab.com/Dimbreath/turnbasedgamedata) and [ZenlessData](https://git.mero.moe/dimbreath/ZenlessData). If that work helps you too, please support it. Kaption is built on PaddleOCR, ONNX Runtime, OpenCV, Velopack, Lucene.NET and Sentry.
+Kaption began as a fork of [qew21/Genshin-Subtitles](https://github.com/qew21/Genshin-Subtitles) (Apache-2.0), where the idea of reading the dialogue and looking it up in the game's text came from. Lines from Genshin Impact, Honkai: Star Rail and Zenless Zone Zero are matched against game data maintained by [Dimbreath](https://www.patreon.com/c/dimbreath/posts): [AnimeGameData2](https://gitlab.com/Dimbreath/animegamedata2), [turnbasedgamedata](https://gitlab.com/Dimbreath/turnbasedgamedata) and [ZenlessData](https://git.mero.moe/dimbreath/ZenlessData). If that work helps you too, please support it. Kaption is built on PaddleOCR, ONNX Runtime, OpenCV, Velopack, Lucene.NET and Sentry.
 
-Kaption is independent and not affiliated with HoYoverse, Cognosphere, miHoYo or Kuro Games.
+Kaption is independent and not affiliated with HoYoverse, Cognosphere, miHoYo, Kuro Games or GRYPHLINE.
